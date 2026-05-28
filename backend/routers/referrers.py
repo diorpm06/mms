@@ -1,0 +1,73 @@
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from auth_utils import require_admin_or_ceo, require_ceo
+from database import get_db
+from models.referrer import Referrer
+from models.user import User
+from schemas import ReferrerCreate, ReferrerOut, ReferrerUpdate
+from services.finance import payout_recipient_balance
+
+router = APIRouter(prefix="/api/referrers", tags=["referrers"])
+
+
+class PayoutBody(BaseModel):
+    source: str | None = None
+
+
+@router.get("", response_model=list[ReferrerOut])
+def list_referrers(
+    active_only: bool = True,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    q = db.query(Referrer)
+    if active_only:
+        q = q.filter(Referrer.is_active == True)
+    return q.order_by(Referrer.full_name).all()
+
+
+@router.post("", response_model=ReferrerOut)
+def create_referrer(data: ReferrerCreate, db: Session = Depends(get_db), _: User = Depends(require_ceo)):
+    r = Referrer(**data.model_dump())
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return r
+
+
+@router.put("/{referrer_id}", response_model=ReferrerOut)
+def update_referrer(
+    referrer_id: int, data: ReferrerUpdate, db: Session = Depends(get_db), _: User = Depends(require_ceo)
+):
+    r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(r, k, v)
+    db.commit()
+    db.refresh(r)
+    return r
+
+
+@router.delete("/{referrer_id}")
+def delete_referrer(referrer_id: int, db: Session = Depends(get_db), _: User = Depends(require_ceo)):
+    r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
+    r.is_active = False
+    db.commit()
+    return {"message": "O'chirildi"}
+
+
+@router.post("/{referrer_id}/payout")
+def payout_referrer(
+    referrer_id: int,
+    body: PayoutBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_ceo),
+):
+    payout = payout_recipient_balance(db, "referrer", referrer_id, source=body.source)
+    db.commit()
+    return {"message": "Balans chiqarildi", "amount": payout.amount, "source": body.source}

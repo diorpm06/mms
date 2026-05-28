@@ -1,0 +1,38 @@
+{
+  "registration": [
+    {
+      "chat_id": "-1003948078393",
+      "thread_id": 2
+    }
+  ],
+  "inpatients": [
+    {
+      "chat_id": "-1003948078393",
+      "thread_id": 5
+    }
+  ],
+  "finance": [
+    {
+      "chat_id": "-1003948078393",
+      "thread_id": 3
+    }
+  ],
+  "reports": [
+    {
+      "chat_id": "-1003948078393",
+      "thread_id": 4
+    }
+  ],
+  "cancellations": [
+    {
+      "chat_id": "-1003948078393",
+      "thread_id": 8
+    }
+  ],
+  "system": [
+    {
+      "chat_id": "-1003948078393",
+      "thread_id": 6
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "name": "Marjona Med Servis",
+  "short_name": "MarjonaMed",
+  "description": "Tibbiy klinika boshqaruv tizimi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#09101f",
+  "theme_color": "#d4af37",
+  "lang": "uz",
+  "icons": [
+    {
+      "src": "/assets/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Yangi mijoz",
+      "short_name": "Yangi",
+      "url": "/admin/new-patient",
+      "icons": [{ "src": "/assets/logo.png", "sizes": "96x96" }]
+    }
+  ],
+  "categories": ["medical", "productivity", "business"]
+}
