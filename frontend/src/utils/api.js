@@ -1,9 +1,13 @@
 import { useAuthStore } from '../store/authStore'
 
-// Vercel-da VITE_API_URL muhit o'zgaruvchisi orqali backend URL ko'rsatiladi
-const API_BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : '/api'
+function resolveApiBase() {
+  const raw = (import.meta.env.VITE_API_URL || '').trim()
+  if (!raw) return '/api'
+  const cleaned = raw.replace(/\/+$/, '')
+  return cleaned.endsWith('/api') ? cleaned : `${cleaned}/api`
+}
+
+const API_BASE = resolveApiBase()
 
 function extractErrorMessage(err) {
   if (!err) return 'Xato yuz berdi'
