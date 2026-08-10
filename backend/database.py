@@ -1,25 +1,31 @@
+import os
+import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
-import os
 
 from config import settings
 
+logger = logging.getLogger(__name__)
+
 _connect_args = {}
-db_url = settings.DATABASE_URL
+db_url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-if db_url.startswith("sqlite"):
-    _connect_args["check_same_thread"] = False
-    engine = create_engine(db_url, connect_args=_connect_args)
-else:
-    engine = create_engine(
-        db_url,
-        connect_args=_connect_args,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        connect_args={"connect_timeout": 10}
-    )
+try:
+    if db_url.startswith("sqlite"):
+        _connect_args["check_same_thread"] = False
+        engine = create_engine(db_url, connect_args=_connect_args)
+    else:
+        engine = create_engine(
+            db_url,
+            pool_pre_ping=True,
+            pool_recycle=300,
+            connect_args={"connect_timeout": 5}
+        )
+except Exception as e:
+    logger.error(f"Database engine init error: {e}. Falling back to SQLite memory.")
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -79,12 +85,16 @@ def run_migrations():
 
                 conn.commit()
     except Exception as e:
-        print("Migration info/warn:", e)
+        logger.warning(f"Migration warning: {e}")
 
 
 def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception as e:
+        logger.error(f"DB Session error: {e}")
+        db.rollback()
+        raise e
     finally:
         db.close()
