@@ -30,20 +30,16 @@ limiter = Limiter(key_func=get_remote_address)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        Base.metadata.create_all(bind=engine)
-        run_migrations()
-    except Exception as e:
-        logger.error(f"Database setup warning: {e}")
-
     if not os.environ.get("VERCEL"):
         try:
+            Base.metadata.create_all(bind=engine)
+            run_migrations()
             start_sheet_worker()
             start_scheduler()
         except Exception as e:
-            logger.error(f"Worker startup warning: {e}")
-
-    logger.info("Marjona Med Service backend ishga tushdi")
+            logger.error(f"Startup warning: {e}")
+    else:
+        logger.info("Marjona Med Service backend Vercel-da ishga tushdi")
     yield
 
 
