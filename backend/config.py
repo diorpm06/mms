@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/marjona_med"
-    SECRET_KEY: str = "change-me-in-production"
+    DATABASE_URL: str = "postgresql://postgres.jfulmcvwtyfykrukhmdw:Dark006..mms@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+    SECRET_KEY: str = "marjona_med_service_crm_secret_key_2026_x89f"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
