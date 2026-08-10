@@ -118,9 +118,13 @@ _ROOT_DIR = os.path.dirname(_THIS_DIR)
 _CANDIDATES = [
     os.path.join(_ROOT_DIR, "frontend", "dist"),
     os.path.join(_THIS_DIR, "..", "frontend", "dist"),
+    os.path.join(_THIS_DIR, "frontend", "dist"),
+    os.path.join(_THIS_DIR, "dist"),
     os.path.join(os.getcwd(), "frontend", "dist"),
     os.path.join(os.getcwd(), "dist"),
     "/var/task/frontend/dist",
+    "/var/task/api/frontend/dist",
+    "/var/task/api/dist",
 ]
 
 FRONTEND_DIST = None
@@ -133,6 +137,13 @@ for c in _CANDIDATES:
         FRONTEND_DIST = abs_c
         INDEX_HTML = idx
         break
+
+if not FRONTEND_DIST:
+    import glob
+    found_indexes = glob.glob("/var/task/**/index.html", recursive=True)
+    if found_indexes:
+        INDEX_HTML = os.path.abspath(found_indexes[0])
+        FRONTEND_DIST = os.path.dirname(INDEX_HTML)
 
 if FRONTEND_DIST:
     assets_dir = os.path.join(FRONTEND_DIST, "assets")
