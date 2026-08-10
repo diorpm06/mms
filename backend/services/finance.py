@@ -29,31 +29,86 @@ def log_balance_change(db: Session, amount: int, entry_type: str, description: s
     db.add(BalanceHistory(amount=amount, entry_type=entry_type, description=description))
 
 
-def process_payment(db: Session, patient: Patient) -> Transaction:
-    provider = db.query(Provider).filter(Provider.id == patient.provider_id, Provider.is_active == True).first()
-    if not provider:
-        raise HTTPException(status_code=400, detail="Xizmat ko'rsatuvchi topilmadi")
+def calculate_financial_split(
+    total: int,
+    provider_percentage: int,
+    referrer_percentage: int | None = None,
+    referrer_commission_sum: int | None = 0,
+    ref_doc_split_pct: int | None = None,
+    ref_doc_split_sum: int | None = 0,
+):
+    """
+    Financial split logic:
+    - Provider (Doctor) base = total * provider_percentage / 100
+    - Referrer amount = referrer_commission_sum or (total * referrer_percentage / 100)
+    - Doctor deduction = ref_doc_split_sum or (referrer_amount * ref_doc_split_pct / 100)
+    - Provider final = max(0, provider_base - doctor_deduction)
+    - Center final = max(0, total - referrer_amount - provider_final)
+    """
+    provider_base = int(total * provider_percentage / 100)
 
-    total = patient.payment_amount
-    referrer = None
     referrer_amount = 0
+    if referrer_commission_sum and referrer_commission_sum > 0:
+        referrer_amount = int(referrer_commission_sum)
+    elif referrer_percentage:
+        referrer_amount = int(total * referrer_percentage / 100)
 
-    if patient.referrer_id:
-        referrer = db.query(Referrer).filter(
-            Referrer.id == patient.referrer_id, Referrer.is_active == True
-        ).first()
+    ref_doc_deduction = 0
+    if referrer_amount > 0:
+        if ref_doc_split_sum and ref_doc_split_sum > 0:
+            ref_doc_deduction = int(ref_doc_split_sum)
+        elif ref_doc_split_pct is not None and ref_doc_split_pct > 0:
+            ref_doc_deduction = int((referrer_amount * ref_doc_split_pct) / 100)
+
+    provider_amount = max(0, provider_base - ref_doc_deduction)
+    center_amount = max(0, total - referrer_amount - provider_amount)
+
+    return referrer_amount, provider_amount, center_amount
+
+
+def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None, db: Session, service_id: int | None = None):
+    provider = None
+    provider_pct = 0
+    if provider_id:
+        provider = db.query(Provider).filter(Provider.id == provider_id, Provider.is_active == True).first()
+        if provider:
+            provider_pct = provider.percentage
+
+    referrer = None
+    referrer_pct = None
+    if referrer_id:
+        referrer = db.query(Referrer).filter(Referrer.id == referrer_id, Referrer.is_active == True).first()
         if referrer:
-            referrer_amount = int(total * referrer.percentage / 100)
+            referrer_pct = referrer.percentage
 
-    provider_amount = int(total * provider.percentage / 100)
-    center_amount = total - referrer_amount - provider_amount
+    from models.service import Service
+    service = db.query(Service).filter(Service.id == service_id).first() if service_id else None
 
-    if center_amount < 0:
-        raise HTTPException(status_code=400, detail="Foizlar jami 100% dan oshib ketdi")
+    ref_comm_sum = service.referrer_commission_sum if service else 0
+    ref_comm_pct = service.referrer_commission_percent if (service and service.referrer_commission_percent) else 0
+    ref_doc_split_pct = service.referrer_doctor_split_percent if service else None
+    ref_doc_split_sum = service.referrer_doctor_split_sum if service else 0
+
+    referrer_amount, provider_amount, center_amount = calculate_financial_split(
+        total=total,
+        provider_percentage=provider_pct,
+        referrer_percentage=ref_comm_pct,
+        referrer_commission_sum=ref_comm_sum,
+        ref_doc_split_pct=ref_doc_split_pct if referrer else None,
+        ref_doc_split_sum=ref_doc_split_sum if referrer else 0,
+    )
+    return provider, referrer, referrer_amount, provider_amount, center_amount
+
+
+def process_payment(db: Session, patient: Patient) -> Transaction:
+    provider, referrer, referrer_amount, provider_amount, center_amount = _split_amounts(
+        patient.payment_amount, patient.referrer_id, patient.provider_id, db, service_id=patient.service_id
+    )
 
     if referrer:
         referrer.balance += referrer_amount
-    provider.balance += provider_amount
+    if provider:
+        provider.balance += provider_amount
 
     bal = get_or_create_balance(db)
     bal.current_balance += center_amount
@@ -68,13 +123,16 @@ def process_payment(db: Session, patient: Patient) -> Transaction:
 
     tx = Transaction(
         patient_id=patient.id,
-        total_amount=total,
+        total_amount=patient.payment_amount,
         referrer_id=patient.referrer_id,
         referrer_amount=referrer_amount,
-        provider_id=provider.id,
+        provider_id=provider.id if provider else None,
         provider_amount=provider_amount,
         center_amount=center_amount,
         payment_type=patient.payment_type,
+        cash_amount=patient.cash_amount or 0,
+        card_amount=patient.card_amount or 0,
+        created_at=patient.created_at or datetime.utcnow(),
     )
     db.add(tx)
     return tx
@@ -82,8 +140,6 @@ def process_payment(db: Session, patient: Patient) -> Transaction:
 
 def process_expense(db: Session, amount: int, description: str) -> Balance:
     bal = get_or_create_balance(db)
-    if bal.current_balance < amount:
-        raise HTTPException(status_code=400, detail="Balans yetarli emas")
     bal.current_balance -= amount
     bal.updated_at = datetime.utcnow()
     log_balance_change(db, -amount, "expense", description)
@@ -268,23 +324,6 @@ def employee_payroll_summary(db: Session, employee_id: int, month: str | None = 
             for a in advances
         ],
     }
-
-
-def _split_amounts(total: int, referrer_id: int | None, provider_id: int, db: Session):
-    provider = db.query(Provider).filter(Provider.id == provider_id, Provider.is_active == True).first()
-    if not provider:
-        raise HTTPException(status_code=400, detail="Xizmat ko'rsatuvchi topilmadi")
-    referrer_amount = 0
-    referrer = None
-    if referrer_id:
-        referrer = db.query(Referrer).filter(Referrer.id == referrer_id, Referrer.is_active == True).first()
-        if referrer:
-            referrer_amount = int(total * referrer.percentage / 100)
-    provider_amount = int(total * provider.percentage / 100)
-    center_amount = total - referrer_amount - provider_amount
-    if center_amount < 0:
-        raise HTTPException(status_code=400, detail="Foizlar jami 100% dan oshib ketdi")
-    return provider, referrer, referrer_amount, provider_amount, center_amount
 
 
 def cancel_patient_payment(db: Session, patient: Patient, tx: Transaction) -> None:

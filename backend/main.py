@@ -8,12 +8,16 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from fastapi.staticfiles import StaticFiles
+import os
+
 from config import settings
-from database import Base, engine
+from database import Base, engine, run_migrations
 from routers import (
-    advances, audit, auth, balance, cash, duty, employees, expenses,
-    inpatients, notifications, patients, providers, referrers, reports, services, sheets_backup, webhook,
+    advances, appointments, audit, auth, balance, banners, cash, chat, duty, employees, expenses,
+    incassation, inpatients, inventory, lab_results, notifications, patients, payroll, providers, queue, referrers, reports, services, sheets_backup, webhook,
 )
+
 from services.scheduler import start_scheduler
 from services.sheets import start_sheet_worker
 
@@ -27,6 +31,7 @@ limiter = Limiter(key_func=get_remote_address)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    run_migrations()
     start_sheet_worker()
     start_scheduler()
     logger.info("Marjona Med Service backend ishga tushdi")
@@ -73,6 +78,7 @@ app.include_router(referrers.router)
 app.include_router(providers.router)
 app.include_router(employees.router)
 app.include_router(patients.router)
+app.include_router(queue.router)
 app.include_router(expenses.router)
 app.include_router(balance.router)
 app.include_router(reports.router)
@@ -84,6 +90,17 @@ app.include_router(cash.router)
 app.include_router(advances.router)
 app.include_router(notifications.router)
 app.include_router(sheets_backup.router)
+app.include_router(chat.router)
+app.include_router(appointments.router)
+app.include_router(inventory.router)
+app.include_router(payroll.router)
+app.include_router(lab_results.router)
+app.include_router(incassation.router)
+app.include_router(banners.router)
+
+uploads_dir = os.path.join(os.getcwd(), "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 @app.get("/api/health")

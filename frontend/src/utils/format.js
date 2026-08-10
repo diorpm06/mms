@@ -1,6 +1,20 @@
 export function formatMoney(n) {
-  if (n == null) return '0 so\'m'
-  return `${Number(n).toLocaleString('uz-UZ')} so'm`
+  if (n == null || isNaN(n)) return "0 so'm"
+  const formatted = Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  return `${formatted} so'm`
+}
+
+export function formatWithCommas(val) {
+  if (val === '' || val == null) return ''
+  const digits = String(val).replace(/\D/g, '')
+  if (!digits) return ''
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+export function parseDigits(val) {
+  if (val === '' || val == null) return 0
+  const digits = String(val).replace(/\D/g, '')
+  return parseInt(digits, 10) || 0
 }
 
 export function formatDate(iso) {
@@ -15,5 +29,19 @@ export function toISODate(ddmmyyyy) {
 }
 
 export function paymentLabel(type) {
-  return type === 'cash' ? 'Naqt' : 'Karta'
+  switch (type) {
+    case 'cash':
+    case 'naqd':
+      return '💵 Naqd'
+    case 'card':
+    case 'karta':
+      return '💳 Karta'
+    case 'click':
+      return '📱 Click'
+    case 'qr':
+    case 'payme':
+      return '🔳 QR Code'
+    default:
+      return type || 'Naqd'
+  }
 }

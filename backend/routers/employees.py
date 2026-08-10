@@ -25,8 +25,15 @@ class SalaryReminderBody(BaseModel):
 
 
 @router.get("", response_model=list[EmployeeOut])
-def list_employees(db: Session = Depends(get_db), _: User = Depends(require_ceo)):
-    return db.query(Employee).filter(Employee.is_active == True).order_by(Employee.full_name).all()
+def list_employees(
+    include_inactive: bool = Query(True),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_ceo)
+):
+    q = db.query(Employee)
+    if not include_inactive:
+        q = q.filter(Employee.is_active == True)
+    return q.order_by(Employee.full_name).all()
 
 
 @router.post("", response_model=EmployeeOut)
@@ -53,13 +60,22 @@ def update_employee(
 
 
 @router.delete("/{employee_id}")
-def delete_employee(employee_id: int, db: Session = Depends(get_db), _: User = Depends(require_ceo)):
+def delete_employee(
+    employee_id: int,
+    hard: bool = False,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_ceo)
+):
     e = db.query(Employee).filter(Employee.id == employee_id).first()
     if not e:
         raise HTTPException(status_code=404, detail="Xodim topilmadi")
-    e.is_active = False
+    if hard:
+        db.delete(e)
+    else:
+        e.is_active = not e.is_active
     db.commit()
-    return {"message": "O'chirildi"}
+    return {"message": "Status o'zgartirildi / O'chirildi", "is_active": e.is_active if not hard else False}
+
 
 
 @router.post("/{employee_id}/pay-salary")

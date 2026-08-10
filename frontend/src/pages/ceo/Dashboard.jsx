@@ -5,13 +5,15 @@ import {
   Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { RefreshCw, TrendingUp, Wallet, Users, Receipt } from 'lucide-react'
-import { api } from '../../utils/api'
+import { api, downloadBlob } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { formatYAxis, moneyFormatter } from '../../utils/charts'
 import { CardSkeleton } from '../../components/Skeleton'
 import { useTheme } from '../../hooks/useTheme'
 import { useToastStore } from '../../store/toastStore'
+import { Btn, Icons } from '../../components/UIKit'
 import Modal from '../../components/Modal'
+import PeakHeatmapChart from '../../components/PeakHeatmapChart'
 
 const EMPTY = {
   daily_income: 0, current_balance: 0,
@@ -27,15 +29,33 @@ export default function CeoDashboard() {
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(null)
   const [referrerModal, setReferrerModal] = useState(null)
-  const [referrerDetails, setReferrerDetails] = useState([])
+  const [analytics, setAnalytics] = useState(null)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
   const location = useLocation()
   const { chartAxis, chartGrid, chartGold, chartColors, tooltipStyle } = useTheme()
   const toast = useToastStore((s) => s.add)
 
+  const handleDownloadDailyPdf = async () => {
+    setDownloadingPdf(true)
+    try {
+      const todayStr = new Date().toISOString().split('T')[0]
+      const blob = await api(`/reports/export/pdf?type=daily&date=${todayStr}`)
+      downloadBlob(blob, `Kunlik_Hisobot_${todayStr}.pdf`)
+      toast("✓ Kunlik PDF Hisobot yuklab olindi!")
+    } catch (e) {
+      toast(e.message || "PDF hisobot yuklashda xatolik", 'error')
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      const res = await api('/reports/dashboard')
+      const [res, forecastData] = await Promise.all([
+        api('/reports/dashboard'),
+        api('/reports/analytics/forecast').catch(() => null),
+      ])
       setData({
         ...EMPTY, ...res,
         income_chart:  res.income_chart  || [],
@@ -43,6 +63,7 @@ export default function CeoDashboard() {
         top_referrers: res.top_referrers || [],
         last_activity: res.last_activity || null,
       })
+      if (forecastData) setAnalytics(forecastData)
       setLastUpdate(new Date())
     } catch (e) {
       if (!silent) toast(e.message || 'Dashboard yuklanmadi', 'error')
@@ -101,6 +122,9 @@ export default function CeoDashboard() {
               Yangilangan: {lastUpdate.toLocaleTimeString('uz-UZ')}
             </span>
           )}
+          <Btn variant="gold" size="sm" icon={Icons.printer} loading={downloadingPdf} onClick={handleDownloadDailyPdf}>
+            Kunlik PDF Hisobot
+          </Btn>
           <button
             type="button"
             className="btn-outline flex items-center gap-2 py-2 text-sm"
@@ -187,6 +211,18 @@ export default function CeoDashboard() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Analytics Forecast & Peak Hours Heatmap */}
+      {analytics && (
+        <div className="mb-6">
+          <PeakHeatmapChart
+            heatmap={analytics.heatmap}
+            busiestHour={analytics.busiest_hour}
+            avgDailyRevenue={analytics.avg_daily_revenue}
+            projectedNext30Days={analytics.projected_next_30_days}
+          />
+        </div>
+      )}
 
       {/* Top cards */}
       <div className="grid gap-4 md:grid-cols-2">

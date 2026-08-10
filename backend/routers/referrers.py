@@ -29,7 +29,7 @@ def list_referrers(
 
 
 @router.post("", response_model=ReferrerOut)
-def create_referrer(data: ReferrerCreate, db: Session = Depends(get_db), _: User = Depends(require_ceo)):
+def create_referrer(data: ReferrerCreate, db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)):
     r = Referrer(**data.model_dump())
     db.add(r)
     db.commit()
@@ -39,7 +39,7 @@ def create_referrer(data: ReferrerCreate, db: Session = Depends(get_db), _: User
 
 @router.put("/{referrer_id}", response_model=ReferrerOut)
 def update_referrer(
-    referrer_id: int, data: ReferrerUpdate, db: Session = Depends(get_db), _: User = Depends(require_ceo)
+    referrer_id: int, data: ReferrerUpdate, db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)
 ):
     r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
     if not r:
@@ -52,7 +52,7 @@ def update_referrer(
 
 
 @router.delete("/{referrer_id}")
-def delete_referrer(referrer_id: int, db: Session = Depends(get_db), _: User = Depends(require_ceo)):
+def delete_referrer(referrer_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)):
     r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
     if not r:
         raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
@@ -66,7 +66,7 @@ def payout_referrer(
     referrer_id: int,
     body: PayoutBody,
     db: Session = Depends(get_db),
-    _: User = Depends(require_ceo),
+    _: User = Depends(require_admin_or_ceo),
 ):
     payout = payout_recipient_balance(db, "referrer", referrer_id, source=body.source)
     db.commit()

@@ -35,6 +35,20 @@ export default function Login() {
     })
   }, [])
 
+  const parseResponseJson = async (res) => {
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) {
+      throw new Error("Backend ulanmagan yoki API URL noto'g'ri (Netlify env: VITE_API_URL)")
+    }
+    return res.json()
+  }
+
+  const getRedirectPath = (role) => {
+    if (role === 'ceo') return '/ceo'
+    if (role === 'doctor') return '/doctor'
+    return '/admin'
+  }
+
   const doRefreshAndNavigate = async () => {
     const { refreshToken: rt, role: r } = useAuthStore.getState()
     if (!rt) return false
@@ -44,9 +58,9 @@ export default function Login() {
       body: JSON.stringify({ refresh_token: rt }),
     })
     if (!res.ok) return false
-    const data = await res.json()
+    const data = await parseResponseJson(res)
     setAuth(data)
-    navigate(data.role === 'ceo' ? '/ceo' : '/admin')
+    navigate(getRedirectPath(data.role))
     return true
   }
 
@@ -76,17 +90,11 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       })
-      const data = await res.json()
+      const data = await parseResponseJson(res)
       if (!res.ok) throw new Error(data.detail || 'Login xato')
       setAuth(data)
       toast('Muvaffaqiyatli kirdingiz')
-
-      // Offer biometric registration after first successful login
-      if (bioAvailable && !hasBiometricRegistered()) {
-        setShowRegBio(true)
-        return
-      }
-      navigate(data.role === 'ceo' ? '/ceo' : '/admin')
+      navigate(getRedirectPath(data.role))
     } catch (err) {
       toast(err.message, 'error')
     } finally {
@@ -104,7 +112,7 @@ export default function Login() {
       toast(e.message || "Biometrik yoqilmadi", 'error')
     } finally {
       const { role: r } = useAuthStore.getState()
-      navigate(r === 'ceo' ? '/ceo' : '/admin')
+      navigate(getRedirectPath(r))
     }
   }
 
@@ -138,7 +146,7 @@ export default function Login() {
               className="btn-outline w-full py-3 text-base"
               onClick={() => {
                 const { role: r } = useAuthStore.getState()
-                navigate(r === 'ceo' ? '/ceo' : '/admin')
+                navigate(getRedirectPath(r))
               }}
             >
               Keyinroq

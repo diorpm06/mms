@@ -44,8 +44,10 @@ frontend/.env.local
 frontend/.env.production
 !frontend/.env.example
 
-# IDE
+# IDE & Scratch
 .vscode/
 .idea/
 *.swp
 *.swo
+scratch/
+backend/scratch_test_backend.py

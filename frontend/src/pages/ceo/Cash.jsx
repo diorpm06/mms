@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { api } from '../../utils/api'
 import { formatMoney, formatDate } from '../../utils/format'
 import { Skeleton } from '../../components/Skeleton'
+import IncassationModal from '../../components/IncassationModal'
 
 export default function Cash() {
   const [data, setData] = useState(null)
   const [from, setFrom] = useState(new Date().toISOString().slice(0, 10))
   const [to,   setTo]   = useState(new Date().toISOString().slice(0, 10))
+  const [incassationOpen, setIncassationOpen] = useState(false)
 
   const load = () => {
     setData(null)
@@ -39,7 +41,18 @@ export default function Cash() {
 
   return (
     <div>
-      <h1 className="page-title mb-6">Kassa</h1>
+      <IncassationModal open={incassationOpen} onClose={() => { setIncassationOpen(false); load() }} />
+
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="page-title">Kassa</h1>
+        <button
+          type="button"
+          onClick={() => setIncassationOpen(true)}
+          className="btn-gold py-2 px-4 text-xs font-black shadow-lg flex items-center gap-2"
+        >
+          🔒 Smenani Yopish va Inkassatsiya
+        </button>
+      </div>
 
       <div className="mb-5 flex flex-wrap gap-2">
         <input type="date" className="input-field max-w-[180px]" value={from} onChange={(e) => setFrom(e.target.value)} />

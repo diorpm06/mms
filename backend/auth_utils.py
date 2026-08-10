@@ -70,3 +70,17 @@ def require_admin_or_ceo(user: User = Depends(get_current_user)) -> User:
     if user.role not in ("ceo", "admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ruxsat yo'q")
     return user
+
+
+def require_doctor(user: User = Depends(get_current_user)) -> User:
+    if user.role != "doctor":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faqat shifokorlar uchun")
+    return user
+
+
+def require_doctor_or_admin_or_ceo(user: User = Depends(get_current_user)) -> User:
+    if user.role not in ("ceo", "admin", "doctor"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ruxsat yo'q")
+    return user
+
+

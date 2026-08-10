@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marjona Med Service — CRM Tizimi To'liq Qo'llanma</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    :root {
+      --gold: #f59e0b;
+      --gold-dim: rgba(245,158,11,0.12);
+      --bg: #0a0f1e;
+      --card: #111827;
+      --card2: #1a2236;
+      --border: rgba(255,255,255,0.08);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --success: #10b981;
+      --info: #3b82f6;
+      --danger: #ef4444;
+      --cyan: #06b6d4;
+      --purple: #8b5cf6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    /* ─── HERO HEADER ─── */
+    .hero {
+      background: linear-gradient(135deg, #0a0f1e 0%, #0f1a35 50%, #0a1628 100%);
+      border-bottom: 1px solid rgba(245,158,11,0.3);
+      padding: 60px 40px 50px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -100px; left: 50%;
+      transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(245,158,11,0.15);
+      border: 1px solid rgba(245,158,11,0.4);
+      color: var(--gold);
+      padding: 5px 16px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: 900;
+      background: linear-gradient(135deg, #f59e0b, #fcd34d, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+      line-height: 1.15;
+    }
+    .hero-sub {
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 640px;
+      margin: 0 auto 30px;
+    }
+    .hero-meta {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .meta-chip {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .meta-chip strong { color: var(--gold); }
+
+    /* ─── LAYOUT ─── */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ─── TABLE OF CONTENTS ─── */
+    .toc-card {
+      background: var(--card);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 20px;
+      padding: 32px 36px;
+      margin-bottom: 48px;
+    }
+    .toc-card h2 {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--gold);
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .toc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 8px;
+    }
+    .toc-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .toc-item:hover {
+      background: var(--card2);
+      color: var(--gold);
+    }
+    .toc-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: var(--gold-dim);
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    /* ─── SECTION ─── */
+    .section {
+      margin-bottom: 56px;
+      scroll-margin-top: 80px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .section-icon {
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .section-title span {
+      color: var(--gold);
+    }
+    .section-divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(245,158,11,0.4), transparent);
+      margin-bottom: 28px;
+    }
+
+    /* ─── CARD ─── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cyan);
+      margin: 14px 0 8px;
+    }
+
+    /* ─── TABLE ─── */
+    .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); margin: 16px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { background: rgba(245,158,11,0.08); }
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 700;
+      color: var(--gold);
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 11px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: var(--muted);
+      vertical-align: top;
+    }
+    td strong { color: var(--text); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* ─── LIST STYLES ─── */
+    .step-list { list-style: none; counter-reset: steps; }
+    .step-list li {
+      counter-increment: steps;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 14px;
+    }
+    .step-list li:last-child { border-bottom: none; }
+    .step-list li::before {
+      content: counter(steps);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: var(--gold-dim);
+      border: 1px solid rgba(245,158,11,0.3);
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 800;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .bullet-list { list-style: none; }
+    .bullet-list li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 6px 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .bullet-list li::before {
+      content: '›';
+      color: var(--gold);
+      font-weight: 900;
+      font-size: 18px;
+      line-height: 1.2;
+      flex-shrink: 0;
+    }
+    .bullet-list li strong { color: var(--text); }
+
+    /* ─── BADGES ─── */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge-gold { background: rgba(245,158,11,0.15); color: var(--gold); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-green { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+    .badge-blue { background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); }
+    .badge-red { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-cyan { background: rgba(6,182,212,0.15); color: #67e8f9; border: 1px solid rgba(6,182,212,0.3); }
+    .badge-purple { background: rgba(139,92,246,0.15); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.3); }
+
+    /* ─── ALERT BOXES ─── */
+    .alert {
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin: 16px 0;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 13.5px;
+    }
+    .alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .alert-gold { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); }
+    .alert-blue { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); }
+    .alert-green { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); }
+    .alert-red { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); }
+
+    /* ─── CODE BLOCK ─── */
+    .code-block {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #e6edf3;
+      overflow-x: auto;
+      margin: 12px 0;
+      line-height: 1.6;
+    }
+    .code-block .comment { color: #6e7681; }
+    .code-block .string { color: #a5d6ff; }
+    .code-block .keyword { color: #ff7b72; }
+    .code-block .func { color: #d2a8ff; }
+
+    /* ─── ROLE CARDS ─── */
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .role-card {
+      background: var(--card2);
+      border-radius: 14px;
+      padding: 20px;
+      border-top: 3px solid transparent;
+    }
+    .role-card.ceo { border-top-color: #ef4444; }
+    .role-card.admin { border-top-color: #f59e0b; }
+    .role-card.doctor { border-top-color: #10b981; }
+    .role-card .role-title {
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .role-card.ceo .role-title { color: #f87171; }
+    .role-card.admin .role-title { color: var(--gold); }
+    .role-card.doctor .role-title { color: #34d399; }
+
+    /* ─── URL TABLE ─── */
+    .url-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+      background: var(--card2);
+    }
+    .url-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .url-link {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--cyan);
+      text-decoration: none;
+      background: rgba(6,182,212,0.1);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(6,182,212,0.2);
+      white-space: nowrap;
+    }
+    .url-link:hover { background: rgba(6,182,212,0.2); }
+
+    /* ─── PROCESS FLOW ─── */
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin: 16px 0;
+    }
+    .flow-step {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .flow-arrow { color: var(--gold); font-size: 18px; font-weight: 900; }
+
+    /* ─── PRINT STYLES ─── */
+    .print-sample {
+      background: white;
+      color: #111;
+      border-radius: 12px;
+      padding: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-width: 300px;
+      border: 1px solid #e5e7eb;
+    }
+    .print-sample .ps-title { text-align: center; font-weight: 900; font-size: 14px; text-transform: uppercase; margin-bottom: 8px; }
+    .print-sample .ps-divider { border-top: 1px dashed #666; margin: 8px 0; }
+    .print-sample .ps-big { text-align: center; font-size: 36px; font-weight: 900; color: #111; }
+    .print-sample .ps-row { display: flex; justify-content: space-between; padding: 2px 0; }
+
+    /* ─── BACK TO TOP ─── */
+    .back-top {
+      position: fixed;
+      bottom: 32px;
+      right: 32px;
+      background: var(--gold);
+      color: #111;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      font-weight: 900;
+      font-size: 18px;
+      box-shadow: 0 4px 20px rgba(245,158,11,0.4);
+      transition: transform 0.2s;
+      z-index: 100;
+    }
+    .back-top:hover { transform: translateY(-3px); }
+
+    /* ─── FOOTER ─── */
+    .footer {
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 32px 40px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .footer strong { color: var(--gold); }
+
+    @media (max-width: 640px) {
+      .hero { padding: 40px 20px 36px; }
+      .container { padding: 28px 16px 60px; }
+      .toc-card { padding: 20px; }
+      .url-item { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<a href="#top" class="back-top" title="Yuqoriga">↑</a>
+
+<!-- HERO -->
+<div class="hero" id="top">
+  <div class="hero-badge">🏥 Enterprise HMS v3.0</div>
+  <h1>Marjona Med Service<br>CRM Tizimi</h1>
+  <p class="hero-sub">To'liq batafsil qo'llanma — har bir modul, tugma va jarayonning to'liq tavsifi</p>
+  <div class="hero-meta">
+    <div class="meta-chip">📅 Versiya: <strong>3.0 Enterprise</strong></div>
+    <div class="meta-chip">🌐 Manzil: <strong>192.168.0.101:5173</strong></div>
+    <div class="meta-chip">🗄️ Backend: <strong>FastAPI + SQLite</strong></div>
+    <div class="meta-chip">⚛️ Frontend: <strong>React 18 + Vite</strong></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="toc-card">
+    <h2>📖 Mundarija</h2>
+    <div class="toc-grid">
+      <a href="#s1" class="toc-item"><span class="toc-num">1</span> Tizim Haqida Umumiy Ma'lumot</a>
+      <a href="#s2" class="toc-item"><span class="toc-num">2</span> Foydalanuvchi Rollari</a>
+      <a href="#s3" class="toc-item"><span class="toc-num">3</span> Tizimga Kirish (Login)</a>
+      <a href="#s4" class="toc-item"><span class="toc-num">4</span> CEO Boshqaruv Paneli</a>
+      <a href="#s5" class="toc-item"><span class="toc-num">5</span> Yangi Bemor Qabul Qilish</a>
+      <a href="#s6" class="toc-item"><span class="toc-num">6</span> Navbat Boshqaruv Tizimi</a>
+      <a href="#s7" class="toc-item"><span class="toc-num">7</span> Qabul Kalendari</a>
+      <a href="#s8" class="toc-item"><span class="toc-num">8</span> Shifokor Paneli</a>
+      <a href="#s9" class="toc-item"><span class="toc-num">9</span> Bugungi Bemorlar (Admin)</a>
+      <a href="#s10" class="toc-item"><span class="toc-num">10</span> Bemorlarni Qidirish</a>
+      <a href="#s11" class="toc-item"><span class="toc-num">11</span> Elektron Salomatlik Kartasi (EHR)</a>
+      <a href="#s12" class="toc-item"><span class="toc-num">12</span> Laboratoriya va Diagnostika</a>
+      <a href="#s13" class="toc-item"><span class="toc-num">13</span> Statsionar Bemorlar</a>
+      <a href="#s14" class="toc-item"><span class="toc-num">14</span> Kassa Boshqaruvi</a>
+      <a href="#s15" class="toc-item"><span class="toc-num">15</span> Inkassatsiya va Smena Yopish</a>
+      <a href="#s16" class="toc-item"><span class="toc-num">16</span> Balans va Moliya</a>
+      <a href="#s17" class="toc-item"><span class="toc-num">17</span> Harajatlar Moduli</a>
+      <a href="#s18" class="toc-item"><span class="toc-num">18</span> Omborxona (Dori/Material)</a>
+      <a href="#s19" class="toc-item"><span class="toc-num">19</span> Shifokorlar Boshqaruvi</a>
+      <a href="#s20" class="toc-item"><span class="toc-num">20</span> Xizmatlar Katalogi</a>
+      <a href="#s21" class="toc-item"><span class="toc-num">21</span> Yo'naltiruvchilar (Referral)</a>
+      <a href="#s22" class="toc-item"><span class="toc-num">22</span> Xodimlar Boshqaruvi</a>
+      <a href="#s23" class="toc-item"><span class="toc-num">23</span> Avanslar Moduli</a>
+      <a href="#s24" class="toc-item"><span class="toc-num">24</span> Oylik Maosh Kalkulyatori</a>
+      <a href="#s25" class="toc-item"><span class="toc-num">25</span> Hisobotlar Tizimi</a>
+      <a href="#s26" class="toc-item"><span class="toc-num">26</span> Telegram Bot</a>
+      <a href="#s27" class="toc-item"><span class="toc-num">27</span> Ichki Chat va Bildirishnomalar</a>
+      <a href="#s28" class="toc-item"><span class="toc-num">28</span> Chegirma Tizimi</a>
+      <a href="#s29" class="toc-item"><span class="toc-num">29</span> Chop Etish va Blankalar</a>
+      <a href="#s30" class="toc-item"><span class="toc-num">30</span> TV Navbat Ekrani</a>
+      <a href="#s31" class="toc-item"><span class="toc-num">31</span> Faoliyat Tarixi (Audit)</a>
+      <a href="#s32" class="toc-item"><span class="toc-num">32</span> Tarmoq Manzillari</a>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 1 ═══ -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <div class="section-icon">🏥</div>
+      <div class="section-title">1. <span>Tizim Haqida Umumiy Ma'lumot</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <p style="color:var(--muted);margin-bottom:16px"><strong style="color:var(--text)">Marjona Med Service CRM</strong> — bu tibbiyot markazining barcha jarayonlarini to'liq raqamlashtirish va avtomatlashtirish uchun maxsus ishlab chiqilgan <strong style="color:var(--gold)">Enterprise darajasidagi Klinika Boshqaruv Tizimi (Hospital Management System — HMS)</strong>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Muammo</th><th>Tizim Yechimi</th></tr></thead>
+          <tbody>
+            <tr><td>Qog'oz jurnallarda bemor yozish</td><td><strong>Elektron ro'yxat va tezkor qidiruv</strong></td></tr>
+            <tr><td>Navbat tartibsizligi</td><td><strong>Avtomatik navbat tartibida TV ekran</strong></td></tr>
+            <tr><td>Naqd pul nazorat qilinmaydi</td><td><strong>Real-vaqt kassa hisobi va inkassatsiya</strong></td></tr>
+            <tr><td>Shifokor ulushi qo'lda hisoblanadi</td><td><strong>Avtomatik 50/50 split kalkulyator</strong></td></tr>
+            <tr><td>Dori qoldiqlari ko'rinmaydi</td><td><strong>Omborxona moduli va ogohlantirish</strong></td></tr>
+            <tr><td>Oylik hisobot tayyorlanmaydi</td><td><strong>Bir tugma bilan Excel/PDF eksport</strong></td></tr>
+            <tr><td>CEO klinikadan uzoqda bo'lsa</td><td><strong>Telegram bot orqali kunlik hisobot</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>✅ Texnik imkoniyatlar</h3>
+      <ul class="bullet-list">
+        <li><strong>Bir vaqtda</strong> bir nechta kompyuter va planshetdan foydalanish (tarmoq orqali)</li>
+        <li><strong>Internet bo'lmasa ham</strong> ishlashi (PWA offline rejim + Service Worker)</li>
+        <li><strong>80mm termik printer</strong> bilan to'liq integratsiya (navbat taloni, kassa cheki)</li>
+        <li><strong>Real-vaqt sinxronizatsiya</strong> — WebSocket orqali bir joyda o'zgarish hamma joyda ko'rinadi</li>
+        <li><strong>Telegram bot</strong> — CEO real-vaqt xabarnomalar va kunlik hisobot oladi</li>
+        <li><strong>Excel va PDF eksport</strong> — barcha hisobotlar ikki formatda yuklab olinadi</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 2 ═══ -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <div class="section-icon">👤</div>
+      <div class="section-title">2. <span>Foydalanuvchi Rollari</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="role-grid">
+      <div class="role-card ceo">
+        <div class="role-title">🔴 CEO Roli</div>
+        <ul class="bullet-list">
+          <li>Barcha sahifalar va ma'lumotlarga to'liq kirish</li>
+          <li>To'lovlarni bekor qilish huquqi</li>
+          <li>Moliyaviy hisobotlar va kassa</li>
+          <li>Xodimlar va shifokorlar boshqaruvi</li>
+          <li>Maosh kalkulyatori (Payroll)</li>
+          <li>Backup va tizim sozlamalari</li>
+        </ul>
+      </div>
+      <div class="role-card admin">
+        <div class="role-title">🟡 Admin (Registratura)</div>
+        <ul class="bullet-list">
+          <li>Yangi bemor qabul qilish</li>
+          <li>Navbat boshqarish (chaqirish, yakunlash)</li>
+          <li>Bugungi bemorlar ro'yxati</li>
+          <li>Harajatlar kiritish (bekor qilish yo'q)</li>
+          <li>Omborxona ko'rish va kirim/chiqim</li>
+          <li>Kunlik hisobot</li>
+        </ul>
+      </div>
+      <div class="role-card doctor">
+        <div class="role-title">🟢 Shifokor Roli</div>
+        <ul class="bullet-list">
+          <li>Faqat o'z kabineti navbat ro'yxati</li>
+          <li>Bemorni chaqirish va qabulni yakunlash</li>
+          <li>Ko'rik natijasini kiritish</li>
+          <li>Retsept yozish</li>
+          <li>Pauza rejimi (band bo'lganda)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 3 ═══ -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <div class="section-icon">🔐</div>
+      <div class="section-title">3. <span>Tizimga Kirish (Login)</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Kirish jarayoni</h3>
+      <ol class="step-list">
+        <li>Brauzerda <code style="background:var(--card2);padding:2px 8px;border-radius:5px;font-family:monospace;color:var(--cyan)">http://192.168.0.101:5173</code> manzili ochiladi</li>
+        <li><strong>Foydalanuvchi nomi</strong> (username) kiritiladi</li>
+        <li><strong>Parol</strong> kiritiladi</li>
+        <li><strong>"Kirish"</strong> tugmasi bosiladi</li>
+        <li>Tizim rolni aniqlaydi va tegishli sahifaga yo'naltiradi: CEO → /ceo | Admin → /admin | Shifokor → /doctor</li>
+      </ol>
+      <div class="alert alert-gold" style="margin-top:16px">
+        <div class="alert-icon">🔑</div>
+        <div>Parolni almashtirish uchun <strong>CEO paneli → "Parollar"</strong> menyu bandiga o'ting. Har bir xodim va shifokorning paroli CEO tomonidan yangilanishi mumkin.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 4 ═══ -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <div class="section-icon">📊</div>
+      <div class="section-title">4. <span>CEO Boshqaruv Paneli (Dashboard)</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="alert alert-blue">
+      <div class="alert-icon">ℹ️</div>
+      <div>Sahifa <strong>har 30 soniyada</strong> avtomatik yangilanadi. Oyna focus bo'lganda ham yangilanadi.</div>
+    </div>
+    <div class="card">
+      <h3>4.1 Asosiy 4 ta Statistika Kartochalari</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Kartochka</th><th>Rang</th><th>Ko'rsatiladigan ma'lumot</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Kunlik daromad</strong></td><td><span class="badge badge-green">🟢 Yashil</span></td><td>Bugun soat 00:00 dan hozirga qadar qabul qilingan barcha to'lovlar</td></tr>
+            <tr><td><strong>Jami balans</strong></td><td><span class="badge badge-gold">🟡 Oltin</span></td><td>Kassadagi mavjud umumiy mablag' (kirim − chiqim)</td></tr>
+            <tr><td><strong>Bugungi mijozlar</strong></td><td><span class="badge badge-blue">🔵 Moviy</span></td><td>Bugun ro'yxatdan o'tgan bemorlar soni (bekor qilinganlar hisobga olinmaydi)</td></tr>
+            <tr><td><strong>Harajatlar (bu oy)</strong></td><td><span class="badge badge-red">🔴 Qizil</span></td><td>Joriy oy davomida kiritilgan barcha harajatlar jami</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>4.2 Daromad Prognozi va Gavjumlik Xaritasi (Heatmap)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element</th><th>Tavsifi</th></tr></thead>
+          <tbody>
+            <tr><td>📈 Kelgusi 30-kunlik prognoz</td><td>O'rtacha kunlik daromad × 30 kun hisoblangan prognoz (oxirgi 30 kun asosida)</td></tr>
+            <tr><td>🔥 Eng Gavjum Soat</td><td>Klinikada eng ko'p bemor keladigan soat (masalan: 10:00–11:00)</td></tr>
+            <tr><td>💵 O'rtacha Kunlik Tushum</td><td>Oxirgi 30 kunlik o'rtacha kunlik daromad</td></tr>
+            <tr><td>Haftalik Heatmap Grid</td><td>7 kun × 11 soat (08:00–18:00) katakchali vizual xarita. Rangi: Kulrang=bo'sh → Moviy=o'rtacha → To'q sariq=juda gavjum</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 5 ═══ -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <div class="section-icon">🆕</div>
+      <div class="section-title">5. <span>Yangi Bemor Qabul Qilish</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Qabul qilish jarayoni (qadam-baqadam)</h3>
+      <ol class="step-list">
+        <li><strong>Ism va Familiya</strong> kiritiladi (majburiy)</li>
+        <li><strong>Tug'ilgan sana</strong> kiritiladi (format: kk/oo/yyyy, masalan: 25/12/1985) — tizim avtomatik formatlaydi</li>
+        <li><strong>Telefon raqami</strong> kiritiladi (+998... formatida, majburiy)</li>
+        <li><strong>Manzil</strong> kiritiladi (majburiy)</li>
+        <li><strong>Yo'naltiruvchi</strong> tanlanadi (ixtiyoriy — referral shifokor yoki hamkor)</li>
+        <li><strong>Xizmat ko'rsatuvchi shifokor</strong> tanlanadi (majburiy)</li>
+        <li><strong>Ko'rik turi (xizmat)</strong> tanlanadi — narxi avtomatik to'ldiriladi</li>
+        <li><strong>Chegirma</strong> qo'shiladi (ixtiyoriy): foizli (%) yoki summaviy (so'm) + sabab</li>
+        <li><strong>To'lov turi</strong> tanlanadi: Naqd yoki Karta (Uzcard/Humo)</li>
+        <li><strong>"Saqlash"</strong> bosiladi — ma'lumotlar saqlanib, <strong>Navbat Taloni</strong> oynasi darhol ochiladi</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>5.1 Navbat Taloni Modal Oynasi (PaymentTicketModal)</h3>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start">
+        <div class="print-sample">
+          <div class="ps-title">MARJONA MED SERVICE</div>
+          <div style="text-align:center;font-size:10px;color:#666">Tibbiyot Markazi va Kassa</div>
+          <div class="ps-divider"></div>
+          <div style="text-align:center;font-size:10px;color:#555;margin-bottom:4px">SIZNING NAVBATINGIZ:</div>
+          <div class="ps-big">№ 014</div>
+          <div style="text-align:center;font-size:10px;color:#2563eb;font-weight:700;margin:4px 0 8px">3-XONA / KABINET</div>
+          <div class="ps-divider"></div>
+          <div class="ps-row"><span>Bemor:</span><strong>Malika Yusupova</strong></div>
+          <div class="ps-row"><span>Xizmat:</span><span>UZI tekshiruvi</span></div>
+          <div class="ps-row"><span>Shifokor:</span><span>Dr. Azimov</span></div>
+          <div class="ps-row"><span>To'lov:</span><strong>Naqd</strong></div>
+          <div class="ps-divider"></div>
+          <div class="ps-row" style="font-weight:900"><span>JAMI:</span><span>150,000 so'm</span></div>
+          <div class="ps-divider"></div>
+          <div style="text-align:center;font-size:9px;color:#777;margin-top:6px">TV ekranini kuzatib turing</div>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <ul class="bullet-list">
+            <li><strong>Klinika nomi</strong> — MARJONA MED SERVICE</li>
+            <li><strong>Yirik navbat raqami</strong> — №014 (3 xonali, nol bilan to'ldirilgan)</li>
+            <li><strong>Kabinet/Xona</strong> — masalan 3-XONA</li>
+            <li><strong>Bemor to'liq ismi</strong></li>
+            <li><strong>Xizmat turi</strong></li>
+            <li><strong>Shifokor ismi</strong></li>
+            <li><strong>To'lov turi</strong> (Naqd/Karta)</li>
+            <li><strong>To'langan summa</strong></li>
+            <li><strong>Sana va vaqt</strong></li>
+            <li><strong>🖨️ "Chop etish"</strong> — termik printerga yuboradi</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 6 ═══ -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <div class="section-icon">🎫</div>
+      <div class="section-title">6. <span>Navbat Boshqaruv Tizimi</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Navbat jarayoni (umumiy ko'rinish)</h3>
+      <div class="flow">
+        <div class="flow-step">💰 Bemor to'lov qiladi</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">🎫 Navbat №014 beriladi</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">📺 TV ekranda ko'rinadi</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">🔔 Admin chaqiradi</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">🏥 Bemor xonaga kiradi</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">✅ Yakunlandi</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Navbat holatlari va ma'nosi</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Holat</th><th>Belgi</th><th>Rang</th><th>Ma'nosi</th><th>Keyingi amal</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Kutmoqda</strong></td><td>⏳</td><td><span class="badge badge-gold">Sariq</span></td><td>Navbat kutilmoqda</td><td>Chaqirish yoki O'tkazib yuborish</td></tr>
+            <tr><td><strong>Qabulda</strong></td><td>🟢</td><td><span class="badge badge-green">Yashil</span></td><td>Hozir shifokor xonasida</td><td>Tugatish</td></tr>
+            <tr><td><strong>Yakunlandi</strong></td><td>✅</td><td><span class="badge" style="background:rgba(255,255,255,0.1);color:#94a3b8;border:1px solid #374151">Kulrang</span></td><td>Ko'rik tugallandi</td><td>—</td></tr>
+            <tr><td><strong>O'tkazildi</strong></td><td>❌</td><td><span class="badge badge-red">Qizil</span></td><td>Chaqirildi, kelmadi</td><td>Navbatni tiklash</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🔁 O'tib Ketgan Navbatni Tiklash</h3>
+      <div class="alert alert-gold">
+        <div class="alert-icon">💡</div>
+        <div><strong>Vaziyat:</strong> Bemor navbatda edi, lekin zarur ishi bilan chiqib ketdi. Qaytib kelganda navbati o'tib ketgan.</div>
+      </div>
+      <ol class="step-list">
+        <li>Admin <strong>Bugungi Bemorlar</strong> sahifasida bemorni topadi</li>
+        <li><strong>🔁 Navbatni tiklash</strong> tugmasini bosadi (moviy rangda)</li>
+        <li>Bemor holati qayta <strong>Kutmoqda</strong>ga o'tadi</li>
+        <li>TV ekranda yana navbat ro'yxatiga qo'shiladi</li>
+        <li>Admin kerak bo'lsa qayta chaqiradi</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>🖨️ Chek va Talonni Qayta Chop Etish</h3>
+      <p style="color:var(--muted);font-size:14px"><strong style="color:var(--text)">Vaziyat:</strong> Bemor talonini yo'qotib qo'ydi yoki printer chiqarmadi.</p>
+      <ol class="step-list" style="margin-top:12px">
+        <li>Admin <strong>Bugungi Bemorlar</strong> sahifasida bemorni topadi</li>
+        <li><strong>🖨️ Chek &amp; Talon</strong> tugmasini bosadi (sariq-amber rangda)</li>
+        <li>Navbat taloni modal oynasi ochiladi</li>
+        <li><strong>"Chop etish"</strong> bosiladi — yangi talon chiqadi</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 7 ═══ -->
+  <div class="section" id="s7">
+    <div class="section-header">
+      <div class="section-icon">📅</div>
+      <div class="section-title">7. <span>Qabul Kalendari (Appointments)</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <ul class="bullet-list">
+        <li><strong>Haftalik grid ko'rinishi</strong> — 7 kun, soat 08:00–18:00 oralig'i</li>
+        <li>Navbat vaqti, shifokor, bemor ismi va telefoni kiritiladi</li>
+        <li>Holat ranglari: 🟡 Kutilmoqda | 🟢 Tasdiqlandi | 🔴 Bekor | ✅ Keldi</li>
+        <li><strong>Check-in</strong> — bemor kelganda tasdiqlash va yangi qabul shakliga o'tish</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 8 ═══ -->
+  <div class="section" id="s8">
+    <div class="section-header">
+      <div class="section-icon">🩺</div>
+      <div class="section-title">8. <span>Shifokor Paneli</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Imkoniyatlar</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Funksiya</th><th>Tavsifi</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Navbat ro'yxati</strong></td><td>O'z kabineti uchun bugungi kutayotgan bemorlar</td></tr>
+            <tr><td><strong>🔔 Chaqirish</strong></td><td>Kabinet nomini tasdiqlash → TV ekranga signal + ovozli chime</td></tr>
+            <tr><td><strong>Ko'rik natijasi</strong></td><td>Tashxis (ICD-10), ko'rik tavsifi, tavsiyalar kiritish</td></tr>
+            <tr><td><strong>Retsept yozish</strong></td><td>Dori nomi, dozasi, qabul tartibi — bemorning EHR kartasida saqlanadi</td></tr>
+            <tr><td><strong>✅ Tugatish</strong></td><td>Ko'rikni yakunlash, bemor holati "Yakunlandi" ga o'tadi</td></tr>
+            <tr><td><strong>⏸️ Pauza rejimi</strong></td><td>Shifokor vaqtincha band bo'lganda navbatni to'xtatish</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 9 ═══ -->
+  <div class="section" id="s9">
+    <div class="section-header">
+      <div class="section-icon">📋</div>
+      <div class="section-title">9. <span>Bugungi Bemorlar (Admin Panel)</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Sahifa <strong style="color:var(--text)">har 10 soniyada</strong> avtomatik yangilanadi.</p>
+      <h3>Har bir bemor qatoridagi tugmalar</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tugma</th><th>Rang</th><th>Vazifasi</th><th>Qachon ko'rinadi</th></tr></thead>
+          <tbody>
+            <tr><td><strong>🖨️ Chek &amp; Talon</strong></td><td><span class="badge badge-gold">Sariq</span></td><td>Navbat taloni va chekni qayta ko'rish va chop etish</td><td>Har doim</td></tr>
+            <tr><td><strong>🔔 Chaqirish</strong></td><td><span class="badge badge-green">Yashil</span></td><td>Bemorni xonaga chaqirish, TV ekranga signal</td><td>"Qabulda" holati bo'lmasa</td></tr>
+            <tr><td><strong>✅ Tugatish</strong></td><td><span class="badge badge-blue">Moviy</span></td><td>Ko'rikni yakunlash</td><td>Faqat "Qabulda" holatida</td></tr>
+            <tr><td><strong>🔁 Navbatni tiklash</strong></td><td><span class="badge badge-cyan">Zangori</span></td><td>O'tib ketgan navbatni qayta tiklash</td><td>"Kutmoqda" holati bo'lmasa</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 10 ═══ -->
+  <div class="section" id="s10">
+    <div class="section-header">
+      <div class="section-icon">🔍</div>
+      <div class="section-title">10. <span>Bemorlarni Qidirish va EHR Kartasi</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Qidiruv usullari</h3>
+      <ul class="bullet-list">
+        <li><strong>Ism bo'yicha</strong> — masalan: "Malika" yoki "Mal" (qisman qidiruv ishlaydi)</li>
+        <li><strong>Familiya bo'yicha</strong> — masalan: "Yusupova"</li>
+        <li><strong>Telefon bo'yicha</strong> — masalan: "+99890..." yoki "990..."</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 11 ═══ -->
+  <div class="section" id="s11">
+    <div class="section-header">
+      <div class="section-icon">📁</div>
+      <div class="section-title">11. <span>Elektron Salomatlik Kartasi (EHR)</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Karta tarkibi</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Qism</th><th>Tarkibi</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Shaxsiy ma'lumotlar</strong></td><td>To'liq ismi, tug'ilgan sanasi (yosh hisoblanib chiqiladi), telefon, manzil</td></tr>
+            <tr><td><strong>Ko'riklar tarixi</strong></td><td>Barcha tashriflar sana bo'yicha kamayib ketish tartibida: sana/vaqt, xizmat, shifokor, to'lov</td></tr>
+            <tr><td><strong>Retseptlar</strong></td><td>Har bir ko'rikda yozilgan dorilar ro'yxati (nomi, dozasi, qabul tartibi)</td></tr>
+            <tr><td><strong>Laboratoriya natijalari</strong></td><td>Qon tahlillari, UZI xulosalari, rentgen natijalari, KT natijalari</td></tr>
+            <tr><td><strong>Tashxislar</strong></td><td>ICD-10 kodi va tashxis nomi</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 12 ═══ -->
+  <div class="section" id="s12">
+    <div class="section-header">
+      <div class="section-icon">🧬</div>
+      <div class="section-title">12. <span>Laboratoriya va Diagnostika Moduli</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Tahlil Natijasini Saqlash va Chop Etish</h3>
+      <ol class="step-list">
+        <li>Bemor kartasidan <strong>"+ Tahlil qo'shish"</strong> bosiladi</li>
+        <li><strong>Tahlil nomi</strong> kiritiladi (masalan: "Umumiy qon tahlili")</li>
+        <li><strong>Kategoriya</strong> tanlanadi: Qon tahlili / UZI / Rentgen / KT / Boshqa</li>
+        <li><strong>Natijalar</strong> kiritiladi: "Parametr: Qiymat" formatida (masalan: Gemoglobin: 125 g/L)</li>
+        <li>Saqlanadi va bemorning EHR kartasiga qo'shiladi</li>
+        <li><strong>🖨️ Tahlil Natijasini Chop Etish</strong> — rasmiy klinika blankasida, laborant ismi va muhr o'rni bilan</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 13 ═══ -->
+  <div class="section" id="s13">
+    <div class="section-header">
+      <div class="section-icon">🏥</div>
+      <div class="section-title">13. <span>Statsionar Bemorlar Boshqaruvi</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Vizual Palatalar Xaritasi (Visual Room Map)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Ko'rinish</th><th>Tavsifi</th><th>Tugmalar</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge badge-green">🟢 Bo'sh Koyka</span></td><td>Yashil rang, "BO'SH" yozuvi</td><td><strong>"+ Bemor qabul qilish"</strong> — xona va koyka avtomatik to'ldiriladi</td></tr>
+            <tr><td><span class="badge badge-blue">🔵 Band Koyka</span></td><td>Bemor ismi, shifokor, yotgan kun, jami summa</td><td><strong>"Chiqarish"</strong> — yakunlash | <strong>"🧾 Chek"</strong> — chop etish</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="alert alert-blue" style="margin-top:16px">
+        <div class="alert-icon">ℹ️</div>
+        <div>8 ta palata × 2 koyka = jami <strong>16 koyka</strong> vizual xaritada ko'rinadi. Har bir bo'sh koykaga yangi bemorni bir bosishda qabul qilish mumkin.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 14 ═══ -->
+  <div class="section" id="s14">
+    <div class="section-header">
+      <div class="section-icon">💰</div>
+      <div class="section-title">14. <span>Kassa Boshqaruvi</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Kassa hisobi jadvali</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Satr</th><th>Ma'nosi</th></tr></thead>
+          <tbody>
+            <tr><td>Boshlang'ich qoldiq</td><td>Tanlangan davrdan oldingi balans</td></tr>
+            <tr><td>Kirim — Naqt</td><td>Davrda naqd to'lovlar jami</td></tr>
+            <tr><td>Kirim — Karta</td><td>Davrda karta to'lovlar jami</td></tr>
+            <tr><td><strong>Jami kirim</strong></td><td><strong>Barcha kirimlar</strong></td></tr>
+            <tr><td>Chiqim — Harajat</td><td>Kiritilgan xarajatlar</td></tr>
+            <tr><td>Chiqim — Avans</td><td>Berilgan avanslar</td></tr>
+            <tr><td>Chiqim — Maosh</td><td>To'langan maoshlar</td></tr>
+            <tr><td><strong>Jami chiqim</strong></td><td><strong>Barcha chiqimlar</strong></td></tr>
+            <tr><td><strong>Yakuniy qoldiq</strong></td><td><strong style="color:var(--gold)">Kassada qolgan mablag'</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 15 ═══ -->
+  <div class="section" id="s15">
+    <div class="section-header">
+      <div class="section-icon">🔒</div>
+      <div class="section-title">15. <span>Inkassatsiya va Smena Yopish</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Smena yopish jarayoni (6 qadam)</h3>
+      <ol class="step-list">
+        <li><strong>Tizim avtomatik hisoblaydi:</strong> Bugungi naqd tushum − harajat = Kassada bo'lishi kerak bo'lgan naqd pul</li>
+        <li><strong>Kassir</strong> kassadagi pulni qo'lda sanaydi</li>
+        <li><strong>"Qo'lda sanalgan naqd pul"</strong> maydoniga kiritadi</li>
+        <li>Tizim <strong>farqni</strong> ko'rsatadi: 🔴 Kamomad yoki 🟢 Ortiqcha</li>
+        <li><strong>Seyfga topshiriladigan inkassatsiya summasi</strong> kiritiladi</li>
+        <li><strong>"Smenani Yopish"</strong> bosiladi → Inkassatsiya Dalolatnomasi chop etiladi (kassir + CEO imzosi)</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 16 ═══ -->
+  <div class="section" id="s16">
+    <div class="section-header">
+      <div class="section-icon">📈</div>
+      <div class="section-title">16–17. <span>Balans, Harajatlar va Avanslar</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Harajatlar kategoriyalari</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <span class="badge badge-gold">Kommunal (elektr, suv, gaz)</span>
+        <span class="badge badge-blue">Xodim maoshi</span>
+        <span class="badge badge-red">Ta'mirlash</span>
+        <span class="badge badge-green">Dori/material xarid</span>
+        <span class="badge badge-purple">Ijara</span>
+        <span class="badge badge-cyan">Transport</span>
+        <span class="badge badge-gold">Boshqa</span>
+      </div>
+      <div class="alert alert-gold" style="margin-top:16px">
+        <div class="alert-icon">⚠️</div>
+        <div>Faqat <strong>CEO</strong> xato kiritilgan harajatni bekor qila oladi. Bekor qilingan harajat balansga ta'sir qilmaydi va qizil chiziq bilan ko'rsatiladi.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 18 ═══ -->
+  <div class="section" id="s18">
+    <div class="section-header">
+      <div class="section-icon">💊</div>
+      <div class="section-title">18. <span>Omborxona (Dori/Material Hisobi)</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Kategoriyalar va imkoniyatlar</h3>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <span class="badge badge-red">💊 Dori-darmonlar</span>
+        <span class="badge badge-blue">🩺 Sarflash materiallari</span>
+        <span class="badge badge-purple">🔬 Reaktivlar</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Funksiya</th><th>Tavsifi</th></tr></thead>
+          <tbody>
+            <tr><td>⚠️ Ogohlantirish banneri</td><td>Qoldiq minimal miqdordan past tushganda sahifa yuqorisida qizil banner: "3 ta mahsulot tugayotgan..."</td></tr>
+            <tr><td>📥 Kirim (+)</td><td>Yangi material kelganda miqdor va izoh kiritib omborni to'ldirish</td></tr>
+            <tr><td>📤 Chiqim (-)</td><td>Ishlatilgan miqdor kiritish (qoldiqdan ko'p bo'lsa xato chiqadi)</td></tr>
+            <tr><td>Minimal miqdor</td><td>Har bir material uchun ogohlantirish chegarasi belgilanadi</td></tr>
+            <tr><td>Birliklar</td><td>Dona, flakon, quti, ml, litr, gramm va boshqa</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 21 ═══ -->
+  <div class="section" id="s21">
+    <div class="section-header">
+      <div class="section-icon">📢</div>
+      <div class="section-title">19–21. <span>Shifokorlar, Xizmatlar va Yo'naltiruvchilar</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Yo'naltiruvchilar — 50/50 Referral Split Qoidasi</h3>
+      <div class="alert alert-gold">
+        <div class="alert-icon">💡</div>
+        <div>Yo'naltiruvchi uchun belgilangan foiz (masalan 10%) <strong>quyidagicha bo'linadi:</strong> 50% shifokor ulushidan + 50% klinika ulushidan</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element</th><th>Misol hisob</th></tr></thead>
+          <tbody>
+            <tr><td>Bemor to'lovi</td><td><strong>200,000 so'm</strong></td></tr>
+            <tr><td>Shifokor foizi (40%)</td><td>Shifokor ulushi: <strong>80,000 so'm</strong></td></tr>
+            <tr><td>Yo'naltiruvchi foizi (10%)</td><td>Yo'naltiruvchi ulushi: <strong>20,000 so'm</strong> (Shifokordan: 10,000 + Klinikadan: 10,000)</td></tr>
+            <tr><td>Shifokor yakuniy ulushi</td><td><strong style="color:var(--gold)">70,000 so'm</strong> (80,000 − 10,000)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 24 ═══ -->
+  <div class="section" id="s24">
+    <div class="section-header">
+      <div class="section-icon">📊</div>
+      <div class="section-title">22–24. <span>Xodimlar, Avanslar va Maosh Kalkulyatori</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Oylik Maosh Hisoblash Formulasi</h3>
+      <div style="background:var(--card2);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:20px;text-align:center;margin:12px 0">
+        <p style="font-size:18px;font-weight:800;color:var(--gold);font-family:monospace">
+          Yakuniy Maosh = Shifokor/Xodim Ulushi − Ushbu Oy Avanslar
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Jadval Ustuni</th><th>Tavsifi</th></tr></thead>
+          <tbody>
+            <tr><td>Mijozlar Soni</td><td>Ushbu oy qabul qilgan bemorlar soni</td></tr>
+            <tr><td>Jami Tushum</td><td>Uning ko'riklaridan umumiy tushum</td></tr>
+            <tr><td>Hissi/Oyligi</td><td>Hisoblangan ulush (50/50 split hisobga olingan)</td></tr>
+            <tr><td>Avans (−)</td><td>Ushbu oy olgan avanslari</td></tr>
+            <tr><td><strong>Qo'lga Tegadigan Maosh (=)</strong></td><td><strong style="color:var(--gold)">Yakuniy to'lanadigan summa</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>Eksport imkoniyatlari:</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="badge badge-green">📥 Excel (.xlsx)</span>
+        <span class="badge badge-blue">📄 PDF</span>
+        <span class="badge badge-gold">🖨️ Rasmiy Oylik Maosh Qaydnomasi (CEO + Buxgalter imzosi)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 25 ═══ -->
+  <div class="section" id="s25">
+    <div class="section-header">
+      <div class="section-icon">📈</div>
+      <div class="section-title">25. <span>Hisobotlar Tizimi</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Hisobot turlari</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tur</th><th>Tavsif</th><th>Ko'rsatkichlar</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Kunlik</strong></td><td>Biror sana uchun</td><td>Jami bemorlar, naqd/karta, shifokor statistikasi, bekor qilishlar</td></tr>
+            <tr><td><strong>Haftalik</strong></td><td>7 kunlik jamlangan</td><td>Har kuni tushum grafigi</td></tr>
+            <tr><td><strong>Oylik</strong></td><td>Butun oy</td><td>Eng yaxshi kunlar, eng yaxshi shifokorlar</td></tr>
+            <tr><td><strong>Yillik</strong></td><td>Yil davomida</td><td>Oylar bo'yicha daromad grafigi</td></tr>
+            <tr><td><strong>Maxsus davr</strong></td><td>Ixtiyoriy oraliq</td><td>Tanlangan sanalar bo'yicha</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 26 ═══ -->
+  <div class="section" id="s26">
+    <div class="section-header">
+      <div class="section-icon">🤖</div>
+      <div class="section-title">26. <span>Telegram Bot Xabarnomalari</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>Kunlik CEO Hisoboti (har kuni soat 20:00)</h3>
+      <div class="code-block">
+📊 MARJONA MED SERVICE - Kunlik Hisobot
+📅 Sana: 05.08.2026
+
+💰 Kunlik Daromad: 2,350,000 so'm
+👥 Bemorlar Soni: 18 ta
+📈 Haftalik o'rtacha: 1,890,000 so'm
+
+🏆 Bugungi eng faol shifokor:
+Dr. Azimov Bobur — 7 ta bemor
+      </div>
+      <h4>Real-Vaqt Xabarnomalar:</h4>
+      <ul class="bullet-list">
+        <li>✅ <strong>Yangi bemor qabul:</strong> Ismi, to'lov miqdori, shifokor</li>
+        <li>❌ <strong>To'lov bekor qilindi:</strong> Bemor ismi, bekor qilingan summa</li>
+        <li>💸 <strong>Yangi harajat:</strong> Kategoriya, miqdor, kim kiritgani</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 27 ═══ -->
+  <div class="section" id="s27">
+    <div class="section-header">
+      <div class="section-icon">💬</div>
+      <div class="section-title">27. <span>Ichki Chat va Bildirishnomalar</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <ul class="bullet-list">
+        <li><strong>Ichki Chat:</strong> CEO, Admin va Shifokorlar orasida real-vaqt xabar almashuvi — sahifa yuqorisidagi chat belgisi orqali</li>
+        <li><strong>Bildirishnomalar (🔔):</strong> Navbat o'zgarishi, yangi xabar, ombor ogohlantirishlari</li>
+        <li>O'qilmagan xabarlar soni ko'rsatiladi</li>
+        <li>"Barchasini o'qilgan" deb belgilash imkoniyati</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 28 ═══ -->
+  <div class="section" id="s28">
+    <div class="section-header">
+      <div class="section-icon">🏷️</div>
+      <div class="section-title">28. <span>Chegirma va Promo Tizimi</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tur</th><th>Misol</th><th>Hisob</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Foizli (%)</strong></td><td>Asosiy: 200,000 so'm, Chegirma: 20%</td><td>Chegirma: 40,000 | Yakuniy: <strong>160,000 so'm</strong></td></tr>
+            <tr><td><strong>Summaviy (so'm)</strong></td><td>Asosiy: 200,000 so'm, Chegirma: 50,000</td><td>Yakuniy: <strong>150,000 so'm</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="alert alert-gold" style="margin-top:12px">
+        <div class="alert-icon">📝</div>
+        <div>Har bir chegirmaga <strong>sabab kiritilishi shart</strong> (masalan: "VIP mijoz", "Ko'p marta kelgan"). Chek va hisobotlarda ko'rsatiladi va auditda saqlanadi.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 29 ═══ -->
+  <div class="section" id="s29">
+    <div class="section-header">
+      <div class="section-icon">🖨️</div>
+      <div class="section-title">29. <span>Chop Etish va Blankalar Tizimi</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Hujjat</th><th>Format</th><th>Tarkibi</th></tr></thead>
+          <tbody>
+            <tr><td><strong>📄 Navbat Taloni</strong></td><td><span class="badge badge-gold">80mm</span></td><td>Klinika nomi, navbat №, kabinet, bemor, xizmat, summa, vaqt</td></tr>
+            <tr><td><strong>🧾 Kassa Cheki</strong></td><td><span class="badge badge-gold">80mm</span></td><td>Tranzaksiya №, bemor, xizmat, chegirma, yakuniy summa, to'lov turi</td></tr>
+            <tr><td><strong>🔒 Inkassatsiya Dalolatnomasi</strong></td><td><span class="badge badge-gold">80mm</span></td><td>Kassir, sana, kutilgan/sanalgan naqd, seyfga topshirildi, imzolar</td></tr>
+            <tr><td><strong>📊 Oylik Maosh Qaydnomasi</strong></td><td><span class="badge badge-blue">A4</span></td><td>Xodimlar jadvali, ulushlar, avanslar, yakuniy maosh, CEO+Buxgalter imzosi</td></tr>
+            <tr><td><strong>🧬 Laboratoriya Blankas</strong></td><td><span class="badge badge-blue">A4</span></td><td>Parametrlar jadvali, laborant ismi, muhr o'rni, imzo</td></tr>
+            <tr><td><strong>🏥 Statsionar Chiqish Cheki</strong></td><td><span class="badge badge-blue">A4</span></td><td>Kirish/chiqish sanasi, kun soni, tarif, jami summa, tashxis</td></tr>
+            <tr><td><strong>🩺 Tibbiy Ko'rik Blankas</strong></td><td><span class="badge badge-blue">A4</span></td><td>Tashxis (ICD-10), natijalar, retsept, shifokor imzosi va muhr</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 30 ═══ -->
+  <div class="section" id="s30">
+    <div class="section-header">
+      <div class="section-icon">📺</div>
+      <div class="section-title">30. <span>TV Navbat Ekrani</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Bu sahifa <strong style="color:var(--text)">karidor yoki kutish zalidagi katta TV yoki monitorga</strong> ulanadi va doimo ochiq qoladi.</p>
+      <div style="background:#0d1117;border-radius:12px;padding:32px;text-align:center;border:1px solid var(--border)">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:8px">🔔 CHAQIRILMOQDA:</p>
+        <p style="font-size:32px;font-weight:900;color:var(--gold)">MALIKA YUSUPOVA</p>
+        <p style="font-size:18px;font-weight:700;color:var(--cyan);margin-top:8px">3-XONA (KARDIOLOGIYA)</p>
+        <p style="font-size:14px;color:var(--muted);margin-top:8px">Iltimos, kiring!</p>
+      </div>
+      <ul class="bullet-list" style="margin-top:16px">
+        <li><strong>WebSocket</strong> orqali real-vaqtda yangilanadi — bir necha millisoniyada</li>
+        <li><strong>Ovozli signal</strong> (chime) — yangi chaqiruv kelib tushganda yangradi</li>
+        <li><strong>O'ng tarafda:</strong> Kutayotgan bemorlar ro'yxati (navbat №, ism)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 31 ═══ -->
+  <div class="section" id="s31">
+    <div class="section-header">
+      <div class="section-icon">📜</div>
+      <div class="section-title">31. <span>Faoliyat Tarixi (Audit Journal)</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:12px">Tizimda amalga oshirilgan barcha muhim amallar saqlanadi va ko'rsatiladi:</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <span class="badge badge-green">Yangi bemor qo'shilishi</span>
+        <span class="badge badge-gold">To'lov qabul qilinishi</span>
+        <span class="badge badge-red">To'lov bekor qilinishi</span>
+        <span class="badge badge-blue">Harajat kiritilishi</span>
+        <span class="badge badge-purple">Avans berilishi</span>
+        <span class="badge badge-cyan">Tizimga kirish/chiqish</span>
+      </div>
+      <div class="alert alert-blue" style="margin-top:16px">
+        <div class="alert-icon">ℹ️</div>
+        <div>Har bir amal uchun: <strong>Sana va vaqt</strong>, <strong>Kim bajargan</strong> (foydalanuvchi), <strong>Qanday amal</strong>, <strong>Tafsilotlar</strong> (summa, bemor ismi va h.k.) saqlanadi.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 32 ═══ -->
+  <div class="section" id="s32">
+    <div class="section-header">
+      <div class="section-icon">🌐</div>
+      <div class="section-title">32. <span>Tarmoq Manzillari va Ishga Tushirish</span></div>
+    </div>
+    <div class="section-divider"></div>
+    <div class="card">
+      <h3>To'liq Tarmoq Manzillari</h3>
+      <div class="url-item"><span class="url-label">🔴 CEO Boshqaruv Paneli</span><a class="url-link" href="http://192.168.0.101:5173/ceo">192.168.0.101:5173/ceo</a></div>
+      <div class="url-item"><span class="url-label">📊 Maosh Kalkulyatori (Payroll)</span><a class="url-link" href="http://192.168.0.101:5173/ceo/payroll">192.168.0.101:5173/ceo/payroll</a></div>
+      <div class="url-item"><span class="url-label">💰 Kassa va Inkassatsiya</span><a class="url-link" href="http://192.168.0.101:5173/ceo/cash">192.168.0.101:5173/ceo/cash</a></div>
+      <div class="url-item"><span class="url-label">🏥 Statsionar Palatalar Xaritasi</span><a class="url-link" href="http://192.168.0.101:5173/ceo/inpatients">192.168.0.101:5173/ceo/inpatients</a></div>
+      <div class="url-item"><span class="url-label">📈 Hisobotlar</span><a class="url-link" href="http://192.168.0.101:5173/ceo/reports">192.168.0.101:5173/ceo/reports</a></div>
+      <div class="url-item"><span class="url-label">💊 Omborxona (CEO)</span><a class="url-link" href="http://192.168.0.101:5173/ceo/inventory">192.168.0.101:5173/ceo/inventory</a></div>
+      <div class="url-item"><span class="url-label">🟡 Registratura Bosh Paneli</span><a class="url-link" href="http://192.168.0.101:5173/admin">192.168.0.101:5173/admin</a></div>
+      <div class="url-item"><span class="url-label">🆕 Yangi Bemor Qabul</span><a class="url-link" href="http://192.168.0.101:5173/admin/new-patient">192.168.0.101:5173/admin/new-patient</a></div>
+      <div class="url-item"><span class="url-label">📋 Bugungi Bemorlar va Navbat</span><a class="url-link" href="http://192.168.0.101:5173/admin/today">192.168.0.101:5173/admin/today</a></div>
+      <div class="url-item"><span class="url-label">📅 Qabul Kalendari</span><a class="url-link" href="http://192.168.0.101:5173/admin/appointments">192.168.0.101:5173/admin/appointments</a></div>
+      <div class="url-item"><span class="url-label">💊 Omborxona (Admin)</span><a class="url-link" href="http://192.168.0.101:5173/admin/inventory">192.168.0.101:5173/admin/inventory</a></div>
+      <div class="url-item"><span class="url-label">🩺 Shifokor Paneli</span><a class="url-link" href="http://192.168.0.101:5173/doctor">192.168.0.101:5173/doctor</a></div>
+      <div class="url-item"><span class="url-label">📺 Karidor TV Navbat Ekrani</span><a class="url-link" href="http://192.168.0.101:5173/tv">192.168.0.101:5173/tv</a></div>
+      <div class="url-item"><span class="url-label">🔧 API Hujjati (Swagger)</span><a class="url-link" href="http://192.168.0.101:8000/docs">192.168.0.101:8000/docs</a></div>
+    </div>
+    <div class="card">
+      <h3>Serverni ishga tushirish buyruqlari</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px"><strong style="color:var(--text)">Backend (API Server):</strong></p>
+      <div class="code-block">cd "c:\Users\hp\OneDrive\Desktop\mms crm\marjona-med\backend"
+.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000</div>
+      <p style="font-size:13px;color:var(--muted);margin:12px 0 8px"><strong style="color:var(--text)">Frontend (Web Server):</strong></p>
+      <div class="code-block">cd "c:\Users\hp\OneDrive\Desktop\mms crm\marjona-med\frontend"
+npx vite --host 0.0.0.0 --port 5173</div>
+    </div>
+    <div class="card">
+      <h3>Texnik tuzilma</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Qatlam</th><th>Texnologiya</th></tr></thead>
+          <tbody>
+            <tr><td>Frontend</td><td><span class="badge badge-cyan">React 18</span> <span class="badge badge-blue">Vite 6</span> <span class="badge badge-gold">Vanilla CSS</span></td></tr>
+            <tr><td>Grafiklar</td><td><span class="badge badge-purple">Recharts</span></td></tr>
+            <tr><td>Backend</td><td><span class="badge badge-green">Python FastAPI</span> <span class="badge badge-blue">SQLAlchemy</span></td></tr>
+            <tr><td>Ma'lumotlar bazasi</td><td><span class="badge badge-gold">SQLite (lokal fayl)</span></td></tr>
+            <tr><td>Real-vaqt aloqa</td><td><span class="badge badge-cyan">WebSocket</span></td></tr>
+            <tr><td>Autentifikatsiya</td><td><span class="badge badge-red">JWT Token</span> <span class="badge badge-blue">bcrypt</span></td></tr>
+            <tr><td>Telegram Bot</td><td><span class="badge badge-cyan">python-telegram-bot</span></td></tr>
+            <tr><td>Excel/PDF Eksport</td><td><span class="badge badge-green">xlsx</span> <span class="badge badge-red">jsPDF</span></td></tr>
+            <tr><td>Offline qo'llab-quvvatlash</td><td><span class="badge badge-purple">PWA + Workbox Service Worker</span></td></tr>
+            <tr><td>Printer</td><td><span class="badge badge-gold">80mm termik printer (@media print)</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <strong>Marjona Med Service CRM Tizimi</strong> — barcha huquqlar himoyalangan © 2026<br>
+  <span style="font-size:11px;margin-top:4px;display:block">Hujjat versiyasi: 3.0 Enterprise — 2026-yil Avgust</span>
+</div>
+
+</body>
+</html>

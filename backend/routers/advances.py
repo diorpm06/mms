@@ -1,152 +1,126 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
-from sqlalchemy import extract
-from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
+from typing import List, Optional
 
-from auth_utils import require_ceo
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from auth_utils import require_admin_or_ceo, require_ceo
 from database import get_db
-from models.advance import Advance
-from models.employee import Employee
+from models.provider import Provider
+from models.provider_advance import ProviderAdvance
+from models.referrer import Referrer
 from models.user import User
-from services.audit import get_client_info, log_audit
-from services.finance import cancel_advance, process_advance
-from services.telegram_notify import send_telegram_message
+from schemas import ProviderAdvanceCreate, ProviderAdvanceOut
 
 router = APIRouter(prefix="/api/advances", tags=["advances"])
 
 
-class AdvanceCreate(BaseModel):
-    employee_id: int
-    amount: int = Field(gt=0)
-    note: str | None = None
-    source: str | None = None
+@router.get("", response_model=List[ProviderAdvanceOut])
+def list_advances(
+    recipient_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    query = db.query(ProviderAdvance)
+    if recipient_type:
+        query = query.filter(ProviderAdvance.recipient_type == recipient_type)
 
+    advances = query.order_by(ProviderAdvance.created_at.desc()).all()
+    results = []
+    for a in advances:
+        name = "Noma'lum"
+        if a.recipient_type == "provider":
+            p = db.query(Provider).filter(Provider.id == a.recipient_id).first()
+            if p:
+                name = p.full_name
+        elif a.recipient_type == "referrer":
+            r = db.query(Referrer).filter(Referrer.id == a.recipient_id).first()
+            if r:
+                name = r.full_name
 
-class CancelBody(BaseModel):
-    reason: str = Field(min_length=3)
-
-
-@router.get("")
-def list_advances(db: Session = Depends(get_db), _: User = Depends(require_ceo)):
-    items = (
-        db.query(Advance)
-        .options(joinedload(Advance.employee))
-        .order_by(Advance.created_at.desc())
-        .limit(100)
-        .all()
-    )
-    out = []
-    for a in items:
-        note = a.note
-        source = None
-        if note and note.startswith("[MANBA:") and "] " in note:
-            source = note.split("] ", 1)[0].replace("[MANBA:", "").strip()
-            note = note.split("] ", 1)[1]
-        month = a.created_at.strftime("%Y-%m")
-        month_adv_total = (
-            db.query(Advance)
-            .filter(
-                Advance.employee_id == a.employee_id,
-                Advance.is_cancelled == False,
-                extract("year", Advance.created_at) == a.created_at.year,
-                extract("month", Advance.created_at) == a.created_at.month,
+        results.append(
+            ProviderAdvanceOut(
+                id=a.id,
+                recipient_type=a.recipient_type,
+                recipient_id=a.recipient_id,
+                recipient_name=name,
+                amount=a.amount,
+                remaining=a.remaining,
+                note=a.note,
+                is_settled=a.is_settled,
+                created_at=a.created_at,
             )
-            .all()
         )
-        total_adv = int(sum(x.amount for x in month_adv_total))
-        base = int(a.employee.monthly_salary if a.employee else 0)
-        out.append(
-            {
-                "id": a.id,
-                "employee_id": a.employee_id,
-                "employee_name": a.employee.full_name if a.employee else "?",
-                "amount": a.amount,
-                "note": note,
-                "source": source,
-                "is_cancelled": a.is_cancelled,
-                "created_at": a.created_at.isoformat(),
-                "month": month,
-                "base_salary": base,
-                "month_advances_total": total_adv,
-                "remaining_salary": max(0, base - total_adv),
-            }
-        )
-    return out
+    return results
 
 
-@router.post("")
+@router.post("", response_model=ProviderAdvanceOut)
 def create_advance(
-    data: AdvanceCreate,
-    request: Request,
+    data: ProviderAdvanceCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_ceo),
+    _: User = Depends(require_ceo),
 ):
-    emp = db.query(Employee).filter(Employee.id == data.employee_id, Employee.is_active == True).first()
-    if not emp:
-        raise HTTPException(status_code=404, detail="Xodim topilmadi")
-    note = data.note
-    if data.source:
-        note = f"[MANBA: {data.source}] {note or ''}".strip()
-    process_advance(db, data.amount, f"Avans: {emp.full_name}")
-    adv = Advance(employee_id=data.employee_id, amount=data.amount, note=note, created_by=user.id)
-    db.add(adv)
-    db.flush()
-    ip, device = get_client_info(request)
-    log_audit(
-        db, user_id=user.id, user_role=user.role, action_type="ADVANCE",
-        table_name="advances", record_id=adv.id,
-        new_data={"employee": emp.full_name, "amount": data.amount},
-        ip_address=ip, device_info=device,
-        detail_message=f"Avans berildi: {emp.full_name} — {data.amount:,} so'm".replace(",", " "),
+    if data.recipient_type not in ("provider", "referrer"):
+        raise HTTPException(status_code=400, detail="Recipient type 'provider' yoki 'referrer' bo'lishi kerak")
+
+    name = "Noma'lum"
+    if data.recipient_type == "provider":
+        p = db.query(Provider).filter(Provider.id == data.recipient_id).first()
+        if not p:
+            raise HTTPException(status_code=404, detail="Shifokor topilmadi")
+        name = p.full_name
+    else:
+        r = db.query(Referrer).filter(Referrer.id == data.recipient_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
+        name = r.full_name
+
+    advance = ProviderAdvance(
+        recipient_type=data.recipient_type,
+        recipient_id=data.recipient_id,
+        amount=data.amount,
+        remaining=data.amount,  # initial remaining = total amount
+        note=data.note,
+        is_settled=False,
     )
+    db.add(advance)
     db.commit()
-    import asyncio
-    import threading
-    threading.Thread(
-        target=lambda: asyncio.run(
-            send_telegram_message(
-                f"💸 Avans berildi\n👤 {emp.full_name}\n💰 {data.amount:,} so'm".replace(",", " "),
-                section="finance",
-            )
-        ),
-        daemon=True,
-    ).start()
-    return {"id": adv.id}
+    db.refresh(advance)
+
+    return ProviderAdvanceOut(
+        id=advance.id,
+        recipient_type=advance.recipient_type,
+        recipient_id=advance.recipient_id,
+        recipient_name=name,
+        amount=advance.amount,
+        remaining=advance.remaining,
+        note=advance.note,
+        is_settled=advance.is_settled,
+        created_at=advance.created_at,
+    )
 
 
-@router.post("/{advance_id}/cancel")
-def cancel_advance_record(
+@router.post("/{advance_id}/settle")
+def settle_advance(
     advance_id: int,
-    body: CancelBody,
-    request: Request,
+    amount: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_ceo),
+    _: User = Depends(require_ceo),
 ):
-    adv = db.query(Advance).filter(Advance.id == advance_id).first()
-    if not adv or adv.is_cancelled:
-        raise HTTPException(status_code=400, detail="Avans topilmadi yoki bekor qilingan")
-    cancel_advance(db, adv.amount)
-    adv.is_cancelled = True
-    adv.cancelled_at = datetime.utcnow()
-    adv.cancelled_by = user.id
-    adv.cancel_reason = body.reason
-    ip, device = get_client_info(request)
-    log_audit(
-        db, user_id=user.id, user_role=user.role, action_type="CANCEL",
-        table_name="advances", record_id=adv.id, reason=body.reason,
-        ip_address=ip, device_info=device,
-    )
+    advance = db.query(ProviderAdvance).filter(ProviderAdvance.id == advance_id).first()
+    if not advance:
+        raise HTTPException(status_code=404, detail="Avans topilmadi")
+
+    if advance.is_settled:
+        raise HTTPException(status_code=400, detail="Ushbu avans allaqachon to'liq qoplangan")
+
+    deduct = min(amount, advance.remaining)
+    advance.remaining -= deduct
+
+    if advance.remaining <= 0:
+        advance.remaining = 0
+        advance.is_settled = True
+        advance.settled_at = datetime.utcnow()
+
     db.commit()
-    import asyncio
-    import threading
-    threading.Thread(
-        target=lambda: asyncio.run(
-            send_telegram_message(
-                f"❌ Avans bekor qilindi\n👤 {adv.employee.full_name if adv.employee else '?'}\n📝 Sabab: {body.reason}",
-                section="cancellations",
-            )
-        ),
-        daemon=True,
-    ).start()
-    return {"message": "Avans bekor qilindi"}
+    return {"message": f"{deduct:,} so'm avans qoplandi", "remaining": advance.remaining, "is_settled": advance.is_settled}

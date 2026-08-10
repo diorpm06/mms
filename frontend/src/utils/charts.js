@@ -4,7 +4,7 @@ export function paymentPieData(cash, card, paymentChart) {
   if (fromApi.length) return fromApi
   return [
     { name: 'Naqt',  value: cash || 0 },
-    { name: 'Karta', value: card || 0 },
+    { name: 'QR / Terminal', value: card || 0 },
   ].filter((d) => d.value > 0)
 }
 

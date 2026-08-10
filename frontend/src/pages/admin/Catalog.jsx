@@ -56,17 +56,19 @@ export default function AdminCatalog() {
               <thead>
                 <tr className="table-head border-b">
                   <th className="p-2 text-left">Nomi</th>
+                  <th className="p-2 text-left">Joylashgan Xona</th>
                   <th className="p-2 text-left">Narxi</th>
                   <th className="p-2 text-left">Holati</th>
                 </tr>
               </thead>
               <tbody>
                 {services.length === 0 ? (
-                  <tr><td colSpan={3} className="text-muted p-6 text-center">Xizmatlar yo'q</td></tr>
+                  <tr><td colSpan={4} className="text-muted p-6 text-center">Xizmatlar yo'q</td></tr>
                 ) : services.map((s) => (
                   <tr key={s.id} className="table-row border-b">
-                    <td className="p-2">{s.name}</td>
-                    <td className="accent-value p-2">{formatMoney(s.price)}</td>
+                    <td className="p-2 font-medium">{s.name}</td>
+                    <td className="p-2 text-cyan-400 font-semibold">🚪 {s.cabinet || '1-Xona'}</td>
+                    <td className="accent-value p-2 font-bold">{formatMoney(s.price)}</td>
                     <td className="p-2">{s.is_active ? 'Faol' : 'Nofaol'}</td>
                   </tr>
                 ))}

@@ -42,7 +42,36 @@ def _with_db(fn):
 
 
 def job_daily_report():
+    import json
+    from models.saved_report import SavedReport
+    from services.export import export_pdf
+
     def _job(db: Session):
+        d = date.today()
+        rep = daily_report(db, d)
+        pdf_bytes = export_pdf(rep, title=f"Marjona Med — Kunlik Hisobot ({d.strftime('%d.%m.%Y')})")
+        d_str = d.isoformat()
+
+        saved = db.query(SavedReport).filter(
+            SavedReport.report_type == "daily",
+            SavedReport.period_start == d_str,
+        ).first()
+
+        if not saved:
+            saved = SavedReport(
+                report_type="daily",
+                period_start=d_str,
+                period_end=d_str,
+                title=f"Kunlik Hisobot — {d.strftime('%d.%m.%Y')}",
+                pdf_data=pdf_bytes,
+                json_data=json.dumps(rep, default=str),
+            )
+            db.add(saved)
+        else:
+            saved.pdf_data = pdf_bytes
+            saved.json_data = json.dumps(rep, default=str)
+            saved.created_at = datetime.utcnow()
+
         msg = format_daily_message(db)
         _run_async(send_telegram_message(msg, section="reports"))
 
@@ -143,10 +172,10 @@ def job_sheets_backup_sync():
 def start_scheduler():
     if scheduler.running:
         return
-    scheduler.add_job(job_daily_report, "cron", hour=0, minute=0, id="daily_report")
-    scheduler.add_job(job_weekly_report, "cron", day_of_week="sun", hour=0, minute=0, id="weekly_report")
-    scheduler.add_job(job_monthly_report_and_salary, "cron", day="last", hour=0, minute=0, id="monthly")
-    scheduler.add_job(job_ten_day_payout, "cron", day="10,20,last", hour=0, minute=0, id="ten_day_payout")
+    scheduler.add_job(job_daily_report, "cron", hour=20, minute=0, id="daily_report")
+    scheduler.add_job(job_weekly_report, "cron", day_of_week="sun", hour=20, minute=0, id="weekly_report")
+    scheduler.add_job(job_monthly_report_and_salary, "cron", day="last", hour=20, minute=0, id="monthly")
+    scheduler.add_job(job_ten_day_payout, "cron", day="10,20,last", hour=20, minute=0, id="ten_day_payout")
     scheduler.add_job(job_salary_reminder, "interval", minutes=1, id="salary_reminder")
     scheduler.add_job(job_sheets_backup_sync, "interval", minutes=2, id="sheets_backup_sync")
     scheduler.start()

@@ -1,54 +1,65 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { Moon, Sun, LogOut, Menu, X } from 'lucide-react'
+import { Moon, Sun, LogOut, Menu, X, MessageSquare } from 'lucide-react'
 import { api } from '../utils/api'
 import { useTheme } from '../hooks/useTheme'
 import NotificationBell from './NotificationBell'
+import InternalChatModal from './InternalChatModal'
 import logo from '@assets/logo.png'
 
 const CEO_LINKS = [
-  { to: '/ceo',              label: 'Dashboard',           end: true },
-  { to: '/ceo/new-patient',  label: 'Yangi mijoz' },
-  { to: '/ceo/search',       label: 'Qidirish' },
-  { to: '/ceo/patients',     label: 'Mijozlar' },
-  { to: '/ceo/services',     label: 'Xizmatlar' },
-  { to: '/ceo/referrers',    label: "Yo'naltiruvchilar" },
-  { to: '/ceo/providers',    label: "Xizmat ko'rsatuvchilar" },
-  { to: '/ceo/employees',    label: 'Xodimlar' },
-  { to: '/ceo/inpatients',   label: 'Yotganlar' },
-  { to: '/ceo/duty',         label: 'Dejur' },
-  { to: '/ceo/cash',         label: 'Kassa' },
-  { to: '/ceo/balance',      label: 'Balans' },
-  { to: '/ceo/expenses',     label: 'Harajatlar' },
-  { to: '/ceo/advances',     label: 'Avanslar' },
-  { to: '/ceo/reports',      label: 'Hisobotlar' },
-  { to: '/ceo/activity',     label: 'Faoliyat tarixi' },
-  { to: '/ceo/backup',       label: 'Backup (Sheets URL)' },
-  { to: '/ceo/change-password', label: 'Parollar' },
+  { to: '/ceo',                 label: 'Dashboard',             icon: '📌', end: true },
+  { to: '/ceo/new-patient',     label: 'Yangi Mijoz Qabul',     icon: '➕' },
+  { to: '/ceo/patients',        label: 'Barcha Bemorlar va Qidiruv', icon: '👤' },
+  { to: '/ceo/reports',         label: 'Hisobotlar va Moliya Markazi', icon: '📊' },
+  { to: '/ceo/expenses',        label: 'Harajatlar (Xarajatlar)',icon: '💸' },
+  { to: '/ceo/employees',       label: 'Xodimlar va Shifokorlar',icon: '👨‍⚕️' },
+  { to: '/ceo/services',        label: 'Xizmatlar Katalogi',    icon: '🩺' },
+  { to: '/ceo/referrers',       label: "Yo'naltiruvchilar (10-Kunlik)", icon: '🤝' },
+  { to: '/ceo/inventory',       label: 'Omborxona',             icon: '💊' },
+  { to: '/ceo/doctor',          label: 'Doctor Paneli',         icon: '🩺' },
+  { to: '/ceo/tv-manager',      label: 'TV Navbat Ekrani',      icon: '📺' },
+  { to: '/ceo/inpatients',      label: 'Statsionar (Yotganlar)',icon: '🛏️' },
+  { to: '/ceo/activity',        label: 'Tizim Faoliyati Tarixi',icon: '📜' },
+  { to: '/ceo/backup',          label: 'Sheets Backup Sync',    icon: '🔄' },
+  { to: '/ceo/change-password', label: 'Parollar va Xavfsizlik',icon: '🔐' },
 ]
 
 const ADMIN_LINKS = [
-  { to: '/admin',            label: 'Dashboard',        end: true },
-  { to: '/admin/new-patient',label: 'Yangi mijoz' },
-  { to: '/admin/search',     label: 'Qidirish' },
-  { to: '/admin/today',      label: 'Bugungi mijozlar' },
-  { to: '/admin/catalog',    label: "Ma'lumotnomalar" },
-  { to: '/admin/reports',    label: 'Kunlik hisobot' },
-  { to: '/admin/inpatients', label: 'Yotganlar' },
-  { to: '/admin/expenses',   label: 'Harajat' },
+  { to: '/admin',               label: 'Dashboard',             icon: '📌', end: true },
+  { to: '/admin/new-patient',   label: 'Yangi Mijoz Qabul',     icon: '➕' },
+  { to: '/admin/today',         label: 'Bugungi Bemorlar',     icon: '📋' },
+  { to: '/admin/expenses',      label: 'Harajat Kiritish',     icon: '💸' },
+  { to: '/admin/patients',      label: 'Barcha Bemorlar va Qidiruv', icon: '👤' },
+  { to: '/admin/reports',       label: 'Kunlik Hisobot',        icon: '📊' },
+  { to: '/admin/appointments',  label: 'Kalendar & Navbat',    icon: '📅' },
+  { to: '/admin/doctor',        label: 'Doctor Paneli',         icon: '🩺' },
+  { to: '/admin/tv-manager',    label: 'TV Navbat Ekrani',      icon: '📺' },
+  { to: '/admin/inventory',     label: 'Omborxona (Material)', icon: '💊' },
+  { to: '/admin/inpatients',    label: 'Statsionar (Yotganlar)',icon: '🛏️' },
+  { to: '/admin/catalog',       label: "Ma'lumotnomalar",       icon: '📚' },
 ]
+
+const DOCTOR_LINKS = [
+  { to: '/doctor',              label: 'Doctor Paneli',         icon: '🩺', end: true },
+]
+
 
 export default function Layout({ role }) {
   const { toggleTheme, role: authRole, logout, accessToken } = useAuthStore()
   const [logoError, setLogoError] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
   const { isLight } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
-  const links = role === 'ceo' ? CEO_LINKS : ADMIN_LINKS
+  
+  // Prioritize layout route role over store authRole so doctor layout strictly shows DOCTOR_LINKS
+  const effectiveRole = role || authRole
+  const links = effectiveRole === 'doctor' ? DOCTOR_LINKS : effectiveRole === 'admin' ? ADMIN_LINKS : CEO_LINKS
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navRef = useRef(null)
-  const scrollKey = `sidebar-scroll-${role}`
+  const scrollKey = `sidebar-scroll-${effectiveRole}`
 
   const handleLogout = async () => {
     try {
@@ -94,131 +105,134 @@ export default function Layout({ role }) {
             MMS
           </div>
         )}
-        <p className="text-center text-sm font-bold" style={{ color: 'var(--gold)' }}>
+        <p className="text-center text-sm font-black tracking-wide" style={{ color: 'var(--gold)' }}>
           Marjona Med Service
         </p>
-        <p className="text-muted text-xs">{authRole === 'ceo' ? 'CEO' : 'Admin'}</p>
+        <p className="text-muted text-xs font-semibold">
+          {effectiveRole === 'doctor' ? '🩺 Shifokor' : effectiveRole === 'admin' ? '👤 Administrator (Admin)' : '👑 CEO (Boshqaruv)'}
+        </p>
       </div>
 
-      <nav ref={navRef} onScroll={saveScroll} className="flex flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+      <nav ref={navRef} onScroll={saveScroll} className="flex flex-1 flex-col gap-1 overflow-y-auto pr-1">
         {links.map((l) => (
-          <Link
-            key={l.to}
-            to={l.to}
-            onClick={() => { saveScroll(); setSidebarOpen(false) }}
-            className={isActive(l.to, l.end) ? 'nav-active' : 'nav-link'}
-          >
-            {l.label}
-          </Link>
+          l.external ? (
+            <a
+              key={l.to}
+              href={l.to}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="nav-link font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-2"
+            >
+              <span>{l.icon}</span>
+              <span>{l.label} ↗</span>
+            </a>
+          ) : (
+            <Link
+              key={l.to}
+              to={l.to}
+              onClick={() => { saveScroll(); setSidebarOpen(false) }}
+              className={`${isActive(l.to, l.end) ? 'nav-active font-bold' : 'nav-link'} flex items-center gap-2.5`}
+            >
+              <span className="text-base">{l.icon}</span>
+              <span>{l.label}</span>
+            </Link>
+          )
         ))}
       </nav>
 
       <div
-        className="mt-2 flex gap-2 border-t pt-3"
+        className="mt-2 flex gap-1.5 border-t pt-3"
         style={{ borderColor: 'var(--border)' }}
       >
-        <div className="flex items-center justify-center">
-          <NotificationBell />
-        </div>
+        <button
+          type="button"
+          onClick={() => setChatOpen(!chatOpen)}
+          className="btn-gold flex-1 py-2 text-xs font-bold flex items-center justify-center gap-1 shadow-md"
+          title="Klinika Chat"
+        >
+          <MessageSquare className="h-4 w-4" /> Chat
+        </button>
         <button
           type="button"
           onClick={toggleTheme}
-          className="btn-outline flex-1 py-2 text-sm"
-          title={isLight ? 'Qora mavzu' : 'Oq mavzu'}
+          className="btn-outline flex h-9 w-9 items-center justify-center rounded-xl p-0"
+          title={isLight ? 'Qorong me rejim' : 'Yorug rejim'}
         >
-          {isLight ? <Moon className="mx-auto h-4 w-4" /> : <Sun className="mx-auto h-4 w-4" />}
+          {isLight ? <Moon className="h-4 w-4 text-amber-400" /> : <Sun className="h-4 w-4 text-amber-400" />}
         </button>
         <button
           type="button"
           onClick={handleLogout}
-          className="btn-outline flex-1 py-2 text-sm"
-          title="Chiqish"
+          className="btn-danger flex h-9 w-9 items-center justify-center rounded-xl p-0"
+          title="Tizimdan chiqish"
         >
-          <LogOut className="mx-auto h-4 w-4" />
+          <LogOut className="h-4 w-4" />
         </button>
       </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen">
-      {/* Desktop sidebar */}
-      <aside className="fixed left-0 top-0 hidden h-full md:flex">
+    <div className="flex h-screen w-screen overflow-hidden bg-body font-sans text-body transition-colors duration-200">
+      {/* Desktop Sidebar (Independent Left Scroll Area) */}
+      <aside className="hidden md:flex md:w-64 flex-shrink-0 h-screen overflow-hidden border-r border-border/40">
         <SidebarContent />
       </aside>
 
-      {/* Mobile hamburger */}
-      <header
-        className="fixed left-0 right-0 top-0 z-20 flex h-14 items-center gap-3 border-b px-4 md:hidden"
-        style={{
-          background: 'var(--surface)',
-          borderColor: 'var(--border)',
-          boxShadow: 'var(--card-shadow)',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(true)}
-          className="btn-ghost p-2"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-        <p className="flex-1 font-bold text-sm" style={{ color: 'var(--gold)' }}>
-          Marjona Med Service
-        </p>
-        <NotificationBell />
-      </header>
-
-      {/* Mobile overlay */}
+      {/* Mobile Drawer */}
       {sidebarOpen && (
-        <div
-          className="sidebar-overlay md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div className="relative flex w-64 max-w-xs flex-1 flex-col z-10 h-full overflow-hidden">
+            <SidebarContent />
+          </div>
+        </div>
       )}
 
-      {/* Mobile sidebar drawer */}
-      <div className={`sidebar-mobile md:hidden ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar flex h-full flex-col p-4 w-64">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="font-bold text-sm" style={{ color: 'var(--gold)' }}>Menyu</p>
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(false)}
-              className="btn-ghost p-1"
-            >
-              <X className="h-5 w-5" />
+      {/* Main Content Area (Independent Right Scroll Area) */}
+      <div className="flex flex-1 flex-col min-w-0 h-screen overflow-hidden">
+        {/* Mobile Header Bar */}
+        <header className="flex h-14 items-center justify-between border-b px-4 md:hidden flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}>
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="btn-ghost p-1 text-gold"
+          >
+            {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+          <span className="font-extrabold text-sm text-gold">Marjona Med Service</span>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <button type="button" onClick={handleLogout} className="text-rose-400 p-1">
+              <LogOut className="h-5 w-5" />
             </button>
           </div>
-          <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-            {links.map((l) => (
-              <Link
-                key={l.to}
-                to={l.to}
-                onClick={() => setSidebarOpen(false)}
-                className={isActive(l.to, l.end) ? 'nav-active' : 'nav-link'}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="mt-2 flex gap-2 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
-            <button type="button" onClick={toggleTheme} className="btn-outline flex-1 py-2 text-sm">
-              {isLight ? <Moon className="mx-auto h-4 w-4" /> : <Sun className="mx-auto h-4 w-4" />}
-            </button>
-            <button type="button" onClick={handleLogout} className="btn-outline flex-1 py-2 text-sm">
-              <LogOut className="mx-auto h-4 w-4" />
-            </button>
+        </header>
+
+        {/* Desktop Top Header Bar for Notifications */}
+        <header className="hidden md:flex h-12 items-center justify-between px-6 border-b border-border/40 bg-surface-1/40 backdrop-blur-sm flex-shrink-0">
+          <div className="flex items-center gap-2 text-xs font-bold text-muted">
+            <span>🏥 Marjona Med Service CRM</span>
+            <span>•</span>
+            <span className="text-gold font-mono uppercase tracking-wider">{effectiveRole} Paneli</span>
           </div>
-        </div>
+
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+          </div>
+        </header>
+
+        {/* Dynamic Route Page Body (INDEPENDENT RIGHT SCROLL) */}
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto min-h-0">
+          <Outlet />
+        </main>
       </div>
 
-      {/* Main content */}
-      <main className="min-h-screen pt-14 md:ml-64 md:pt-0">
-        <div className="p-4 md:p-6">
-          <Outlet />
-        </div>
-      </main>
+      {/* Internal Clinic Staff Chat Modal */}
+      <InternalChatModal open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   )
 }

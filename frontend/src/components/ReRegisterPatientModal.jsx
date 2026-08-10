@@ -1,0 +1,239 @@
+import { useEffect, useState } from 'react'
+import { X, Plus, Check, Stethoscope, User, Calendar, CreditCard, DollarSign } from 'lucide-react'
+import { api } from '../utils/api'
+import { formatMoney } from '../utils/format'
+import { useToastStore } from '../store/toastStore'
+import { Btn, Icons } from './UIKit'
+
+const PAYMENT_TYPES = [
+  { id: 'naqd', label: '💵 Naqd pul' },
+  { id: 'karta', label: '💳 Karta (Click/Payme/Terminal)' },
+  { id: 'aralash', label: '⚖️ Aralash (Naqd + Karta)' },
+  { id: 'kassa', label: '🏦 Kassa' },
+]
+
+export default function ReRegisterPatientModal({ open, patient, onClose, onSuccess }) {
+  const [services, setServices] = useState([])
+  const [providers, setProviders] = useState([])
+  const [referrers, setReferrers] = useState([])
+  
+  const [selectedServiceId, setSelectedServiceId] = useState('')
+  const [selectedProviderId, setSelectedProviderId] = useState('')
+  const [selectedReferrerId, setSelectedReferrerId] = useState('')
+  const [paymentType, setPaymentType] = useState('naqd')
+  
+  const [price, setPrice] = useState(0)
+  const [discountAmount, setDiscountAmount] = useState(0)
+  const [discountReason, setDiscountReason] = useState('')
+  const [cashAmount, setCashAmount] = useState(0)
+  const [cardAmount, setCardAmount] = useState(0)
+  
+  const [loading, setLoading] = useState(false)
+  const toast = useToastStore((s) => s.add)
+
+  useEffect(() => {
+    if (!open) return
+    Promise.all([
+      api('/services?active_only=true').catch(() => []),
+      api('/providers?active_only=true').catch(() => []),
+      api('/referrers?active_only=true').catch(() => []),
+    ]).then(([svcs, provs, refs]) => {
+      setServices(svcs || [])
+      setProviders(provs || [])
+      setReferrers(refs || [])
+      if (svcs && svcs.length > 0) {
+        setSelectedServiceId(svcs[0].id)
+        setPrice(svcs[0].price || 0)
+      }
+    })
+  }, [open])
+
+  if (!open || !patient) return null
+
+  const handleServiceChange = (svcId) => {
+    const sId = Number(svcId)
+    setSelectedServiceId(sId)
+    const found = services.find((s) => s.id === sId)
+    if (found) {
+      setPrice(found.price || 0)
+    }
+  }
+
+  const finalAmount = Math.max(0, price - discountAmount)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!selectedServiceId) {
+      toast("Xizmat turini tanlang", "error")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const payload = {
+        first_name: patient.first_name || patient.first_name,
+        last_name: patient.last_name || patient.last_name || '',
+        birth_date: patient.birth_date ? String(patient.birth_date).slice(0, 10) : '2000-01-01',
+        phone: patient.phone || '+998',
+        address: patient.address || '',
+        service_id: Number(selectedServiceId),
+        provider_id: selectedProviderId ? Number(selectedProviderId) : null,
+        referrer_id: selectedReferrerId ? Number(selectedReferrerId) : null,
+        payment_type: paymentType,
+        payment_amount: finalAmount,
+        discount_amount: Number(discountAmount) || 0,
+        discount_reason: discountReason || null,
+        cash_amount: paymentType === 'aralash' ? Number(cashAmount) : (paymentType === 'naqd' ? finalAmount : 0),
+        card_amount: paymentType === 'aralash' ? Number(cardAmount) : (paymentType === 'karta' ? finalAmount : 0),
+      }
+
+      const res = await api('/patients', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+
+      toast(`✓ ${patient.first_name} yangi xizmatga muvaffaqiyatli yozildi! (Talon: ${res.ticket_number || `A-${res.id}`})`)
+      if (onSuccess) onSuccess(res)
+      onClose()
+    } catch (err) {
+      toast(err.message || "Xizmatga yozishda xatolik", "error")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="card max-w-lg w-full p-6 relative animate-in fade-in zoom-in-95 space-y-4">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 text-cyan font-bold flex items-center justify-center border border-cyan-500/30 text-lg">
+              ➕
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-gold uppercase tracking-wide">
+                Qayta Xizmatga Yozish
+              </h3>
+              <p className="text-xs text-muted font-bold">
+                Bemor: <strong className="text-cyan">{patient.first_name} {patient.last_name}</strong> ({patient.phone})
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl text-muted hover:text-body transition-all">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+          {/* Select Service */}
+          <div>
+            <label className="form-label text-xs font-bold text-cyan">🏢 Xizmat turini tanlang *</label>
+            <select
+              className="input-field font-bold text-xs text-cyan py-2"
+              value={selectedServiceId}
+              onChange={(e) => handleServiceChange(e.target.value)}
+            >
+              {services.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.category ? `[${s.category}] ` : ''}{s.name} — {formatMoney(s.price)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Select Provider / Doctor */}
+          <div>
+            <label className="form-label text-xs font-bold">🩺 Qabul qiluvchi Shifokor (Ixtiyoriy)</label>
+            <select
+              className="input-field text-xs py-2"
+              value={selectedProviderId}
+              onChange={(e) => setSelectedProviderId(e.target.value)}
+            >
+              <option value="">— Navbatdagi Bo'sh Shifokor —</option>
+              {providers.map((pr) => (
+                <option key={pr.id} value={pr.id}>
+                  Dr. {pr.full_name} ({pr.specialization || 'Shifokor'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Select Referrer */}
+          <div>
+            <label className="form-label text-xs font-bold text-muted">🤝 Yo'naltiruvchi Shifokor / Muassasa</label>
+            <select
+              className="input-field text-xs text-muted py-2"
+              value={selectedReferrerId}
+              onChange={(e) => setSelectedReferrerId(e.target.value)}
+            >
+              <option value="">— Yo'naltiruvchi yo'q —</option>
+              {referrers.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.full_name} ({r.phone || '—'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Payment Type */}
+          <div>
+            <label className="form-label text-xs font-bold">💳 To'lov Usuli</label>
+            <div className="grid grid-cols-2 gap-2">
+              {PAYMENT_TYPES.map((pt) => (
+                <button
+                  key={pt.id}
+                  type="button"
+                  onClick={() => setPaymentType(pt.id)}
+                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left ${
+                    paymentType === pt.id
+                      ? 'border-gold bg-gold-dim text-gold shadow-sm'
+                      : 'border-border bg-surface-2 text-muted hover:border-gold-glow'
+                  }`}
+                >
+                  {pt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Pricing & Discount Calculation */}
+          <div className="p-3.5 rounded-2xl card-2 space-y-2">
+            <div className="flex justify-between items-center text-xs text-muted">
+              <span>Xizmat Narxi:</span>
+              <span className="font-mono font-bold text-body">{formatMoney(price)}</span>
+            </div>
+
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-amber font-bold">Chegirma (so'm):</span>
+              <input
+                type="number"
+                className="input-field max-w-[120px] text-right font-mono font-bold py-1 text-amber text-xs"
+                placeholder="0"
+                value={discountAmount || ''}
+                onChange={(e) => setDiscountAmount(Number(e.target.value) || 0)}
+              />
+            </div>
+
+            <div className="flex justify-between items-center text-sm font-black pt-2 border-t border-border">
+              <span className="text-cyan">TO'LANADIGAN SUMMA:</span>
+              <span className="text-emerald font-mono text-base">{formatMoney(finalAmount)}</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-2">
+            <Btn variant="ghost" full icon={Icons.x} type="button" onClick={onClose}>
+              Bekor
+            </Btn>
+            <Btn variant="gold" full icon={Icons.check} type="submit" loading={loading}>
+              Yangi Xizmatga Yozish
+            </Btn>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

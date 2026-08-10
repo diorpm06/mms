@@ -6,7 +6,7 @@ import {
 import { RefreshCw } from 'lucide-react'
 import { api } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
-import { hasPositiveValues, paymentPieData, truncateLabel } from '../../utils/charts'
+import { hasPositiveValues, paymentPieData, truncateLabel, formatYAxis } from '../../utils/charts'
 import { useTheme } from '../../hooks/useTheme'
 import { useToastStore } from '../../store/toastStore'
 
@@ -17,7 +17,7 @@ export default function AdminReports() {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
   const [autoAdjusted, setAutoAdjusted] = useState(false)
-  const { chartAxis, chartGrid, chartGold } = useTheme()
+  const { chartAxis, chartGrid, chartGold, tooltipStyle } = useTheme()
   const toast = useToastStore((s) => s.add)
 
   const load = useCallback(async () => {
@@ -63,18 +63,23 @@ export default function AdminReports() {
   const pieData = paymentPieData(report.cash, report.card, report.payment_chart)
   const services = report.services_breakdown || []
 
+  // Top 8 services for clean, non-overlapping chart display
+  const topServicesForChart = [...services]
+    .sort((a, b) => (b.total || 0) - (a.total || 0))
+    .slice(0, 8)
+
   const stats = [
     { label: 'Mijozlar keldi', value: `${report.patients_count} nafar` },
     { label: 'Yangi / Qayta', value: `${report.new_patients} / ${report.repeat_patients}` },
-    { label: 'Jami tushgan mablag', value: formatMoney(report.total_income) },
-    { label: 'Naqt', value: formatMoney(report.cash) },
+    { label: 'Jami tushgan mablag\'', value: formatMoney(report.total_income) },
+    { label: 'Naqd', value: formatMoney(report.cash) },
     { label: 'Karta', value: formatMoney(report.card) },
     { label: 'Harajatlar', value: formatMoney(report.expenses) },
   ]
 
   return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="page-title mb-1">Kunlik hisobot</h1>
           <p className="text-muted text-sm">Mijozlar, xizmatlar, tushum va harajatlar</p>
@@ -93,20 +98,22 @@ export default function AdminReports() {
         </div>
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((s) => (
           <div key={s.label} className="card">
             <p className="text-muted text-sm">{s.label}</p>
-            <p className="accent-value mt-2 text-xl">{s.value}</p>
+            <p className="accent-value mt-2 text-xl font-mono font-bold">{s.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="mb-6 grid gap-4 lg:grid-cols-2">
-        <div className="card min-h-[280px]">
-          <h3 className="text-body mb-3 font-semibold">Naqt / Karta</h3>
+      <div className="grid gap-5 lg:grid-cols-2">
+        
+        {/* Naqd / Karta Pie Chart */}
+        <div className="card min-h-[320px]">
+          <h3 className="text-body mb-3 font-bold text-sm uppercase tracking-wide">Naqd / Karta Taqsimoti</h3>
           {hasPositiveValues(pieData) ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={240}>
               <PieChart margin={{ top: 16, right: 24, bottom: 16, left: 24 }}>
                 <Pie
                   data={pieData}
@@ -114,7 +121,9 @@ export default function AdminReports() {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  outerRadius={62}
+                  outerRadius={70}
+                  innerRadius={40}
+                  paddingAngle={4}
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   labelLine={false}
                 >
@@ -122,54 +131,78 @@ export default function AdminReports() {
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v) => formatMoney(v)} />
-                <Legend />
+                <Tooltip formatter={(v) => formatMoney(v)} contentStyle={tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-muted py-12 text-center text-sm">To'lov ma'lumoti yo'q</p>
+            <p className="text-muted py-16 text-center text-sm italic">To'lov ma'lumoti yo'q</p>
           )}
         </div>
-        <div className="card min-h-[280px]">
-          <h3 className="text-body mb-3 font-semibold">Xizmatlar bo'yicha</h3>
-          {hasPositiveValues(services, 'total') ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={services} margin={{ bottom: 40 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+
+        {/* Xizmatlar Bo'yicha BarChart (Non-Overlapping) */}
+        <div className="card min-h-[320px]">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-body font-bold text-sm uppercase tracking-wide">Top Xizmatlar bo'yicha (Daromad)</h3>
+            <span className="text-[11px] text-muted font-bold">Top 8 ta xizmat</span>
+          </div>
+
+          {hasPositiveValues(topServicesForChart, 'total') ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={topServicesForChart} margin={{ top: 10, right: 10, bottom: 55, left: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} vertical={false} />
                 <XAxis
                   dataKey="name"
                   stroke={chartAxis}
-                  tick={{ fill: chartAxis, fontSize: 10 }}
-                  tickFormatter={(v) => truncateLabel(v, 10)}
+                  tick={{ fill: chartAxis, fontSize: 9.5, fontWeight: 'bold' }}
+                  tickFormatter={(v) => truncateLabel(v, 20)}
                   interval={0}
-                  angle={-25}
+                  angle={-35}
                   textAnchor="end"
-                  height={50}
+                  height={55}
                 />
-                <YAxis stroke={chartAxis} tick={{ fill: chartAxis, fontSize: 10 }} />
-                <Tooltip formatter={(v) => formatMoney(v)} />
-                <Bar dataKey="total" fill={chartGold} radius={[4, 4, 0, 0]} />
+                <YAxis stroke={chartAxis} tick={{ fill: chartAxis, fontSize: 10 }} tickFormatter={formatYAxis} width={45} />
+                <Tooltip formatter={(v) => [formatMoney(v), 'Daromad']} contentStyle={tooltipStyle} />
+                <Bar dataKey="total" fill={chartGold} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-muted py-12 text-center text-sm">Xizmat ma'lumoti yo'q</p>
+            <p className="text-muted py-16 text-center text-sm italic">Xizmat ma'lumoti yo'q</p>
           )}
         </div>
+
       </div>
 
+      {/* Full Services Breakdown Table */}
       <div className="card">
-        <h3 className="accent-value mb-3 font-semibold">Qaysi xizmatlardan foydalanildi</h3>
+        <h3 className="accent-value mb-4 font-bold text-sm uppercase tracking-wide">Barcha Xizmatlar Tushumi Ro'yxati</h3>
         {services.length === 0 ? (
-          <p className="text-muted text-sm">—</p>
+          <p className="text-muted text-sm italic py-4 text-center">Ma'lumot topilmadi</p>
         ) : (
-          <ul className="space-y-2 text-sm">
-            {services.map((s, i) => (
-              <li key={i} className="text-body flex justify-between border-b pb-2" style={{ borderColor: 'var(--border)' }}>
-                <span>{s.name} — {s.count} ta mijoz</span>
-                <span className="accent-value">{formatMoney(s.total)}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-gold font-bold text-left bg-surface-2">
+                  <th className="p-3">#</th>
+                  <th className="p-3">Xizmat Nomi</th>
+                  <th className="p-3 text-center">Mijozlar Soni</th>
+                  <th className="p-3 text-right">Jami Tushum</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {services.map((s, i) => (
+                  <tr key={i} className="hover:bg-surface-hover font-semibold">
+                    <td className="p-3 text-muted font-mono">#{i + 1}</td>
+                    <td className="p-3 text-body font-bold">{s.name}</td>
+                    <td className="p-3 text-center">
+                      <span className="badge badge-info">{s.count} nafar</span>
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-emerald">{formatMoney(s.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

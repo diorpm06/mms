@@ -6,57 +6,95 @@
 :root,
 html.dark {
   --bg:             #09101f;
-  --surface:        #111827;
-  --surface-2:      #1a2540;
+  --surface:        #0f172a;
+  --surface-2:      #1e293b;
   --surface-hover:  rgba(255, 255, 255, 0.05);
-  --gold:           #d4af37;
-  --gold-hover:     #e8c547;
-  --gold-dim:       rgba(212, 175, 55, 0.12);
-  --gold-glow:      rgba(212, 175, 55, 0.25);
-  --text:           #e8eaf2;
-  --text-muted:     #8892a4;
-  --border:         rgba(212, 175, 55, 0.14);
-  --border-strong:  rgba(212, 175, 55, 0.32);
+  --gold:           #f59e0b;
+  --gold-hover:     #fbbf24;
+  --gold-dim:       rgba(245, 158, 11, 0.15);
+  --gold-glow:      rgba(245, 158, 11, 0.3);
+  --text:           #f8fafc;
+  --text-muted:     #94a3b8;
+  --border:         rgba(245, 158, 11, 0.2);
+  --border-strong:  rgba(245, 158, 11, 0.4);
+  
+  --color-cyan:     #38bdf8;
+  --color-emerald:  #34d399;
+  --color-amber:    #fbbf24;
+  --color-rose:     #f43f5e;
+  --color-blue:     #60a5fa;
+
+  --modal-bg:       #0f172a;
+  --modal-header:   #1e293b;
+
   --danger:         #ef4444;
   --success:        #10b981;
   --info:           #3b82f6;
-  --card-shadow:    0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(212, 175, 55, 0.08);
-  --chart-axis:     #8892a4;
-  --chart-grid:     #1e2d46;
-  --chart-gold:     #d4af37;
-  --tooltip-bg:     #1a2540;
-  --tooltip-border: rgba(212, 175, 55, 0.3);
-  --tooltip-text:   #e8eaf2;
-  --scrollbar-track: #111827;
-  --scrollbar-thumb: rgba(212, 175, 55, 0.3);
+  --card-shadow:    0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(245, 158, 11, 0.15);
+  
+  --chart-axis:     #94a3b8;
+  --chart-grid:     #1e293b;
+  --chart-gold:     #f59e0b;
+  --tooltip-bg:     #1e293b;
+  --tooltip-border: rgba(245, 158, 11, 0.3);
+  --tooltip-text:   #f8fafc;
+  --scrollbar-track: #09101f;
+  --scrollbar-thumb: rgba(245, 158, 11, 0.3);
+}
+
+@keyframes marquee-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-marquee-scroll {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee-scroll 55s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-scroll:hover {
+  animation-play-state: paused;
 }
 
 /* ─── LIGHT THEME ────────────────────────────────────────── */
 html.light {
-  --bg:             #f4f2ec;
+  --bg:             #f1f5f9;
   --surface:        #ffffff;
-  --surface-2:      #faf8f3;
-  --surface-hover:  #f5f2ea;
-  --gold:           #a87520;
-  --gold-hover:     #c08828;
-  --gold-dim:       rgba(168, 117, 32, 0.10);
-  --gold-glow:      rgba(168, 117, 32, 0.18);
-  --text:           #1a1d29;
-  --text-muted:     #5e6a82;
-  --border:         #e8e2d4;
-  --border-strong:  #c8b98a;
+  --surface-2:      #f8fafc;
+  --surface-hover:  #f1f5f9;
+  --gold:           #d97706;
+  --gold-hover:     #b45309;
+  --gold-dim:       rgba(217, 119, 6, 0.12);
+  --gold-glow:      rgba(217, 119, 6, 0.22);
+  --text:           #0f172a;
+  --text-muted:     #475569;
+  --border:         #cbd5e1;
+  --border-strong:  #94a3b8;
+
+  --color-cyan:     #0284c7;
+  --color-emerald:  #059669;
+  --color-amber:    #d97706;
+  --color-rose:     #e11d48;
+  --color-blue:     #2563eb;
+
+  --modal-bg:       #ffffff;
+  --modal-header:   #f8fafc;
+
   --danger:         #dc2626;
   --success:        #059669;
   --info:           #2563eb;
-  --card-shadow:    0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.05);
-  --chart-axis:     #5e6a82;
-  --chart-grid:     #ede8de;
-  --chart-gold:     #a87520;
+  --card-shadow:    0 2px 10px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.08);
+  
+  --chart-axis:     #475569;
+  --chart-grid:     #e2e8f0;
+  --chart-gold:     #d97706;
   --tooltip-bg:     #ffffff;
-  --tooltip-border: #e8e2d4;
-  --tooltip-text:   #1a1d29;
-  --scrollbar-track: #f4f2ec;
-  --scrollbar-thumb: #c8b98a;
+  --tooltip-border: #cbd5e1;
+  --tooltip-text:   #0f172a;
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
 }
 
 /* ─── BASE ────────────────────────────────────────────────── */
@@ -86,13 +124,27 @@ html.light {
 /* ─── COMPONENTS ──────────────────────────────────────────── */
 @layer components {
 
+  /* ── Semantic Text Color Classes ── */
+  .text-theme { color: var(--text); }
+  .text-muted { color: var(--text-muted); }
+  .text-gold  { color: var(--gold); }
+  .text-cyan  { color: var(--color-cyan); }
+  .text-emerald { color: var(--color-emerald); }
+  .text-amber { color: var(--color-amber); }
+  .text-rose  { color: var(--color-rose); }
+  .text-blue  { color: var(--color-blue); }
+
+  /* ── Semantic Background Classes ── */
+  .bg-surface   { background-color: var(--surface); }
+  .bg-surface-2 { background-color: var(--surface-2); }
+  .bg-modal     { background-color: var(--modal-bg); }
+
   /* ── Page title ── */
   .page-title {
-    @apply text-2xl font-bold tracking-tight;
+    @apply text-2xl font-black tracking-tight;
     color: var(--gold);
   }
 
-  .text-muted  { color: var(--text-muted); }
   .text-body   { color: var(--text); }
 
   /* ── Card ── */
@@ -102,7 +154,7 @@ html.light {
     border: 1px solid var(--border);
     box-shadow: var(--card-shadow);
     color: var(--text);
-    transition: box-shadow 0.2s;
+    transition: box-shadow 0.2s, border-color 0.2s;
   }
   .card:hover { box-shadow: var(--card-shadow), 0 0 0 1px var(--gold-glow); }
 
@@ -128,12 +180,11 @@ html.light {
 
   /* ── Buttons ── */
   .btn-gold {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 font-semibold transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 font-bold transition-all duration-200 shadow-md;
     background: linear-gradient(135deg, var(--gold) 0%, var(--gold-hover) 100%);
-    color: #fff;
-    box-shadow: 0 2px 8px var(--gold-glow);
+    color: #ffffff;
   }
-  html.dark .btn-gold { color: #0a0f1e; }
+  html.dark .btn-gold { color: #0f172a; }
   .btn-gold:hover:not(:disabled) {
     filter: brightness(1.1);
     box-shadow: 0 4px 14px var(--gold-glow);
@@ -143,7 +194,7 @@ html.light {
   .btn-gold:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border-2 px-4 py-2 font-medium transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border-2 px-4 py-2 font-bold transition-all duration-200;
     border-color: var(--gold);
     color: var(--gold);
     background: transparent;
@@ -155,26 +206,26 @@ html.light {
   .btn-outline:disabled { opacity: 0.45; cursor: not-allowed; }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
     border-color: var(--danger);
     color: var(--danger);
     background: transparent;
   }
   .btn-danger:hover {
-    background-color: rgba(239, 68, 68, 0.08);
+    background-color: rgba(239, 68, 68, 0.1);
     box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2);
   }
 
   .btn-success {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
     border-color: var(--success);
     color: var(--success);
     background: transparent;
   }
-  .btn-success:hover { background-color: rgba(16, 185, 129, 0.08); }
+  .btn-success:hover { background-color: rgba(16, 185, 129, 0.1); }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all duration-200;
     color: var(--text-muted);
     background: transparent;
   }
@@ -185,7 +236,7 @@ html.light {
 
   /* ── Input / Select ── */
   .input-field {
-    @apply w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition-all duration-200;
+    @apply w-full rounded-xl border px-3.5 py-2.5 text-xs font-bold outline-none transition-all duration-200;
     border-color: var(--border);
     background-color: var(--surface-2);
     color: var(--text);
@@ -205,16 +256,16 @@ html.light {
     color: var(--text);
   }
   html.dark .sidebar {
-    background: linear-gradient(180deg, #0e1525 0%, #111827 100%);
+    background: linear-gradient(180deg, #0b1324 0%, #0f172a 100%);
   }
   html.light .sidebar {
     background: #ffffff;
-    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.06);
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.05);
   }
 
   /* ── Nav links ── */
   .nav-link {
-    @apply flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-all duration-150;
+    @apply flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold transition-all duration-150;
     color: var(--text-muted);
   }
   .nav-link:hover {
@@ -223,10 +274,10 @@ html.light {
     transform: translateX(2px);
   }
   .nav-active {
-    @apply flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold;
+    @apply flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-black;
     background: var(--gold-dim);
     color: var(--gold) !important;
-    border-left: 3px solid var(--gold);
+    border-left: 3.5px solid var(--gold);
     box-shadow: inset 0 0 8px var(--gold-glow);
   }
 
@@ -237,13 +288,14 @@ html.light {
 
   /* ── Badges ── */
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-extrabold whitespace-nowrap;
   }
-  .badge-gold    { background: var(--gold-dim); color: var(--gold); }
-  .badge-success { background: rgba(16, 185, 129, 0.12); color: var(--success); }
-  .badge-danger  { background: rgba(239, 68, 68, 0.12);  color: var(--danger);  }
-  .badge-info    { background: rgba(59, 130, 246, 0.12); color: var(--info);    }
-  .badge-muted   { background: var(--surface-hover); color: var(--text-muted); }
+  .badge-gold    { background: var(--gold-dim); color: var(--gold); border: 1px solid var(--border-strong); }
+  .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--color-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+  .badge-danger  { background: rgba(239, 68, 68, 0.15);  color: var(--color-rose);    border: 1px solid rgba(239, 68, 68, 0.3);  }
+  .badge-info    { background: rgba(59, 130, 246, 0.15); color: var(--color-cyan);    border: 1px solid rgba(59, 130, 246, 0.3);  }
+  .badge-amber   { background: rgba(245, 158, 11, 0.15); color: var(--color-amber);   border: 1px solid rgba(245, 158, 11, 0.3);  }
+  .badge-muted   { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
 
   /* ── Cancelled row ── */
   .row-cancelled {
@@ -256,7 +308,7 @@ html.light {
   .logo-img { @apply h-14 w-auto object-contain; }
 
   /* ── Accent value ── */
-  .accent-value { color: var(--gold); font-weight: 600; }
+  .accent-value { color: var(--gold); font-weight: 700; }
 
   /* ── Divider ── */
   .divider {
@@ -266,7 +318,7 @@ html.light {
 
   /* ── Tab buttons ── */
   .tab-btn {
-    @apply rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all duration-200;
+    @apply rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all duration-200;
     color: var(--text-muted);
     background: transparent;
     border: 1px solid transparent;
@@ -276,6 +328,59 @@ html.light {
     background: var(--gold-dim);
     color: var(--gold);
     border-color: var(--border-strong);
+  }
+
+  /* ── Extra button variants ── */
+  .btn-info {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
+    border-color: rgba(59, 130, 246, 0.5);
+    color: var(--color-blue);
+    background: transparent;
+  }
+  .btn-info:hover { background-color: rgba(59, 130, 246, 0.1); }
+
+  .btn-cyan {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
+    border-color: rgba(6, 182, 212, 0.5);
+    color: var(--color-cyan);
+    background: transparent;
+  }
+  .btn-cyan:hover { background-color: rgba(6, 182, 212, 0.1); }
+
+  .btn-amber {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
+    border-color: rgba(245, 158, 11, 0.5);
+    color: var(--color-amber);
+    background: transparent;
+  }
+  .btn-amber:hover { background-color: rgba(245, 158, 11, 0.1); }
+
+  /* ── Table head cell style ── */
+  .th-cell {
+    @apply px-3.5 py-3 text-left text-xs font-extrabold uppercase tracking-wider whitespace-nowrap;
+    color: var(--gold);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .th-cell-right { @apply th-cell text-right; }
+
+  /* ── Table data cell ── */
+  .td-cell {
+    @apply px-3.5 py-3 text-xs font-medium whitespace-nowrap align-middle;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .td-muted { @apply td-cell; color: var(--text-muted); }
+
+  /* ── Action buttons row (right-aligned) ── */
+  .action-row {
+    @apply flex items-center justify-end gap-1.5 whitespace-nowrap;
+  }
+
+  /* ── Form label ── */
+  .form-label {
+    @apply block text-xs font-bold uppercase tracking-wider mb-1.5;
+    color: var(--text-muted);
   }
 }
 

@@ -6,7 +6,8 @@ import {
 } from 'recharts'
 import { api, downloadBlob } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
-import { hasPositiveValues, paymentPieData, formatYAxis, moneyFormatter } from '../../utils/charts'
+import { hasPositiveValues, paymentPieData, formatYAxis, moneyFormatter, truncateLabel } from '../../utils/charts'
+import { exportToExcel, exportToPdf } from '../../utils/exportUtils'
 
 const TABS = [
   { id: 'daily',   label: 'Kunlik' },
@@ -51,13 +52,55 @@ export default function CeoReports() {
   }, [tab, date, year, month])
 
   const exportFile = async (fmt) => {
-    const p = new URLSearchParams({ type: tab })
-    if (tab === 'daily' || tab === 'weekly') p.set('date', date)
-    if (tab === 'monthly') { p.set('year', year); p.set('month', month) }
-    if (tab === 'yearly') p.set('year', year)
-    if (tab === 'custom') { p.set('from', from); p.set('to', to) }
-    const blob = await api(`/reports/export/${fmt}?${p}`)
-    downloadBlob(blob, `hisobot.${fmt === 'excel' ? 'xlsx' : 'pdf'}`)
+    try {
+      const p = new URLSearchParams({ type: tab })
+      if (tab === 'daily' || tab === 'weekly') p.set('date', date)
+      if (tab === 'monthly') { p.set('year', year); p.set('month', month) }
+      if (tab === 'yearly') p.set('year', year)
+      if (tab === 'custom') { p.set('from', from); p.set('to', to) }
+      const blob = await api(`/reports/export/${fmt}?${p}`)
+      downloadBlob(blob, `hisobot.${fmt === 'excel' ? 'xlsx' : 'pdf'}`)
+    } catch (e) {
+      if (fmt === 'excel') handleClientExcelExport()
+      else handleClientPdfExport()
+    }
+  }
+
+  const handleClientExcelExport = () => {
+    if (!report) return
+    const exportData = [
+      { Parametr: 'Jami daromad', Qiymat: report.total_income },
+      { Parametr: 'Naqt', Qiymat: report.cash },
+      { Parametr: 'Karta', Qiymat: report.card },
+      { Parametr: 'Yo\'naltiruvchi ulushi', Qiymat: report.referrer_share },
+      { Parametr: 'Shifokor ulushi', Qiymat: report.provider_share },
+      { Parametr: 'Klinika ulushi', Qiymat: report.center_share },
+      { Parametr: 'Harajatlar', Qiymat: report.expenses },
+      { Parametr: 'Sof foyda', Qiymat: report.net_profit },
+      { Parametr: 'Joriy balans', Qiymat: report.current_balance },
+      { Parametr: 'Jami mijozlar', Qiymat: report.patients_count },
+    ]
+    exportToExcel(exportData, `Moliyaviy_Hisobot_${tab}`)
+  }
+
+  const handleClientPdfExport = () => {
+    if (!report) return
+    const exportData = [
+      { name: 'Jami daromad', val: formatMoney(report.total_income) },
+      { name: 'Naqt', val: formatMoney(report.cash) },
+      { name: 'Karta', val: formatMoney(report.card) },
+      { name: 'Yo\'naltiruvchilar ulushi', val: formatMoney(report.referrer_share) },
+      { name: 'Shifokorlar ulushi', val: formatMoney(report.provider_share) },
+      { name: 'Klinika ulushi', val: formatMoney(report.center_share) },
+      { name: 'Harajatlar', val: formatMoney(report.expenses) },
+      { name: 'Sof foyda', val: formatMoney(report.net_profit) },
+      { name: 'Joriy balans', val: formatMoney(report.current_balance) },
+    ]
+    const columns = [
+      { header: 'Ko\'rsatkich Nomi', accessor: (r) => r.name },
+      { header: 'Qiymati', accessor: (r) => r.val },
+    ]
+    exportToPdf(`Moliyaviy Hisobot (${tab.toUpperCase()})`, exportData, columns)
   }
 
   const NoData = ({ text = "Ma'lumot yo'q" }) => (
@@ -207,16 +250,20 @@ export default function CeoReports() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={(report.finance_chart || []).filter((d) => d.value !== 0)}
-                    margin={{ top: 4, right: 4, bottom: 4, left: 0 }}
+                    margin={{ top: 10, right: 10, bottom: 50, left: 10 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} vertical={false} />
                     <XAxis
                       dataKey="name"
                       stroke={chartAxis}
-                      tick={{ fill: chartAxis, fontSize: 11 }}
+                      tick={{ fill: chartAxis, fontSize: 10, fontWeight: 'bold' }}
+                      tickFormatter={(v) => truncateLabel(v, 20)}
                       axisLine={false}
                       tickLine={false}
                       interval={0}
+                      angle={-35}
+                      textAnchor="end"
+                      height={55}
                     />
                     <YAxis
                       stroke={chartAxis}

@@ -42,7 +42,7 @@ def list_expenses(
     month: int | None = None,
     year: int | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_ceo),
+    _: User = Depends(require_admin_or_ceo),
 ):
     q = db.query(Expense).filter(Expense.is_cancelled == False)
     if year and month:
@@ -59,7 +59,7 @@ def expenses_summary(
     year: int | None = None,
     month: int | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_ceo),
+    _: User = Depends(require_admin_or_ceo),
 ):
     q = db.query(func.coalesce(func.sum(Expense.amount), 0))
     if year and month:
