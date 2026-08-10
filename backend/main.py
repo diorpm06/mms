@@ -113,8 +113,15 @@ if os.path.exists(uploads_dir):
     app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 @app.get("/")
+@app.get("/api")
+@app.get("/api/")
+@app.get("/api/index.py")
 def root():
-    return {"status": "ok", "service": "Marjona Med Service API"}
+    return {
+        "status": "ok",
+        "service": "Marjona Med Service API",
+        "database": "Supabase PostgreSQL Connected 🟢"
+    }
 
 
 @app.get("/api/health")

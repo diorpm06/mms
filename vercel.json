@@ -9,6 +9,10 @@
     {
       "source": "/uploads/(.*)",
       "destination": "/api/index.py"
+    },
+    {
+      "source": "/((?!api/|uploads/).*)",
+      "destination": "/index.html"
     }
   ]
 }
