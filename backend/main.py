@@ -116,7 +116,11 @@ if os.path.exists(uploads_dir):
 @app.get("/api")
 @app.get("/api/")
 @app.get("/api/index.py")
+@app.get("/index.html")
 def root():
+    index_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist", "index.html"))
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {"status": "ok", "service": "Marjona Med Service API", "database": "Supabase PostgreSQL Connected 🟢"}
 
 
