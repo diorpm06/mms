@@ -1,26 +1,17 @@
 {
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/index.py": {
-      "includeFiles": "frontend/dist/**"
-    }
-  },
   "rewrites": [
     {
-      "source": "/api/(.*)",
+      "source": "/api/:path*",
       "destination": "/api/index.py"
     },
     {
-      "source": "/uploads/(.*)",
+      "source": "/uploads/:path*",
       "destination": "/api/index.py"
     },
     {
-      "source": "/assets/(.*)",
-      "destination": "/assets/$1"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!assets/|favicon|manifest|logo|api/|uploads/).*)",
       "destination": "/index.html"
     }
   ]
