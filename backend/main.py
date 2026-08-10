@@ -140,6 +140,21 @@ if FRONTEND_DIST:
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
 
+@app.get("/api/debug-files")
+def debug_files():
+    import glob
+    files = glob.glob("/var/task/**", recursive=True)
+    return {
+        "cwd": os.getcwd(),
+        "this_dir": _THIS_DIR,
+        "root_dir": _ROOT_DIR,
+        "frontend_dist": FRONTEND_DIST,
+        "index_html_exists": INDEX_HTML and os.path.exists(INDEX_HTML),
+        "files_count": len(files),
+        "files_matching_dist": [f for f in files if "dist" in f][:30]
+    }
+
+
 @app.get("/api/health")
 def health():
     return {
