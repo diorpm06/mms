@@ -113,17 +113,41 @@ if os.path.exists(uploads_dir):
     app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-FRONTEND_DIST = os.path.abspath(os.path.join(_THIS_DIR, "..", "frontend", "dist"))
-INDEX_HTML = os.path.join(FRONTEND_DIST, "index.html")
+_ROOT_DIR = os.path.dirname(_THIS_DIR)
 
-assets_dir = os.path.join(FRONTEND_DIST, "assets")
-if os.path.exists(assets_dir):
-    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+_CANDIDATES = [
+    os.path.join(_ROOT_DIR, "frontend", "dist"),
+    os.path.join(_THIS_DIR, "..", "frontend", "dist"),
+    os.path.join(os.getcwd(), "frontend", "dist"),
+    os.path.join(os.getcwd(), "dist"),
+    "/var/task/frontend/dist",
+]
+
+FRONTEND_DIST = None
+INDEX_HTML = None
+
+for c in _CANDIDATES:
+    abs_c = os.path.abspath(c)
+    idx = os.path.join(abs_c, "index.html")
+    if os.path.exists(idx):
+        FRONTEND_DIST = abs_c
+        INDEX_HTML = idx
+        break
+
+if FRONTEND_DIST:
+    assets_dir = os.path.join(FRONTEND_DIST, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "Marjona Med Service", "database": "Supabase PostgreSQL Connected 🟢"}
+    return {
+        "status": "ok",
+        "service": "Marjona Med Service",
+        "database": "Supabase PostgreSQL Connected 🟢",
+        "frontend_dist_found": FRONTEND_DIST is not None
+    }
 
 
 @app.get("/")
@@ -132,7 +156,12 @@ def health():
 def serve_spa(full_path: str = ""):
     if full_path.startswith("api/") or full_path.startswith("uploads/"):
         raise HTTPException(status_code=404, detail="Not Found")
-    if os.path.exists(INDEX_HTML):
+    if INDEX_HTML and os.path.exists(INDEX_HTML):
         return FileResponse(INDEX_HTML, media_type="text/html")
-    return {"status": "ok", "service": "Marjona Med Service API", "database": "Supabase PostgreSQL Connected 🟢"}
+    return {
+        "status": "ok",
+        "service": "Marjona Med Service API",
+        "database": "Supabase PostgreSQL Connected 🟢",
+        "frontend_dist_found": FRONTEND_DIST is not None
+    }
 
