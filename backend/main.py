@@ -112,19 +112,27 @@ except Exception:
 if os.path.exists(uploads_dir):
     app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-@app.get("/")
-@app.get("/api")
-@app.get("/api/")
-@app.get("/api/index.py")
-@app.get("/index.html")
-def root():
-    index_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist", "index.html"))
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"status": "ok", "service": "Marjona Med Service API", "database": "Supabase PostgreSQL Connected 🟢"}
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIST = os.path.abspath(os.path.join(_THIS_DIR, "..", "frontend", "dist"))
+INDEX_HTML = os.path.join(FRONTEND_DIST, "index.html")
+
+assets_dir = os.path.join(FRONTEND_DIST, "assets")
+if os.path.exists(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
 
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "Marjona Med Service", "database": "Supabase PostgreSQL Connected 🟢"}
+
+
+@app.get("/")
+@app.get("/index.html")
+@app.get("/{full_path:path}")
+def serve_spa(full_path: str = ""):
+    if full_path.startswith("api/") or full_path.startswith("uploads/"):
+        raise HTTPException(status_code=404, detail="Not Found")
+    if os.path.exists(INDEX_HTML):
+        return FileResponse(INDEX_HTML, media_type="text/html")
+    return {"status": "ok", "service": "Marjona Med Service API", "database": "Supabase PostgreSQL Connected 🟢"}
 
