@@ -107,9 +107,14 @@ app.include_router(lab_results.router)
 app.include_router(incassation.router)
 app.include_router(banners.router)
 
-uploads_dir = os.path.join(os.getcwd(), "uploads")
-os.makedirs(uploads_dir, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+uploads_dir = "/tmp/uploads" if os.environ.get("VERCEL") else os.path.join(os.getcwd(), "uploads")
+try:
+    os.makedirs(uploads_dir, exist_ok=True)
+except Exception:
+    pass
+
+if os.path.exists(uploads_dir):
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 @app.get("/api/health")
