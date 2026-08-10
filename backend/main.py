@@ -112,31 +112,11 @@ except Exception:
 if os.path.exists(uploads_dir):
     app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
-assets_dir = os.path.join(frontend_dist, "assets")
-
-if os.path.exists(assets_dir):
-    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
-
-
 @app.get("/")
 def root():
-    index_path = os.path.join(frontend_dist, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
     return {"status": "ok", "service": "Marjona Med Service API"}
 
 
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "Marjona Med Service"}
-
-
-@app.get("/{full_path:path}")
-def catch_all(full_path: str):
-    if full_path.startswith("api/") or full_path.startswith("uploads/"):
-        raise HTTPException(status_code=404, detail="Not Found")
-    index_path = os.path.join(frontend_dist, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    raise HTTPException(status_code=404, detail="Not Found")
