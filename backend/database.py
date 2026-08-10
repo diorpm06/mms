@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+import os
 
 from config import settings
 
@@ -12,7 +13,13 @@ if db_url.startswith("sqlite"):
     _connect_args["check_same_thread"] = False
     engine = create_engine(db_url, connect_args=_connect_args)
 else:
-    engine = create_engine(db_url, connect_args=_connect_args, pool_pre_ping=True, pool_recycle=300)
+    engine = create_engine(
+        db_url,
+        connect_args=_connect_args,
+        pool_pre_ping=True,
+        pool_recycle=300,
+        connect_args={"connect_timeout": 10}
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -26,20 +33,18 @@ def run_migrations():
     try:
         with engine.connect() as conn:
             if settings.DATABASE_URL.startswith("sqlite"):
-                # Check patients columns
                 result = conn.execute(text("PRAGMA table_info(patients)")).fetchall()
                 existing_cols = [r[1] for r in result]
                 for col in ["cash_amount", "card_amount"]:
                     if col not in existing_cols:
                         conn.execute(text(f"ALTER TABLE patients ADD COLUMN {col} FLOAT DEFAULT 0"))
 
-                # Check transactions columns
                 result = conn.execute(text("PRAGMA table_info(transactions)")).fetchall()
                 existing_cols = [r[1] for r in result]
                 for col in ["cash_amount", "card_amount"]:
                     if col not in existing_cols:
                         conn.execute(text(f"ALTER TABLE transactions ADD COLUMN {col} FLOAT DEFAULT 0"))
-                # Check services cabinet and category columns
+
                 result = conn.execute(text("PRAGMA table_info(services)")).fetchall()
                 existing_cols = [r[1] for r in result]
                 if "cabinet" not in existing_cols:
@@ -65,7 +70,6 @@ def run_migrations():
                 if "allow_custom_price" not in existing_cols:
                     conn.execute(text("ALTER TABLE services ADD COLUMN allow_custom_price BOOLEAN DEFAULT 0"))
 
-                # Check queue_tickets columns
                 result = conn.execute(text("PRAGMA table_info(queue_tickets)")).fetchall()
                 existing_cols = [r[1] for r in result]
                 if "category" not in existing_cols:
