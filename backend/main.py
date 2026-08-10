@@ -171,8 +171,14 @@ def health():
 def serve_spa(full_path: str = ""):
     if full_path.startswith("api/") or full_path.startswith("uploads/"):
         raise HTTPException(status_code=404, detail="Not Found")
-    if INDEX_HTML and os.path.exists(INDEX_HTML):
-        return FileResponse(INDEX_HTML, media_type="text/html")
+
+    if FRONTEND_DIST:
+        target_path = os.path.join(FRONTEND_DIST, full_path)
+        if os.path.isfile(target_path):
+            return FileResponse(target_path)
+        if INDEX_HTML and os.path.exists(INDEX_HTML):
+            return FileResponse(INDEX_HTML, media_type="text/html")
+
     return {
         "status": "ok",
         "service": "Marjona Med Service API",
