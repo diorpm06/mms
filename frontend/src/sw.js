@@ -1,6 +1,6 @@
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
-import { registerRoute, NavigationRoute } from 'workbox-routing'
-import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from 'workbox-strategies'
+import { registerRoute } from 'workbox-routing'
+import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 
 // ── Statik fayllarni oldindan keshlash (plugin tomonidan inject qilinadi) ──
@@ -11,21 +11,21 @@ cleanupOutdatedCaches()
 registerRoute(
   ({ url }) => url.pathname.startsWith('/api/'),
   new NetworkFirst({
-    cacheName: 'api-v1',
-    plugins: [new CacheableResponsePlugin({ statuses: [0, 200] })],
+    cacheName: 'api-v2',
+    plugins: [new CacheableResponsePlugin({ statuses: [200] })],
   })
 )
 
-// ── Assets: Cache first ───────────────────────────────────────────────────
+// ── Assets: StaleWhileRevalidate (har doim yangi kodni oladi va 200 OK keshlaydi) ──
 registerRoute(
   ({ request }) =>
     request.destination === 'image' ||
     request.destination === 'font' ||
     request.destination === 'style' ||
     request.destination === 'script',
-  new CacheFirst({
-    cacheName: 'assets-v1',
-    plugins: [new CacheableResponsePlugin({ statuses: [0, 200] })],
+  new StaleWhileRevalidate({
+    cacheName: 'assets-v2',
+    plugins: [new CacheableResponsePlugin({ statuses: [200] })],
   })
 )
 

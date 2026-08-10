@@ -5,16 +5,12 @@ import './index.css'
 import ErrorBoundary from './components/ErrorBoundary'
 import { registerSW } from 'virtual:pwa-register'
 
-// Service worker'ni ro'yxatdan o'tkazish (dev + prod da ishlaydi)
 const updateSW = registerSW({
   onNeedRefresh() {
-    // Yangi versiya chiqdi — foydalanuvchi ilovani yangilashi mumkin
-    if (confirm('Yangi versiya mavjud! Yangilash?')) {
-      updateSW(true)
-    }
+    updateSW(true)
   },
   onOfflineReady() {
-    console.log('Ilova oflayn rejimda ishlashga tayyor')
+    console.log('Ilova tayyor')
   },
 })
 
