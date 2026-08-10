@@ -112,18 +112,25 @@ except Exception:
 if os.path.exists(uploads_dir):
     app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-@app.get("/")
-@app.get("/api")
-@app.get("/api/")
-@app.get("/api/index.py")
-def root():
-    return {
-        "status": "ok",
-        "service": "Marjona Med Service API",
-        "database": "Supabase PostgreSQL Connected 🟢"
-    }
+# Locate frontend/dist/index.html (built by Vite during Vercel build)
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIST = os.path.join(_THIS_DIR, "..", "frontend", "dist")
+INDEX_HTML = os.path.join(FRONTEND_DIST, "index.html")
+
+# Mount static assets (CSS, JS, images) from frontend/dist
+if os.path.exists(os.path.join(FRONTEND_DIST, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "Marjona Med Service"}
+    return {"status": "ok", "service": "Marjona Med Service", "database": "Supabase PostgreSQL Connected 🟢"}
+
+
+@app.get("/{full_path:path}")
+def spa_fallback(full_path: str):
+    """Serve React SPA for all non-API routes."""
+    if os.path.exists(INDEX_HTML):
+        return FileResponse(INDEX_HTML, media_type="text/html")
+    return {"status": "ok", "service": "Marjona Med Service API"}
+
