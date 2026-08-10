@@ -117,6 +117,11 @@ if os.path.exists(uploads_dir):
     app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "Marjona Med Service API"}
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "Marjona Med Service"}
