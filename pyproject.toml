@@ -1,0 +1,6 @@
+[project]
+name = "marjona-med-crm"
+version = "1.0.0"
+
+[tool.vercel]
+entrypoint = "backend/main.py"
