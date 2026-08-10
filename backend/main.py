@@ -166,39 +166,22 @@ def debug_files():
     }
 
 
-@app.get("/api/health")
-def health():
-    import glob
-    all_files = glob.glob("/var/task/**", recursive=True) if os.path.exists("/var/task") else []
-    matching = [f for f in all_files if "dist" in f or "assets" in f or "index" in f]
-    return {
-        "status": "ok",
-        "service": "Marjona Med Service",
-        "database": "Supabase PostgreSQL Connected 🟢",
-        "frontend_dist": FRONTEND_DIST,
-        "index_html": INDEX_HTML,
-        "matching_files": matching[:40]
-    }
-
-
 @app.get("/")
-@app.get("/index.html")
-@app.get("/{full_path:path}")
-def serve_spa(full_path: str = ""):
-    if full_path.startswith("api/") or full_path.startswith("uploads/"):
-        raise HTTPException(status_code=404, detail="Not Found")
-
-    if FRONTEND_DIST:
-        target_path = os.path.join(FRONTEND_DIST, full_path)
-        if os.path.isfile(target_path):
-            return FileResponse(target_path)
-        if INDEX_HTML and os.path.exists(INDEX_HTML):
-            return FileResponse(INDEX_HTML, media_type="text/html")
-
+@app.get("/api")
+@app.get("/api/")
+def root():
     return {
         "status": "ok",
         "service": "Marjona Med Service API",
-        "database": "Supabase PostgreSQL Connected 🟢",
-        "frontend_dist_found": FRONTEND_DIST is not None
+        "database": "Supabase PostgreSQL Connected 🟢"
+    }
+
+
+@app.get("/api/health")
+def health():
+    return {
+        "status": "ok",
+        "service": "Marjona Med Service",
+        "database": "Supabase PostgreSQL Connected 🟢"
     }
 
