@@ -115,6 +115,7 @@ if os.path.exists(uploads_dir):
 @app.get("/")
 @app.get("/api")
 @app.get("/api/")
+@app.get("/api/index.py")
 def root():
     return {"status": "ok", "service": "Marjona Med Service API", "database": "Supabase PostgreSQL Connected 🟢"}
 
