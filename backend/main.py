@@ -168,11 +168,16 @@ def debug_files():
 
 @app.get("/api/health")
 def health():
+    import glob
+    all_files = glob.glob("/var/task/**", recursive=True) if os.path.exists("/var/task") else []
+    matching = [f for f in all_files if "dist" in f or "assets" in f or "index" in f]
     return {
         "status": "ok",
         "service": "Marjona Med Service",
         "database": "Supabase PostgreSQL Connected 🟢",
-        "frontend_dist_found": FRONTEND_DIST is not None
+        "frontend_dist": FRONTEND_DIST,
+        "index_html": INDEX_HTML,
+        "matching_files": matching[:40]
     }
 
 
