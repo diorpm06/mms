@@ -41,7 +41,13 @@ export function paymentLabel(type) {
     case 'qr':
     case 'payme':
       return '🔳 QR Code'
+    case 'later':
+    case 'keyinroq':
+    case 'nasiya':
+    case 'qarz':
+      return '⏳ Keyinroq (Nasiya)'
     default:
       return type || 'Naqd'
   }
 }
+

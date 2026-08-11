@@ -1,4 +1,4 @@
-import { Printer, X } from 'lucide-react'
+import { Printer, X, AlertTriangle } from 'lucide-react'
 import { formatMoney, paymentLabel } from '../utils/format'
 import { Btn, Icons } from './UIKit'
 
@@ -26,6 +26,8 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
   const isBatch = patient.batch && Array.isArray(patient.patients)
   const patientList = isBatch ? patient.patients : [patient]
   const firstPatient = patientList[0] || {}
+
+  const isPayLater = ['later', 'keyinroq', 'nasiya', 'qarz'].includes(String(firstPatient.payment_type || '').toLowerCase())
 
   const rawTickets = patientList.map((p) => p.ticket_number || `A-${p.id}`).filter(Boolean)
   const uniqueTickets = Array.from(new Set(rawTickets))
@@ -170,6 +172,17 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
           <X className="h-5 w-5" />
         </button>
 
+        {/* Pay Later Warning Box in Modal */}
+        {isPayLater && (
+          <div className="no-print mb-4 flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-500 text-xs">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            <div>
+              <strong className="block font-bold">To'lov keyinroq amalga oshiriladi!</strong>
+              Ushbu chek to'lov eslatmasi (nasiya cheki) sifatida chop etiladi.
+            </div>
+          </div>
+        )}
+
         {/* PRINTABLE RECEIPT CONTAINER */}
         <div id="payment-ticket-container" className="bg-white text-slate-900 p-3 rounded-2xl font-mono text-xs space-y-2 border border-slate-300">
 
@@ -233,9 +246,15 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
             </div>
 
             <div className="flex justify-between pt-1 font-bold text-xs border-t-2 border-slate-900 my-1">
-              <span>TO'LANGAN SUMMA:</span>
+              <span>{isPayLater ? "TO'LANISHI KERAK SUMMA:" : "TO'LANGAN SUMMA:"}</span>
               <span className="text-slate-900 font-mono font-black">{formatMoney(totalAmount)}</span>
             </div>
+
+            {isPayLater && (
+              <div className="my-1.5 p-2 bg-amber-100 border border-slate-900 rounded-lg text-[9px] text-slate-900 font-black text-center uppercase tracking-tight">
+                ⚠️ TO'LOV KUTILMOQDA: QABULDAN SO'NG KASSAGA TO'LASHINGIZ SO'RALADI
+              </div>
+            )}
 
             <div className="text-[9px] text-slate-900 font-bold text-center pt-1">
               Sana: {dateStr}
