@@ -56,6 +56,7 @@ export default function NewPatient({ homePath = '/admin' }) {
   const [selectedServices, setSelectedServices] = useState([])
   const [referrers, setReferrers] = useState([])
   const [services, setServices] = useState([])
+  const [providers, setProviders] = useState([])
   const [loading, setLoading] = useState(false)
   const [createdPatient, setCreatedPatient] = useState(null)
   const [expandedCat, setExpandedCat] = useState(null) // accordion
@@ -145,10 +146,12 @@ export default function NewPatient({ homePath = '/admin' }) {
     Promise.all([
       api('/referrers'),
       api('/services'),
+      api('/providers'),
     ])
-      .then(([r, s]) => {
+      .then(([r, s, p]) => {
         setReferrers(r || [])
         setServices(s || [])
+        setProviders(p || [])
         if (!s?.length) toast('Xizmat turlari topilmadi', 'error')
       })
       .catch((e) => toast(e.message || 'Ro\'yxatlar yuklanmadi', 'error'))
@@ -228,6 +231,16 @@ export default function NewPatient({ homePath = '/admin' }) {
     setSelectedServices((prev) =>
       prev.map((item) =>
         String(item.service_id) === String(sid) ? { ...item, price: newPrice } : item
+      )
+    )
+  }
+
+  const updateServiceDoctor = (sid, providerId) => {
+    setSelectedServices((prev) =>
+      prev.map((item) =>
+        String(item.service_id) === String(sid)
+          ? { ...item, provider_id: providerId ? Number(providerId) : null }
+          : item
       )
     )
   }
@@ -761,6 +774,23 @@ export default function NewPatient({ homePath = '/admin' }) {
                                 1 dona: <span className="font-mono text-slate-300">{formatMoney(unitPrice)}</span>
                               </p>
                             )}
+
+                            {/* Doctor Selection Dropdown */}
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <span className="text-[11px] text-amber-400 font-semibold">👨‍⚕️ Shifokor:</span>
+                              <select
+                                value={row.provider_id || ''}
+                                onChange={(e) => updateServiceDoctor(svcObj.id, e.target.value)}
+                                className="px-2 py-1 rounded-lg bg-slate-950 border border-amber-500/40 text-amber-300 font-semibold text-[11px] focus:outline-none focus:border-amber-400 max-w-[200px]"
+                              >
+                                <option value="">(Avto-biriktirish)</option>
+                                {providers.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.full_name} ({p.specialization || 'Shifokor'})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
 
                           <div className="flex items-center gap-3 shrink-0 justify-between sm:justify-end">

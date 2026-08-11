@@ -168,24 +168,47 @@ def get_doctor_queue(
         doc_service_ids = [s.service_id for s in doc_services]
         
         spec = (provider.specialization or "").strip().lower() if provider else ""
-        
+        spec_clean = spec.replace("xona", "").replace("vrach", "").replace("shifokor", "").replace("shifokori", "").strip()
+
         matching_conditions = [Patient.provider_id == target_provider_id]
         if doc_service_ids:
             matching_conditions.append(
-                and_(Patient.provider_id == None, Patient.service_id.in_(doc_service_ids))
+                and_(or_(Patient.provider_id == None, Patient.provider_id == target_provider_id), Patient.service_id.in_(doc_service_ids))
             )
-        if spec:
-            matching_conditions.append(
-                and_(
-                    Patient.provider_id == None,
-                    Patient.service.has(
-                        or_(
-                            Service.category.ilike(f"%{spec}%"),
-                            Service.name.ilike(f"%{spec}%")
+        if spec_clean:
+            # Map common medical specializations
+            terms = [spec_clean]
+            if "kardio" in spec_clean:
+                terms.extend(["kardio", "yurak"])
+            elif "nevro" in spec_clean:
+                terms.extend(["nevro", "asab"])
+            elif "uzi" in spec_clean or "ultra" in spec_clean:
+                terms.extend(["uzi", "ultratovush"])
+            elif "lab" in spec_clean or "analiz" in spec_clean:
+                terms.extend(["lab", "analiz", "tahlil"])
+            elif "pediatr" in spec_clean or "bosh" in spec_clean:
+                terms.extend(["pediatr", "bosh"])
+            elif "lor" in spec_clean:
+                terms.extend(["lor", "quloq"])
+            elif "stomat" in spec_clean or "tish" in spec_clean:
+                terms.extend(["stomat", "tish"])
+            elif "ginekolog" in spec_clean or "ayol" in spec_clean:
+                terms.extend(["ginekolog", "ayol"])
+            elif "terapevt" in spec_clean:
+                terms.extend(["terapevt", "umumiy"])
+
+            for t in terms:
+                matching_conditions.append(
+                    and_(
+                        or_(Patient.provider_id == None, Patient.provider_id == target_provider_id),
+                        Patient.service.has(
+                            or_(
+                                Service.category.ilike(f"%{t}%"),
+                                Service.name.ilike(f"%{t}%")
+                            )
                         )
                     )
                 )
-            )
         query = query.filter(or_(*matching_conditions))
 
     patients = query.all()
@@ -306,24 +329,46 @@ def doctor_call_next(
         doc_services = db.query(ProviderService).filter(ProviderService.provider_id == target_provider_id).all()
         doc_service_ids = [s.service_id for s in doc_services]
         spec = (provider.specialization or "").strip().lower() if provider else ""
+        spec_clean = spec.replace("xona", "").replace("vrach", "").replace("shifokor", "").replace("shifokori", "").strip()
 
         matching_conditions = [Patient.provider_id == target_provider_id]
         if doc_service_ids:
             matching_conditions.append(
-                and_(Patient.provider_id == None, Patient.service_id.in_(doc_service_ids))
+                and_(or_(Patient.provider_id == None, Patient.provider_id == target_provider_id), Patient.service_id.in_(doc_service_ids))
             )
-        if spec:
-            matching_conditions.append(
-                and_(
-                    Patient.provider_id == None,
-                    Patient.service.has(
-                        or_(
-                            Service.category.ilike(f"%{spec}%"),
-                            Service.name.ilike(f"%{spec}%")
+        if spec_clean:
+            terms = [spec_clean]
+            if "kardio" in spec_clean:
+                terms.extend(["kardio", "yurak"])
+            elif "nevro" in spec_clean:
+                terms.extend(["nevro", "asab"])
+            elif "uzi" in spec_clean or "ultra" in spec_clean:
+                terms.extend(["uzi", "ultratovush"])
+            elif "lab" in spec_clean or "analiz" in spec_clean:
+                terms.extend(["lab", "analiz", "tahlil"])
+            elif "pediatr" in spec_clean or "bosh" in spec_clean:
+                terms.extend(["pediatr", "bosh"])
+            elif "lor" in spec_clean:
+                terms.extend(["lor", "quloq"])
+            elif "stomat" in spec_clean or "tish" in spec_clean:
+                terms.extend(["stomat", "tish"])
+            elif "ginekolog" in spec_clean or "ayol" in spec_clean:
+                terms.extend(["ginekolog", "ayol"])
+            elif "terapevt" in spec_clean:
+                terms.extend(["terapevt", "umumiy"])
+
+            for t in terms:
+                matching_conditions.append(
+                    and_(
+                        or_(Patient.provider_id == None, Patient.provider_id == target_provider_id),
+                        Patient.service.has(
+                            or_(
+                                Service.category.ilike(f"%{t}%"),
+                                Service.name.ilike(f"%{t}%")
+                            )
                         )
                     )
                 )
-            )
         query = query.filter(or_(*matching_conditions))
 
     next_patient = query.order_by(Patient.created_at.asc()).first()
