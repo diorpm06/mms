@@ -202,9 +202,28 @@ def consume_item(
             db.add(txn)
 
             if target_patient:
-                target_patient.payment_amount = (target_patient.payment_amount or 0) + charged_amount
-                target_patient.payment_type = "later"
-                target_patient.updated_at = datetime.utcnow()
+                is_already_paid = target_patient.payment_type not in ("later", "keyinroq", "nasiya", "qarz")
+                if is_already_paid:
+                    mat_patient = Patient(
+                        first_name=target_patient.first_name,
+                        last_name=target_patient.last_name,
+                        birth_date=target_patient.birth_date,
+                        phone=target_patient.phone,
+                        address=target_patient.address,
+                        referrer_id=target_patient.referrer_id,
+                        provider_id=target_patient.provider_id,
+                        service_id=target_patient.service_id,
+                        payment_amount=charged_amount,
+                        payment_type="later",
+                        ticket_number=f"{target_patient.ticket_number or 'M'}-Material",
+                        queue_status="yakunlandi",
+                        created_by=user.id,
+                    )
+                    db.add(mat_patient)
+                else:
+                    target_patient.payment_amount = (target_patient.payment_amount or 0) + charged_amount
+                    target_patient.payment_type = "later"
+                    target_patient.updated_at = datetime.utcnow()
 
     # Audit logging
     pat_str = f" ({target_patient.first_name} {target_patient.last_name})" if target_patient else (f" [{body.ticket_number}]" if body.ticket_number else "")
