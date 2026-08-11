@@ -450,6 +450,9 @@ async def create_patient(
         elif data.payment_type in ("cash", "naqd"):
             group_cash = final_group_price
             group_card = 0
+        elif data.payment_type in ("later", "keyinroq", "nasiya", "qarz"):
+            group_cash = 0
+            group_card = 0
         else:
             group_cash = 0
             group_card = final_group_price

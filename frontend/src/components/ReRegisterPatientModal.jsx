@@ -9,7 +9,7 @@ const PAYMENT_TYPES = [
   { id: 'naqd', label: '💵 Naqd pul' },
   { id: 'karta', label: '💳 Karta (Click/Payme/Terminal)' },
   { id: 'aralash', label: '⚖️ Aralash (Naqd + Karta)' },
-  { id: 'kassa', label: '🏦 Kassa' },
+  { id: 'later', label: '⏳ Keyinroq to\'lash (Nasiya)' },
 ]
 
 export default function ReRegisterPatientModal({ open, patient, onClose, onSuccess }) {

@@ -229,8 +229,8 @@ class PatientCreate(BaseModel):
     @field_validator("payment_type")
     @classmethod
     def validate_payment(cls, v: str) -> str:
-        if v not in ("cash", "card", "click", "qr", "naqd", "karta", "payme", "split", "aralash"):
-            raise ValueError("To'lov turi noto'g'ri (cash, card, click, qr, split)")
+        if v not in ("cash", "card", "click", "qr", "naqd", "karta", "payme", "split", "aralash", "later", "keyinroq", "nasiya", "qarz"):
+            raise ValueError("To'lov turi noto'g'ri (cash, card, click, qr, split, later)")
         return v
 
 

@@ -904,12 +904,13 @@ export default function NewPatient({ homePath = '/admin' }) {
         {/* 4. TO'LOV USULI */}
         <div className="space-y-3">
           <label className="form-label">💳 To'lov Usulini Tanlang</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {[
               { id: 'cash',  label: '💵 Naqd',    desc: 'Naqd Pul' },
-              { id: 'click', label: '📱 Click',   desc: 'Click Pay' },
-              { id: 'qr',    label: '🔳 QR',      desc: 'QR kod' },
-              { id: 'split', label: '🔀 Aralash', desc: 'Ikki usulda' },
+              { id: 'click', label: '💳 Karta',   desc: 'Karta / Click' },
+              { id: 'split', label: '🔀 Aralash', desc: 'Naqd + Karta' },
+              { id: 'later', label: '⏳ Keyinroq', desc: 'Nasiya / Qarz' },
+              { id: 'qr',    label: '🔳 QR Kod',  desc: 'QR to\'lov' },
             ].map((pm) => (
               <button
                 key={pm.id}
