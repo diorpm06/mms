@@ -76,6 +76,7 @@ export default function DoctorPanel() {
   const [invSearch, setInvSearch] = useState('')
   const [selectedInvItem, setSelectedInvItem] = useState(null)
   const [consumeAmount, setConsumeAmount] = useState('1')
+  const [chargePatient, setChargePatient] = useState(true)
   const [consuming, setConsuming] = useState(false)
 
   const fetchInventory = async () => {
@@ -101,15 +102,28 @@ export default function DoctorPanel() {
         method: 'POST',
         body: JSON.stringify({
           amount: amt,
-          notes: `Shifokor ${curPatient ? `${curPatient.first_name} ${curPatient.last_name}` : 'qabulida'} ishlatdi`,
+          patient_id: curPatient?.id,
+          ticket_number: curPatient?.ticket_number,
+          patient_name: curPatient ? `${curPatient.first_name} ${curPatient.last_name}` : undefined,
+          charge_patient: curPatient ? chargePatient : false,
+          payment_type: 'later',
+          notes: `Shifokor ${curPatient ? `${curPatient.first_name} ${curPatient.last_name} (${curPatient.ticket_number})` : 'qabulida'} ishlatdi`,
         }),
       })
-      toast(`${selectedInvItem.name} dan ${amt} ${selectedInvItem.unit} ishlatildi ✓`)
+      const unitP = selectedInvItem.unit_price || 0
+      const totalCharge = unitP * amt
+      if (curPatient && chargePatient && totalCharge > 0) {
+        showToast(`✓ ${selectedInvItem.name} (${amt} ${selectedInvItem.unit}) ishlatildi hamda ${curPatient.first_name} uchun ${totalCharge.toLocaleString()} so'm to'lov bildirishnomasi Admin panelga yuborildi!`)
+      } else {
+        showToast(`✓ ${selectedInvItem.name} dan ${amt} ${selectedInvItem.unit} ishlatildi`)
+      }
       setSelectedInvItem(null)
       setConsumeAmount('1')
+      setInventoryModal(false)
       fetchInventory()
+      fetchDoctorQueue()
     } catch (e) {
-      toast(e.message, 'error')
+      showToast(e.message || 'Xatolik yuz berdi', 'error')
     } finally {
       setConsuming(false)
     }
@@ -977,18 +991,45 @@ export default function DoctorPanel() {
           </div>
 
           {selectedInvItem && (
-            <div className="p-3 bg-surface-2 rounded-xl border border-gold/40 space-y-2">
-              <span className="font-bold text-gold block">Ishlatiladigan miqdor:</span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  className="input-field text-sm font-mono font-bold w-24"
-                  value={consumeAmount}
-                  onChange={(e) => setConsumeAmount(e.target.value)}
-                />
-                <span className="text-xs font-bold text-muted">{selectedInvItem.unit}</span>
+            <div className="p-3 bg-surface-2 rounded-xl border border-gold/40 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-gold text-xs block">Ishlatiladigan miqdor:</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    className="input-field text-sm font-mono font-bold w-24 py-1"
+                    value={consumeAmount}
+                    onChange={(e) => setConsumeAmount(e.target.value)}
+                  />
+                  <span className="text-xs font-bold text-muted">{selectedInvItem.unit}</span>
+                </div>
               </div>
+
+              {data?.current_patient && (
+                <div className="pt-2 border-t border-border/60 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={chargePatient}
+                      onChange={(e) => setChargePatient(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-gold focus:ring-gold"
+                    />
+                    <span>
+                      Bemor (<strong className="text-gold">{data.current_patient.first_name} {data.current_patient.last_name}</strong>) hisobiga to'lov qo'shilsin
+                    </span>
+                  </label>
+
+                  {chargePatient && selectedInvItem.unit_price > 0 && (
+                    <div className="flex items-center justify-between text-xs font-mono bg-slate-950 p-2 rounded-lg border border-emerald-500/30">
+                      <span className="text-slate-400 font-sans">To'lov eslatmasi summasi:</span>
+                      <span className="text-emerald-400 font-bold text-sm">
+                        {((selectedInvItem.unit_price || 0) * (Number(consumeAmount) || 1)).toLocaleString()} so'm
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

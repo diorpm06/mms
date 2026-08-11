@@ -24,10 +24,11 @@ class InventoryCreate(BaseModel):
 
 class QuantityChangeBody(BaseModel):
     amount: int = Field(gt=0)
+    patient_id: Optional[int] = None
     ticket_number: Optional[str] = None
     patient_name: Optional[str] = None
     charge_patient: bool = False
-    payment_type: str = "naqd"
+    payment_type: str = "later"
     price_per_unit: Optional[int] = None
     notes: Optional[str] = None
 
@@ -141,11 +142,14 @@ def consume_item(
     item.quantity -= body.amount
     item.updated_at = datetime.utcnow()
 
-    # Find patient by ticket_number if provided (e.g. 'I-007')
+    # Find patient by patient_id, ticket_number, or patient_name
+    from models.patient import Patient
     target_patient = None
-    if body.ticket_number:
+    if body.patient_id:
+        target_patient = db.query(Patient).filter(Patient.id == body.patient_id, Patient.is_cancelled == False).first()
+
+    if not target_patient and body.ticket_number:
         clean_ticket = body.ticket_number.strip().upper()
-        from models.patient import Patient
         target_patient = (
             db.query(Patient)
             .filter(
@@ -153,6 +157,21 @@ def consume_item(
                 or_(
                     Patient.ticket_number.ilike(clean_ticket),
                     Patient.ticket_number.ilike(f"%{clean_ticket}%"),
+                ),
+            )
+            .order_by(Patient.created_at.desc())
+            .first()
+        )
+
+    if not target_patient and body.patient_name:
+        clean_name = body.patient_name.strip()
+        target_patient = (
+            db.query(Patient)
+            .filter(
+                Patient.is_cancelled == False,
+                or_(
+                    (Patient.first_name + " " + Patient.last_name).ilike(f"%{clean_name}%"),
+                    Patient.first_name.ilike(f"%{clean_name}%"),
                 ),
             )
             .order_by(Patient.created_at.desc())
