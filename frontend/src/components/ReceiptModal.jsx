@@ -1,8 +1,10 @@
-import { Printer, X, CheckCircle2 } from 'lucide-react'
+import { Printer, X, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { formatMoney } from '../utils/format'
 
 export default function ReceiptModal({ patient, onClose }) {
   if (!patient) return null
+
+  const isPayLater = ['later', 'keyinroq', 'nasiya', 'qarz'].includes(String(patient.payment_type || '').toLowerCase())
 
   const handlePrint = () => {
     const container = document.getElementById('thermal-receipt-container')
@@ -115,14 +117,24 @@ export default function ReceiptModal({ patient, onClose }) {
           <X className="h-5 w-5" />
         </button>
 
-        {/* Success Header Notification */}
-        <div className="no-print mb-4 flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-2xl text-emerald-800 dark:text-emerald-300">
-          <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
-          <div className="text-xs">
-            <strong className="block text-sm">To'lov muvaffaqiyatli qabul qilindi!</strong>
-            Kassa chekini termoprinterda chop etishingiz mumkin.
+        {/* Header Notification (Pay Later vs Paid) */}
+        {isPayLater ? (
+          <div className="no-print mb-4 flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl text-amber-900 dark:text-amber-300">
+            <AlertTriangle className="h-6 w-6 text-amber-600 shrink-0" />
+            <div className="text-xs">
+              <strong className="block text-sm font-black">To'lov keyinroq amalga oshiriladi!</strong>
+              Ushbu chek to'lov eslatmasi (nasiya cheki) sifatida tayyorlandi.
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="no-print mb-4 flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-2xl text-emerald-800 dark:text-emerald-300">
+            <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
+            <div className="text-xs">
+              <strong className="block text-sm font-black">To'lov muvaffaqiyatli qabul qilindi!</strong>
+              Kassa chekini termoprinterda chop etishingiz mumkin.
+            </div>
+          </div>
+        )}
 
         {/* ── THERMAL RECEIPT CONTENT (PRINTABLE AREA) ────────────────── */}
         <div
@@ -199,16 +211,26 @@ export default function ReceiptModal({ patient, onClose }) {
                 <span>-{formatMoney(patient.discount_amount)}</span>
               </div>
             )}
-            <div className="flex justify-between items-center text-sm font-extrabold">
-              <span>TO'LANGAN SUMMA:</span>
-              <span className="text-base text-emerald-600 dark:text-emerald-400 font-mono">
+            <div className="flex justify-between items-center text-xs font-extrabold">
+              <span>{isPayLater ? "TO'LANISHI KERAK SUMMA:" : "TO'LANGAN SUMMA:"}</span>
+              <span className={`text-base font-mono ${isPayLater ? 'text-amber-600 dark:text-amber-400 font-black' : 'text-emerald-600 dark:text-emerald-400'}`}>
                 {formatMoney(patient.payment_amount)}
               </span>
             </div>
             <div className="flex justify-between text-[11px] text-slate-500 mt-1">
-              <span>To'lov turi:</span>
-              <span className="uppercase font-bold">{patient.payment_type === 'cash' ? 'NAQT KASSA' : 'KARTA'}</span>
+              <span>To'lov turi / holati:</span>
+              <span className={`uppercase font-bold ${isPayLater ? 'text-amber-700 dark:text-amber-300' : ''}`}>
+                {isPayLater
+                  ? "KEYINROQ TO'LANADI (NASIYA)"
+                  : (patient.payment_type === 'cash' || patient.payment_type === 'naqd' ? 'NAQT KASSA' : 'KARTA')}
+              </span>
             </div>
+
+            {isPayLater && (
+              <div className="mt-2.5 p-2 bg-amber-100 dark:bg-amber-950/60 border border-amber-400 dark:border-amber-700 rounded-lg text-[10px] text-amber-900 dark:text-amber-200 font-black text-center uppercase tracking-tight">
+                ⚠️ TO'LOV KUTILMOQDA: QABULDAN SO'NG KASSAGA TO'LASHINGIZ SO'RALADI
+              </div>
+            )}
           </div>
 
           {/* Timestamp & Cashier */}
