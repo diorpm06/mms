@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
+from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo, get_current_user
 from database import get_db
 from models.patient import Patient
 from models.provider import Provider
@@ -675,7 +675,7 @@ def mark_patient_paid(
     patient_id: int,
     body: PayLaterBody,
     db: Session = Depends(get_db),
-    user: User = Depends(require_doctor_or_admin_or_ceo),
+    user: User = Depends(get_current_user),
 ):
     p = db.query(Patient).filter(Patient.id == patient_id).first()
     if not p:

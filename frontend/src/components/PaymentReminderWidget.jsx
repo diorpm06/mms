@@ -30,19 +30,26 @@ export default function PaymentReminderWidget() {
 
   if (!pendingItems || pendingItems.length === 0) return null
 
-  const handlePaySubmit = async () => {
+  const handlePaySubmit = async (e) => {
+    if (e) e.preventDefault()
     if (!activeModalItem) return
+    const targetId = activeModalItem.patient_id || activeModalItem.id
+    if (!targetId) {
+      toast("Bemor ID topilmadi", "error")
+      return
+    }
     setSubmitting(true)
     try {
-      await api(`/patients/${activeModalItem.patient_id}/pay-later`, {
+      await api(`/patients/${targetId}/pay-later`, {
         method: 'POST',
         body: JSON.stringify({
-          payment_type: selectedPayType,
+          payment_type: selectedPayType || 'naqd',
         }),
       })
-      toast(`✓ ${activeModalItem.full_name} to'lovi (${selectedPayType.toUpperCase()}) qabul qilindi!`)
+      toast(`✓ ${activeModalItem.full_name} to'lovi (${(selectedPayType || 'naqd').toUpperCase()}) qabul qilindi!`)
       setActiveModalItem(null)
       fetchPending()
+      window.dispatchEvent(new CustomEvent('payment-updated'))
     } catch (err) {
       toast(err.message || "To'lovni saqlashda xatolik", 'error')
     } finally {
@@ -157,13 +164,16 @@ export default function PaymentReminderWidget() {
       {/* Quick Pay Modal */}
       {activeModalItem && (
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in zoom-in-95">
+          <form
+            onSubmit={handlePaySubmit}
+            className="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in zoom-in-95"
+          >
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-xl">💳</span>
                 <h4 className="font-extrabold text-amber-400 text-sm">To'lovni Qabul Qilish</h4>
               </div>
-              <button onClick={() => setActiveModalItem(null)} className="text-slate-400 hover:text-white">
+              <button type="button" onClick={() => setActiveModalItem(null)} className="text-slate-400 hover:text-white">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -211,15 +221,14 @@ export default function PaymentReminderWidget() {
                 Bekor qilish
               </button>
               <button
-                type="button"
+                type="submit"
                 disabled={submitting}
-                onClick={handlePaySubmit}
                 className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-lg shadow-emerald-600/30"
               >
                 {submitting ? "Saqlanmoqda..." : "Tasdiqlash ✓"}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
     </>
