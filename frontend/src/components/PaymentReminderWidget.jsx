@@ -309,8 +309,5 @@ export default function PaymentReminderWidget() {
       )}
     </>
   )
-}      )}
-    </>
-  )
 }
 
