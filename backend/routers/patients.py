@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
