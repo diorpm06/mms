@@ -207,6 +207,24 @@ export default function NewPatient({ homePath = '/admin' }) {
     })
   }
 
+  const findMatchingDoctor = (serviceId) => {
+    const sid = Number(serviceId)
+    if (!providers || providers.length === 0) return null
+
+    // 1. Check if provider has service_ids array containing sid
+    const matched = providers.find((p) => Array.isArray(p.service_ids) && p.service_ids.map(Number).includes(sid))
+    if (matched) return matched.id
+
+    // 2. Check if service object has provider_id
+    const svc = services.find((s) => s.id === sid)
+    if (svc && svc.provider_id) return svc.provider_id
+
+    // 3. If there is only 1 provider overall, return that provider ID
+    if (providers.length === 1) return providers[0].id
+
+    return null
+  }
+
   const isServiceSelected = (sid) => selectedServices.some((s) => String(s.service_id) === String(sid))
 
   const toggleServiceSelection = (s) => {
@@ -214,9 +232,28 @@ export default function NewPatient({ homePath = '/admin' }) {
     if (isServiceSelected(sid)) {
       setSelectedServices((prev) => prev.filter((item) => String(item.service_id) !== sid))
     } else {
-      setSelectedServices((prev) => [...prev.filter((item) => item.service_id), { service_id: sid, price: s.price, quantity: 1 }])
+      const autoDoctorId = findMatchingDoctor(s.id)
+      setSelectedServices((prev) => [
+        ...prev.filter((item) => item.service_id),
+        { service_id: sid, price: s.price, quantity: 1, provider_id: autoDoctorId || null },
+      ])
     }
   }
+
+  // Auto-assign doctor to selected services if provider_id is missing
+  useEffect(() => {
+    if (providers.length > 0 && selectedServices.length > 0) {
+      setSelectedServices((prev) =>
+        prev.map((item) => {
+          if (!item.provider_id && item.service_id) {
+            const autoId = findMatchingDoctor(item.service_id)
+            return autoId ? { ...item, provider_id: autoId } : item
+          }
+          return item
+        })
+      )
+    }
+  }, [providers, services])
 
   const updateServiceQuantity = (sid, newQty) => {
     const qty = Math.max(1, parseInt(newQty, 10) || 1)
@@ -345,6 +382,7 @@ export default function NewPatient({ homePath = '/admin' }) {
       discount_reason: computedDiscount > 0 ? form.discount_reason || 'Chegirma' : null,
       services: validServices.map((s) => ({
         service_id: +s.service_id,
+        provider_id: s.provider_id ? +s.provider_id : null,
         price: Number(s.price) || 0,
         quantity: Math.max(1, Number(s.quantity) || 1),
       })),
@@ -777,18 +815,23 @@ export default function NewPatient({ homePath = '/admin' }) {
 
                             {/* Doctor Selection Dropdown */}
                             <div className="mt-2 flex items-center gap-1.5">
-                              <span className="text-[11px] text-amber-400 font-semibold">👨‍⚕️ Shifokor:</span>
+                              <span className="text-[11px] text-amber-400 font-bold">👨‍⚕️ Shifokor:</span>
                               <select
                                 value={row.provider_id || ''}
                                 onChange={(e) => updateServiceDoctor(svcObj.id, e.target.value)}
-                                className="px-2 py-1 rounded-lg bg-slate-950 border border-amber-500/40 text-amber-300 font-semibold text-[11px] focus:outline-none focus:border-amber-400 max-w-[200px]"
+                                className={`px-2 py-1 rounded-lg bg-slate-950 border text-[11px] font-bold focus:outline-none focus:border-amber-400 max-w-[240px] ${
+                                  row.provider_id ? 'border-emerald-500/60 text-emerald-300' : 'border-amber-500/40 text-amber-300'
+                                }`}
                               >
-                                <option value="">(Avto-biriktirish)</option>
-                                {providers.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.full_name} ({p.specialization || 'Shifokor'})
-                                  </option>
-                                ))}
+                                <option value="">(Avto-biriktirish / Navbat bo'yicha)</option>
+                                {providers.map((p) => {
+                                  const isMatched = Array.isArray(p.service_ids) && p.service_ids.map(Number).includes(svcObj.id)
+                                  return (
+                                    <option key={p.id} value={p.id}>
+                                      {p.full_name} ({p.specialization || 'Shifokor'}){isMatched ? ' ⭐ (Biriktirilgan)' : ''}
+                                    </option>
+                                  )
+                                })}
                               </select>
                             </div>
                           </div>
