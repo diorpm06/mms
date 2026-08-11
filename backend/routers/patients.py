@@ -663,6 +663,54 @@ def reissue_ticket(
     return _patient_row(p)
 
 
+class PayLaterBody(BaseModel):
+    payment_type: str = "naqd"  # naqd | karta | split
+    cash_amount: Optional[int] = 0
+    card_amount: Optional[int] = 0
+
+
+@router.post("/{patient_id}/pay-later")
+def mark_patient_paid(
+    patient_id: int,
+    body: PayLaterBody,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_doctor_or_admin_or_ceo),
+):
+    p = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Bemor topilmadi")
+
+    pay_type = body.payment_type if body.payment_type in ("naqd", "karta", "card", "cash", "split", "aralash") else "naqd"
+    p.payment_type = pay_type
+
+    amount = p.payment_amount or 0
+    if pay_type in ("split", "aralash"):
+        p.cash_amount = body.cash_amount or 0
+        p.card_amount = body.card_amount or max(0, amount - p.cash_amount)
+    elif pay_type in ("cash", "naqd"):
+        p.cash_amount = amount
+        p.card_amount = 0
+    else:
+        p.cash_amount = 0
+        p.card_amount = amount
+
+    p.updated_at = datetime.utcnow()
+
+    # Update existing transaction if present, or process payment
+    tx = db.query(Transaction).filter(Transaction.patient_id == p.id, Transaction.is_cancelled == False).first()
+    if tx:
+        tx.payment_type = pay_type
+        tx.cash_amount = p.cash_amount
+        tx.card_amount = p.card_amount
+        tx.total_amount = amount
+    else:
+        process_payment(db, p)
+
+    db.commit()
+    db.refresh(p)
+    return {"message": f"Bemor {p.ticket_number or p.first_name} to'lovi ({pay_type.upper()}) qabul qilindi", "patient": _patient_row(p)}
+
+
 @router.get("/{patient_id}/visits")
 def patient_visits(patient_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)):
     p = db.query(Patient).filter(Patient.id == patient_id).first()

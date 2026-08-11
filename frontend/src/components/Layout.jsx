@@ -6,6 +6,7 @@ import { api } from '../utils/api'
 import { useTheme } from '../hooks/useTheme'
 import NotificationBell from './NotificationBell'
 import InternalChatModal from './InternalChatModal'
+import PaymentReminderWidget from './PaymentReminderWidget'
 import logo from '@assets/logo.png'
 
 const CEO_LINKS = [
@@ -233,6 +234,9 @@ export default function Layout({ role }) {
 
       {/* Internal Clinic Staff Chat Modal */}
       <InternalChatModal open={chatOpen} onClose={() => setChatOpen(false)} />
+
+      {/* Floating Bottom-Left Unpaid Payment Reminder Widget */}
+      <PaymentReminderWidget />
     </div>
   )
 }

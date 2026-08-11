@@ -123,6 +123,47 @@ def get_live_queue(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/pending-payments")
+def get_pending_payments(db: Session = Depends(get_db)):
+    """
+    Returns active pending/unpaid payment reminders for today.
+    Used by bottom-left floating payment alert widget.
+    """
+    today = date.today()
+    start = datetime.combine(today, datetime.min.time())
+
+    # Patients registered with payment_type in ('later', 'keyinroq', 'nasiya', 'qarz')
+    patients = (
+        db.query(Patient)
+        .options(joinedload(Patient.service), joinedload(Patient.provider))
+        .filter(
+            Patient.is_cancelled == False,
+            Patient.created_at >= start,
+            Patient.payment_type.in_(["later", "keyinroq", "nasiya", "qarz"]),
+        )
+        .order_by(Patient.created_at.desc())
+        .all()
+    )
+
+    items = []
+    for p in patients:
+        svc_name = p.service.name if p.service else "Tibbiy Xizmat"
+        prov_name = p.provider.full_name if p.provider else "Shifokor"
+        items.append({
+            "id": p.id,
+            "patient_id": p.id,
+            "ticket_number": p.ticket_number or f"A-{p.id:03d}",
+            "full_name": f"{p.first_name} {p.last_name}".strip(),
+            "phone": p.phone or "Kiritilmagan",
+            "reason": f"{svc_name} ({prov_name})",
+            "amount": p.payment_amount or 0,
+            "payment_type": p.payment_type,
+            "created_at": p.created_at.isoformat() if p.created_at else datetime.utcnow().isoformat(),
+        })
+
+    return items
+
+
 @router.get("/doctor/my-queue")
 def get_doctor_queue(
     provider_id: Optional[int] = None,

@@ -167,18 +167,24 @@ def consume_item(
 
         if charged_amount > 0:
             from models.transaction import Transaction
-            cash_amt = charged_amount if body.payment_type in ("naqd", "cash") else 0
-            card_amt = charged_amount if body.payment_type in ("karta", "card") else 0
+            pay_tp = body.payment_type if body.payment_type in ("naqd", "cash", "karta", "card", "split") else "later"
+            cash_amt = charged_amount if pay_tp in ("naqd", "cash") else 0
+            card_amt = charged_amount if pay_tp in ("karta", "card") else 0
 
             txn = Transaction(
                 patient_id=target_patient.id if target_patient else None,
                 total_amount=charged_amount,
                 center_amount=charged_amount,
-                payment_type=body.payment_type,
+                payment_type=pay_tp,
                 cash_amount=cash_amt,
                 card_amount=card_amt,
             )
             db.add(txn)
+
+            if target_patient:
+                target_patient.payment_amount = (target_patient.payment_amount or 0) + charged_amount
+                target_patient.payment_type = "later"
+                target_patient.updated_at = datetime.utcnow()
 
     # Audit logging
     pat_str = f" ({target_patient.first_name} {target_patient.last_name})" if target_patient else (f" [{body.ticket_number}]" if body.ticket_number else "")
