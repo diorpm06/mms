@@ -123,7 +123,7 @@ export default function DoctorPanel() {
       fetchInventory()
       fetchDoctorQueue()
     } catch (e) {
-      showToast(e.message || 'Xatolik yuz berdi', 'error')
+      showToast(e.message || 'Xatolik yuz berdi')
     } finally {
       setConsuming(false)
     }
@@ -1008,22 +1008,22 @@ export default function DoctorPanel() {
 
               {data?.current_patient && (
                 <div className="pt-2 border-t border-border/60 space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-200">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-slate-800 dark:text-slate-200">
                     <input
                       type="checkbox"
                       checked={chargePatient}
                       onChange={(e) => setChargePatient(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-900 text-gold focus:ring-gold"
+                      className="rounded border-slate-700 bg-slate-900 text-gold focus:ring-gold w-4 h-4"
                     />
                     <span>
-                      Bemor (<strong className="text-gold">{data.current_patient.first_name} {data.current_patient.last_name}</strong>) hisobiga to'lov qo'shilsin
+                      Bemor (<strong className="text-amber-600 dark:text-gold font-black">{data.current_patient.first_name} {data.current_patient.last_name}</strong>) hisobiga to'lov qo'shilsin
                     </span>
                   </label>
 
                   {chargePatient && selectedInvItem.unit_price > 0 && (
-                    <div className="flex items-center justify-between text-xs font-mono bg-slate-950 p-2 rounded-lg border border-emerald-500/30">
-                      <span className="text-slate-400 font-sans">To'lov eslatmasi summasi:</span>
-                      <span className="text-emerald-400 font-bold text-sm">
+                    <div className="flex items-center justify-between text-xs font-mono bg-slate-950 p-2.5 rounded-xl border border-emerald-500/40 shadow-inner">
+                      <span className="text-slate-300 font-sans font-extrabold">To'lov eslatmasi summasi:</span>
+                      <span className="text-emerald-400 font-black text-sm">
                         {((selectedInvItem.unit_price || 0) * (Number(consumeAmount) || 1)).toLocaleString()} so'm
                       </span>
                     </div>
@@ -1033,20 +1033,23 @@ export default function DoctorPanel() {
             </div>
           )}
 
-          <div className="flex gap-2 pt-2 border-t border-border">
-            <Btn variant="ghost" full icon={Icons.x} onClick={() => setInventoryModal(false)}>
-              Bekor Qilish
-            </Btn>
-            <Btn
-              variant="amber"
-              full
-              icon={<MinusCircle className="h-4 w-4" />}
-              loading={consuming}
-              disabled={!selectedInvItem}
-              onClick={handleConsumeInventory}
+          <div className="flex gap-2.5 pt-3 border-t border-border">
+            <button
+              type="button"
+              onClick={() => setInventoryModal(false)}
+              className="flex-1 py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all"
             >
-              ✓ Ishlatishni Tasdiqlash
-            </Btn>
+              Bekor Qilish
+            </button>
+
+            <button
+              type="button"
+              disabled={!selectedInvItem || consuming || !consumeAmount || Number(consumeAmount) <= 0}
+              onClick={handleConsumeInventory}
+              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {consuming ? "Saqlanmoqda..." : "✓ Ishlatishni Tasdiqlash"}
+            </button>
           </div>
         </div>
       </Modal>
