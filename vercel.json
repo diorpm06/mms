@@ -1,22 +1,9 @@
 {
   "buildCommand": "npm install --prefix frontend && npm run build --prefix frontend",
   "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/**/*.py": {
-      "runtime": "python3.12"
-    }
-  },
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/uploads/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/((?!api|uploads|assets).*)",
+      "source": "/((?!assets).*)",
       "destination": "/index.html"
     }
   ]
