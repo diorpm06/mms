@@ -99,7 +99,11 @@ html.light {
 
 /* ─── BASE ────────────────────────────────────────────────── */
 @layer base {
-  html { @apply font-sans antialiased; }
+  html {
+    @apply font-sans antialiased;
+    /* Fallback: dark background before JS applies the theme class */
+    background-color: #09101f;
+  }
 
   body {
     background-color: var(--bg);

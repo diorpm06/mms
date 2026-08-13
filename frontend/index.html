@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="uz" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/assets/logo.png" />
@@ -13,6 +13,18 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Marjona Med Servis</title>
+    <script>
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('marjona-auth')
+          var data = stored ? JSON.parse(stored) : null
+          var theme = (data && data.state && data.state.theme) ? data.state.theme : 'dark'
+          document.documentElement.className = theme
+        } catch (e) {
+          document.documentElement.className = 'dark'
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
