@@ -4,6 +4,11 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.py" },
     { "source": "/uploads/(.*)", "destination": "/api/index.py" },
+    { "source": "/assets/(.*)", "destination": "/assets/$1" },
+    { "source": "/sw.js", "destination": "/sw.js" },
+    { "source": "/sw.mjs", "destination": "/sw.mjs" },
+    { "source": "/manifest.webmanifest", "destination": "/manifest.webmanifest" },
+    { "source": "/favicon.ico", "destination": "/favicon.ico" },
     { "source": "/(.*)", "destination": "/api/index.py" }
   ]
 }
