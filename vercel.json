@@ -1,8 +1,4 @@
 {
   "buildCommand": "npm install --prefix frontend && npm run build --prefix frontend && cp frontend/dist/index.html frontend/dist/404.html",
-  "outputDirectory": "frontend/dist",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.py" },
-    { "source": "/uploads/(.*)", "destination": "/api/index.py" }
-  ]
+  "outputDirectory": "frontend/dist"
 }
