@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -180,7 +180,6 @@ def debug_files():
     }
 
 
-@app.get("/")
 @app.get("/api")
 @app.get("/api/")
 def root():
@@ -199,3 +198,35 @@ def health():
         "database": "Supabase PostgreSQL Connected 🟢"
     }
 
+
+def _serve_index_html() -> HTMLResponse | FileResponse:
+    """React SPA index.html ni qaytaradi (Vercel va local uchun)"""
+    if INDEX_HTML and os.path.exists(INDEX_HTML):
+        return FileResponse(INDEX_HTML, media_type="text/html")
+    # glob orqali topishga harakat
+    import glob as _glob
+    found = _glob.glob("/var/task/**/index.html", recursive=True)
+    if found:
+        return FileResponse(found[0], media_type="text/html")
+    # Oxirgi fallback: redirect
+    return HTMLResponse(
+        '<!DOCTYPE html><html><head>'
+        '<meta http-equiv="refresh" content="0;url=/">'
+        '<title>Loading...</title></head>'
+        '<body>Loading...</body></html>',
+        status_code=200,
+    )
+
+
+@app.get("/")
+async def serve_root():
+    """Root URL — React SPA login sahifasini ko'rsatadi"""
+    return _serve_index_html()
+
+
+@app.get("/{full_path:path}")
+async def spa_fallback(full_path: str):
+    """Barcha boshqa yo'llar uchun React SPA'ni qaytaradi"""
+    # /assets/* FastAPI StaticFiles mount orqali keladi (agar mavjud bo'lsa)
+    # Bu catch-all faqat SPA routing uchun
+    return _serve_index_html()
