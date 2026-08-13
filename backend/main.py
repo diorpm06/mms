@@ -18,8 +18,15 @@ from routers import (
     incassation, inpatients, inventory, lab_results, notifications, patients, payroll, providers, queue, referrers, reports, services, sheets_backup, webhook,
 )
 
-from services.scheduler import start_scheduler
-from services.sheets import start_sheet_worker
+try:
+    from services.scheduler import start_scheduler
+except Exception:
+    start_scheduler = None
+
+try:
+    from services.sheets import start_sheet_worker
+except Exception:
+    start_sheet_worker = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,11 +41,18 @@ async def lifespan(app: FastAPI):
         try:
             Base.metadata.create_all(bind=engine)
             run_migrations()
-            start_sheet_worker()
-            start_scheduler()
+            if start_sheet_worker:
+                start_sheet_worker()
+            if start_scheduler:
+                start_scheduler()
         except Exception as e:
             logger.error(f"Startup warning: {e}")
     else:
+        # Vercel serverless: faqat DB connection tekshiramiz
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception as e:
+            logger.warning(f"Vercel DB init warning: {e}")
         logger.info("Marjona Med Service backend Vercel-da ishga tushdi")
     yield
 

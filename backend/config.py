@@ -2,7 +2,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://postgres.jfulmcvwtyfykrukhmdw:Dark006..mms@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+    # DATABASE_URL ni Vercel dashboard'da yoki .env da ko'rsating
+    # Supabase: postgresql://postgres.xxx:password@aws-xxx.pooler.supabase.com:6543/postgres
+    DATABASE_URL: str = "sqlite:///./marjona_med.db"  # local fallback (dev uchun)
     SECRET_KEY: str = "marjona_med_service_crm_secret_key_2026_x89f"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
