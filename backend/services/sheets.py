@@ -5,8 +5,12 @@ import threading
 from datetime import datetime
 from typing import Any
 
-import gspread
-from google.oauth2.service_account import Credentials
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+    _GSPREAD_AVAILABLE = True
+except ImportError:
+    _GSPREAD_AVAILABLE = False
 
 from config import settings
 
@@ -22,6 +26,8 @@ _worker_started = False
 
 
 def _get_client():
+    if not _GSPREAD_AVAILABLE:
+        raise RuntimeError("gspread o'rnatilmagan")
     creds = Credentials.from_service_account_file(
         settings.GOOGLE_SHEETS_CREDENTIALS, scopes=SCOPES
     )
