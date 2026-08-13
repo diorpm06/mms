@@ -199,7 +199,46 @@ def health():
     }
 
 
+def _get_index_html_path() -> str | None:
+    """Vercel yoki local'da index.html yo'lini topadi"""
+    candidates = [
+        INDEX_HTML,
+        "/var/task/frontend/dist/index.html",
+    ]
+    import glob as _glob
+    for path in candidates:
+        if path and os.path.exists(path):
+            return path
+    found = _glob.glob("/var/task/**/index.html", recursive=True)
+    return found[0] if found else None
+
+
 @app.get("/")
 async def serve_root():
-    """Root URL — 404.html usuli Vercel'da SPA routing boshqaradi"""
+    """Root URL — React SPA index.html ni qaytaradi"""
+    idx = _get_index_html_path()
+    if idx:
+        return FileResponse(idx, media_type="text/html")
     return {"status": "ok", "message": "Marjona Med Service API ishlayapti"}
+
+
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
+async def spa_fallback(full_path: str):
+    """Barcha SPA yo'llari uchun index.html qaytaradi.
+    API yo'llari (auth, patients...) routers orqali aniq routelar sifatida
+    bu catch-all'dan OLDIN match bo'ladi.
+    """
+    # Agar kimdir /api/... ga kelsa lekin route topilmasa — 404 qaytaramiz
+    if full_path.startswith(("api/", "uploads/")):
+        raise HTTPException(status_code=404, detail="API endpoint topilmadi")
+    idx = _get_index_html_path()
+    if idx:
+        return FileResponse(idx, media_type="text/html")
+    # Fallback: meta-refresh
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(
+        '<!DOCTYPE html><html><head>'
+        '<meta http-equiv="refresh" content="0;url=/">'
+        '<title>Marjona Med</title></head><body></body></html>',
+        status_code=200,
+    )
