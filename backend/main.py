@@ -222,23 +222,41 @@ async def serve_root():
     return {"status": "ok", "message": "Marjona Med Service API ishlayapti"}
 
 
-@app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
-async def spa_fallback(full_path: str):
-    """Barcha SPA yo'llari uchun index.html qaytaradi.
-    API yo'llari (auth, patients...) routers orqali aniq routelar sifatida
-    bu catch-all'dan OLDIN match bo'ladi.
+@app.api_route(
+    "/{full_path:path}",
+    methods=["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    include_in_schema=False,
+)
+async def spa_fallback(request: Request, full_path: str):
+    """SPA catch-all.
+
+    Aniq API routelari (auth.router, patients.router ...) bu funksiyadan
+    OLDIN ro'yxatdan o'tganligi sababli POST /api/auth/login kabi so'rovlar
+    shu yerga yetib kelmaydi — to'g'ridan-to'g'ri tegishli handler tomonidan
+    bajariladi.
+
+    Bu catch-all faqat hech qanday route topilmagan so'rovlar uchun ishlaydi:
+      - SPA sahifalari (GET /login, GET /ceo/dashboard ...) → index.html
+      - Noma'lum API endpointlar (/api/nimadir/topilmadi) → 404
     """
-    # Agar kimdir /api/... ga kelsa lekin route topilmasa — 404 qaytaramiz
+    method = request.method
+
+    # Noma'lum API yoki uploads endpointi — 404
     if full_path.startswith(("api/", "uploads/")):
-        raise HTTPException(status_code=404, detail="API endpoint topilmadi")
-    idx = _get_index_html_path()
-    if idx:
-        return FileResponse(idx, media_type="text/html")
-    # Fallback: meta-refresh
-    from fastapi.responses import HTMLResponse
-    return HTMLResponse(
-        '<!DOCTYPE html><html><head>'
-        '<meta http-equiv="refresh" content="0;url=/">'
-        '<title>Marjona Med</title></head><body></body></html>',
-        status_code=200,
-    )
+        raise HTTPException(status_code=404, detail=f"API endpoint topilmadi: /{full_path}")
+
+    # GET/HEAD → SPA index.html qaytaramiz
+    if method in ("GET", "HEAD"):
+        idx = _get_index_html_path()
+        if idx:
+            return FileResponse(idx, media_type="text/html")
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(
+            '<!DOCTYPE html><html><head>'
+            '<meta http-equiv="refresh" content="0;url=/">'
+            '<title>Marjona Med</title></head><body></body></html>',
+            status_code=200,
+        )
+
+    # Boshqa methodlar (POST/PUT/...) noma'lum yo'llarga → 405
+    raise HTTPException(status_code=405, detail=f"Method Not Allowed: {method} /{full_path}")
