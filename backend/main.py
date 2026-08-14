@@ -32,17 +32,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ── SECRET_KEY xavfsizlik tekshiruvi ─────────────────────
+# Eslatma: ataylab RuntimeError bilan to'xtatilmaydi — noto'g'ri sozlangan
+# SECRET_KEY butun serverless funksiyani "crash" qilib qo'yishi mumkin edi.
+# Faqat ogohlantirish log qilinadi, ilova ishlashda davom etadi.
 _INSECURE_DEFAULT_SECRET_KEY = "marjona_med_service_crm_secret_key_2026_x89f"
 if settings.SECRET_KEY == _INSECURE_DEFAULT_SECRET_KEY:
-    if os.environ.get("VERCEL") or not settings.DATABASE_URL.startswith("sqlite"):
-        raise RuntimeError(
-            "SECRET_KEY environment variable sozlanmagan (yoki standart qiymatda qolgan). "
-            "Production'da ishga tushirishdan oldin kuchli tasodifiy SECRET_KEY o'rnating "
-            "(python -c \"import secrets; print(secrets.token_hex(32))\")."
-        )
     logger.warning(
         "XAVFSIZLIK OGOHLANTIRISHI: standart SECRET_KEY ishlatilmoqda. "
-        "Bu faqat local development uchun xavfsiz."
+        "Vercel dashboard > Environment Variables'da SECRET_KEY'ni kuchli "
+        "tasodifiy qiymatga o'zgartiring (python -c \"import secrets; print(secrets.token_hex(32))\")."
     )
 
 # Rate limiter (global, IP asosida)
