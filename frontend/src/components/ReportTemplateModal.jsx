@@ -1,24 +1,28 @@
 import { useEffect, useState } from 'react'
-import { X, Send } from 'lucide-react'
+import { X, Send, ChevronRight } from 'lucide-react'
 import { api } from '../utils/api'
 import { useToastStore } from '../store/toastStore'
 import { Btn, Icons } from './UIKit'
-import { getTemplateByKey } from '../utils/reportTemplates'
+import { getTemplateByKey, getTemplatesByCategory } from '../utils/reportTemplates'
 
 const STATUS_LABEL = {
   submitted: { text: 'Adminga yuborilgan', cls: 'badge-gold' },
   printed: { text: 'Chop etilgan', cls: 'badge-cyan' },
 }
 
-export default function ReportTemplateModal({ patient, templateKey, serviceId, onClose }) {
-  const template = getTemplateByKey(templateKey)
+// view: 'history' | 'picker' | 'fill'
+export default function ReportTemplateModal({ patient, category, defaultTemplateKey, serviceId, onClose }) {
+  const [view, setView] = useState('history')
+  const [selectedKey, setSelectedKey] = useState(defaultTemplateKey || null)
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
-  const [fillMode, setFillMode] = useState(true)
   const [fieldValues, setFieldValues] = useState({})
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const toast = useToastStore((s) => s.add)
+
+  const template = getTemplateByKey(selectedKey)
+  const candidateTemplates = getTemplatesByCategory(category)
 
   const loadHistory = () => {
     if (!patient) return
@@ -39,23 +43,23 @@ export default function ReportTemplateModal({ patient, templateKey, serviceId, o
       template.fields.forEach((f) => { init[f.name] = '' })
       setFieldValues(init)
     }
-  }, [templateKey])
+  }, [selectedKey])
 
   if (!patient) return null
 
-  if (!template) {
-    return (
-      <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
-        <div className="card max-w-md w-full p-6 text-center space-y-3">
-          <p className="text-sm text-muted">Bu xizmat uchun shablon topilmadi.</p>
-          <Btn variant="ghost" full onClick={onClose}>Yopish</Btn>
-        </div>
-      </div>
-    )
+  const openPicker = () => {
+    setSelectedKey(defaultTemplateKey || null)
+    setView(defaultTemplateKey ? 'fill' : 'picker')
+  }
+
+  const chooseTemplate = (key) => {
+    setSelectedKey(key)
+    setView('fill')
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!template) return
     setSubmitting(true)
     try {
       await api('/report-submissions', {
@@ -71,7 +75,7 @@ export default function ReportTemplateModal({ patient, templateKey, serviceId, o
         }),
       })
       toast('✓ Shablon adminga yuborildi!')
-      setFillMode(false)
+      setView('history')
       loadHistory()
     } catch (err) {
       toast(err.message || 'Yuborishda xatolik', 'error')
@@ -87,11 +91,11 @@ export default function ReportTemplateModal({ patient, templateKey, serviceId, o
         <div className="flex items-center justify-between pb-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 text-cyan font-bold flex items-center justify-center border border-cyan-500/30 text-xl">
-              {template.category === 'UZI' ? '🩻' : '🔬'}
+              {view === 'fill' && template ? (template.category === 'UZI' ? '🩻' : '🔬') : '📋'}
             </div>
             <div>
               <h3 className="text-lg font-black text-gold uppercase tracking-wide">
-                {template.name}
+                {view === 'fill' && template ? template.name : 'Tekshiruv Shablonlari'}
               </h3>
               <p className="text-xs text-muted font-bold">
                 Bemor: <strong className="text-cyan">{patient.first_name} {patient.last_name}</strong>
@@ -103,21 +107,60 @@ export default function ReportTemplateModal({ patient, templateKey, serviceId, o
           </button>
         </div>
 
-        <div className="card-2 p-3 flex justify-between items-center">
-          <span className="text-xs text-muted font-bold">
-            Bu bemor uchun oldingi topshiriqlar: {history.length} ta
-          </span>
-          <button
-            type="button"
-            onClick={() => setFillMode(!fillMode)}
-            className="btn-gold py-2 px-4 text-xs font-black"
-          >
-            {fillMode ? 'Tarixni ko\'rish' : '+ Yangi to\'ldirish'}
-          </button>
-        </div>
+        {view !== 'picker' && (
+          <div className="card-2 p-3 flex justify-between items-center">
+            <span className="text-xs text-muted font-bold">
+              Bu bemor uchun oldingi topshiriqlar: {history.length} ta
+            </span>
+            <button
+              type="button"
+              onClick={() => (view === 'history' ? openPicker() : setView('history'))}
+              className="btn-gold py-2 px-4 text-xs font-black"
+            >
+              {view === 'history' ? '+ Yangi to\'ldirish' : 'Tarixni ko\'rish'}
+            </button>
+          </div>
+        )}
 
-        {fillMode ? (
+        {view === 'picker' && (
+          <div className="space-y-2 animate-in fade-in">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black text-amber uppercase tracking-wider">
+                Qaysi tekshiruv turi? (sohani tanlang)
+              </h4>
+              <button type="button" onClick={() => setView('history')} className="text-xs text-muted hover:text-body">
+                Bekor
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {candidateTemplates.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => chooseTemplate(t.key)}
+                  className="card-2 p-3 text-left flex items-center justify-between hover:border-gold transition-all"
+                >
+                  <span className="text-xs font-bold text-body">
+                    {t.category === 'UZI' ? '🩻' : '🔬'} {t.name}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {view === 'fill' && template && (
           <form onSubmit={handleSubmit} className="space-y-4 pt-1 animate-in fade-in">
+            {!defaultTemplateKey && (
+              <button
+                type="button"
+                onClick={() => setView('picker')}
+                className="text-xs text-cyan font-bold hover:underline"
+              >
+                ← Boshqa sohani tanlash
+              </button>
+            )}
             <div className="space-y-2 card-2 p-4">
               <h4 className="text-xs font-black text-amber uppercase tracking-wider mb-2">
                 📋 Ko'rsatkichlarni kiriting:
@@ -157,7 +200,9 @@ export default function ReportTemplateModal({ patient, templateKey, serviceId, o
               </Btn>
             </div>
           </form>
-        ) : (
+        )}
+
+        {view === 'history' && (
           <div className="space-y-3">
             {loading ? (
               <p className="text-xs text-muted italic text-center py-8">Yuklanmoqda...</p>

@@ -37,6 +37,7 @@ import MedicalReportModal from '../../components/MedicalReportModal'
 import Modal from '../../components/Modal'
 import LabResultsModal from '../../components/LabResultsModal'
 import ReportTemplateModal from '../../components/ReportTemplateModal'
+import { guessTemplateCategory } from '../../utils/reportTemplates'
 import { Btn, Icons, PageHeader, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
 
 export default function DoctorPanel() {
@@ -716,7 +717,7 @@ export default function DoctorPanel() {
                 🧪 Laboratoriya Javoblari
               </Btn>
 
-              {current_patient.template_key && (
+              {guessTemplateCategory(current_patient.service_category, current_patient.service_name) && (
                 <Btn
                   variant="success"
                   size="sm"
@@ -960,7 +961,8 @@ export default function DoctorPanel() {
       {templatePatient && (
         <ReportTemplateModal
           patient={templatePatient}
-          templateKey={templatePatient.template_key}
+          category={guessTemplateCategory(templatePatient.service_category, templatePatient.service_name)}
+          defaultTemplateKey={templatePatient.template_key}
           serviceId={templatePatient.service_id}
           onClose={() => setTemplatePatient(null)}
         />

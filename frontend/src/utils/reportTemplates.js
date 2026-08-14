@@ -389,3 +389,22 @@ export const REPORT_TEMPLATES = [
 export function getTemplateByKey(key) {
   return REPORT_TEMPLATES.find((t) => t.key === key) || null
 }
+
+// Xizmat category/nomidan qaysi shablon guruhi tegishli ekanini taxmin qiladi.
+// Aniq shablon (masalan "UZI_BUYRAK") emas, faqat "UZI" | "Laboratoriya" | null qaytaradi —
+// aniq turini keyin shifokorning o'zi tanlaydi (bitta xizmatga bir nechta yo'nalish tegishli
+// bo'lishi mumkin, masalan UZI'da "1 ta soha" narx darajasi ostida 9 xil tekshiruv bo'lishi mumkin).
+export function guessTemplateCategory(serviceCategory, serviceName) {
+  const combined = `${serviceCategory || ''} ${serviceName || ''}`.toLowerCase()
+  if (combined.includes('uzi') || combined.includes('узи')) return 'UZI'
+  if (
+    combined.includes('laborat') || combined.includes('labar') ||
+    combined.includes('tahlil') || combined.includes('analiz')
+  ) return 'Laboratoriya'
+  return null
+}
+
+export function getTemplatesByCategory(category) {
+  if (!category) return REPORT_TEMPLATES
+  return REPORT_TEMPLATES.filter((t) => t.category === category)
+}

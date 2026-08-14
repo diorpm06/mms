@@ -60,6 +60,7 @@ def _format_patient_queue_item(p: Patient, public: bool = False) -> dict:
         "provider_specialization": p.provider.specialization if p.provider else None,
         "service_id": p.service_id,
         "service_name": p.service.name if p.service else None,
+        "service_category": p.service.category if p.service else None,
         "template_key": p.service.template_key if p.service else None,
     }
 
