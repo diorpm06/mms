@@ -244,24 +244,33 @@ async def serve_root():
     include_in_schema=False,
 )
 async def spa_fallback(request: Request, full_path: str):
-    """SPA catch-all.
-
-    Aniq API routelari (auth.router, patients.router ...) bu funksiyadan
-    OLDIN ro'yxatdan o'tganligi sababli POST /api/auth/login kabi so'rovlar
-    shu yerga yetib kelmaydi — to'g'ridan-to'g'ri tegishli handler tomonidan
-    bajariladi.
-
-    Bu catch-all faqat hech qanday route topilmagan so'rovlar uchun ishlaydi:
-      - SPA sahifalari (GET /login, GET /ceo/dashboard ...) → index.html
-      - Noma'lum API endpointlar (/api/nimadir/topilmadi) → 404
-    """
     method = request.method
 
-    # Noma'lum API yoki uploads endpointi — 404
+    # VAQTINCHA DEBUG: /api/* uchun to'liq ma'lumot qaytaramiz
+    # (Bu login ham ishlamayotganini aniqlash uchun)
     if full_path.startswith(("api/", "uploads/")):
-        raise HTTPException(status_code=404, detail=f"API endpoint topilmadi: /{full_path}")
+        all_routes = []
+        for r in app.routes:
+            route_info = {"name": getattr(r, "name", "?"), "path": getattr(r, "path", "?")}
+            if hasattr(r, "methods"):
+                route_info["methods"] = sorted(list(r.methods or []))
+            all_routes.append(route_info)
+        return {
+            "debug": True,
+            "caught_by_fallback": True,
+            "full_path": full_path,
+            "scope_path": request.scope.get("path", ""),
+            "raw_path": request.scope.get("raw_path", b"").decode(errors="replace"),
+            "query_string": request.scope.get("query_string", b"").decode(errors="replace"),
+            "method": method,
+            "headers": {
+                k.decode(errors="replace"): v.decode(errors="replace")
+                for k, v in request.scope.get("headers", [])
+            },
+            "registered_routes": all_routes,
+        }
 
-    # GET/HEAD → SPA index.html qaytaramiz
+    # GET/HEAD → SPA index.html
     if method in ("GET", "HEAD"):
         idx = _get_index_html_path()
         if idx:
@@ -274,5 +283,4 @@ async def spa_fallback(request: Request, full_path: str):
             status_code=200,
         )
 
-    # Boshqa methodlar (POST/PUT/...) noma'lum yo'llarga → 405
     raise HTTPException(status_code=405, detail=f"Method Not Allowed: {method} /{full_path}")
