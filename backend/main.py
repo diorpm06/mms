@@ -247,9 +247,16 @@ async def spa_fallback(request: Request, full_path: str):
     """SPA catch-all — aniq API routelari bu yerga yetib kelmaydi."""
     method = request.method
 
-    # Noma'lum API yoki uploads endpointi — 404
+    # Noma'lum API yoki uploads endpointi — DEBUG qaytaramiz
     if full_path.startswith(("api/", "uploads/")):
-        raise HTTPException(status_code=404, detail=f"API endpoint topilmadi: /{full_path}")
+        return {
+            "debug": True,
+            "caught_by_fallback": True,
+            "full_path": full_path,
+            "scope_path": request.scope.get("path", ""),
+            "query_string": request.scope.get("query_string", b"").decode(errors="replace"),
+            "method": method,
+        }
 
     # GET/HEAD → SPA index.html
     if method in ("GET", "HEAD"):

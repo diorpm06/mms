@@ -3,6 +3,6 @@
   "outputDirectory": "frontend/dist",
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/api/index.py?__v_path=/$1" }
+    { "src": "/(.*)", "dest": "/api/index.py" }
   ]
 }
