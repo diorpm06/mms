@@ -19,6 +19,7 @@ const CEO_LINKS = [
   { to: '/ceo/services',        label: 'Xizmatlar Katalogi',    icon: '🩺' },
   { to: '/ceo/referrers',       label: "Yo'naltiruvchilar (10-Kunlik)", icon: '🤝' },
   { to: '/ceo/inventory',       label: 'Omborxona',             icon: '💊' },
+  { to: '/ceo/report-queue',    label: 'Shablonlar (Chop etish)', icon: '📋' },
   { to: '/ceo/doctor',          label: 'Doctor Paneli',         icon: '🩺' },
   { to: '/ceo/tv-manager',      label: 'TV Navbat Ekrani',      icon: '📺' },
   { to: '/ceo/inpatients',      label: 'Statsionar (Yotganlar)',icon: '🛏️' },
@@ -38,6 +39,7 @@ const ADMIN_LINKS = [
   { to: '/admin/doctor',        label: 'Doctor Paneli',         icon: '🩺' },
   { to: '/admin/tv-manager',    label: 'TV Navbat Ekrani',      icon: '📺' },
   { to: '/admin/inventory',     label: 'Omborxona (Material)', icon: '💊' },
+  { to: '/admin/report-queue',  label: 'Shablonlar (Chop etish)', icon: '📋' },
   { to: '/admin/inpatients',    label: 'Statsionar (Yotganlar)',icon: '🛏️' },
   { to: '/admin/catalog',       label: "Ma'lumotnomalar",       icon: '📚' },
 ]

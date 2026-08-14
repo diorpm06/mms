@@ -31,10 +31,12 @@ import {
   Package,
   MinusCircle,
   TestTube,
+  ClipboardList,
 } from 'lucide-react'
 import MedicalReportModal from '../../components/MedicalReportModal'
 import Modal from '../../components/Modal'
 import LabResultsModal from '../../components/LabResultsModal'
+import ReportTemplateModal from '../../components/ReportTemplateModal'
 import { Btn, Icons, PageHeader, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
 
 export default function DoctorPanel() {
@@ -68,6 +70,9 @@ export default function DoctorPanel() {
 
   // Lab Modal State
   const [labPatient, setLabPatient] = useState(null)
+
+  // Report Template Modal State (UZI/Lab shablonlari)
+  const [templatePatient, setTemplatePatient] = useState(null)
 
   // Inventory Modal State
   const [inventoryModal, setInventoryModal] = useState(false)
@@ -711,6 +716,18 @@ export default function DoctorPanel() {
                 🧪 Laboratoriya Javoblari
               </Btn>
 
+              {current_patient.template_key && (
+                <Btn
+                  variant="success"
+                  size="sm"
+                  icon={<ClipboardList className="h-4 w-4" />}
+                  onClick={() => setTemplatePatient(current_patient)}
+                  className="w-full font-bold"
+                >
+                  📋 Shablonni To'ldirish
+                </Btn>
+              )}
+
               <Btn
                 variant="amber"
                 size="sm"
@@ -936,6 +953,16 @@ export default function DoctorPanel() {
         <LabResultsModal
           patient={labPatient}
           onClose={() => setLabPatient(null)}
+        />
+      )}
+
+      {/* ── MODAL 2b: REPORT TEMPLATE (UZI/Lab shabloni) ── */}
+      {templatePatient && (
+        <ReportTemplateModal
+          patient={templatePatient}
+          templateKey={templatePatient.template_key}
+          serviceId={templatePatient.service_id}
+          onClose={() => setTemplatePatient(null)}
         />
       )}
 

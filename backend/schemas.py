@@ -46,6 +46,7 @@ class ServiceCreate(BaseModel):
     referrer_doctor_split_sum: Optional[int] = Field(default=0, ge=0)
     referrer_clinic_split_sum: Optional[int] = Field(default=0, ge=0)
     allow_custom_price: Optional[bool] = False
+    template_key: Optional[str] = None
 
 
 class ServiceUpdate(BaseModel):
@@ -63,6 +64,7 @@ class ServiceUpdate(BaseModel):
     referrer_clinic_split_sum: Optional[int] = Field(default=None, ge=0)
     allow_custom_price: Optional[bool] = None
     is_active: Optional[bool] = None
+    template_key: Optional[str] = None
 
 
 class ServiceOut(BaseModel):
@@ -80,6 +82,7 @@ class ServiceOut(BaseModel):
     referrer_doctor_split_sum: Optional[int] = 0
     referrer_clinic_split_sum: Optional[int] = 0
     allow_custom_price: Optional[bool] = False
+    template_key: Optional[str] = None
     is_active: bool
     created_at: datetime
 

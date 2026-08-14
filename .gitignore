@@ -51,3 +51,7 @@ frontend/.env.production
 *.swo
 scratch/
 backend/scratch_test_backend.py
+
+# Bemor ma'lumoti (PHI) bor Word shablonlari — gitga yuborilmaydi.
+# Maydonlar ro'yxati frontend/src/utils/reportTemplates.js'da strukturalangan.
+shablonlar/

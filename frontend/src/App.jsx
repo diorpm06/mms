@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import CeoDashboard from './pages/ceo/Dashboard'
 import CeoPatients from './pages/ceo/Patients'
 import CeoServices from './pages/ceo/Services'
+import AdminReportQueue from './pages/admin/ReportQueue'
 import CeoReferrers from './pages/ceo/Referrers'
 import CeoProviders from './pages/ceo/Providers'
 import CeoEmployees from './pages/ceo/Employees'
@@ -102,6 +103,7 @@ function AppRoutes() {
           <Route path="payroll" element={<Payroll />} />
           <Route path="appointments" element={<Appointments />} />
           <Route path="inventory" element={<Inventory />} />
+          <Route path="report-queue" element={<AdminReportQueue />} />
           <Route path="new-patient" element={<NewPatient homePath="/ceo" />} />
           <Route path="search" element={<Search homePath="/ceo" />} />
           <Route path="patients" element={<CeoPatients />} />
@@ -128,6 +130,7 @@ function AppRoutes() {
           <Route index element={<AdminDashboard />} />
           <Route path="appointments" element={<Appointments />} />
           <Route path="inventory" element={<Inventory />} />
+          <Route path="report-queue" element={<AdminReportQueue />} />
           <Route path="new-patient" element={<NewPatient homePath="/admin" />} />
           <Route path="today" element={<TodayPatients />} />
           <Route path="patients" element={<CeoPatients />} />

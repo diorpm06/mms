@@ -6,6 +6,7 @@ import { useToastStore } from '../../store/toastStore'
 import Modal from '../../components/Modal'
 import { TableSkeleton } from '../../components/Skeleton'
 import { Btn, Icons, PageHeader, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
+import { REPORT_TEMPLATES } from '../../utils/reportTemplates'
 
 const EMPTY_SVC = {
   name: '',
@@ -19,6 +20,7 @@ const EMPTY_SVC = {
   referrer_doctor_split_sum: '',
   referrer_clinic_split_sum: '',
   allow_custom_price: false,
+  template_key: '',
 }
 
 export default function CeoServices() {
@@ -194,6 +196,7 @@ export default function CeoServices() {
       referrer_doctor_split_sum: s.referrer_doctor_split_sum ? String(s.referrer_doctor_split_sum) : '',
       referrer_clinic_split_sum: s.referrer_clinic_split_sum ? String(s.referrer_clinic_split_sum) : '',
       allow_custom_price: s.allow_custom_price || false,
+      template_key: s.template_key || '',
     })
     setSvcModal(true)
   }
@@ -218,6 +221,7 @@ export default function CeoServices() {
         referrer_doctor_split_sum: parseInt(form.referrer_doctor_split_sum, 10) || 0,
         referrer_clinic_split_sum: parseInt(form.referrer_clinic_split_sum, 10) || 0,
         allow_custom_price: !!form.allow_custom_price,
+        template_key: form.template_key || null,
       }
       if (edit) await api(`/services/${edit.id}`, { method: 'PUT', body: JSON.stringify(body) })
       else await api('/services', { method: 'POST', body: JSON.stringify(body) })
@@ -555,6 +559,24 @@ export default function CeoServices() {
             <label htmlFor="custom_price" className="font-bold text-body cursor-pointer">
               ✏️ Qabul jarayonida narxni erkin o'zgartirishga ruxsat berish
             </label>
+          </div>
+
+          <div>
+            <label className="form-label text-xs">📋 Biriktirilgan shablon (Doctor Panelda to'ldirish uchun)</label>
+            <select
+              className="input-field text-xs"
+              value={form.template_key || ''}
+              onChange={(e) => setForm({ ...form, template_key: e.target.value })}
+            >
+              <option value="">— Shablon yo'q —</option>
+              {['Laboratoriya', 'UZI'].map((cat) => (
+                <optgroup key={cat} label={cat}>
+                  {REPORT_TEMPLATES.filter((t) => t.category === cat).map((t) => (
+                    <option key={t.key} value={t.key}>{t.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
 
           <div className="flex gap-2 pt-2 border-t border-border">

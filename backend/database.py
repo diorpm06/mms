@@ -105,6 +105,18 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"Migration warning: {e}")
 
+    # services.template_key — SQLite va PostgreSQL ikkalasida ham (mavjud bo'lsa xato
+    # jim yutiladi, ADD COLUMN IF NOT EXISTS SQLite'da yo'q)
+    try:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE services ADD COLUMN template_key VARCHAR(50)"))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+    except Exception as e:
+        logger.warning(f"template_key migration warning: {e}")
+
     # Ko'p so'raladigan ustunlarga indeks — SQLite va PostgreSQL'da bir xil sintaksis
     try:
         with engine.connect() as conn:

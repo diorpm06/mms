@@ -15,10 +15,11 @@ from models.advance import Advance
 from models.duty_log import DutyLog
 from models.inpatient import Inpatient, InpatientPayment
 from models.banner import Banner
+from models.report_submission import ReportSubmission
 
 __all__ = [
     "User", "Patient", "Service", "Referrer", "Provider", "ProviderService", "Employee",
     "Transaction", "Expense", "Balance", "BalanceHistory", "Payout",
     "SalaryLog", "AuditLog", "SessionLog", "Advance", "DutyLog",
-    "Inpatient", "InpatientPayment", "Banner",
+    "Inpatient", "InpatientPayment", "Banner", "ReportSubmission",
 ]
