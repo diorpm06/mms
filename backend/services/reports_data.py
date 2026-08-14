@@ -449,6 +449,40 @@ def daily_report(db: Session, d: date) -> dict:
     return get_report(db, d, d)
 
 
+def dashboard_summary(db: Session, d: date) -> dict:
+    """
+    Faqat CEO dashboard uchun yengil xulosa — to'liq get_report() o'rniga
+    (~15 so'rov o'rniga 3 ta). get_report() har doim daily/weekly/monthly/
+    ten-day hisobot sahifalari uchun to'liq holicha qoladi.
+    """
+    s, e = _day_range(d)
+    total_income = (
+        db.query(func.coalesce(func.sum(Transaction.total_amount), 0))
+        .filter(
+            Transaction.created_at >= s,
+            Transaction.created_at <= e,
+            Transaction.is_cancelled == False,
+        )
+        .scalar()
+    )
+    patients_count = (
+        db.query(func.count(Patient.id))
+        .filter(
+            Patient.created_at >= s,
+            Patient.created_at <= e,
+            Patient.is_cancelled == False,
+        )
+        .scalar()
+    )
+    bal = db.query(Balance).first()
+    current_balance = bal.current_balance if bal else 0
+    return {
+        "total_income": int(total_income or 0),
+        "patients_count": int(patients_count or 0),
+        "current_balance": int(current_balance),
+    }
+
+
 def weekly_report(db: Session, d: date) -> dict:
     start = d - timedelta(days=d.weekday())
     end = start + timedelta(days=6)

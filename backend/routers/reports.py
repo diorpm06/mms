@@ -14,6 +14,7 @@ from services.export import export_excel, export_pdf
 from services.reports_data import (
     admin_daily_report,
     daily_report,
+    dashboard_summary,
     get_report,
     income_last_n_days,
     last_activity_date,
@@ -35,7 +36,7 @@ def ceo_dashboard(db: Session = Depends(get_db), _: User = Depends(require_ceo))
     from models.expense import Expense
 
     today = date.today()
-    daily = daily_report(db, today)
+    daily = dashboard_summary(db, today)
     chart = income_last_n_days(db, 7)
     tops = top_services(db, 3)
     refs = top_referrers(db, 3)
@@ -58,7 +59,7 @@ def ceo_dashboard(db: Session = Depends(get_db), _: User = Depends(require_ceo))
     if daily["patients_count"] == 0 and daily["total_income"] == 0:
         last = last_activity_date(db)
         if last and last != today:
-            prev = daily_report(db, last)
+            prev = dashboard_summary(db, last)
             last_activity = {
                 "date": last.isoformat(),
                 "date_label": last.strftime("%d.%m.%Y"),
