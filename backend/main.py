@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from urllib.parse import parse_qs, urlencode
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -107,9 +108,6 @@ async def security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-    # VAQTINCHALIK: Vercel routing diagnostikasi uchun (xavfsiz, faylizim/secret oshkor qilmaydi)
-    response.headers["X-Debug-Scope-Path"] = request.scope.get("path", "")
-    response.headers["X-Debug-Query"] = request.scope.get("query_string", b"").decode(errors="replace")
     return response
 
 
@@ -257,4 +255,33 @@ async def spa_fallback(request: Request, full_path: str):
         )
 
     raise HTTPException(status_code=405, detail=f"Method Not Allowed: {method} /{full_path}")
+
+
+class VercelPathRewriteMiddleware:
+    """
+    vercel.json'dagi rewrite har bir so'rovni /api/index.py?__v_path=<asl_yo'l>
+    ko'rinishida yuboradi — Vercel ASGI scope'ga asl yo'l o'rniga shu destination
+    yo'lini beradi. Bu middleware __v_path'ni o'qib, scope["path"]ni asl
+    (brauzer so'ragan) yo'lga tiklaydi, aks holda FastAPI routing hech qanday
+    marshrutga mos kelmay, doim 404 qaytaradi.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            query_string = scope.get("query_string", b"")
+            if query_string and b"__v_path" in query_string:
+                params = parse_qs(query_string.decode("utf-8", errors="replace"))
+                v_path = params.pop("__v_path", None)
+                if v_path and v_path[0]:
+                    scope = dict(scope)
+                    scope["path"] = v_path[0]
+                    scope["raw_path"] = v_path[0].encode("utf-8")
+                    scope["query_string"] = urlencode(params, doseq=True).encode("utf-8")
+        await self.app(scope, receive, send)
+
+
+app = VercelPathRewriteMiddleware(app)
 
