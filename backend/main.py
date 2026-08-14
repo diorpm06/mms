@@ -107,6 +107,9 @@ async def security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    # VAQTINCHALIK: Vercel routing diagnostikasi uchun (xavfsiz, faylizim/secret oshkor qilmaydi)
+    response.headers["X-Debug-Scope-Path"] = request.scope.get("path", "")
+    response.headers["X-Debug-Query"] = request.scope.get("query_string", b"").decode(errors="replace")
     return response
 
 
