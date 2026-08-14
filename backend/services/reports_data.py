@@ -1,3 +1,4 @@
+import json
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import func
@@ -261,20 +262,30 @@ def get_report(db: Session, start: date, end: date) -> dict:
     bal = db.query(Balance).first()
     current_balance = bal.current_balance if bal else 0
 
+    daily_totals_rows = (
+        db.query(
+            func.date(Transaction.created_at).label("day"),
+            func.sum(Transaction.total_amount).label("total"),
+        )
+        .filter(
+            Transaction.created_at >= s,
+            Transaction.created_at <= e,
+            Transaction.is_cancelled == False,
+        )
+        .group_by(func.date(Transaction.created_at))
+        .all()
+    )
+    daily_totals_map = {}
+    for row in daily_totals_rows:
+        day_val = row.day
+        if isinstance(day_val, str):
+            day_val = datetime.fromisoformat(day_val).date()
+        daily_totals_map[day_val] = int(row.total or 0)
+
     chart = []
     d = start
     while d <= end:
-        ds, de = _day_range(d)
-        day_total = (
-            db.query(func.coalesce(func.sum(Transaction.total_amount), 0))
-            .filter(
-                Transaction.created_at >= ds,
-                Transaction.created_at <= de,
-                Transaction.is_cancelled == False,
-            )
-            .scalar()
-        )
-        chart.append({"date": d.strftime("%d.%m"), "income": int(day_total or 0), "expenses": 0})
+        chart.append({"date": d.strftime("%d.%m"), "income": daily_totals_map.get(d, 0), "expenses": 0})
         d += timedelta(days=1)
 
     payment_chart = [
@@ -308,7 +319,13 @@ def get_report(db: Session, start: date, end: date) -> dict:
 
     mat_summary = {}
     for l in mat_logs:
-        nd = l.new_data or {}
+        if isinstance(l.new_data, str):
+            try:
+                nd = json.loads(l.new_data) if l.new_data else {}
+            except (json.JSONDecodeError, TypeError):
+                nd = {}
+        else:
+            nd = l.new_data or {}
         item_name = nd.get("item_name") or "Noma'lum Material"
         consumed_amt = int(nd.get("consumed") or 0)
         charged_amt = int(nd.get("charged") or 0)
@@ -519,49 +536,6 @@ def top_referrers(db: Session, limit: int = 10):
     )
 
 
-def referrer_patient_details(db: Session, referrer_id: int, start: date, end: date):
-    s, e = _period_range(start, end)
-    rows = (
-        db.query(
-            Patient.id,
-            Patient.first_name,
-            Patient.last_name,
-            Service.name.label("service_name"),
-            Provider.full_name.label("provider_name"),
-            Transaction.total_amount,
-            Transaction.referrer_amount,
-            Transaction.created_at,
-            Referrer.percentage,
-        )
-        .join(Transaction, Transaction.patient_id == Patient.id)
-        .join(Service, Service.id == Patient.service_id)
-        .join(Provider, Provider.id == Patient.provider_id)
-        .join(Referrer, Referrer.id == Transaction.referrer_id)
-        .filter(
-            Transaction.referrer_id == referrer_id,
-            Transaction.created_at >= s,
-            Transaction.created_at <= e,
-            Transaction.is_cancelled == False,
-        )
-        .order_by(Transaction.created_at.desc())
-        .limit(100)
-        .all()
-    )
-    return [
-        {
-            "patient_id": r[0],
-            "patient_name": f"{r[1]} {r[2]}",
-            "service_name": r[3],
-            "provider_name": r[4],
-            "total_amount": int(r[5] or 0),
-            "referrer_amount": int(r[6] or 0),
-            "referrer_percent": int(r[8] or 0),
-            "created_at": r[7].isoformat(),
-        }
-        for r in rows
-    ]
-
-
 def top_services(db: Session, limit: int = 10):
     return (
         db.query(
@@ -579,21 +553,34 @@ def top_services(db: Session, limit: int = 10):
 
 
 def income_last_n_days(db: Session, days: int = 7):
-    result = []
     today = date.today()
+    start = today - timedelta(days=days - 1)
+    s, e = _period_range(start, today)
+
+    rows = (
+        db.query(
+            func.date(Transaction.created_at).label("day"),
+            func.sum(Transaction.total_amount).label("total"),
+        )
+        .filter(
+            Transaction.created_at >= s,
+            Transaction.created_at <= e,
+            Transaction.is_cancelled == False,
+        )
+        .group_by(func.date(Transaction.created_at))
+        .all()
+    )
+    totals_map = {}
+    for row in rows:
+        day_val = row.day
+        if isinstance(day_val, str):
+            day_val = datetime.fromisoformat(day_val).date()
+        totals_map[day_val] = int(row.total or 0)
+
+    result = []
     for i in range(days - 1, -1, -1):
         d = today - timedelta(days=i)
-        ds, de = _day_range(d)
-        total = (
-            db.query(func.coalesce(func.sum(Transaction.total_amount), 0))
-            .filter(
-                Transaction.created_at >= ds,
-                Transaction.created_at <= de,
-                Transaction.is_cancelled == False,
-            )
-            .scalar()
-        )
-        result.append({"date": d.strftime("%d.%m"), "income": int(total or 0)})
+        result.append({"date": d.strftime("%d.%m"), "income": totals_map.get(d, 0)})
     return result
 
 
@@ -607,8 +594,11 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     base_report = get_report(db, start, end)
 
     # 1. Detailed Service Breakdown with Commissions
+    from sqlalchemy.orm import joinedload
+
     patients = (
         db.query(Patient)
+        .options(joinedload(Patient.service))
         .filter(
             Patient.created_at >= s,
             Patient.created_at <= e,
@@ -619,7 +609,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
 
     svc_map = {}
     for p in patients:
-        svc = db.query(Service).filter(Service.id == p.service_id).first()
+        svc = p.service
         svc_name = svc.name if svc else "Noma'lum"
         svc_id = svc.id if svc else 0
         paid = p.payment_amount or 0
@@ -676,7 +666,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
 
         ref_patients = []
         for p in raw_ref_patients:
-            svc = db.query(Service).filter(Service.id == p.service_id).first() if p.service_id else None
+            svc = p.service
             dept_name = _extract_department_name(svc.name if svc else "", svc.category if svc else "", svc.cabinet if svc else "") if svc else "Boshqa xizmatlar"
             if not any(ex in dept_name for ex in ["Massaj", "Ineksiya"]):
                 ref_patients.append(p)
@@ -689,7 +679,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         total_comm = 0
         patient_details = []
         for p in sorted(ref_patients, key=lambda x: x.created_at, reverse=True):
-            svc = db.query(Service).filter(Service.id == p.service_id).first() if p.service_id else None
+            svc = p.service
             dept_name = _extract_department_name(svc.name if svc else "", svc.category if svc else "", svc.cabinet if svc else "") if svc else "Boshqa xizmatlar"
 
             paid = p.payment_amount or 0
@@ -737,7 +727,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         dept_map_r = {}
         for p in ref_patients:
             d_str = p.created_at.strftime("%d.%m.%Y") if p.created_at else ""
-            svc = db.query(Service).filter(Service.id == p.service_id).first() if p.service_id else None
+            svc = p.service
             s_name = svc.name if svc else "Noma'lum xizmat"
             d_name = _extract_department_name(svc.name if svc else "", svc.category if svc else "", svc.cabinet if svc else "") if svc else "Boshqa xizmatlar"
             if any(ex in d_name for ex in ["Massaj", "Ineksiya"]):
@@ -864,7 +854,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         from services.finance import calculate_financial_split
         for p in pr_patients:
             paid = p.payment_amount or 0
-            svc = db.query(Service).filter(Service.id == p.service_id).first() if p.service_id else None
+            svc = p.service
             ref_comm_sum = svc.referrer_commission_sum if svc else 0
             ref_comm_pct = (svc.referrer_commission_percent if (svc and svc.referrer_commission_percent) else 0) if p.referrer_id else 0
             ref_doc_split_pct = svc.referrer_doctor_split_percent if svc else None
@@ -921,9 +911,12 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
 
 def referrer_patient_details(db: Session, referrer_id: int, start: date, end: date) -> list:
     """Returns detailed patient list for a specific referrer in date range."""
+    from sqlalchemy.orm import joinedload
+
     s, e = _period_range(start, end)
     patients = (
         db.query(Patient)
+        .options(joinedload(Patient.service))
         .filter(
             Patient.referrer_id == referrer_id,
             Patient.created_at >= s,
@@ -935,7 +928,7 @@ def referrer_patient_details(db: Session, referrer_id: int, start: date, end: da
     )
     result = []
     for p in patients:
-        svc = db.query(Service).filter(Service.id == p.service_id).first()
+        svc = p.service
         paid = p.payment_amount or 0
         ref_comm = 0
         if svc and getattr(svc, "referrer_commission_sum", 0) and svc.referrer_commission_sum > 0:
@@ -957,11 +950,14 @@ def referrer_patient_details(db: Session, referrer_id: int, start: date, end: da
 
 def top_referrers_analytics(db: Session) -> list:
     """Returns top referrers with patient count and total commission earned."""
+    from sqlalchemy.orm import joinedload
+
     referrers = db.query(Referrer).filter(Referrer.is_active == True).all()
     results = []
     for r in referrers:
         patients = (
             db.query(Patient)
+            .options(joinedload(Patient.service))
             .filter(Patient.referrer_id == r.id, Patient.is_cancelled == False)
             .all()
         )
@@ -971,7 +967,7 @@ def top_referrers_analytics(db: Session) -> list:
         for p in patients:
             paid = p.payment_amount or 0
             total_paid += paid
-            svc = db.query(Service).filter(Service.id == p.service_id).first()
+            svc = p.service
             if svc and getattr(svc, "referrer_commission_sum", 0) and svc.referrer_commission_sum > 0:
                 ref_comm = svc.referrer_commission_sum
             else:
