@@ -82,23 +82,6 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-
-# VAQTINCHALIK: production'da 500 xatolarning aniq sababini ko'rish uchun.
-@app.exception_handler(Exception)
-async def _debug_unhandled_exception_handler(request: Request, exc: Exception):
-    import traceback
-    tb = traceback.format_exc()
-    logger.error("Unhandled exception on %s: %s\n%s", request.url.path, exc, tb)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "debug_error": True,
-            "type": type(exc).__name__,
-            "message": str(exc),
-            "traceback_tail": tb.splitlines()[-8:],
-        },
-    )
-
 # ── CORS ──────────────────────────────────────────────────
 _allowed_origins = {
     origin.strip()
