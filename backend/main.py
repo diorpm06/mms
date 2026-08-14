@@ -199,6 +199,22 @@ def health():
     }
 
 
+@app.api_route("/api/debug-scope", methods=["GET", "POST"])
+async def debug_scope(request: Request):
+    """Vercel headerlarini ko'rsatadi — routing muammosini tashxislash uchun"""
+    return {
+        "scope_path": request.scope.get("path", ""),
+        "raw_path": request.scope.get("raw_path", b"").decode(errors="replace"),
+        "query_string": request.scope.get("query_string", b"").decode(errors="replace"),
+        "method": request.method,
+        "url": str(request.url),
+        "headers": {
+            k.decode(errors="replace"): v.decode(errors="replace")
+            for k, v in request.scope.get("headers", [])
+        },
+    }
+
+
 def _get_index_html_path() -> str | None:
     """Vercel yoki local'da index.html yo'lini topadi"""
     candidates = [

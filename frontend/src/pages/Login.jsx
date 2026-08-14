@@ -38,7 +38,7 @@ export default function Login() {
   const parseResponseJson = async (res) => {
     const ct = res.headers.get('content-type') || ''
     if (!ct.includes('application/json')) {
-      throw new Error("Backend ulanmagan yoki API URL noto'g'ri (Netlify env: VITE_API_URL)")
+      throw new Error("Backend bilan ulanishda xato yuz berdi. Iltimos qayta urinib ko'ring.")
     }
     return res.json()
   }
