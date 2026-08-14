@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -25,6 +26,16 @@ class Settings(BaseSettings):
     SHEETS_WEBHOOK_SECRET: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    @field_validator(
+        "DATABASE_URL", "SECRET_KEY", "FRONTEND_URL", "SHEETS_WEBHOOK_SECRET",
+        mode="before",
+    )
+    @classmethod
+    def _strip_whitespace(cls, v):
+        # Dashboard'ga qiymat joylashtirilganda tasodifan qo'shilib qolgan
+        # bo'sh joy/qator belgilarini kesib tashlaydi (masalan trailing \n).
+        return v.strip() if isinstance(v, str) else v
 
 
 settings = Settings()

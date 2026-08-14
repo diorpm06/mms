@@ -8,7 +8,7 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 _connect_args = {}
-db_url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
+db_url = (os.environ.get("DATABASE_URL") or settings.DATABASE_URL).strip()
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
