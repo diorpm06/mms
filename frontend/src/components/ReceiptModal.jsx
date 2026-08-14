@@ -34,6 +34,56 @@ export default function ReceiptModal({ patient, onClose }) {
       })
     : new Date().toLocaleString('uz-UZ')
 
+  const cleanServiceName = (name) => {
+    if (!name) return "Umumiy ko'rik"
+    let str = String(name).trim()
+    if (str.startsWith('Sarflangan Material (') && str.endsWith(')')) {
+      str = str.slice(21, -1).trim()
+    }
+    if (str.startsWith('Material: ')) {
+      str = str.slice(10).trim()
+    }
+    return str || "Umumiy ko'rik"
+  }
+
+  const cleanCategory = (cat) => {
+    if (!cat || cat === 'Ombor Materiali') return 'Umumiy'
+    return cat
+  }
+
+  const allPrintItems = []
+  const isBatch = patient.batch && Array.isArray(patient.patients)
+  const patientList = isBatch ? patient.patients : [patient]
+
+  patientList.forEach((p) => {
+    if (p.breakdown && Array.isArray(p.breakdown) && p.breakdown.length > 0) {
+      p.breakdown.forEach((sub) => {
+        allPrintItems.push({
+          category: cleanCategory(sub.category || p.service_category || p.category),
+          service_name: cleanServiceName(sub.service_name || sub.title),
+          payment_amount: sub.price || sub.payment_amount || 0,
+          quantity: sub.quantity || 1,
+        })
+      })
+    } else if (p.sub_items && Array.isArray(p.sub_items) && p.sub_items.length > 0) {
+      p.sub_items.forEach((sub) => {
+        allPrintItems.push({
+          category: cleanCategory(sub.category || p.service_category || p.category),
+          service_name: cleanServiceName(sub.service_name || sub.title),
+          payment_amount: sub.price || sub.payment_amount || 0,
+          quantity: sub.quantity || 1,
+        })
+      })
+    } else {
+      allPrintItems.push({
+        category: cleanCategory(p.service_category || p.category),
+        service_name: cleanServiceName(p.service_name || p.diagnosis || p.title),
+        payment_amount: p.payment_amount || p.price || 0,
+        quantity: p.quantity || 1,
+      })
+    }
+  })
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
       {/* ── PRINT STYLES ── */}
@@ -187,13 +237,36 @@ export default function ReceiptModal({ patient, onClose }) {
 
           {/* Service & Payment Info */}
           <div className="space-y-1.5 py-3 border-b border-dashed border-slate-300 dark:border-slate-700">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Xizmat turi:</span>
-              <strong className="text-right text-cyan-700 dark:text-cyan-300">{patient.service_name || 'Umumiy ko\'rik'}</strong>
-            </div>
-            <div className="flex justify-between">
+            <span className="text-slate-500 font-bold text-[10px] block">
+              Xizmatlar va Ishlatilgan Materiallar ({allPrintItems.length} ta):
+            </span>
+            {Object.entries(
+              allPrintItems.reduce((acc, item) => {
+                const cat = item.category || 'Umumiy'
+                if (!acc[cat]) acc[cat] = []
+                acc[cat].push(item)
+                return acc
+              }, {})
+            ).map(([catName, list]) => (
+              <div key={catName} className="space-y-1">
+                <span className="font-black text-slate-800 dark:text-slate-200 text-[10px] block uppercase tracking-wide bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">
+                  📁 {catName}
+                </span>
+                {list.map((it, i) => (
+                  <div key={i} className="flex justify-between text-xs pl-1 font-mono">
+                    <span className="text-slate-900 dark:text-slate-100 font-medium">
+                      • {it.service_name}{it.quantity && it.quantity > 1 ? ` (${it.quantity} ta)` : ''}
+                    </span>
+                    <strong className="text-slate-900 dark:text-slate-100 font-bold font-mono">
+                      {formatMoney(it.payment_amount || 0)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div className="flex justify-between pt-1 text-[11px]">
               <span className="text-slate-500">Shifokor:</span>
-              <span>{patient.provider_name || '—'}</span>
+              <span className="font-bold text-slate-900 dark:text-slate-100">{patient.provider_name || '—'}</span>
             </div>
             {patient.referrer_name && (
               <div className="flex justify-between text-[11px]">

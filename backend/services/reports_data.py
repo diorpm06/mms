@@ -291,6 +291,92 @@ def get_report(db: Session, start: date, end: date) -> dict:
         {"name": "Klinikada qolgan", "value": int(net_profit)},
     ]
 
+    from models.audit_log import AuditLog
+    from models.inventory import InventoryItem
+
+    inv_map = {item.name: item for item in db.query(InventoryItem).all()}
+
+    mat_logs = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.action_type == "CONSUME_MATERIAL",
+            AuditLog.created_at >= s,
+            AuditLog.created_at <= e,
+        )
+        .all()
+    )
+
+    mat_summary = {}
+    for l in mat_logs:
+        nd = l.new_data or {}
+        item_name = nd.get("item_name") or "Noma'lum Material"
+        consumed_amt = int(nd.get("consumed") or 0)
+        charged_amt = int(nd.get("charged") or 0)
+
+        item_obj = inv_map.get(item_name)
+        cost_p = getattr(item_obj, "cost_price", 0) if item_obj else int(nd.get("cost_price") or 0)
+        unit_p = getattr(item_obj, "unit_price", 0) if item_obj else (charged_amt // consumed_amt if consumed_amt > 0 else 0)
+
+        if item_name not in mat_summary:
+            mat_summary[item_name] = {
+                "name": item_name,
+                "quantity_used": 0,
+                "unit_price": unit_p,
+                "cost_price": cost_p,
+                "total_income": 0,
+                "total_cost": 0,
+                "profit": 0,
+            }
+        mat_summary[item_name]["quantity_used"] += consumed_amt
+        mat_summary[item_name]["total_income"] += charged_amt
+        mat_summary[item_name]["total_cost"] += consumed_amt * cost_p
+
+    mat_patients = (
+        db.query(Patient)
+        .filter(
+            Patient.created_at >= s,
+            Patient.created_at <= e,
+            Patient.is_cancelled == False,
+            Patient.diagnosis != None,
+        )
+        .all()
+    )
+    for p in mat_patients:
+        diag = (p.diagnosis or "").strip()
+        mat_name = None
+        if diag.startswith("Sarflangan Material (") and diag.endswith(")"):
+            mat_name = diag[21:-1].strip()
+        elif diag.startswith("Material: "):
+            mat_name = diag[10:].strip()
+        elif p.queue_status == "yakunlandi" and p.service and (p.service.name == diag or not p.service_id):
+            mat_name = diag
+
+        if mat_name:
+            item_obj = inv_map.get(mat_name)
+            cost_p = getattr(item_obj, "cost_price", 0) if item_obj else 0
+            unit_p = getattr(item_obj, "unit_price", 0) if item_obj else int(p.payment_amount or 0)
+
+            if mat_name not in mat_summary:
+                mat_summary[mat_name] = {
+                    "name": mat_name,
+                    "quantity_used": 1,
+                    "unit_price": unit_p,
+                    "cost_price": cost_p,
+                    "total_income": int(p.payment_amount or 0),
+                    "total_cost": cost_p,
+                    "profit": int(p.payment_amount or 0) - cost_p,
+                }
+
+    for k, v in mat_summary.items():
+        v["profit"] = v["total_income"] - v["total_cost"]
+
+    materials_used_breakdown = list(mat_summary.values())
+    materials_used_breakdown.sort(key=lambda x: x["profit"], reverse=True)
+    total_material_income = sum(m["total_income"] for m in materials_used_breakdown)
+    total_material_cost = sum(m["total_cost"] for m in materials_used_breakdown)
+    total_material_profit = sum(m["profit"] for m in materials_used_breakdown)
+    total_material_quantity = sum(m["quantity_used"] for m in materials_used_breakdown)
+
     return {
         "period_start": start.isoformat(),
         "period_end": end.isoformat(),
@@ -325,6 +411,11 @@ def get_report(db: Session, start: date, end: date) -> dict:
         "referrers_breakdown": [
             {"name": r[0], "count": r[1], "total": int(r[2] or 0)} for r in referrers_breakdown
         ],
+        "materials_used_breakdown": materials_used_breakdown,
+        "total_material_income": int(total_material_income),
+        "total_material_cost": int(total_material_cost),
+        "total_material_profit": int(total_material_profit),
+        "total_material_quantity": int(total_material_quantity),
         "duty_today": duty_list,
         "income_chart": chart,
         "payment_chart": payment_chart,

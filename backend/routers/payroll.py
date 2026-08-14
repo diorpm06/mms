@@ -2,15 +2,17 @@ from datetime import date, datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models.patient import Patient
 from models.provider import Provider
 from models.employee import Employee
 from models.advance import Advance
+from models.service import Service
 from models.user import User
 from auth_utils import require_ceo
+from services.finance import calculate_financial_split
 
 router = APIRouter(prefix="/api/payroll", tags=["payroll"])
 
@@ -43,6 +45,7 @@ def get_monthly_payroll(
         # Get active patients for this provider in this month
         patients = (
             db.query(Patient)
+            .options(joinedload(Patient.service))
             .filter(
                 Patient.provider_id == p.id,
                 Patient.created_at >= start_dt,
@@ -54,19 +57,16 @@ def get_monthly_payroll(
 
         total_patients = len(patients)
         total_income = sum(pt.payment_amount for pt in patients)
-        
+
         # Calculate doctor share (fixed base salary + percentage of revenue)
         base_fixed = getattr(p, 'fixed_salary', 0) or 0
         doctor_share = base_fixed
-
-        from services.finance import calculate_financial_split
-        from models.service import Service
 
         for pt in patients:
             price = pt.payment_amount
             raw_doc_pct = getattr(p, 'percentage', 0) or 0
 
-            svc = db.query(Service).filter(Service.id == pt.service_id).first() if pt.service_id else None
+            svc = pt.service
             ref_comm_sum = svc.referrer_commission_sum if svc else 0
             ref_comm_pct = (svc.referrer_commission_percent if (svc and svc.referrer_commission_percent) else 0) if pt.referrer_id else 0
             ref_doc_split_pct = svc.referrer_doctor_split_percent if svc else None

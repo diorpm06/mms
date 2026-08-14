@@ -232,7 +232,52 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
     )
     elements.append(t_exp)
 
-    # Section 3: Summary & Cash Balance
+    # Section 3: Consumed Materials Summary
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph("3. ISHLATILGAN MATERIALLAR VA TUSHUM", section_style))
+
+    mats_list = report.get("materials_used_breakdown") or []
+    mat_data = [["№", "Material Nomi", "Ishlatilgan Miqdor", "Tushum / Ishlab Topilgan Pul"]]
+    mat_idx = 1
+    total_mat_income = report.get("total_material_income", 0)
+
+    if isinstance(mats_list, list) and len(mats_list) > 0:
+        for m in mats_list:
+            if isinstance(m, dict):
+                mat_data.append([
+                    str(mat_idx),
+                    str(m.get("name", "")),
+                    f"{m.get('quantity_used', 0)} dona",
+                    _format_money(int(m.get("total_income", 0))),
+                ])
+                mat_idx += 1
+    else:
+        mat_data.append(["—", "Ishlatilgan materiallar mavjud emas", "0", "0 so'm"])
+
+    mat_data.append(["", "JAMI MATERIAL TUSHUMI", f"{report.get('total_material_quantity', 0)} dona", _format_money(int(total_mat_income))])
+
+    t_mat = Table(mat_data, colWidths=[1.2 * cm, 8.8 * cm, 3.5 * cm, 5.5 * cm])
+    t_mat.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10.5),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (2, 0), (2, -1), "CENTER"),
+                ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+                ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#f1f5f9")),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
+    elements.append(t_mat)
+
+    # Section 4: Summary & Cash Balance
     elements.append(Spacer(1, 10))
     elements.append(Paragraph("3. KASSA YAKUNNING HISOBI", section_style))
 

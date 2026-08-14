@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo, get_current_user
+from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
 from database import get_db
 from models.patient import Patient
 from models.provider import Provider
@@ -141,44 +141,6 @@ def _patient_to_dict(p: Patient, db: Session) -> dict:
         "payment_type": p.payment_type,
         "holat": "bekor" if p.is_cancelled else "aktiv",
     }
-
-
-def _sync_patient_background(patient_ids: list[int], user_role: str, first_name: str, last_name: str, payment_type: str, total_paid: int):
-    from database import SessionLocal
-    import logging
-    logger = logging.getLogger(__name__)
-    db = SessionLocal()
-    try:
-        patients = db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
-        for p in patients:
-            try:
-                row_dict = _patient_to_dict(p, db)
-                add_patient_to_sheets(row_dict)
-                push_row_to_backup_url(row_dict)
-            except Exception as e:
-                logger.error("Sheet/Backup error: %s", e)
-
-        p_names = ", ".join([f"{p.first_name} {p.last_name}".strip() for p in patients])
-        svc_names = ", ".join([p.service.name for p in patients if p.service])
-        msg = (
-            f"👤 YANGI MIJOZ RO'YXATGA OLINDI!\n"
-            f"📝 F.I.Sh: {p_names}\n"
-            f"🩺 Xizmat: {svc_names}\n"
-            f"💰 To'lov: {total_paid:,} so'm ({payment_type})\n"
-            f"📅 Vaqt: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
-        ).replace(",", " ")
-        
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        loop.run_until_complete(send_telegram_message(msg, section="registration"))
-    except Exception as e:
-        logger.error("_sync_patient_background error: %s", e)
-    finally:
-        db.close()
 
 
 @router.get("/today")
@@ -668,6 +630,7 @@ class PayLaterBody(BaseModel):
     payment_type: str = "naqd"  # naqd | karta | split
     cash_amount: Optional[int] = 0
     card_amount: Optional[int] = 0
+    related_patient_ids: Optional[list[int]] = None
 
 
 @router.post("/{patient_id}/pay-later")
@@ -675,41 +638,62 @@ def mark_patient_paid(
     patient_id: int,
     body: PayLaterBody,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin_or_ceo),
 ):
-    p = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not p:
+    target_ids = body.related_patient_ids if (body.related_patient_ids and len(body.related_patient_ids) > 0) else [patient_id]
+    if patient_id not in target_ids:
+        target_ids.append(patient_id)
+
+    patients_to_pay = db.query(Patient).filter(Patient.id.in_(target_ids)).all()
+    if not patients_to_pay:
         raise HTTPException(status_code=404, detail="Bemor topilmadi")
 
-    pay_type = body.payment_type if body.payment_type in ("naqd", "karta", "card", "cash", "split", "aralash") else "naqd"
-    p.payment_type = pay_type
+    total_all_amount = sum(p.payment_amount or 0 for p in patients_to_pay)
+    pay_type = body.payment_type if body.payment_type in ("naqd", "karta", "card", "cash", "split", "aralash", "payme") else "naqd"
 
-    amount = p.payment_amount or 0
-    if pay_type in ("split", "aralash"):
-        p.cash_amount = body.cash_amount or 0
-        p.card_amount = body.card_amount or max(0, amount - p.cash_amount)
-    elif pay_type in ("cash", "naqd"):
-        p.cash_amount = amount
-        p.card_amount = 0
-    else:
-        p.cash_amount = 0
-        p.card_amount = amount
+    main_patient = next((p for p in patients_to_pay if p.id == patient_id), patients_to_pay[0])
 
-    p.updated_at = datetime.utcnow()
+    for p in patients_to_pay:
+        p.payment_type = pay_type
+        amount = p.payment_amount or 0
+        if pay_type in ("split", "aralash"):
+            if total_all_amount > 0:
+                ratio = amount / total_all_amount
+                p.cash_amount = int((body.cash_amount or 0) * ratio)
+                p.card_amount = max(0, amount - p.cash_amount)
+            else:
+                p.cash_amount = 0
+                p.card_amount = 0
+        elif pay_type in ("cash", "naqd"):
+            p.cash_amount = amount
+            p.card_amount = 0
+        else:
+            p.cash_amount = 0
+            p.card_amount = amount
 
-    # Update existing transaction if present, or process payment
-    tx = db.query(Transaction).filter(Transaction.patient_id == p.id, Transaction.is_cancelled == False).first()
-    if tx:
-        tx.payment_type = pay_type
-        tx.cash_amount = p.cash_amount
-        tx.card_amount = p.card_amount
-        tx.total_amount = amount
-    else:
-        process_payment(db, p)
+        p.updated_at = datetime.utcnow()
+
+        tx = db.query(Transaction).filter(Transaction.patient_id == p.id, Transaction.is_cancelled == False).first()
+        if tx:
+            tx.payment_type = pay_type
+            tx.cash_amount = p.cash_amount
+            tx.card_amount = p.card_amount
+            tx.total_amount = amount
+        else:
+            process_payment(db, p)
 
     db.commit()
-    db.refresh(p)
-    return {"message": f"Bemor {p.ticket_number or p.first_name} to'lovi ({pay_type.upper()}) qabul qilindi", "patient": _patient_row(p)}
+    db.refresh(main_patient)
+
+    result_row = _patient_row(main_patient)
+    if len(patients_to_pay) > 1:
+        result_row["batch"] = True
+        result_row["total_amount"] = total_all_amount
+        result_row["cash_amount"] = sum(p.cash_amount or 0 for p in patients_to_pay)
+        result_row["card_amount"] = sum(p.card_amount or 0 for p in patients_to_pay)
+        result_row["patients"] = [_patient_row(p) for p in patients_to_pay]
+
+    return {"message": f"Bemor {main_patient.first_name} to'lovi ({pay_type.upper()}) qabul qilindi", "patient": result_row}
 
 
 @router.get("/{patient_id}/visits")
@@ -787,13 +771,14 @@ def delete_patient(
     ip, ua = get_client_info(request)
     log_audit(
         db,
-        user.id,
-        "DELETE_PATIENT",
-        "Patient",
-        p.id,
-        f"Bemor o'chirildi: {p.first_name} {p.last_name} ({p.phone})",
-        ip,
-        ua,
+        user_id=user.id,
+        user_role=user.role,
+        action_type="DELETE_PATIENT",
+        table_name="Patient",
+        record_id=p.id,
+        detail_message=f"Bemor o'chirildi: {p.first_name} {p.last_name} ({p.phone})",
+        ip_address=ip,
+        device_info=ua,
     )
 
     db.query(Transaction).filter(Transaction.patient_id == p.id).delete()

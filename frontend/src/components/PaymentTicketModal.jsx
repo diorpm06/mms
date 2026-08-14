@@ -58,22 +58,48 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
     return `${uppercaseCab}-XONA`
   }
 
-  // Flatten patientList to all individual sub-services for printing
+  const cleanServiceName = (name) => {
+    if (!name) return 'Xizmat'
+    let str = String(name).trim()
+    if (str.startsWith('Sarflangan Material (') && str.endsWith(')')) {
+      str = str.slice(21, -1).trim()
+    }
+    if (str.startsWith('Material: ')) {
+      str = str.slice(10).trim()
+    }
+    return str || 'Xizmat'
+  }
+
+  const cleanCategory = (cat) => {
+    if (!cat || cat === 'Ombor Materiali' || cat === 'Sarflangan Material') return 'Umumiy'
+    return cat
+  }
+
+  // Flatten patientList to all individual sub-services and consumed materials for printing
   const allPrintItems = []
   patientList.forEach((p) => {
-    if (p.sub_items && Array.isArray(p.sub_items) && p.sub_items.length > 0) {
+    if (p.breakdown && Array.isArray(p.breakdown) && p.breakdown.length > 0) {
+      p.breakdown.forEach((sub) => {
+        allPrintItems.push({
+          category: cleanCategory(sub.category || p.service_category || p.category),
+          service_name: cleanServiceName(sub.service_name || sub.title),
+          payment_amount: sub.price || sub.payment_amount || 0,
+          quantity: sub.quantity || 1,
+        })
+      })
+    } else if (p.sub_items && Array.isArray(p.sub_items) && p.sub_items.length > 0) {
       p.sub_items.forEach((sub) => {
         allPrintItems.push({
-          category: sub.category || p.service_category || p.category || 'Umumiy',
-          service_name: sub.service_name,
-          payment_amount: sub.price,
+          category: cleanCategory(sub.category || p.service_category || p.category),
+          service_name: cleanServiceName(sub.service_name || sub.title),
+          payment_amount: sub.price || sub.payment_amount || 0,
           quantity: sub.quantity || 1,
         })
       })
     } else {
       allPrintItems.push({
-        category: p.service_category || p.category || 'Umumiy',
-        service_name: p.service_name || 'Xizmat',
+        category: cleanCategory(p.service_category || p.category),
+        service_name: cleanServiceName(p.service_name || p.diagnosis || p.title),
         payment_amount: p.payment_amount || p.price || 0,
         quantity: p.quantity || 1,
       })

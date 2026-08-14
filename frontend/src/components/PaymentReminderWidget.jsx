@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { api } from '../utils/api'
 import { formatMoney } from '../utils/format'
 import { useToastStore } from '../store/toastStore'
-import { X, Check, Bell, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, Check, Bell, ChevronDown, ChevronUp, Printer, Receipt } from 'lucide-react'
+import PaymentTicketModal from './PaymentTicketModal'
 
 export default function PaymentReminderWidget() {
   const [pendingItems, setPendingItems] = useState([])
   const [activeModalItem, setActiveModalItem] = useState(null)
+  const [receiptPatient, setReceiptPatient] = useState(null)
   const [selectedPayType, setSelectedPayType] = useState('naqd')
   const [cashAmountInput, setCashAmountInput] = useState('')
   const [cardAmountInput, setCardAmountInput] = useState('')
@@ -39,8 +41,6 @@ export default function PaymentReminderWidget() {
     }
   }, [activeModalItem])
 
-  if (!pendingItems || pendingItems.length === 0) return null
-
   const handleCashChange = (val) => {
     const num = Number(val) || 0
     setCashAmountInput(val)
@@ -60,18 +60,42 @@ export default function PaymentReminderWidget() {
     try {
       const payload = {
         payment_type: selectedPayType || 'naqd',
+        related_patient_ids: activeModalItem.related_patient_ids || [targetId],
       }
       if (selectedPayType === 'aralash') {
         payload.cash_amount = Number(cashAmountInput) || 0
         payload.card_amount = Number(cardAmountInput) || 0
       }
 
-      await api(`/patients/${targetId}/pay-later`, {
+      const res = await api(`/patients/${targetId}/pay-later`, {
         method: 'POST',
         body: JSON.stringify(payload),
       })
       toast(`✓ ${activeModalItem.full_name} to'lovi (${(selectedPayType || 'naqd').toUpperCase()}) qabul qilindi!`)
+
+      // Construct patient object for thermal receipt printing modal
+      const paidData = res?.patient || {}
+      const breakdownItems = activeModalItem.breakdown || []
+
+      const receiptObj = {
+        ...paidData,
+        first_name: paidData.first_name || activeModalItem.first_name,
+        last_name: paidData.last_name || activeModalItem.last_name,
+        ticket_number: activeModalItem.ticket_number || paidData.ticket_number,
+        payment_amount: activeModalItem.amount || paidData.payment_amount,
+        payment_type: selectedPayType || 'naqd',
+        cash_amount: selectedPayType === 'aralash' ? Number(cashAmountInput) : (selectedPayType === 'naqd' ? activeModalItem.amount : 0),
+        card_amount: selectedPayType === 'aralash' ? Number(cardAmountInput) : (selectedPayType === 'karta' ? activeModalItem.amount : 0),
+        sub_items: breakdownItems.map((b) => ({
+          service_name: b.title || b.service_name || 'Tibbiy Xizmat',
+          category: b.category || 'Umumiy',
+          price: b.price || 0,
+          quantity: b.quantity || 1,
+        })),
+      }
+
       setActiveModalItem(null)
+      setReceiptPatient(receiptObj)
       fetchPending()
       window.dispatchEvent(new CustomEvent('payment-updated'))
     } catch (err) {
@@ -81,32 +105,50 @@ export default function PaymentReminderWidget() {
     }
   }
 
-  const totalAmount = pendingItems.reduce((acc, item) => acc + (item.amount || 0), 0)
+  const totalAmount = (pendingItems || []).reduce((acc, item) => acc + (item.amount || 0), 0)
 
-  // Minimized Compact Pill Mode (sal kichik, ekranning o'ng pastki burchagida)
+  if (!pendingItems || pendingItems.length === 0) return (
+    <>
+      <PaymentTicketModal
+        open={!!receiptPatient}
+        patient={receiptPatient}
+        onClose={() => setReceiptPatient(null)}
+      />
+    </>
+  )
+
+  // Minimized Compact Pill Mode
   if (isMinimized) {
     return (
-      <div className="fixed bottom-4 right-4 z-50 animate-in fade-in zoom-in-95 duration-200">
-        <button
-          type="button"
-          onClick={() => setIsMinimized(false)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-amber-500/50 bg-slate-950/85 hover:bg-slate-900 text-amber-300 shadow-xl backdrop-blur-md transition-all hover:scale-105 group"
-          title="To'lov eslatmalarini ochish"
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-          </span>
-          <Bell className="h-3.5 w-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
-          <span className="text-xs font-black tracking-wide">
-            {pendingItems.length} ta to'lov
-          </span>
-          <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-500/30">
-            {formatMoney(totalAmount)}
-          </span>
-          <ChevronUp className="h-3.5 w-3.5 text-slate-400 group-hover:text-white" />
-        </button>
-      </div>
+      <>
+        <div className="fixed bottom-4 right-4 z-50 animate-in fade-in zoom-in-95 duration-200">
+          <button
+            type="button"
+            onClick={() => setIsMinimized(false)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-amber-500/50 bg-slate-950/85 hover:bg-slate-900 text-amber-300 shadow-xl backdrop-blur-md transition-all hover:scale-105 group"
+            title="To'lov eslatmalarini ochish"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <Bell className="h-3.5 w-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
+            <span className="text-xs font-black tracking-wide">
+              {pendingItems.length} ta to'lov
+            </span>
+            <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-500/30">
+              {formatMoney(totalAmount)}
+            </span>
+            <ChevronUp className="h-3.5 w-3.5 text-slate-400 group-hover:text-white" />
+          </button>
+        </div>
+
+        <PaymentTicketModal
+          open={!!receiptPatient}
+          patient={receiptPatient}
+          onClose={() => setReceiptPatient(null)}
+        />
+      </>
     )
   }
 
@@ -136,7 +178,8 @@ export default function PaymentReminderWidget() {
           {pendingItems.map((item) => (
             <div
               key={item.id}
-              className="relative overflow-hidden rounded-xl border border-amber-500/40 bg-slate-950/85 p-3 shadow-xl backdrop-blur-md transition-all hover:border-amber-400 hover:bg-slate-950/95"
+              onClick={() => setActiveModalItem(item)}
+              className="relative overflow-hidden rounded-xl border border-amber-500/40 bg-slate-950/85 p-3 shadow-xl backdrop-blur-md transition-all hover:border-amber-400 hover:bg-slate-950/95 cursor-pointer group"
             >
               {/* Glowing Accent Line */}
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600" />
@@ -173,11 +216,14 @@ export default function PaymentReminderWidget() {
               <div className="pt-1.5 border-t border-slate-800/80">
                 <button
                   type="button"
-                  onClick={() => setActiveModalItem(item)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveModalItem(item)
+                  }}
                   className="w-full py-1.5 px-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-[11px] uppercase tracking-wider shadow-md hover:shadow-emerald-500/20 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                 >
                   <Check className="h-3.5 w-3.5 stroke-[3]" />
-                  <span>To'lov Qildi</span>
+                  <span>To'lov Qildi / Tafsilotlar</span>
                 </button>
               </div>
             </div>
@@ -185,18 +231,21 @@ export default function PaymentReminderWidget() {
         </div>
       </div>
 
-      {/* Quick Pay Modal */}
+      {/* Quick Pay & Detailed Breakdown Modal */}
       {activeModalItem && (
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <form
             onSubmit={handlePaySubmit}
-            className="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95"
+            className="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-xl">💳</span>
-                <h4 className="font-black text-amber-400 text-base tracking-wide">To'lovni Qabul Qilish</h4>
+                <div>
+                  <h4 className="font-black text-amber-400 text-base tracking-wide">To'lov Eslatmasi va Qabul Qilish</h4>
+                  <p className="text-[11px] text-slate-400 font-medium">Quyida bu pul nimalar hisobiga kelib chiqqani ro'yxati ko'rsatilgan</p>
+                </div>
               </div>
               <button
                 type="button"
@@ -207,17 +256,76 @@ export default function PaymentReminderWidget() {
               </button>
             </div>
 
-            {/* Patient & Details Box */}
-            <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2 text-xs">
-              <p className="text-slate-300 font-semibold">
-                Bemor: <strong className="text-white font-extrabold">{activeModalItem.full_name}</strong>{' '}
-                <span className="text-cyan-400 font-mono font-bold">({activeModalItem.ticket_number})</span>
-              </p>
-              <p className="text-slate-300 font-semibold">
-                Xizmat / Sarflangan: <strong className="text-amber-300 font-bold">{activeModalItem.reason}</strong>
-              </p>
-              <div className="flex justify-between items-center pt-2.5 border-t border-slate-800">
-                <span className="text-slate-200 font-extrabold text-xs">To'lov Summasi:</span>
+            {/* Patient Info Box */}
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-xs flex justify-between items-center">
+              <div>
+                <span className="text-slate-400 text-[10px] block uppercase font-bold">Bemor:</span>
+                <strong className="text-white text-sm font-extrabold">{activeModalItem.full_name}</strong>
+                {activeModalItem.phone && <span className="text-slate-400 text-[11px] block">📱 {activeModalItem.phone}</span>}
+              </div>
+              <div className="text-right">
+                <span className="text-slate-400 text-[10px] block uppercase font-bold">Navbat chiptasi:</span>
+                <span className="inline-block bg-amber-500/20 text-amber-300 font-mono font-black text-xs px-2 py-0.5 rounded border border-amber-500/40">
+                  🎫 {activeModalItem.ticket_number}
+                </span>
+              </div>
+            </div>
+
+            {/* Breakdown List ("Nimalar Hisobiga Kelib Chiqqani Ro'yxati") */}
+            <div className="space-y-2 bg-slate-950 p-3.5 rounded-xl border border-amber-500/30">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <span className="text-[11px] font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                  📋 To'lov Tarkibi va Manbasi:
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono font-bold">
+                  {(activeModalItem.breakdown || []).length} ta positsiya
+                </span>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {(activeModalItem.breakdown && activeModalItem.breakdown.length > 0) ? (
+                  activeModalItem.breakdown.map((bItem, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs hover:border-slate-700 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-extrabold text-slate-100 truncate text-xs">
+                          {bItem.title || bItem.service_name}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-400 mt-1">
+                          <span className="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300 font-medium">
+                            📁 {bItem.category || 'Umumiy'}
+                          </span>
+                          {bItem.provider_name && (
+                            <span className="truncate max-w-[130px]">
+                              👨‍⚕️ {bItem.provider_name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-black text-emerald-400 text-xs">
+                          {formatMoney(bItem.price)}
+                        </div>
+                        {bItem.ticket_number && (
+                          <span className="text-[9px] font-mono text-cyan-400 font-bold block mt-0.5">
+                            🎫 {bItem.ticket_number}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-xs text-slate-300 p-2">
+                    {activeModalItem.reason || activeModalItem.service_name}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center pt-2.5 border-t border-slate-800 font-bold">
+                <span className="text-slate-200 text-xs uppercase tracking-wide">Jami To'lov Summasi:</span>
                 <span className="text-emerald-400 font-mono text-lg font-black tracking-tight">
                   {formatMoney(activeModalItem.amount)}
                 </span>
@@ -299,15 +407,24 @@ export default function PaymentReminderWidget() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
               >
-                {submitting ? "Saqlanmoqda..." : "TASDIQLASH ✓"}
+                <Printer className="h-4 w-4" />
+                <span>{submitting ? "Saqlanmoqda..." : "TASDIQLASH VA CHEK CHOP ETISH 🖨️"}</span>
               </button>
             </div>
           </form>
         </div>
       )}
+
+      {/* Printable Receipt / Check Modal (Opens automatically after paying) */}
+      <PaymentTicketModal
+        open={!!receiptPatient}
+        patient={receiptPatient}
+        onClose={() => setReceiptPatient(null)}
+      />
     </>
   )
 }
+
 

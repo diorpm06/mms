@@ -31,16 +31,36 @@ except Exception:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ── SECRET_KEY xavfsizlik tekshiruvi ─────────────────────
+_INSECURE_DEFAULT_SECRET_KEY = "marjona_med_service_crm_secret_key_2026_x89f"
+if settings.SECRET_KEY == _INSECURE_DEFAULT_SECRET_KEY:
+    if os.environ.get("VERCEL") or not settings.DATABASE_URL.startswith("sqlite"):
+        raise RuntimeError(
+            "SECRET_KEY environment variable sozlanmagan (yoki standart qiymatda qolgan). "
+            "Production'da ishga tushirishdan oldin kuchli tasodifiy SECRET_KEY o'rnating "
+            "(python -c \"import secrets; print(secrets.token_hex(32))\")."
+        )
+    logger.warning(
+        "XAVFSIZLIK OGOHLANTIRISHI: standart SECRET_KEY ishlatilmoqda. "
+        "Bu faqat local development uchun xavfsiz."
+    )
+
 # Rate limiter (global, IP asosida)
 limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Jadval/ustun/indeks migratsiyalari — Vercel serverless'da ham ishga tushishi shart,
+    # aks holda yangi ustun/indekslar productionda hech qachon yaratilmaydi.
+    try:
+        Base.metadata.create_all(bind=engine)
+        run_migrations()
+    except Exception as e:
+        logger.warning(f"DB init/migration warning: {e}")
+
     if not os.environ.get("VERCEL"):
         try:
-            Base.metadata.create_all(bind=engine)
-            run_migrations()
             if start_sheet_worker:
                 start_sheet_worker()
             if start_scheduler:
@@ -48,11 +68,6 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Startup warning: {e}")
     else:
-        # Vercel serverless: faqat DB connection tekshiramiz
-        try:
-            Base.metadata.create_all(bind=engine)
-        except Exception as e:
-            logger.warning(f"Vercel DB init warning: {e}")
         logger.info("Marjona Med Service backend Vercel-da ishga tushdi")
     yield
 
@@ -69,9 +84,16 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── CORS ──────────────────────────────────────────────────
+_allowed_origins = {
+    origin.strip()
+    for origin in settings.FRONTEND_URL.split(",")
+    if origin.strip()
+}
+_allowed_origins.update({"http://localhost:5173", "http://localhost:3000"})
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(_allowed_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -165,21 +187,6 @@ if FRONTEND_DIST:
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
 
-@app.get("/api/debug-files")
-def debug_files():
-    import glob
-    files = glob.glob("/var/task/**", recursive=True)
-    return {
-        "cwd": os.getcwd(),
-        "this_dir": _THIS_DIR,
-        "root_dir": _ROOT_DIR,
-        "frontend_dist": FRONTEND_DIST,
-        "index_html_exists": INDEX_HTML and os.path.exists(INDEX_HTML),
-        "files_count": len(files),
-        "files_matching_dist": [f for f in files if "dist" in f][:30]
-    }
-
-
 @app.get("/api")
 @app.get("/api/")
 def root():
@@ -196,22 +203,6 @@ def health():
         "status": "ok",
         "service": "Marjona Med Service",
         "database": "Supabase PostgreSQL Connected 🟢"
-    }
-
-
-@app.api_route("/api/debug-scope", methods=["GET", "POST"])
-async def debug_scope(request: Request):
-    """Vercel headerlarini ko'rsatadi — routing muammosini tashxislash uchun"""
-    return {
-        "scope_path": request.scope.get("path", ""),
-        "raw_path": request.scope.get("raw_path", b"").decode(errors="replace"),
-        "query_string": request.scope.get("query_string", b"").decode(errors="replace"),
-        "method": request.method,
-        "url": str(request.url),
-        "headers": {
-            k.decode(errors="replace"): v.decode(errors="replace")
-            for k, v in request.scope.get("headers", [])
-        },
     }
 
 
@@ -247,16 +238,9 @@ async def spa_fallback(request: Request, full_path: str):
     """SPA catch-all — aniq API routelari bu yerga yetib kelmaydi."""
     method = request.method
 
-    # Noma'lum API yoki uploads endpointi — DEBUG qaytaramiz
+    # Noma'lum API yoki uploads endpointi
     if full_path.startswith(("api/", "uploads/")):
-        return {
-            "debug": True,
-            "caught_by_fallback": True,
-            "full_path": full_path,
-            "scope_path": request.scope.get("path", ""),
-            "query_string": request.scope.get("query_string", b"").decode(errors="replace"),
-            "method": method,
-        }
+        raise HTTPException(status_code=404, detail="Not Found")
 
     # GET/HEAD → SPA index.html
     if method in ("GET", "HEAD"):

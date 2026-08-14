@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../utils/api'
 import { useToastStore } from '../../store/toastStore'
-import { useAuthStore } from '../../store/authStore'
-import { KeyRound, Eye, EyeOff, Fingerprint } from 'lucide-react'
-import { isBiometricAvailable, hasBiometricRegistered, registerBiometric, removeBiometric } from '../../utils/webauthn'
+import { KeyRound, Eye, EyeOff } from 'lucide-react'
 
 export default function ChangePassword() {
   const [users,      setUsers]      = useState([])
@@ -13,14 +11,10 @@ export default function ChangePassword() {
   const [confirm,    setConfirm]    = useState('')
   const [showPw,     setShowPw]     = useState(false)
   const [loading,    setLoading]    = useState(false)
-  const [bioAvail,   setBioAvail]   = useState(false)
-  const [bioOn,      setBioOn]      = useState(false)
-  const { fullName } = useAuthStore()
   const toast = useToastStore((s) => s.add)
 
   useEffect(() => {
     api('/auth/users').then(setUsers).catch(() => {})
-    isBiometricAvailable().then((ok) => { setBioAvail(ok); if (ok) setBioOn(hasBiometricRegistered()) })
   }, [])
 
   const submit = async () => {
@@ -182,45 +176,6 @@ export default function ChangePassword() {
         </button>
       </div>
 
-      {/* Biometric section */}
-      {bioAvail && (
-        <div className="card mt-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="rounded-xl p-2.5" style={{ background: 'var(--gold-dim)' }}>
-              <Fingerprint className="h-5 w-5" style={{ color: 'var(--gold)' }} />
-            </div>
-            <div>
-              <h2 className="font-semibold text-sm">Biometrik kirish</h2>
-              <p className="text-muted text-xs">Face ID / Touch ID (faqat bu qurilma uchun)</p>
-            </div>
-          </div>
-          {bioOn ? (
-            <button
-              type="button"
-              className="btn-danger w-full py-2"
-              onClick={() => { removeBiometric(); setBioOn(false); toast("Biometrik kirish o'chirildi") }}
-            >
-              O'chirish
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn-gold w-full py-2"
-              onClick={async () => {
-                try {
-                  await registerBiometric(fullName || 'user', fullName || 'user')
-                  setBioOn(true)
-                  toast("Biometrik kirish yoqildi!")
-                } catch (e) {
-                  toast(e.message || "Biometrik yoqilmadi", 'error')
-                }
-              }}
-            >
-              Yoqish
-            </button>
-          )}
-        </div>
-      )}
     </div>
   )
 }

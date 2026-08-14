@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Package, AlertTriangle, Plus, ArrowDownRight, ArrowUpRight, Trash2, Search, Filter, History, DollarSign, CheckCircle2 } from 'lucide-react'
+import { Package, AlertTriangle, Plus, ArrowDownRight, ArrowUpRight, Trash2, Search, Edit3 } from 'lucide-react'
 import { api } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
+import { useLocation } from 'react-router-dom'
+import { useAuthStore } from '../../store/authStore'
 import Modal from '../../components/Modal'
 
 export default function Inventory() {
+  const role = useAuthStore((s) => s.role)
+  const location = useLocation()
+  
+  // Strictly CEO view only if URL path starts with /ceo AND role is ceo
+  const isCEO = role === 'ceo' && location.pathname.startsWith('/ceo')
+
   const [activeTab, setActiveTab] = useState('catalog') // 'catalog' | 'logs'
   const [items, setItems] = useState([])
   const [logs, setLogs] = useState([])
@@ -13,6 +21,7 @@ export default function Inventory() {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [createModal, setCreateModal] = useState(false)
+  const [editModal, setEditModal] = useState(null)
   const [restockModal, setRestockModal] = useState(null)
   
   // Consume Modal State
@@ -33,6 +42,7 @@ export default function Inventory() {
     unit: 'dona',
     min_quantity: '10',
     unit_price: '',
+    cost_price: '',
     notes: '',
   })
 
@@ -66,14 +76,41 @@ export default function Inventory() {
           quantity: +form.quantity || 0,
           min_quantity: +form.min_quantity || 10,
           unit_price: +form.unit_price || 0,
+          cost_price: +form.cost_price || 0,
         }),
       })
       toast("Yangi material saqlandi ✓")
       setCreateModal(false)
-      setForm({ name: '', category: 'Sarflash materiali', quantity: '', unit: 'dona', min_quantity: '10', unit_price: '', notes: '' })
+      setForm({ name: '', category: 'Sarflash materiali', quantity: '', unit: 'dona', min_quantity: '10', unit_price: '', cost_price: '', notes: '' })
       loadItems()
     } catch (err) {
       toast(err.message, 'error')
+    }
+  }
+
+  const handleUpdate = async (e) => {
+    e.preventDefault()
+    if (!editModal) return
+
+    try {
+      await api(`/inventory/${editModal.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: editModal.name,
+          category: editModal.category || 'Sarflash materiali',
+          quantity: editModal.quantity !== '' && editModal.quantity !== null ? Number(editModal.quantity) : 0,
+          unit: editModal.unit || 'dona',
+          min_quantity: editModal.min_quantity !== '' && editModal.min_quantity !== null ? Number(editModal.min_quantity) : 10,
+          unit_price: editModal.unit_price !== '' && editModal.unit_price !== null ? Number(editModal.unit_price) : 0,
+          cost_price: editModal.cost_price !== '' && editModal.cost_price !== null ? Number(editModal.cost_price) : 0,
+          notes: editModal.notes || null,
+        }),
+      })
+      toast("Material yangilandi ✓")
+      setEditModal(null)
+      loadItems()
+    } catch (err) {
+      toast(err.message || "Tahrirlashda xatolik yuz berdi", 'error')
     }
   }
 
@@ -175,13 +212,15 @@ export default function Inventory() {
           <p className="text-xs text-muted mt-1">Dori-darmonlar, shpritslar va bemorga biriktiriluvchi sarflash materiallari boshqaruvi</p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setCreateModal(true)}
-          className="btn-gold py-2.5 px-4 text-xs font-bold flex items-center gap-2 shadow-lg whitespace-nowrap"
-        >
-          <Plus className="h-4 w-4" /> Yangi Material Qo'shish
-        </button>
+        {isCEO && (
+          <button
+            type="button"
+            onClick={() => setCreateModal(true)}
+            className="btn-gold py-2.5 px-4 text-xs font-bold flex items-center gap-2 shadow-lg whitespace-nowrap"
+          >
+            <Plus className="h-4 w-4" /> Yangi Material Qo'shish
+          </button>
+        )}
       </div>
 
       {/* TABS */}
@@ -270,16 +309,17 @@ export default function Inventory() {
                   <th className="p-3 whitespace-nowrap">Kategoriya</th>
                   <th className="p-3 whitespace-nowrap">Mavjud Qoldiq</th>
                   <th className="p-3 whitespace-nowrap">Min Chegara</th>
-                  <th className="p-3 whitespace-nowrap">Dona Narxi</th>
+                  <th className="p-3 whitespace-nowrap">Sotilish Narxi</th>
+                  {isCEO && <th className="p-3 whitespace-nowrap">Tan Narxi</th>}
                   <th className="p-3 whitespace-nowrap">Holat</th>
-                  <th className="p-3 text-right whitespace-nowrap">Amallar (Kirim / Chiqim)</th>
+                  <th className="p-3 text-right whitespace-nowrap">Amallar</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="p-4 text-center text-muted text-xs">Yuklanmoqda...</td></tr>
+                  <tr><td colSpan={isCEO ? 8 : 7} className="p-4 text-center text-muted text-xs">Yuklanmoqda...</td></tr>
                 ) : filteredItems.length === 0 ? (
-                  <tr><td colSpan={7} className="p-4 text-center text-muted text-xs italic">Materiallar topilmadi</td></tr>
+                  <tr><td colSpan={isCEO ? 8 : 7} className="p-4 text-center text-muted text-xs italic">Materiallar topilmadi</td></tr>
                 ) : (
                   filteredItems.map((i) => (
                     <tr key={i.id} className="border-b border-border/40 hover:bg-muted/20 text-xs whitespace-nowrap">
@@ -290,6 +330,11 @@ export default function Inventory() {
                       </td>
                       <td className="p-3 font-mono text-muted whitespace-nowrap">{i.min_quantity} {i.unit}</td>
                       <td className="p-3 font-mono font-bold text-gold whitespace-nowrap">{formatMoney(i.unit_price)}</td>
+                      {isCEO && (
+                        <td className="p-3 font-mono font-bold text-purple-400 whitespace-nowrap">
+                          {formatMoney(i.cost_price || 0)}
+                        </td>
+                      )}
                       <td className="p-3 whitespace-nowrap">
                         {i.is_low_stock ? (
                           <span className="badge badge-danger whitespace-nowrap px-2.5 py-1 text-[11px] font-bold">
@@ -302,13 +347,15 @@ export default function Inventory() {
                         )}
                       </td>
                       <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => { setRestockModal(i); setAmountInput('1') }}
-                          className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-1 shadow-sm"
-                        >
-                          <ArrowDownRight className="h-3.5 w-3.5" /> Kirim (+)
-                        </button>
+                        {isCEO && (
+                          <button
+                            type="button"
+                            onClick={() => { setRestockModal(i); setAmountInput('1') }}
+                            className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center gap-1 shadow-sm"
+                          >
+                            <ArrowDownRight className="h-3.5 w-3.5" /> Kirim (+)
+                          </button>
+                        )}
 
                         <button
                           type="button"
@@ -316,17 +363,30 @@ export default function Inventory() {
                           className="px-2.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs inline-flex items-center gap-1 shadow-sm"
                           title="Bemorgabiriktirish yoki sarflash"
                         >
-                          <ArrowUpRight className="h-3.5 w-3.5" /> Chiqim / Bemor (I-007) (-)
+                          <ArrowUpRight className="h-3.5 w-3.5" /> Chiqim (-)
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(i.id, i.name)}
-                          className="p-1.5 rounded-xl text-rose-400 hover:bg-rose-500/10 transition-all inline-block"
-                          title="O'chirish"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isCEO && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setEditModal(i)}
+                              className="p-1.5 rounded-xl text-cyan-400 hover:bg-cyan-500/10 transition-all inline-block"
+                              title="Tahrirlash (Narxlarni o'zgartirish)"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(i.id, i.name)}
+                              className="p-1.5 rounded-xl text-rose-400 hover:bg-rose-500/10 transition-all inline-block"
+                              title="O'chirish"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -387,7 +447,7 @@ export default function Inventory() {
       )}
 
       {/* CREATE MODAL */}
-      <Modal open={createModal} onClose={() => setCreateModal(false)} title="Yangi Material / Dori Qo'shish">
+      <Modal open={createModal} onClose={() => setCreateModal(false)} title="Yangi Material Qo'shish (Ikki xil narxda)">
         <form onSubmit={handleCreate} className="space-y-3 pt-2">
           <input className="input-field" placeholder="Material nomi (masalan: Shprits 5ml) *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           
@@ -416,12 +476,24 @@ export default function Inventory() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] text-muted block mb-1">Minimal warning chegara</label>
-              <input type="number" className="input-field" placeholder="10" value={form.min_quantity} onChange={(e) => setForm({ ...form, min_quantity: e.target.value })} />
+              <label className="text-[11px] text-muted block mb-1">Tavar haqiqiy narxi (Tan narxi so'mda)</label>
+              <input
+                type="number"
+                className="input-field border-purple-500/40 text-purple-300 font-mono font-bold"
+                placeholder="Masalan: 3000"
+                value={form.cost_price}
+                onChange={(e) => setForm({ ...form, cost_price: e.target.value })}
+              />
             </div>
             <div>
-              <label className="text-[11px] text-muted block mb-1">Dona narxi (so'm)</label>
-              <input type="number" className="input-field" placeholder="1500" value={form.unit_price} onChange={(e) => setForm({ ...form, unit_price: e.target.value })} />
+              <label className="text-[11px] text-muted block mb-1">Sotilish narxi (Kassa narxi so'mda)</label>
+              <input
+                type="number"
+                className="input-field border-gold/40 text-gold font-mono font-bold"
+                placeholder="Masalan: 5000"
+                value={form.unit_price}
+                onChange={(e) => setForm({ ...form, unit_price: e.target.value })}
+              />
             </div>
           </div>
 
@@ -429,6 +501,68 @@ export default function Inventory() {
             Saqlash ✓
           </button>
         </form>
+      </Modal>
+
+      {/* EDIT MODAL */}
+      <Modal open={!!editModal} onClose={() => setEditModal(null)} title="Material Narx va Ma'lumotlarini Tahrirlash">
+        {editModal && (
+          <form onSubmit={handleUpdate} className="space-y-3 pt-2">
+            <div>
+              <label className="text-[11px] text-muted block mb-1">Material Nomi</label>
+              <input
+                className="input-field font-bold"
+                value={editModal.name}
+                onChange={(e) => setEditModal({ ...editModal, name: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] text-muted block mb-1">Qoldiq miqdor</label>
+                <input
+                  type="number"
+                  className="input-field"
+                  value={editModal.quantity}
+                  onChange={(e) => setEditModal({ ...editModal, quantity: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-muted block mb-1">O'lchov birligi</label>
+                <input
+                  className="input-field"
+                  value={editModal.unit}
+                  onChange={(e) => setEditModal({ ...editModal, unit: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] text-muted block mb-1">Tavar haqiqiy narxi (Tan narxi)</label>
+                <input
+                  type="number"
+                  className="input-field border-purple-500/40 text-purple-300 font-mono font-bold"
+                  value={editModal.cost_price ?? ''}
+                  onChange={(e) => setEditModal({ ...editModal, cost_price: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-muted block mb-1">Sotilish narxi (Kassa narxi)</label>
+                <input
+                  type="number"
+                  className="input-field border-gold/40 text-gold font-mono font-bold"
+                  value={editModal.unit_price ?? ''}
+                  onChange={(e) => setEditModal({ ...editModal, unit_price: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <button type="submit" className="btn-gold w-full py-3 font-extrabold text-sm">
+              Saqlash va Yangilash ✓
+            </button>
+          </form>
+        )}
       </Modal>
 
       {/* RESTOCK MODAL */}

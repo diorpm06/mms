@@ -14,6 +14,7 @@ class InventoryItem(TimestampMixin, Base):
     quantity: Mapped[int] = mapped_column(Integer, default=0)
     unit: Mapped[str] = mapped_column(String(50), default="dona") # 'dona' | 'flakon' | 'quti' | 'ampula'
     min_quantity: Mapped[int] = mapped_column(Integer, default=10) # Low stock threshold
-    unit_price: Mapped[int] = mapped_column(Integer, default=0)
+    unit_price: Mapped[int] = mapped_column(Integer, default=0) # Sotilish narxi (Kassa narxi)
+    cost_price: Mapped[int] = mapped_column(Integer, default=0) # Tavar haqiqiy narxi (Tan narxi)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

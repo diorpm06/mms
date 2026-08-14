@@ -15,6 +15,12 @@ from models.user import User
 
 router = APIRouter(prefix="/api/queue", tags=["queue"])
 
+
+def _assert_patient_ownership(p: Patient, user: User) -> None:
+    """Shifokor faqat o'ziga tayinlangan bemorni boshqara oladi; admin/ceo istalganini."""
+    if user.role == "doctor" and p.provider_id and user.provider_id and p.provider_id != user.provider_id:
+        raise HTTPException(status_code=403, detail="Bu bemor boshqa shifokorga tegishli")
+
 # In-memory pause and shift closed store for doctors
 DOCTOR_PAUSE_STATE = {}
 DOCTOR_SHIFT_CLOSED_STATE = {}
@@ -29,7 +35,7 @@ class CallPatientBody(BaseModel):
     cabinet: Optional[str] = "Qabulxona"
 
 
-def _format_patient_queue_item(p: Patient) -> dict:
+def _format_patient_queue_item(p: Patient, public: bool = False) -> dict:
     created_dt = p.created_at or datetime.utcnow()
     created_str = created_dt.isoformat()
     if not created_str.endswith("Z"):
@@ -40,16 +46,11 @@ def _format_patient_queue_item(p: Patient) -> dict:
     if not updated_str.endswith("Z"):
         updated_str += "Z"
 
-    return {
+    item = {
         "id": p.id,
         "first_name": p.first_name,
         "last_name": p.last_name,
         "ticket_number": p.ticket_number or f"A-{p.id:03d}",
-        "phone": p.phone or "Kiritilmagan",
-        "birth_date": p.birth_date.isoformat() if p.birth_date else None,
-        "address": p.address or "Ko'rsatilmagan",
-        "payment_amount": p.payment_amount or 0,
-        "payment_type": p.payment_type or "naqd",
         "queue_status": p.queue_status or "kutmoqda",
         "cabinet": p.cabinet or (f"{p.provider.specialization}" if p.provider else "Qabulxona"),
         "created_at": created_str,
@@ -59,6 +60,16 @@ def _format_patient_queue_item(p: Patient) -> dict:
         "provider_specialization": p.provider.specialization if p.provider else None,
         "service_name": p.service.name if p.service else None,
     }
+
+    if not public:
+        # PII — faqat tizimga kirgan xodimlar uchun (TV navbat taxtasida ko'rsatilmaydi)
+        item["phone"] = p.phone or "Kiritilmagan"
+        item["birth_date"] = p.birth_date.isoformat() if p.birth_date else None
+        item["address"] = p.address or "Ko'rsatilmagan"
+        item["payment_amount"] = p.payment_amount or 0
+        item["payment_type"] = p.payment_type or "naqd"
+
+    return item
 
 
 @router.get("/live")
@@ -94,7 +105,7 @@ def get_live_queue(db: Session = Depends(get_db)):
 
     for p in patients:
         status = p.queue_status or "kutmoqda"
-        item = _format_patient_queue_item(p)
+        item = _format_patient_queue_item(p, public=True)
         if status == "qabulda":
             calling.append(item)
         elif status == "kutmoqda":
@@ -124,10 +135,13 @@ def get_live_queue(db: Session = Depends(get_db)):
 
 
 @router.get("/pending-payments")
-def get_pending_payments(db: Session = Depends(get_db)):
+def get_pending_payments(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
     """
     Returns active pending/unpaid payment reminders for today.
-    Used by bottom-left floating payment alert widget.
+    Used by bottom-right floating payment alert widget.
     """
     today = date.today()
     start = datetime.combine(today, datetime.min.time())
@@ -145,23 +159,79 @@ def get_pending_payments(db: Session = Depends(get_db)):
         .all()
     )
 
-    items = []
+    # Group by patient identity: (first_name, last_name, phone)
+    grouped = {}
     for p in patients:
-        svc_name = p.service.name if p.service else "Tibbiy Xizmat"
-        prov_name = p.provider.full_name if p.provider else "Shifokor"
+        fn = (p.first_name or "").strip().lower()
+        ln = (p.last_name or "").strip().lower()
+        ph = (p.phone or "").strip()
+        key = f"{fn}_{ln}_{ph}" if ph and ph != "Kiritilmagan" else f"{fn}_{ln}_{p.id}"
+
+        if key not in grouped:
+            grouped[key] = []
+        grouped[key].append(p)
+
+    items = []
+    for key, p_list in grouped.items():
+        first_p = p_list[0]
+        total_amount = sum(p.payment_amount or 0 for p in p_list)
+        tickets = [p.ticket_number or f"A-{p.id:03d}" for p in p_list]
+        unique_tickets = list(dict.fromkeys(tickets))
+        tickets_str = ", ".join(unique_tickets)
+
+        breakdown = []
+        for p in p_list:
+            svc_name = p.service.name if p.service else "Tibbiy Xizmat"
+            prov_name = p.provider.full_name if p.provider else "Shifokor / Qabulxona"
+            svc_cat = p.service.category if p.service and p.service.category else "Umumiy"
+
+            item_display_name = svc_name
+            if p.diagnosis:
+                diag = p.diagnosis.strip()
+                if diag.startswith("Sarflangan Material (") and diag.endswith(")"):
+                    item_display_name = diag[21:-1].strip()
+                elif diag.startswith("Material: "):
+                    item_display_name = diag[10:].strip()
+                elif p.diagnosis != svc_name and p.queue_status == "yakunlandi":
+                    item_display_name = diag
+
+            breakdown.append({
+                "patient_id": p.id,
+                "title": item_display_name,
+                "service_name": item_display_name,
+                "category": svc_cat if svc_cat != "Ombor Materiali" else "Umumiy",
+                "provider_name": prov_name,
+                "price": p.payment_amount or 0,
+                "quantity": 1,
+                "ticket_number": p.ticket_number or f"A-{p.id:03d}",
+            })
+
+        reasons = [f"{b['title']} ({b['provider_name']})" for b in breakdown]
+        reason_str = " + ".join(reasons)
+
         items.append({
-            "id": p.id,
-            "patient_id": p.id,
-            "ticket_number": p.ticket_number or f"A-{p.id:03d}",
-            "full_name": f"{p.first_name} {p.last_name}".strip(),
-            "phone": p.phone or "Kiritilmagan",
-            "reason": f"{svc_name} ({prov_name})",
-            "amount": p.payment_amount or 0,
-            "payment_type": p.payment_type,
-            "created_at": p.created_at.isoformat() if p.created_at else datetime.utcnow().isoformat(),
+            "id": first_p.id,
+            "patient_id": first_p.id,
+            "related_patient_ids": [p.id for p in p_list],
+            "ticket_number": tickets_str,
+            "first_name": first_p.first_name,
+            "last_name": first_p.last_name,
+            "full_name": f"{first_p.first_name} {first_p.last_name}".strip(),
+            "phone": first_p.phone or "Kiritilmagan",
+            "address": first_p.address,
+            "birth_date": first_p.birth_date.isoformat() if first_p.birth_date else None,
+            "reason": reason_str,
+            "service_name": first_p.service.name if first_p.service else "Xizmat",
+            "provider_name": first_p.provider.full_name if first_p.provider else "Shifokor",
+            "cabinet": first_p.cabinet,
+            "amount": total_amount,
+            "payment_type": first_p.payment_type,
+            "created_at": first_p.created_at.isoformat() if first_p.created_at else datetime.utcnow().isoformat(),
+            "breakdown": breakdown,
         })
 
     return items
+
 
 
 @router.get("/doctor/my-queue")
@@ -449,7 +519,7 @@ def recall_current_patient(
         query = query.filter(Patient.provider_id == target_provider_id)
 
     cur_p = query.order_by(Patient.updated_at.desc()).first()
-    if not cur_p:
+    if not cur_p and user.role != "doctor":
         cur_p = db.query(Patient).filter(
             Patient.is_cancelled == False,
             Patient.queue_status == "qabulda"
@@ -471,11 +541,12 @@ def recall_patient(
     user: User = Depends(require_doctor_or_admin_or_ceo),
 ):
     p = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not p:
+    if not p and user.role != "doctor":
         p = db.query(Patient).filter(Patient.is_cancelled == False, Patient.queue_status == "qabulda").order_by(Patient.updated_at.desc()).first()
     if not p:
         return {"message": "Qayta chaqirish uchun qabulda bemor topilmadi", "patient": None}
 
+    _assert_patient_ownership(p, user)
     p.queue_status = "qabulda"
     p.updated_at = datetime.utcnow()
 
@@ -496,6 +567,7 @@ def update_patient_queue_status(
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
     if p.is_cancelled:
         raise HTTPException(status_code=400, detail="Bekor qilingan mijoz navbatini o'zgartirib bo'lmaydi")
+    _assert_patient_ownership(p, user)
 
     valid_statuses = ["kutmoqda", "qabulda", "yakunlandi", "o'tkazib yuborildi"]
     if data.queue_status not in valid_statuses:
@@ -520,6 +592,7 @@ def complete_patient_visit(
     p = db.query(Patient).filter(Patient.id == patient_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
+    _assert_patient_ownership(p, user)
 
     p.queue_status = "yakunlandi"
     p.updated_at = datetime.utcnow()
@@ -538,6 +611,7 @@ def skip_patient_visit(
     p = db.query(Patient).filter(Patient.id == patient_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
+    _assert_patient_ownership(p, user)
 
     p.queue_status = "o'tkazib yuborildi"
     p.updated_at = datetime.utcnow()
@@ -559,6 +633,7 @@ def call_patient(
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
     if p.is_cancelled:
         raise HTTPException(status_code=400, detail="Bekor qilingan mijozni chaqirib bo'lmaydi")
+    _assert_patient_ownership(p, user)
 
     p.queue_status = "qabulda"
     if data.cabinet:

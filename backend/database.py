@@ -39,53 +39,92 @@ def run_migrations():
     try:
         with engine.connect() as conn:
             if settings.DATABASE_URL.startswith("sqlite"):
-                result = conn.execute(text("PRAGMA table_info(patients)")).fetchall()
-                existing_cols = [r[1] for r in result]
-                for col in ["cash_amount", "card_amount"]:
-                    if col not in existing_cols:
-                        conn.execute(text(f"ALTER TABLE patients ADD COLUMN {col} FLOAT DEFAULT 0"))
+                # Inventory items
+                try:
+                    result = conn.execute(text("PRAGMA table_info(inventory_items)")).fetchall()
+                    existing_cols = [r[1] for r in result]
+                    if "cost_price" not in existing_cols:
+                        conn.execute(text("ALTER TABLE inventory_items ADD COLUMN cost_price INTEGER DEFAULT 0"))
+                        conn.commit()
+                except Exception as e:
+                    logger.warning(f"inventory_items migration warning: {e}")
 
-                result = conn.execute(text("PRAGMA table_info(transactions)")).fetchall()
-                existing_cols = [r[1] for r in result]
-                for col in ["cash_amount", "card_amount"]:
-                    if col not in existing_cols:
-                        conn.execute(text(f"ALTER TABLE transactions ADD COLUMN {col} FLOAT DEFAULT 0"))
+                # Patients
+                try:
+                    result = conn.execute(text("PRAGMA table_info(patients)")).fetchall()
+                    existing_cols = [r[1] for r in result]
+                    for col in ["cash_amount", "card_amount"]:
+                        if col not in existing_cols:
+                            conn.execute(text(f"ALTER TABLE patients ADD COLUMN {col} FLOAT DEFAULT 0"))
+                    conn.commit()
+                except Exception as e:
+                    logger.warning(f"patients migration warning: {e}")
 
-                result = conn.execute(text("PRAGMA table_info(services)")).fetchall()
-                existing_cols = [r[1] for r in result]
-                if "cabinet" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN cabinet VARCHAR DEFAULT '1-Xona'"))
-                if "category" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN category VARCHAR DEFAULT 'Umumiy'"))
-                if "requires_queue" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN requires_queue BOOLEAN DEFAULT 1"))
-                if "queue_prefix" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN queue_prefix VARCHAR DEFAULT 'A'"))
-                if "referrer_commission_percent" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN referrer_commission_percent INTEGER DEFAULT 0"))
-                if "referrer_commission_sum" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN referrer_commission_sum INTEGER DEFAULT 0"))
-                if "referrer_doctor_split_percent" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN referrer_doctor_split_percent INTEGER DEFAULT 50"))
-                if "referrer_clinic_split_percent" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN referrer_clinic_split_percent INTEGER DEFAULT 50"))
-                if "referrer_doctor_split_sum" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN referrer_doctor_split_sum INTEGER DEFAULT 0"))
-                if "referrer_clinic_split_sum" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN referrer_clinic_split_sum INTEGER DEFAULT 0"))
-                if "allow_custom_price" not in existing_cols:
-                    conn.execute(text("ALTER TABLE services ADD COLUMN allow_custom_price BOOLEAN DEFAULT 0"))
+                # Services
+                try:
+                    result = conn.execute(text("PRAGMA table_info(services)")).fetchall()
+                    existing_cols = [r[1] for r in result]
+                    if "cabinet" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN cabinet VARCHAR DEFAULT '1-Xona'"))
+                    if "category" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN category VARCHAR DEFAULT 'Umumiy'"))
+                    if "requires_queue" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN requires_queue BOOLEAN DEFAULT 1"))
+                    if "queue_prefix" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN queue_prefix VARCHAR DEFAULT 'A'"))
+                    if "referrer_commission_percent" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN referrer_commission_percent INTEGER DEFAULT 0"))
+                    if "referrer_commission_sum" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN referrer_commission_sum INTEGER DEFAULT 0"))
+                    if "referrer_doctor_split_percent" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN referrer_doctor_split_percent INTEGER DEFAULT 50"))
+                    if "referrer_clinic_split_percent" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN referrer_clinic_split_percent INTEGER DEFAULT 50"))
+                    if "referrer_doctor_split_sum" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN referrer_doctor_split_sum INTEGER DEFAULT 0"))
+                    if "referrer_clinic_split_sum" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN referrer_clinic_split_sum INTEGER DEFAULT 0"))
+                    if "allow_custom_price" not in existing_cols:
+                        conn.execute(text("ALTER TABLE services ADD COLUMN allow_custom_price BOOLEAN DEFAULT 0"))
+                    conn.commit()
+                except Exception as e:
+                    logger.warning(f"services migration warning: {e}")
 
-                result = conn.execute(text("PRAGMA table_info(queue_tickets)")).fetchall()
-                existing_cols = [r[1] for r in result]
-                if "category" not in existing_cols:
-                    conn.execute(text("ALTER TABLE queue_tickets ADD COLUMN category VARCHAR DEFAULT 'Umumiy'"))
-                if "queue_prefix" not in existing_cols:
-                    conn.execute(text("ALTER TABLE queue_tickets ADD COLUMN queue_prefix VARCHAR DEFAULT 'A'"))
+                # Queue tickets
+                try:
+                    result = conn.execute(text("PRAGMA table_info(queue_tickets)")).fetchall()
+                    existing_cols = [r[1] for r in result]
+                    if "category" not in existing_cols:
+                        conn.execute(text("ALTER TABLE queue_tickets ADD COLUMN category VARCHAR DEFAULT 'Umumiy'"))
+                    if "queue_prefix" not in existing_cols:
+                        conn.execute(text("ALTER TABLE queue_tickets ADD COLUMN queue_prefix VARCHAR DEFAULT 'A'"))
+                    conn.commit()
+                except Exception as e:
+                    logger.warning(f"queue_tickets migration warning: {e}")
 
-                conn.commit()
     except Exception as e:
         logger.warning(f"Migration warning: {e}")
+
+    # Ko'p so'raladigan ustunlarga indeks — SQLite va PostgreSQL'da bir xil sintaksis
+    try:
+        with engine.connect() as conn:
+            for stmt in (
+                "CREATE INDEX IF NOT EXISTS ix_patients_created_at ON patients (created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_patients_provider_id ON patients (provider_id)",
+                "CREATE INDEX IF NOT EXISTS ix_patients_service_id ON patients (service_id)",
+                "CREATE INDEX IF NOT EXISTS ix_patients_referrer_id ON patients (referrer_id)",
+                "CREATE INDEX IF NOT EXISTS ix_transactions_created_at ON transactions (created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_transactions_patient_id ON transactions (patient_id)",
+                "CREATE INDEX IF NOT EXISTS ix_transactions_provider_id ON transactions (provider_id)",
+                "CREATE INDEX IF NOT EXISTS ix_transactions_referrer_id ON transactions (referrer_id)",
+            ):
+                try:
+                    conn.execute(text(stmt))
+                except Exception as e:
+                    logger.warning(f"Index migration warning ({stmt}): {e}")
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"Index migration warning: {e}")
 
 
 def get_db():

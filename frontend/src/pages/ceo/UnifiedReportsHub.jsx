@@ -321,6 +321,29 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       </tr>`
     })
 
+    let matRowsHtml = ''
+    const usedMats = reportsData?.materials_used_breakdown || []
+    let totalMatIncomeSum = reportsData?.total_material_income || 0
+    let totalMatQtySum = reportsData?.total_material_quantity || 0
+
+    usedMats.forEach((m, idx) => {
+      matRowsHtml += `<tr>
+        <td style="text-align: center;">${idx + 1}</td>
+        <td>${m.name}</td>
+        <td style="text-align: center; font-weight: bold;">${m.quantity_used} dona</td>
+        <td style="text-align: right; font-weight: bold; color: #16a34a;">${formatMoney(m.total_income)}</td>
+      </tr>`
+    })
+
+    if (usedMats.length > 0) {
+      matRowsHtml += `<tr style="background: #f1f5f9; font-weight: bold;">
+        <td></td>
+        <td>JAMI MATERIAL TUSHUMI</td>
+        <td style="text-align: center;">${totalMatQtySum} dona</td>
+        <td style="text-align: right; color: #16a34a;">${formatMoney(totalMatIncomeSum)}</td>
+      </tr>`
+    }
+
     const fullHtml = `<!DOCTYPE html><html><head><title>Hisobot — Marjona Med Service</title>
       <style>
         body { font-family: Segoe UI, Arial, sans-serif; padding: 25px; color: #0f172a; background: #fff; line-height: 1.5; font-size: 15px; }
@@ -370,6 +393,21 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
         </thead>
         <tbody>
           ${expRowsHtml || '<tr><td colSpan="3" style="text-align:center; padding:15px; color:#64748b;">Xarajatlar mavjud emas</td></tr>'}
+        </tbody>
+      </table>
+
+      <div class="section-title">3. ISHLATILGAN MATERIALLAR VA TUSHUM</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 50px; text-align: center;">№</th>
+            <th>Material Nomi</th>
+            <th style="width: 130px; text-align: center;">Ishlatilgan soni</th>
+            <th style="width: 180px; text-align: right;">Tushum (so'm)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${matRowsHtml || '<tr><td colSpan="4" style="text-align:center; padding:15px; color:#64748b;">Ishlatilgan materiallar mavjud emas</td></tr>'}
         </tbody>
       </table>
 
@@ -465,15 +503,16 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       }))
       exportToExcel(rows, `Maosh_Qaydnomasi_${month}_${year}`)
     } else if (type === 'inventory' || activeTab === 'inventory') {
-      const rows = (inventoryData || []).map((item) => ({
-        "Material Nomi": item.name,
-        "Qoldiq Miqdor": item.qty,
-        "O'lchov Birligi": item.unit,
-        "Birlik Narxi": item.unit_price,
-        "Ombordagi Qiymati": item.qty * item.unit_price,
-        "Minimal Chegara": item.min_qty,
+      const rows = (reportsData?.materials_used_breakdown || []).map((m) => ({
+        "Material Nomi": m.name,
+        "Ishlatilgan Miqdor (dona)": m.quantity_used,
+        "Sotilish Narxi (so'm)": m.unit_price || 0,
+        "Tan Narxi (so'm)": m.cost_price || 0,
+        "Jami Tushum": m.total_income,
+        "Tan Narx Summasi": m.total_cost || 0,
+        "Sof Foyda": m.profit || 0,
       }))
-      exportToExcel(rows, `Omborxona_Qoldiqlari_${todayStr}`)
+      exportToExcel(rows, `Materiallar_Foyda_Hisoboti_${dateFrom}_${dateTo}`)
     } else {
       toast("Excel eksport bajarildi", "info")
     }
@@ -1108,8 +1147,14 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
 
   const renderInventorySection = () => {
     const isCollapsed = collapsedSections['inventory']
+    const usedMaterials = reportsData?.materials_used_breakdown || []
+    const totalMatIncome = reportsData?.total_material_income || 0
+    const totalMatCost = reportsData?.total_material_cost || 0
+    const totalMatProfit = reportsData?.total_material_profit || 0
+    const totalMatQty = reportsData?.total_material_quantity || 0
+
     return (
-      <div className="card p-6 space-y-4 transition-all duration-300">
+      <div className="card p-6 space-y-6 transition-all duration-300">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
           <button
             type="button"
@@ -1118,13 +1163,13 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
           >
             {isCollapsed ? <ChevronDown className="h-5 w-5 text-purple-400" /> : <ChevronUp className="h-5 w-5 text-purple-400" />}
             <h3 className="text-sm font-black text-gold uppercase tracking-wider flex items-center gap-2">
-              <Package className="h-4 w-4 text-purple-400" /> 5. Omborxona Materiallari Statistikasi ({inventoryData.length} turdagi)
+              <Package className="h-4 w-4 text-purple-400" /> 5. Omborxona & Ishlatilgan Materiallar Statistikasi va Sof Foyda
             </h3>
           </button>
 
           <div className="flex flex-wrap gap-2 items-center">
             <button type="button" onClick={() => handleExportExcel('inventory')} className="btn-outline py-1 px-3 text-xs font-bold">
-              Excel
+              Excel (Foyda & Tushum)
             </button>
             <button
               type="button"
@@ -1138,31 +1183,110 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
         </div>
 
         {!isCollapsed && (
-          <div className="overflow-x-auto animate-fadeIn">
-            <table className="w-full text-xs">
-              <THead cols={['#', 'Material Nomi', 'Qoldiq Miqdor', 'Birlik Narxi', 'Ombordagi Qiymati', 'Holati']} />
-              <tbody className="divide-y divide-border">
-                {inventoryData.map((item, i) => {
-                  const isLow = item.qty <= item.min_qty
-                  return (
-                    <tr key={item.id} className="hover:bg-surface-hover font-semibold">
-                      <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
-                      <td className="p-2.5 text-body font-bold">{item.name}</td>
-                      <td className="p-2.5 text-center font-mono font-bold">{item.qty} {item.unit}</td>
-                      <td className="p-2.5 text-right font-mono text-muted">{formatMoney(item.unit_price)}</td>
-                      <td className="p-2.5 text-right font-mono text-emerald font-bold">{formatMoney(item.qty * item.unit_price)}</td>
-                      <td className="p-2.5">
-                        {isLow ? (
-                          <span className="badge badge-danger font-bold">⚠️ Tugamoqda</span>
-                        ) : (
-                          <span className="badge badge-success font-bold">✓ Yetarli</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-6 animate-fadeIn">
+            {/* KPI Summary Cards for Consumed Materials & Profit */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="stat-card border-purple-500/30 bg-purple-500/5 p-3">
+                <span className="text-[11px] font-bold text-purple-400 uppercase">Jami Sarflangan Miqdor</span>
+                <p className="text-xl font-black text-purple-400 font-mono mt-1">{totalMatQty} dona</p>
+              </div>
+
+              <div className="stat-card border-cyan-500/30 bg-cyan-500/5 p-3">
+                <span className="text-[11px] font-bold text-cyan-400 uppercase">Jami Tushum (Kassa)</span>
+                <p className="text-xl font-black text-cyan-400 font-mono mt-1">{formatMoney(totalMatIncome)}</p>
+              </div>
+
+              <div className="stat-card border-amber-500/30 bg-amber-500/5 p-3">
+                <span className="text-[11px] font-bold text-amber-400 uppercase">Tan Narxi Summasi</span>
+                <p className="text-xl font-black text-amber-400 font-mono mt-1">{formatMoney(totalMatCost)}</p>
+              </div>
+
+              <div className="stat-card border-emerald-500/40 bg-emerald-500/10 p-3">
+                <span className="text-[11px] font-bold text-emerald uppercase">Materiallardan Sof Foyda</span>
+                <p className="text-xl font-black text-emerald font-mono mt-1">+{formatMoney(totalMatProfit)}</p>
+              </div>
+            </div>
+
+            {/* Table 1: Used Materials Breakdown with Cost Price & Profit in Period */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-extrabold text-gold uppercase tracking-wider flex items-center gap-1.5">
+                💊 Ushbu Davrda Ishlatilgan Materiallar, Tan Narxi va Sof Foyda Hisob-Kitobi ({dateFrom} — {dateTo})
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <THead cols={['#', 'Material Nomi', 'Ishlatilgan Miqdor', 'Sotilish Narxi', 'Tan Narxi', 'Jami Tushum', 'Tan Narx Summasi', 'Sof Foyda']} />
+                  <tbody className="divide-y divide-border">
+                    {usedMaterials.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-6 text-center text-muted italic">
+                          Ushbu tanlangan davrda materiallar ishlatilmagan
+                        </td>
+                      </tr>
+                    ) : (
+                      usedMaterials.map((m, i) => (
+                        <tr key={i} className="hover:bg-surface-hover font-semibold">
+                          <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
+                          <td className="p-2.5 text-body font-extrabold">{m.name}</td>
+                          <td className="p-2.5 text-center font-mono font-bold text-purple-400">{m.quantity_used} dona</td>
+                          <td className="p-2.5 text-right font-mono text-gold">{formatMoney(m.unit_price || 0)}</td>
+                          <td className="p-2.5 text-right font-mono text-amber-400">{formatMoney(m.cost_price || 0)}</td>
+                          <td className="p-2.5 text-right font-mono font-bold text-cyan-400">{formatMoney(m.total_income)}</td>
+                          <td className="p-2.5 text-right font-mono text-muted">{formatMoney(m.total_cost || 0)}</td>
+                          <td className="p-2.5 text-right font-mono font-black text-emerald text-sm">
+                            +{formatMoney(m.profit || 0)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                    {usedMaterials.length > 0 && (
+                      <tr className="bg-surface-2 font-black border-t-2 border-border">
+                        <td className="p-2.5"></td>
+                        <td className="p-2.5 text-gold uppercase">JAMI MATERIALLAR FOYDASI</td>
+                        <td className="p-2.5 text-center font-mono text-purple-400">{totalMatQty} dona</td>
+                        <td className="p-2.5"></td>
+                        <td className="p-2.5"></td>
+                        <td className="p-2.5 text-right font-mono text-cyan-400 text-sm">{formatMoney(totalMatIncome)}</td>
+                        <td className="p-2.5 text-right font-mono text-amber-400 text-sm">{formatMoney(totalMatCost)}</td>
+                        <td className="p-2.5 text-right font-mono text-emerald text-base font-black">+{formatMoney(totalMatProfit)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Table 2: Current Inventory Stock Level */}
+            <div className="space-y-2 pt-4 border-t border-border">
+              <h4 className="text-xs font-extrabold text-gold uppercase tracking-wider flex items-center gap-1.5">
+                📦 Omborxona Joriy Qoldiqlari Katalogi ({inventoryData.length} turdagi)
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <THead cols={['#', 'Material Nomi', 'Qoldiq Miqdor', 'Birlik Narxi', 'Ombordagi Qiymati', 'Holati']} />
+                  <tbody className="divide-y divide-border">
+                    {inventoryData.map((item, i) => {
+                      const isLow = item.qty <= item.min_qty
+                      return (
+                        <tr key={item.id} className="hover:bg-surface-hover font-semibold">
+                          <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
+                          <td className="p-2.5 text-body font-bold">{item.name}</td>
+                          <td className="p-2.5 text-center font-mono font-bold">{item.qty} {item.unit}</td>
+                          <td className="p-2.5 text-right font-mono text-muted">{formatMoney(item.unit_price)}</td>
+                          <td className="p-2.5 text-right font-mono text-emerald font-bold">{formatMoney(item.qty * item.unit_price)}</td>
+                          <td className="p-2.5">
+                            {isLow ? (
+                              <span className="badge badge-danger font-bold">⚠️ Tugamoqda</span>
+                            ) : (
+                              <span className="badge badge-success font-bold">✓ Yetarli</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>

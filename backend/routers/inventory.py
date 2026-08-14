@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.inventory import InventoryItem
 from models.user import User
-from auth_utils import require_admin_or_ceo, require_doctor_or_admin_or_ceo
+from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
@@ -19,7 +19,19 @@ class InventoryCreate(BaseModel):
     quantity: int = Field(default=0, ge=0)
     unit: str = "dona"
     min_quantity: int = Field(default=10, ge=0)
-    unit_price: int = Field(default=0, ge=0)
+    unit_price: int = Field(default=0, ge=0) # Sotilish narxi (Kassa narxi)
+    cost_price: int = Field(default=0, ge=0) # Tavar haqiqiy narxi (Tan narxi)
+    notes: Optional[str] = None
+
+
+class InventoryUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    quantity: Optional[int] = None
+    unit: Optional[str] = None
+    min_quantity: Optional[int] = None
+    unit_price: Optional[int] = None
+    cost_price: Optional[int] = None
     notes: Optional[str] = None
 
 
@@ -34,8 +46,8 @@ class QuantityChangeBody(BaseModel):
     notes: Optional[str] = None
 
 
-def _item_row(i: InventoryItem) -> dict:
-    return {
+def _item_row(i: InventoryItem, role: Optional[str] = None) -> dict:
+    data = {
         "id": i.id,
         "name": i.name,
         "category": i.category,
@@ -47,6 +59,9 @@ def _item_row(i: InventoryItem) -> dict:
         "is_low_stock": i.quantity <= i.min_quantity,
         "created_at": i.created_at.isoformat(),
     }
+    if role == "ceo":
+        data["cost_price"] = getattr(i, "cost_price", 0) or 0
+    return data
 
 
 @router.get("")
@@ -59,7 +74,7 @@ def list_inventory(
     if category:
         q = q.filter(InventoryItem.category == category)
     items = q.order_by(InventoryItem.name.asc()).all()
-    return [_item_row(i) for i in items]
+    return [_item_row(i, user.role) for i in items]
 
 
 @router.get("/logs")
@@ -68,7 +83,7 @@ def list_inventory_logs(
     user: User = Depends(require_doctor_or_admin_or_ceo),
 ):
     """Returns history of material usages with linked patient tickets and payments."""
-    from models.audit import AuditLog
+    from models.audit_log import AuditLog
     logs = (
         db.query(AuditLog)
         .filter(AuditLog.action_type == "CONSUME_MATERIAL")
@@ -102,12 +117,46 @@ def create_inventory_item(
         unit=body.unit,
         min_quantity=body.min_quantity,
         unit_price=body.unit_price,
+        cost_price=body.cost_price,
         notes=body.notes,
     )
     db.add(item)
     db.commit()
     db.refresh(item)
-    return _item_row(item)
+    return _item_row(item, user.role)
+
+
+@router.put("/{item_id}")
+def update_inventory_item(
+    item_id: int,
+    body: InventoryUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Material topilmadi")
+    if body.name is not None:
+        item.name = body.name
+    if body.category is not None:
+        item.category = body.category
+    if body.quantity is not None:
+        item.quantity = body.quantity
+    if body.unit is not None:
+        item.unit = body.unit
+    if body.min_quantity is not None:
+        item.min_quantity = body.min_quantity
+    if body.unit_price is not None:
+        item.unit_price = body.unit_price
+    if body.cost_price is not None:
+        item.cost_price = body.cost_price
+    if body.notes is not None:
+        item.notes = body.notes
+
+    item.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(item)
+    return _item_row(item, user.role)
 
 
 @router.post("/{item_id}/restock")
@@ -124,7 +173,7 @@ def restock_item(
     item.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(item)
-    return _item_row(item)
+    return _item_row(item, user.role)
 
 
 @router.post("/{item_id}/consume")
@@ -202,28 +251,24 @@ def consume_item(
             db.add(txn)
 
             if target_patient:
-                is_already_paid = target_patient.payment_type not in ("later", "keyinroq", "nasiya", "qarz")
-                if is_already_paid:
-                    mat_patient = Patient(
-                        first_name=target_patient.first_name,
-                        last_name=target_patient.last_name,
-                        birth_date=target_patient.birth_date,
-                        phone=target_patient.phone,
-                        address=target_patient.address,
-                        referrer_id=target_patient.referrer_id,
-                        provider_id=target_patient.provider_id,
-                        service_id=target_patient.service_id,
-                        payment_amount=charged_amount,
-                        payment_type="later",
-                        ticket_number=f"{target_patient.ticket_number or 'M'}-Material",
-                        queue_status="yakunlandi",
-                        created_by=user.id,
-                    )
-                    db.add(mat_patient)
-                else:
-                    target_patient.payment_amount = (target_patient.payment_amount or 0) + charged_amount
-                    target_patient.payment_type = "later"
-                    target_patient.updated_at = datetime.utcnow()
+                clean_ticket = (target_patient.ticket_number or f"A-{target_patient.id:03d}").replace("-Material", "").replace("-material", "").strip()
+                mat_patient = Patient(
+                    first_name=target_patient.first_name,
+                    last_name=target_patient.last_name,
+                    birth_date=target_patient.birth_date,
+                    phone=target_patient.phone,
+                    address=target_patient.address,
+                    referrer_id=target_patient.referrer_id,
+                    provider_id=target_patient.provider_id,
+                    service_id=target_patient.service_id,
+                    payment_amount=charged_amount,
+                    payment_type="later",
+                    ticket_number=clean_ticket,
+                    diagnosis=item.name,
+                    queue_status="yakunlandi",
+                    created_by=user.id,
+                )
+                db.add(mat_patient)
 
     # Audit logging
     pat_str = f" ({target_patient.first_name} {target_patient.last_name})" if target_patient else (f" [{body.ticket_number}]" if body.ticket_number else "")
@@ -244,6 +289,8 @@ def consume_item(
             "consumed": body.amount,
             "ticket": body.ticket_number,
             "charged": charged_amount,
+            "cost_price": getattr(item, "cost_price", 0) or 0,
+            "unit_price": unit_p,
         },
         detail_message=log_msg.replace(",", " "),
     )
@@ -251,7 +298,7 @@ def consume_item(
     db.commit()
     db.refresh(item)
     
-    result = _item_row(item)
+    result = _item_row(item, user.role)
     result["last_consumed"] = {
         "amount": body.amount,
         "ticket": body.ticket_number,

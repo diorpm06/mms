@@ -11,17 +11,17 @@ class Transaction(CancelMixin, Base):
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"), nullable=True)
+    patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"), nullable=True, index=True)
     total_amount: Mapped[int] = mapped_column(Integer)
-    referrer_id: Mapped[int | None] = mapped_column(ForeignKey("referrers.id"), nullable=True)
+    referrer_id: Mapped[int | None] = mapped_column(ForeignKey("referrers.id"), nullable=True, index=True)
     referrer_amount: Mapped[int] = mapped_column(Integer, default=0)
-    provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id"), nullable=True)
+    provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id"), nullable=True, index=True)
     provider_amount: Mapped[int] = mapped_column(Integer, default=0)
     center_amount: Mapped[int] = mapped_column(Integer)
     payment_type: Mapped[str] = mapped_column(String(10))
     cash_amount: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
     card_amount: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
     patient = relationship("Patient")
     referrer = relationship("Referrer")

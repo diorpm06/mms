@@ -1,6 +1,7 @@
 {
   "buildCommand": "npm install --prefix frontend && npm run build --prefix frontend",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index.py" }
+    { "source": "/:path+", "destination": "/api/index.py?__v_path=/:path*" },
+    { "source": "/",       "destination": "/api/index.py?__v_path=/" }
   ]
 }
