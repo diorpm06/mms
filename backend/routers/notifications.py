@@ -22,6 +22,7 @@ ACTION_LABELS = {
     "ADVANCE":   "Avans berildi",
     "DISCHARGE": "Bemor chiqarildi",
     "ADMIT":     "Bemor yotqizildi",
+    "REPORT_SUBMITTED": "Shablon chop etishga yuborildi",
 }
 
 ACTION_ICONS = {
@@ -36,6 +37,7 @@ ACTION_ICONS = {
     "ADVANCE":   "💵",
     "DISCHARGE": "🏥",
     "ADMIT":     "🛏️",
+    "REPORT_SUBMITTED": "📋",
 }
 
 
@@ -47,7 +49,11 @@ def get_notifications(
     since = datetime.utcnow() - timedelta(hours=48)
     q = db.query(AuditLog).filter(AuditLog.created_at >= since)
 
-    if current_user.role != "ceo":
+    if current_user.role == "admin":
+        # Admin o'z harakatlarini + hamma joydan kelgan shablon topshiriqlarini ko'radi
+        from sqlalchemy import or_
+        q = q.filter(or_(AuditLog.user_id == current_user.id, AuditLog.action_type == "REPORT_SUBMITTED"))
+    elif current_user.role != "ceo":
         q = q.filter(AuditLog.user_id == current_user.id)
 
     logs = q.order_by(AuditLog.created_at.desc()).limit(30).all()

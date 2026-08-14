@@ -1,286 +1,295 @@
 // Laboratoriya va UZI shablonlari — shablonlar/Lab va shablonlar/Uzi papkalaridagi
-// asl Word fayllarining TO'LIQ matni asosida (original tildagi jumlalar bilan,
-// tarjima qilinmagan). Shifokor bu matnni to'g'ridan-to'g'ri tahrirlaydi —
-// faqat o'zgarishi kerak bo'lgan raqam/natijalarni almashtiradi, qolgan matn
-// asl hujjatdagidek qoladi.
+// asl Word fayllarining HTML'ga o'girilgan, original formatlashi (qalin sarlavhalar,
+// kursiv) saqlangan matni asosida. "______" belgisi — shifokor to'ldirishi kerak
+// bo'lgan joy; frontend bu belgilarni interaktiv katakchalarga almashtiradi.
+// Qolgan matn (formatlash bilan birga) qulflangan — tahrirlab bo'lmaydi.
 
-const CLINIC_HEADER =
-  "MARJONA MED SERVIS\n" +
-  "Hazorasp tumani, Hazorasp shaxarchasi, Ibn Sino ko'chasi.\n" +
-  "Mo'ljal: Tuman Poliklinikasi ro'parasi. Tel: +998-88-130-44-24, +998-97-512-84-63\n" +
-  "──────────────────────────────────────────\n"
+const CLINIC_HEADER_HTML =
+  '<p style="text-align:center;margin:0 0 2px;"><strong style="font-size:15px;">MARJONA MED SERVIS</strong></p>' +
+  '<p style="text-align:center;margin:0 0 2px;font-size:11px;"><strong>Hazorasp tumani, Hazorasp shaxarchasi, Ibn Sino ko\'chasi</strong></p>' +
+  '<p style="text-align:center;margin:0 0 10px;font-size:11px;"><strong>Tel: +998-88-130-44-24, +998-97-512-84-63</strong></p>' +
+  '<hr style="margin:0 0 10px;border-color:#999;" />'
 
-function withPatientLine(body) {
-  return (
-    CLINIC_HEADER +
-    "Ф.И.О: ______________________        Дата: __.__.20___ г.\n\n" +
-    body
-  )
+function withHeader(patientLine, body) {
+  return CLINIC_HEADER_HTML + `<p><strong>${patientLine}</strong></p>` + body
 }
+
+const PATIENT_LINE = 'Ф.И.О: ______   Дата: ______'
 
 export const REPORT_TEMPLATES = [
   // ───────────────────────── LABORATORIYA ─────────────────────────
   {
     key: 'LAB_OAK',
     category: 'Laboratoriya',
-    name: 'Umumiy Qon Tahlili (OAK)',
-    bodyText: withPatientLine(
-      'ОБЩИЙ АНАЛИЗ КРОВИ\n' +
-      'Тахлил турлари                                    Натижа        Норма\n\n' +
-      'Гемоглобин (HGB)                          ______        130-160 (эркак), 120-150 (аёл)\n' +
-      'Эритроцитлар (RBC)                        ______        3.8-5.5 x10^12/л\n' +
-      'Гематокрит (HCT)                          ______        37-49 %\n' +
-      'Эритроцит уртача хажми (MCV)              ______        80-100 fl\n' +
-      'Уртача Гемоглобин микдори (MCH)           ______        27-31 pg\n' +
-      'Эритроцитда гемоглобиннинг уртача концентрацияси (MCHC)  ______  320-360 г/л\n' +
-      'Эритроцитлар анизоцитози (RDW-CV)         ______        11-15 %\n' +
-      'Тромбоцитлар сони (PLT)                   ______        150-400 x10^9/л\n' +
-      'Тромбоцитларни уртача хажми (MPV)         ______        7-11 fl\n' +
-      'Тромбокрит (PCT)                          ______        0.1-0.5 %\n' +
-      'Лейкоцитлар (WBC)                         ______        4.0-9.0 x10^9/л\n' +
-      'Лимфоцитлар (Lymph%)                      ______        20-40 %\n' +
-      'Моноцитлар (Mid%)                         ______        3-9 %\n' +
-      'Гранулоцитлар (Gran%)                     ______        50-70 %\n' +
-      'СОЭ                                       ______        1-10 (эркак), 2-15 (аёл) мм/соат\n' +
-      'Свертываемость (Н/К)                      ______\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Umumiy Qon Tahlili (OAK)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ОБЩИЙ АНАЛИЗ КРОВИ</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>Гемоглобин (HGB)</td><td>______</td><td>Эркак 130-160, Аёл 120-150 г/л</td></tr>' +
+      '<tr><td>Эритроцитлар (RBC)</td><td>______</td><td>3.8-5.5 x10^12/л</td></tr>' +
+      '<tr><td>Гематокрит (HCT)</td><td>______</td><td>37-49 %</td></tr>' +
+      '<tr><td>Эритроцит уртача хажми (MCV)</td><td>______</td><td>80-100 fl</td></tr>' +
+      '<tr><td>Уртача Гемоглобин микдори (MCH)</td><td>______</td><td>27-31 pg</td></tr>' +
+      '<tr><td>Гемоглобиннинг уртача концентрацияси (MCHC)</td><td>______</td><td>320-360 г/л</td></tr>' +
+      '<tr><td>Эритроцитлар анизоцитози (RDW-CV)</td><td>______</td><td>11-15 %</td></tr>' +
+      '<tr><td>Тромбоцитлар сони (PLT)</td><td>______</td><td>150-400 x10^9/л</td></tr>' +
+      '<tr><td>Тромбоцит уртача хажми (MPV)</td><td>______</td><td>7-11 fl</td></tr>' +
+      '<tr><td>Тромбокрит (PCT)</td><td>______</td><td>0.1-0.5 %</td></tr>' +
+      '<tr><td>Лейкоцитлар (WBC)</td><td>______</td><td>4.0-9.0 x10^9/л</td></tr>' +
+      '<tr><td>Лимфоцитлар (Lymph%)</td><td>______</td><td>20-40 %</td></tr>' +
+      '<tr><td>Моноцитлар (Mid%)</td><td>______</td><td>3-9 %</td></tr>' +
+      '<tr><td>Гранулоцитлар (Gran%)</td><td>______</td><td>50-70 %</td></tr>' +
+      '<tr><td>СОЭ</td><td>______</td><td>Эркак 1-10, Аёл 2-15 мм/соат</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_OAM',
     category: 'Laboratoriya',
-    name: 'Umumiy Peshob Tahlili (OAM)',
-    bodyText: withPatientLine(
-      'ОБЩИЙ АНАЛИЗ МОЧИ\n' +
-      'Тахлил турлари                                    Натижа        Норма\n\n' +
-      'Цвет мочи                                 ______        Соломенно-желтая\n' +
-      'Удельный вес (SG)                         ______        1015-1025\n' +
-      'Лейкоцит (LEU)                            ______        До 3 (эркак) / До 6 (аёл) поле зрения\n' +
-      'Нитрит (NIT)                              ______        Abs\n' +
-      'Урабилиноген (URO)                        ______        Норма\n' +
-      'Кетоновое тело (KET)                      ______        Abs\n' +
-      'Глюкоза (GUL)                             ______        Abs\n' +
-      'Ацетон                                    ______        Нерезкий неспецифический\n' +
-      'Количество мочи                           ______        50-100 г\n' +
-      'Соли моча                                 ______        Abs\n' +
-      'Зернистые цилиндры моче                   ______        Abs\n' +
-      'Почечные клетка                           ______        Abs\n' +
-      'Слизь                                     ______        Abs\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Umumiy Peshob Tahlili (OAM)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ОБЩИЙ АНАЛИЗ МОЧИ</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>Цвет мочи</td><td>______</td><td>Соломенно-желтая</td></tr>' +
+      '<tr><td>Удельный вес (SG)</td><td>______</td><td>1015-1025</td></tr>' +
+      '<tr><td>Лейкоцит (LEU)</td><td>______</td><td>До 3 (эрк.) / До 6 (аёл) п.з.</td></tr>' +
+      '<tr><td>Нитрит (NIT)</td><td>______</td><td>Abs</td></tr>' +
+      '<tr><td>Урабилиноген (URO)</td><td>______</td><td>Норма</td></tr>' +
+      '<tr><td>Кетоновое тело (KET)</td><td>______</td><td>Abs</td></tr>' +
+      '<tr><td>Глюкоза (GUL)</td><td>______</td><td>Abs</td></tr>' +
+      '<tr><td>Ацетон</td><td>______</td><td>Нерезкий</td></tr>' +
+      '<tr><td>Количество мочи</td><td>______</td><td>50-100 г</td></tr>' +
+      '<tr><td>Соли моча</td><td>______</td><td>Abs</td></tr>' +
+      '<tr><td>Зернистые цилиндры</td><td>______</td><td>Abs</td></tr>' +
+      '<tr><td>Почечные клетка</td><td>______</td><td>Abs</td></tr>' +
+      '<tr><td>Слизь</td><td>______</td><td>Abs</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_BIOXIM',
     category: 'Laboratoriya',
-    name: 'Biokimyoviy Qon Tahlili',
-    bodyText: withPatientLine(
-      'БИОХИМИЧЕСКОЕ ИССЛЕДОВАНИЕ КРОВИ\n' +
-      'Наименование исследования                         Результат     Норма\n\n' +
-      'АЛТ (аланинаминотрансфераза)              ______        0-40 U/l\n' +
-      'АСТ (аспартатаминотрансфераза)            ______        0-40 U/l\n' +
-      'Билирубин общий                           ______        8.5-20.5 мкмоль/л\n' +
-      'Общий белок (PRO)                         ______        Взрос: 66-87 г/л\n' +
-      'Альбумин                                  ______        40-50 г/л\n' +
-      'Диастаза (Альфа-амилаза)                  ______\n' +
-      'Мочевая кислота                           ______        140-420 мкмоль/л\n' +
-      'Мочевина                                  ______        2.5-8.3 ммоль/л\n' +
-      'Креатинин                                 ______        44-106 мкмоль/л\n' +
-      'Глюкоза                                   ______        3.3-5.5 ммоль/л\n' +
-      'Гамма-глутаминтрансфераза                 ______\n' +
-      'Щелочная фосфатаза (ALP)                  ______\n' +
-      'Холестерин (CHOL)                         ______        3.0-5.2 ммоль/л\n' +
-      'Триглицериды (TG)                         ______        0.4-1.7 ммоль/л\n' +
-      'Магний                                    ______        0.7-1.1 ммоль/л\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Biokimyoviy Qon Tahlili",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>БИОХИМИЧЕСКОЕ ИССЛЕДОВАНИЕ КРОВИ</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>АЛТ</td><td>______</td><td>0-40 U/l</td></tr>' +
+      '<tr><td>АСТ</td><td>______</td><td>0-40 U/l</td></tr>' +
+      '<tr><td>Билирубин общий</td><td>______</td><td>8.5-20.5 мкмоль/л</td></tr>' +
+      '<tr><td>Общий белок (PRO)</td><td>______</td><td>66-87 г/л</td></tr>' +
+      '<tr><td>Альбумин</td><td>______</td><td>40-50 г/л</td></tr>' +
+      '<tr><td>Диастаза (Альфа-амилаза)</td><td>______</td><td>—</td></tr>' +
+      '<tr><td>Мочевая кислота</td><td>______</td><td>140-420 мкмоль/л</td></tr>' +
+      '<tr><td>Мочевина</td><td>______</td><td>2.5-8.3 ммоль/л</td></tr>' +
+      '<tr><td>Креатинин</td><td>______</td><td>44-106 мкмоль/л</td></tr>' +
+      '<tr><td>Глюкоза</td><td>______</td><td>3.3-5.5 ммоль/л</td></tr>' +
+      '<tr><td>Гамма-глутаминтрансфераза</td><td>______</td><td>—</td></tr>' +
+      '<tr><td>Щелочная фосфатаза (ALP)</td><td>______</td><td>—</td></tr>' +
+      '<tr><td>Холестерин (CHOL)</td><td>______</td><td>3.0-5.2 ммоль/л</td></tr>' +
+      '<tr><td>Триглицериды (TG)</td><td>______</td><td>0.4-1.7 ммоль/л</td></tr>' +
+      '<tr><td>Магний</td><td>______</td><td>0.7-1.1 ммоль/л</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_NECHIPORENKO',
     category: 'Laboratoriya',
-    name: 'Peshob (Nechiporenko usulida)',
-    bodyText: withPatientLine(
-      'МОЧА ПО НЕЧИПОРЕНКО\n' +
-      'Тахлил турлари                                    Натижа        Норма\n\n' +
-      'Лейкоцит                                  ______        Эркак: 2000 гача (1 мл да)\n' +
-      'Эритроцит                                 ______        1000 гача (1 мл да)\n' +
-      'Цилиндр                                   ______        20 гача (1 мл да)\n' +
-      'PH (pH)                                   ______        5.0-7.0\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Peshob (Nechiporenko usulida)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>МОЧА ПО НЕЧИПОРЕНКО</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>Лейкоцит</td><td>______</td><td>Эркак: 2000 гача (1мл да)</td></tr>' +
+      '<tr><td>Эритроцит</td><td>______</td><td>1000 гача (1мл да)</td></tr>' +
+      '<tr><td>Цилиндр</td><td>______</td><td>20 гача (1мл да)</td></tr>' +
+      '<tr><td>PH</td><td>______</td><td>5.0-7.0</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_ANALYZ_ALLERGY',
     category: 'Laboratoriya',
-    name: 'Qon Tahlili — Allergiya (IgG)',
-    bodyText: withPatientLine(
-      'АНАЛИЗ КРОВИ НА АЛЛЕРГИЯ IgG\n' +
-      'Наименование                                      Результат     Норма\n\n' +
-      'Иммуноглобулин IgG                        ______        До 10-15 лет 120 МЕ/мл, 15 лет 130 МЕ/мл\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Qon Tahlili — Allergiya (IgG)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>АНАЛИЗ КРОВИ НА АЛЛЕРГИЯ IgG</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>Иммуноглобулин IgG</td><td>______</td><td>10-15 ёш: 120 МЕ/мл, 15+ ёш: 130 МЕ/мл</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_VICH',
     category: 'Laboratoriya',
-    name: 'VICH (Immunoferment Tahlili)',
-    bodyText: withPatientLine(
-      'ИММУНОФЕРМЕНТ ТАХЛИЛИ\n' +
-      'Наименование анализа                              Результат     Норма\n\n' +
-      'ВИЧ (ИФА)                                 ______        Отрицательно\n\n' +
-      'Анализ топширишдан 1 кун олдин алкаголли ичимликлар, ёгли булган овкатларни истемол килиш такикланади,\n' +
-      'кечги овкат соат 19:00 гача истемол килиш керак. Анализларни топширишдан олдин тишларни ювиш мумкин эмас.\n' +
-      'Анализларни эрталаб оч коринга соат 00 дан 12:00 гача топшириш керак.\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "VICH (Immunoferment Tahlili)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ИММУНОФЕРМЕНТ ТАХЛИЛИ</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>ВИЧ (ИФА)</td><td>______</td><td>Отрицательно</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_VITAMIN_D',
     category: 'Laboratoriya',
-    name: 'Vitamin D (25-OH, IFA)',
-    bodyText: withPatientLine(
-      'ВИТАМИН Д (ИФА)\n' +
-      'Тахлил турлари                                    Натижа        Норма\n\n' +
-      '25-OH Витамин D                           ______        нг/мл\n\n' +
-      'Изох: <10 - жуда огир даражадаги етишмовчилик; 10-20 - огир даражадаги етишмовчилик;\n' +
-      '20-30 - паст даража; 30-50 - норма; 50-70 - юкори норма;\n' +
-      '70-150 - микдорни ошириб юбориш (лекин токсик эмас); >150 - захарланиш.\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Vitamin D (25-OH, IFA)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ВИТАМИН Д (ИФА)</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Izoh</strong></td></tr>' +
+      '<tr><td>25-OH Витамин D</td><td>______ нг/мл</td><td>30-50 норма; &lt;20 етишмовчилик; &gt;70 ортиқча</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_GEPATIT',
     category: 'Laboratoriya',
-    name: 'Gepatit (Ekspress test)',
-    bodyText: withPatientLine(
-      'ГЕПАТИТ (экспресс тест)\n\n' +
-      'HBs Ag (Гепатит B)                        ______        Отрицательно\n' +
-      'Anti-HCV (Гепатит C)                      ______        Отрицательно\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Gepatit (Ekspress test)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ГЕПАТИТ (экспресс тест)</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>HBs Ag (Гепатит B)</td><td>______</td><td>Отрицательно</td></tr>' +
+      '<tr><td>Anti-HCV (Гепатит C)</td><td>______</td><td>Отрицательно</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_GORMON',
     category: 'Laboratoriya',
-    name: 'Gormonal Tahlil (FSG/LG/Prolaktin/Testosteron/Progesteron/Estradiol)',
-    bodyText: withPatientLine(
-      'АНАЛИЗ КРОВИ НА ГОРМОН\n' +
-      'Наименование                                      Результат     Норма\n\n' +
-      'ФСГ (Фолликулостимулирующий гормон)       ______        Мужчины / Женщины (фаза бўйича)\n' +
-      'ЛГ (Лютеинизирующий гормон)               ______        Мужчины / Женщины (фаза бўйича)\n' +
-      'Пролактин                                 ______        Мужчин: 60-560 mIU/l\n' +
-      'Тестостерон                               ______        Мужчины: ёшга караб\n' +
-      'Прогестерон                               ______        Фолликулярная / Лютеиновая фаза бўйича\n' +
-      'Эстрадиол                                 ______        ФФ 30-120, ЛФ 70-250, Овул 130-370, Менопауза 15-60 нг/мл\n\n' +
-      'Врач лабарант: ______________________'
+    name: "Gormonal Tahlil (FSG/LG/Prolaktin/Testosteron/Progesteron/Estradiol)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>АНАЛИЗ КРОВИ НА ГОРМОН</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>ФСГ</td><td>______</td><td>Жинс/фазага қараб</td></tr>' +
+      '<tr><td>ЛГ</td><td>______</td><td>Жинс/фазага қараб</td></tr>' +
+      '<tr><td>Пролактин</td><td>______</td><td>Эркак: 60-560 mIU/l</td></tr>' +
+      '<tr><td>Тестостерон</td><td>______</td><td>Ёшга қараб</td></tr>' +
+      '<tr><td>Прогестерон</td><td>______</td><td>Фазага қараб</td></tr>' +
+      '<tr><td>Эстрадиол</td><td>______</td><td>ФФ 30-120, ЛФ 70-250 нг/мл</td></tr>' +
+      '</table><p><strong>Врач лабарант:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_MAZOK',
     category: 'Laboratoriya',
-    name: 'Mazok (Umumiy Flora Tahlili)',
-    bodyText: withPatientLine(
-      'УМУМИЙ ФЛОРА ТАХЛИЛИ\n\n' +
-      'Умумий Флора Тахлили                      ______        Натижа\n' +
-      'Лейкоцитлар                               ______\n' +
-      'Эпителий                                  ______\n' +
-      'Бошка флора                               ______\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Mazok (Umumiy Flora Tahlili)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>УМУМИЙ ФЛОРА ТАХЛИЛИ</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td></tr>' +
+      '<tr><td>Умумий флора тахлили</td><td>______</td></tr>' +
+      '<tr><td>Лейкоцитлар</td><td>______</td></tr>' +
+      '<tr><td>Эпителий</td><td>______</td></tr>' +
+      '<tr><td>Бошка флора</td><td>______</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_PARAZIT',
     category: 'Laboratoriya',
-    name: 'Parazitologik Tahlil',
-    bodyText: withPatientLine(
-      'АНАЛИЗ ПАРАЗИТ\n' +
-      'Наименование анализа                              Результат     Норма\n\n' +
-      'Лямблии суммарные                         ______        Отр.\n' +
-      'Тенида (Тасма)                            ______        Отр.\n' +
-      'Аскарида IgG                              ______        Отр.\n' +
-      'Эхинококк IgG                             ______        Отр.\n' +
-      'Пакана гижжа                              ______        Отр.\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Parazitologik Tahlil",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>АНАЛИЗ ПАРАЗИТ</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>Лямблии суммарные</td><td>______</td><td>Отр.</td></tr>' +
+      '<tr><td>Тенида (Тасма)</td><td>______</td><td>Отр.</td></tr>' +
+      '<tr><td>Аскарида IgG</td><td>______</td><td>Отр.</td></tr>' +
+      '<tr><td>Эхинококк IgG</td><td>______</td><td>Отр.</td></tr>' +
+      '<tr><td>Пакана гижжа</td><td>______</td><td>Отр.</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_REVMOPROBA',
     category: 'Laboratoriya',
-    name: 'Revmoproba (SRB/RF/ASLO)',
-    bodyText: withPatientLine(
-      'АНАЛИЗ КРОВИ НА РЕВМОПРОБА\n' +
-      'Наименование анализа                              Результат     Норма\n\n' +
-      'С-реактивный белок (СРБ)                  ______        Отрицательно\n' +
-      'РФ (Ревмотоидный фактор)                  ______        Отрицательно\n' +
-      'АСЛО (Антистрептолизин)                   ______        Отрицательно\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Revmoproba (SRB/RF/ASLO)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>АНАЛИЗ КРОВИ НА РЕВМОПРОБА</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>С-реактивный белок</td><td>______</td><td>Отрицательно</td></tr>' +
+      '<tr><td>РФ (Ревмотоидный фактор)</td><td>______</td><td>Отрицательно</td></tr>' +
+      '<tr><td>АСЛО</td><td>______</td><td>Отрицательно</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_SPERMOGRAMMA',
     category: 'Laboratoriya',
-    name: 'Spermogramma (JSST 2010)',
-    bodyText: withPatientLine(
-      'СПЕРМОГРАММА ПО ВОЗ 2010\n' +
-      'КЎРСАТКИЧ                                         НАТИЖА        НОРМА\n\n' +
-      'Ранги                                     ______        Оч-сут ранг\n' +
-      'Ҳиди                                      ______        Специфик\n' +
-      'Кўриниши                                  ______        Норма\n' +
-      'Консистенцияси                            ______        Ёпишқоқ\n' +
-      'Суюлиш вакти                              ______        20-60 мин\n' +
-      'Сони (1 мл да)                            ______        15 млндан кўп\n' +
-      'Эякулятдаги сони                          ______        39 млндан кўп\n' +
-      'Харакатчанлик (motility)                  ______        40% дан кўп\n' +
-      'Прогрессив харакатчанлик                  ______        32% дан кўп\n' +
-      'Харакатсиз                                ______        14% дан кам\n' +
-      'Нормал спермийлар                         ______        4% дан кўп\n' +
-      'Анормал спермийлар                        ______        96% дан кам\n' +
-      'Агглютинация                              ______        Йўк\n' +
-      'Лейкоцитлар                               ______        1 млн/мл дан кам\n' +
-      'Эритроцитлар                              ______        Йўк\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Spermogramma (JSST 2010)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>СПЕРМОГРАММА ПО ВОЗ 2010</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>Ранги</td><td>______</td><td>Оч-сут ранг</td></tr>' +
+      '<tr><td>Ҳиди</td><td>______</td><td>Специфик</td></tr>' +
+      '<tr><td>Кўриниши</td><td>______</td><td>Норма</td></tr>' +
+      '<tr><td>Консистенцияси</td><td>______</td><td>Ёпишқоқ</td></tr>' +
+      '<tr><td>Суюлиш вакти</td><td>______</td><td>20-60 мин</td></tr>' +
+      '<tr><td>Сони (1мл да)</td><td>______</td><td>15 млндан кўп</td></tr>' +
+      '<tr><td>Эякулятдаги сони</td><td>______</td><td>39 млндан кўп</td></tr>' +
+      '<tr><td>Харакатчанлик</td><td>______</td><td>40% дан кўп</td></tr>' +
+      '<tr><td>Прогрессив харакатчанлик</td><td>______</td><td>32% дан кўп</td></tr>' +
+      '<tr><td>Харакатсиз</td><td>______</td><td>14% дан кам</td></tr>' +
+      '<tr><td>Нормал спермийлар</td><td>______</td><td>4% дан кўп</td></tr>' +
+      '<tr><td>Анормал спермийлар</td><td>______</td><td>96% дан кам</td></tr>' +
+      '<tr><td>Агглютинация</td><td>______</td><td>Йўк</td></tr>' +
+      '<tr><td>Лейкоцитлар</td><td>______</td><td>1 млн/мл дан кам</td></tr>' +
+      '<tr><td>Эритроцитлар</td><td>______</td><td>Йўк</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_TTG',
     category: 'Laboratoriya',
     name: "Qalqonsimon bez gormonlari (TTG/T3/T4/HGCH)",
-    bodyText: withPatientLine(
-      'АНАЛИЗ КРОВИ НА ГАРМОНЫ\n' +
-      'Тахлил турлари                                    Натижа        Норма\n\n' +
-      'Трийодтиронин Общий (Т3)                  ______\n' +
-      'Трийодтиронин Свободный                   ______\n' +
-      'Тироксин Общий (Т4)                       ______        Мужчины\n' +
-      'Тироксин Свободный                        ______\n' +
-      'ТТГ (Тиреотропный гормон)                 ______        0.4-4.0 mIU/l\n' +
-      'Антитела к тиреопероксидазе                ______       Мужчин / Женщин\n' +
-      'ХГЧ (Хорионический гонадотропин человека) ______        Хафтасига қараб\n\n' +
-      'Лабарант Врач: ______________________'
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>АНАЛИЗ КРОВИ НА ГАРМОНЫ</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>Трийодтиронин Общий (Т3)</td><td>______</td><td>—</td></tr>' +
+      '<tr><td>Трийодтиронин Свободный</td><td>______</td><td>—</td></tr>' +
+      '<tr><td>Тироксин Общий (Т4)</td><td>______</td><td>—</td></tr>' +
+      '<tr><td>Тироксин Свободный</td><td>______</td><td>—</td></tr>' +
+      '<tr><td>ТТГ</td><td>______</td><td>0.4-4.0 mIU/l</td></tr>' +
+      '<tr><td>Антитела к тиреопероксидазе</td><td>______</td><td>—</td></tr>' +
+      '<tr><td>ХГЧ</td><td>______</td><td>Хафтасига қараб</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_ELEMENTLAR',
     category: 'Laboratoriya',
-    name: 'Elektrolitlar (Mikroelementlar)',
-    bodyText: withPatientLine(
-      'АНАЛИЗ КРОВИ НА ЭЛЕКТРОЛИТЫ\n' +
-      'Наименование анализа                              Результат     Норма\n\n' +
-      'Натрий                                    ______        135-150 ммоль/л\n' +
-      'Калий                                     ______        3.5-5.1 ммоль/л\n' +
-      'Хлор                                      ______        98-107 ммоль/л\n' +
-      'Кальций                                   ______        2.15-2.55 ммоль/л\n' +
-      'Железо                                    ______        Мужчины/Женщины бўйича\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Elektrolitlar (Mikroelementlar)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>АНАЛИЗ КРОВИ НА ЭЛЕКТРОЛИТЫ</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>Натрий</td><td>______</td><td>135-150 ммоль/л</td></tr>' +
+      '<tr><td>Калий</td><td>______</td><td>3.5-5.1 ммоль/л</td></tr>' +
+      '<tr><td>Хлор</td><td>______</td><td>98-107 ммоль/л</td></tr>' +
+      '<tr><td>Кальций</td><td>______</td><td>2.15-2.55 ммоль/л</td></tr>' +
+      '<tr><td>Железо</td><td>______</td><td>Жинсга қараб</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'LAB_RW',
     category: 'Laboratoriya',
-    name: 'Vasserman Reaksiyasi (RW)',
-    bodyText: withPatientLine(
-      'РЕАКЦИЯ ВАССЕРМАНА (RW)\n' +
-      'Наименование анализа                              Результат     Норма\n\n' +
-      'Реакция Вассермана (RW)                   ______        Отрицательно\n\n' +
-      'Лабарант Врач: ______________________'
+    name: "Vasserman Reaksiyasi (RW)",
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>РЕАКЦИЯ ВАССЕРМАНА (RW)</em></strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td><strong>Ko\'rsatkich</strong></td><td><strong>Natija</strong></td><td><strong>Norma</strong></td></tr>' +
+      '<tr><td>Реакция Вассермана (RW)</td><td>______</td><td>Отрицательно</td></tr>' +
+      '</table><p><strong>Лабарант Врач:</strong> ______</p>'
     ),
   },
 
@@ -289,231 +298,159 @@ export const REPORT_TEMPLATES = [
     key: 'UZI_BUYRAK',
     category: 'UZI',
     name: 'Buyraklar UZI',
-    bodyText: withPatientLine(
-      'ПРОТОКОЛ УЛЬТРАЗВУКОВОГО ИССЛЕДОВАНИЯ ПОЧЕК\n\n' +
-      'Мочевой пузырь не деформирована, обычной формы. Объем ______мл. Стенки не деформированы. ' +
-      'Толщина ______мм. Содержимое однородное.\n\n' +
-      'Правая почка - ______мм. Топография не изменена. Дыхательная подвижность сохранена. ' +
-      'Капсула прослеживается на всем протяжении, толщиной - ______мм, гиперэхогенная. ' +
-      'Толщина почечной паренхимы ______мм. Паренхима повышенной эхогенности. ЧЛС - не расширена.\n\n' +
-      'Левая почка - ______мм. Топография не изменена. Дыхательная подвижность сохранена. ' +
-      'Капсула прослеживается на всем протяжении, толщиной - ______мм, гиперэхогенная. ' +
-      'Толщина почечной паренхимы ______мм. Паренхима однородная. ЧЛС - не расширена.\n\n' +
-      'Предстательная железа - размеры ______мм. Контуры ровные четкие. Эхоструктура однородная. ' +
-      'Эхогенность - гипоэхогенная.\n' +
-      'Остаточная моча: ______мл\n\n' +
-      'Заключение: ______________________________________\n\n' +
-      'Врач: ______________________'
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ПРОТОКОЛ УЛЬТРАЗВУКОВОГО ИССЛЕДОВАНИЯ ПОЧЕК</em></strong></p>' +
+      '<p><strong><em>Мочевой пузырь</em></strong> не деформирована, обычной формы. Объем ______мл. Стенки не деформированы. Толщина ______мм. Содержимое однородное.</p>' +
+      '<p><strong><em>Правая почка</em></strong> - ______мм. Топография не изменена. Дыхательная подвижность сохранена. Капсула прослеживается на всем протяжении, толщиной - ______мм, гиперэхогенная. Толщина почечной паренхимы ______мм. Паренхима повышенной эхогенности. ЧЛС - не расширена.</p>' +
+      '<p><strong><em>Левая почка</em></strong> - ______мм. Топография не изменена. Дыхательная подвижность сохранена. Капсула прослеживается на всем протяжении, толщиной - ______мм, гиперэхогенная. Толщина почечной паренхимы ______мм. Паренхима однородная. ЧЛС - не расширена.</p>' +
+      '<p><strong><em>Предстательная железа</em></strong> - размеры ______мм. Контуры ровные четкие. Эхоструктура однородная. Эхогенность - гипоэхогенная.</p>' +
+      '<p><strong><em>Остаточная моча:</em></strong> ______мл</p>' +
+      '<p><strong>Заключение:</strong> ______</p>' +
+      '<p><strong>Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'UZI_BACHADON',
     category: 'UZI',
     name: "Bachadon va qo'shimchalar UZI (Ginekologik)",
-    bodyText: withPatientLine(
-      'ПРОТОКОЛ УЛЬТРОЗВУКОВОГО ИССЛЕДОВАНИЯ МАТКА С ПРИДАТКАМИ\n\n' +
-      'Мочевой пузырь не деформирована, обычной формы. Объем ______мл. Стенки не деформированы. ' +
-      'Толщина ______мм. Содержимое однородное.\n\n' +
-      'Матка - позиция: AFV не увеличена, длина ______мм, переднезадний размер ______мм, ширина ______мм. ' +
-      'Топография не изменена. Контур ровные. Толщина миометрия – ______мм. Структура однородня.\n\n' +
-      'Толщина эндометрия - ______мм. Структура однородная. Полость расширена.\n' +
-      'Шейка матки: ______мм. Контур ровные. Структура стенок однородная. Цервикальный канал не расширен, ' +
-      'не деформирован. Эндоцервикс не утолщен.\n\n' +
-      'Правый яичник: размеры ______мм, структура однородная.\n' +
-      'Левый яичник: размеры ______мм, структура однородная, фолликула д-______мм.\n' +
-      'Маточные трубы не расширена.\n' +
-      'Дугласово пространство - свободная жидкость не визуализируется.\n\n' +
-      'Заключение: ______________________________________\n\n' +
-      'Врач: ______________________'
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ПРОТОКОЛ УЛЬТРОЗВУКОВОГО ИССЛЕДОВАНИЯ МАТКА С ПРИДАТКАМИ</em></strong></p>' +
+      '<p><strong><em>Мочевой пузырь</em></strong> не деформирована, обычной формы. Объем ______мл. Стенки не деформированы. Толщина ______мм. Содержимое однородное.</p>' +
+      '<p><strong><em>Матка</em></strong> - позиция: AFV не увеличена, длина ______мм, переднезадний размер ______мм, ширина ______мм. Топография не изменена. Контур ровные. Толщина миометрия – ______мм. Структура однородня.</p>' +
+      '<p>Тощина эндометрия - ______мм. Структура однородная. Полость расширена. <strong><em>Шейка матки:</em></strong> ______мм. Контур ровные. Структура стенок однородная. Цервикальный канал не расширен, не деформирован. Эндоцервикс не утолщен.</p>' +
+      '<p><strong><em>Правый яичник:</em></strong> размеры ______мм, структура однородная.</p>' +
+      '<p><strong><em>Левый яичник:</em></strong> размеры ______мм, структура однородная, <strong><em>фолликула</em></strong> д-______мм. Маточные трубы не расширена.</p>' +
+      '<p><strong><em>Дугласово пространство</em></strong> - свободная жидкость не визуализируется.</p>' +
+      '<p><strong>Заключение:</strong> ______</p>' +
+      '<p><strong>Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'UZI_JIGAR',
     category: 'UZI',
     name: "Jigar UZI (Qorin bo'shlig'i — jigar diagnostikasi)",
-    bodyText: withPatientLine(
-      'ПРОТОКОЛ УЛЬТРОЗВУКОВОГО ИССЛЕДОВАНИЯ БРЮШНОЙ ПОЛОСТИ\n\n' +
-      'Печень не увеличена, подвижная. КВР правой доли - ______мм, ККР левой доли - ______мм. ' +
-      'Контуры ровные, четкие. Капсула прослеживается на всем протяжении, ровная, толщина - ______мм. ' +
-      'Паренхима повышенной эхогенности. Эхоструктура однородная. Внутрипеченочные желчные ходы не расширены. ' +
-      'Звукопроводимость хорошая. Сосудистый рисунок не деформирован, сохранен. ' +
-      'Портальной вены - ______мм, I.V.C. - ______мм.\n\n' +
-      'Желчный пузырь – размерами ______мм, контуры ровные, четкие. Форма деформирован. ' +
-      'Стенки не деформированы, толщиной - ______мм. Содержимое не однородное густое. Холедох - ______мм.\n\n' +
-      'Поджелудочная железа не увеличена. Контуры ровные. Толщина головки - ______мм, тела - ______мм, ' +
-      'хвоста - ______мм. Паренхима повышенной эхогенности. Эхоструктура однородная. Вирсунгов проток не расширен.\n\n' +
-      'Селезенка не увеличена, подвижная. Размеры - ______мм. Контуры ровные. Капсула прослеживается на всем протяжении. ' +
-      'Паренхима однородная.\n\n' +
-      'Заключение: ______________________________________\n\n' +
-      'Врач: ______________________'
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ПРОТОКОЛ УЛЬТРОЗВУКОВОГО ИССЛЕДОВАНИЯ БРЮШНОЙ ПОЛОСТИ</em></strong></p>' +
+      '<p><strong><em>Печень</em></strong> не увеличена, подвижная. КВР правой доли - ______мм, ККР левой доли - ______мм. Контуры ровные, четкие. Капсула прослеживается на всем протяжении, ровная, толщина - ______мм. Паренхима повышенной эхогенности. Эхоструктура однородная. Внутрипеченочные желчные ходы не расширены. Портальной вены - ______мм, I.V.C. - ______мм.</p>' +
+      '<p><strong><em>Желчный пузырь</em></strong> – размерами ______мм, контуры ровные, четкие. Стенки не деформированы, толщиной - ______мм. Содержимое не однородное густое. Холедох - ______мм.</p>' +
+      '<p><strong><em>Поджелудочная железа</em></strong> не увеличена. Контуры ровные. Толщина головки - ______мм, тела - ______мм, хвоста - ______мм. Паренхима повышенной эхогенности. Эхоструктура однородная. Вирсунгов проток не расширен.</p>' +
+      '<p><strong><em>Селезенка</em></strong> не увеличена, подвижная. Размеры - ______мм. Контуры ровные. Капсула прослеживается на всем протяжении. Паренхима однородная.</p>' +
+      '<p><strong>Заключение:</strong> ______</p>' +
+      '<p><strong>Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'UZI_QORIN_UMUMIY',
     category: 'UZI',
     name: "Qorin bo'shlig'i UZI (Umumiy, kattalar)",
-    bodyText: withPatientLine(
-      'ПРОТОКОЛ УЛЬТРОЗВУКОВОГО ИССЛЕДОВАНИЯ БРЮШНОЙ ПОЛОСТИ\n\n' +
-      'Печень не увеличена, подвижная. КВР правой доли - ______мм, ККР левой доли - ______мм. ' +
-      'Контуры ровные, четкие. Капсула прослеживается на всем протяжении, ровная, толщина - ______мм. ' +
-      'Паренхима повышенной эхогенности. Эхоструктура однородная. Внутрипеченочные желчные ходы не расширены. ' +
-      'Портальной вены - ______мм, I.V.C. - ______мм.\n\n' +
-      'Желчный пузырь - размерами ______мм, контуры ровные, четкие. Форма деформирован. ' +
-      'Стенки не деформированы, толщиной - ______мм. Содержимое не однородное густое. Холедох - ______мм.\n\n' +
-      'Поджелудочная железа не увеличена. Контуры ровные. Толщина головки - ______мм, тела - ______мм, ' +
-      'хвоста - ______мм. Паренхима повышенной эхогенности. Эхоструктура однородная. Вирсунгов проток не расширен.\n\n' +
-      'Селезенка не увеличена, подвижная. Размеры - ______мм. Контуры ровные. Капсула прослеживается на всем протяжении.\n\n' +
-      'Правая почка - ______мм. Топография не изменена. Дыхательная подвижность сохранена. ' +
-      'Толщина почечной паренхимы ______мм. Паренхима однородная. ЧЛС - не расширена.\n\n' +
-      'Левая почка - ______мм. Топография не изменена. Дыхательная подвижность сохранена. ' +
-      'Толщина почечной паренхимы ______мм. Паренхима однородная. ЧЛС - не расширена.\n\n' +
-      'Мочевой пузырь не деформирован, обычной формы. Объем ______мл. Стенки не деформированы. ' +
-      'Толщина ______мм. Содержимое однородное.\n\n' +
-      'Предстательная железа - размеры ______мм. Контуры ровные четкие. Эхоструктура не однородная. ' +
-      'Эхогенность - гипоэхогенная. Остаточная моча: ______мл.\n\n' +
-      'Заключение: ______________________________________\n\n' +
-      'Врач: ______________________'
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ПРОТОКОЛ УЛЬТРОЗВУКОВОГО ИССЛЕДОВАНИЯ БРЮШНОЙ ПОЛОСТИ</em></strong></p>' +
+      '<p><strong><em>Печень</em></strong> не увеличена, подвижная. КВР правой доли - ______мм, ККР левой доли - ______мм. Контуры ровные, четкие. Толщина - ______мм. Паренхима повышенной эхогенности. Портальной вены - ______мм, I.V.C. - ______мм.</p>' +
+      '<p><strong><em>Желчный пузырь</em></strong> - размерами ______мм. Стенки толщиной - ______мм. Холедох - ______мм.</p>' +
+      '<p><strong><em>Поджелудочная железа</em></strong> - головка ______мм, тело ______мм, хвост ______мм.</p>' +
+      '<p><strong><em>Селезенка</em></strong> - размеры ______мм.</p>' +
+      '<p><strong><em>Правая почка</em></strong> - ______мм, паренхима ______мм. <strong><em>Левая почка</em></strong> - ______мм, паренхима ______мм. ЧЛС - не расширена.</p>' +
+      '<p><strong><em>Мочевой пузырь</em></strong> - объем ______мл, толщина стенки ______мм.</p>' +
+      '<p><strong><em>Предстательная железа</em></strong> - размеры ______мм. Эхоструктура не однородная. <strong><em>Остаточная моча:</em></strong> ______мл.</p>' +
+      '<p><strong>Заключение:</strong> ______</p>' +
+      '<p><strong>Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'UZI_QORIN_BOLALAR',
     category: 'UZI',
     name: "Qorin bo'shlig'i UZI (Bolalar)",
-    bodyText: withPatientLine(
-      'ПРОТОКОЛ УЛЬТРОЗВУКОВОГО ИССЛЕДОВАНИЯ БРЮШНОЙ ПОЛОСТИ\n\n' +
-      'Печень не увеличена, подвижная. КВР правой доли ______мм. Контуры ровные, четкие. ' +
-      'Капсула прослеживается на всем протяжении, ровная, толщина - ______мм. Паренхима средней эхогенности. ' +
-      'Эхоструктура однородная. Внутрипеченочные желчные ходы не расширены. ' +
-      'Портальной вены - ______мм, I.V.C. - ______мм.\n\n' +
-      'Желчный - размерами ______мм, контуры ровные, четкие. Стенки не деформированы, толщиной - ______мм. ' +
-      'Содержимое однородное.\n\n' +
-      'Поджелудочная железа не увеличена. Контуры ровные. Толщина головки ______мм, тела - ______мм, ' +
-      'хвоста - ______мм. Паренхима средней эхогенности. Эхоструктура однородная. Вирсунгов проток не расширен.\n\n' +
-      'Селезенка не увеличена, подвижная. Размеры - ______мм. Контуры ровные. Капсула прослеживается на всем протяжении. ' +
-      'Паренхима однородная.\n\n' +
-      'Правая почка – ______мм. Топография не изменена. Дыхательная подвижность сохранена. ' +
-      'Толщина почечной паренхимы ______мм. Паренхима однородная. ЧЛС - не расширена.\n\n' +
-      'Левая почка – ______мм. Топография не изменена. Дыхательная подвижность сохранена. ' +
-      'Толщина почечной паренхимы ______мм. Паренхима однородная. ЧЛС - не расширена.\n\n' +
-      'Мочевой пузырь не деформирован, обычной формы. Объем ______мл. Стенки не деформированы. ' +
-      'Толщина ______мм. Содержимое гомогенное.\n\n' +
-      'Заключение: ______________________________________\n\n' +
-      'Врач: ______________________'
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ПРОТОКОЛ УЛЬТРАЗВУКОВОГО ИССЛЕДОВАНИЯ БРЮШНОЙ ПОЛОСТИ</em></strong></p>' +
+      '<p><strong><em>Печень</em></strong> не увеличена, подвижная. КВР правой доли ______мм. Толщина - ______мм. Паренхима средней эхогенности. Портальной вены - ______мм, I.V.C. - ______мм.</p>' +
+      '<p><strong><em>Желчный</em></strong> - размерами ______мм, толщиной - ______мм.</p>' +
+      '<p><strong><em>Поджелудочная железа</em></strong> - головка ______мм, тело ______мм, хвост ______мм.</p>' +
+      '<p><strong><em>Селезенка</em></strong> - размеры ______мм.</p>' +
+      '<p><strong><em>Правая почка</em></strong> – ______мм, паренхима ______мм. <strong><em>Левая почка</em></strong> – ______мм, паренхима ______мм.</p>' +
+      '<p><strong><em>Мочевой пузырь</em></strong> - объем ______мл, толщина ______мм. Содержимое гомогенное.</p>' +
+      '<p><strong>Заключение:</strong> ______</p>' +
+      '<p><strong>Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'UZI_ZOB',
     category: 'UZI',
     name: "Qalqonsimon bez (Zob) UZI",
-    bodyText: withPatientLine(
-      'ЩИТОВИДНАЯ ЖЕЛЕЗА\n\n' +
-      'ПЕРЕШЕЕК\n' +
-      'Топография: на обычном месте (в норме находится на уровне 1-2 хрящевых колец трахеи)\n' +
-      'Контур: норме ровный, четкий\n' +
-      'Эластичность: сохранена\n' +
-      'Глотательная подвижность: сохранена\n' +
-      'Размер толщина: ______мм (в норме до 4-6 мм)\n' +
-      'Эхоструктура: ______\n' +
-      'Эхогенность: ______\n\n' +
-      'ПРАВАЯ ДОЛЯ\n' +
-      'Топография: на обычном месте. Контур: ровный, четкий. Эластичность: сохранена. Глотательная подвижность: сохранена\n' +
-      'Размер длина ______мм (в норме до 40-60мм), толщина ______мм (в норме до 16-18мм), ширина ______мм (в норме до 13-18мм)\n' +
-      'Форма: ______ (в норме треугольная, цилиндрическая)\n' +
-      'Эхоструктура: ______  Эхогенность: ______\n\n' +
-      'ЛЕВАЯ ДОЛЯ\n' +
-      'Топография: на обычном месте. Контур: ровный, четкий. Эластичность: сохранена. Глотательная подвижность: сохранена\n' +
-      'Размер длина ______мм (в норме до 40-60мм), толщина ______мм (в норме до 16-18мм), ширина ______мм (в норме до 13-18мм)\n' +
-      'Форма: ______ (в норме треугольная, цилиндрическая)\n' +
-      'Эхоструктура: ______  Эхогенность: ______\n\n' +
-      'Вывод: ______________________________________\n' +
-      'Рекомендовано: ______________________________________\n\n' +
-      'Врач: ______________________'
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong>ПЕРЕШЕЕК</strong></p>' +
+      '<p><strong>Топография:</strong> на обычном месте <strong>Контур:</strong> ______ <strong>Эластичность:</strong> ______</p>' +
+      '<p><strong>Размер толщина:</strong> ______мм (норма 4-6 мм) <strong>Эхоструктура:</strong> ______ <strong>Эхогенность:</strong> ______</p>' +
+      '<p><strong>ПРАВАЯ ДОЛЯ</strong></p>' +
+      '<p><strong>Контур:</strong> ______ <strong>Эластичность:</strong> ______</p>' +
+      '<p><strong>Размер:</strong> длина ______мм, толщина ______мм, ширина ______мм. <strong>Форма:</strong> ______ <strong>Эхоструктура:</strong> ______ <strong>Эхогенность:</strong> ______</p>' +
+      '<p><strong>ЛЕВАЯ ДОЛЯ</strong></p>' +
+      '<p><strong>Контур:</strong> ______ <strong>Эластичность:</strong> ______</p>' +
+      '<p><strong>Размер:</strong> длина ______мм, толщина ______мм, ширина ______мм. <strong>Форма:</strong> ______ <strong>Эхоструктура:</strong> ______ <strong>Эхогенность:</strong> ______</p>' +
+      '<p><strong>Вывод:</strong> ______</p>' +
+      '<p><strong>Рекомендовано:</strong> ______</p>' +
+      '<p><strong>Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'UZI_TOMIRLAR',
     category: 'UZI',
     name: "Qon-tomirlari UZI (Oyoq arteriya-vena, Doppler)",
-    bodyText: withPatientLine(
-      "ОЁК АРТЕРИЯЛАРИ ВА ВЕНАЛАРИ УЛЬТРАТОВУШ ТЕКШИРУВИ\n\n" +
-      'Артериялар. Ташки тос, умумий сон, юза сон, чукур сон, тизза орти, катта болдир орка, ' +
-      'катта болдир олд, кичик болдир артериялари утказувчанлиги меёрида. Кон окими спектри 3 фазали, ' +
-      'юкори каршиликли. Тезлик ва спектр шакли куриниши меёрида. Интима медиа комплекси умумий сон ' +
-      'артериясида ______мм, структираси узгаришсиз. Артериялар девори текис, силлик. ' +
-      'Атеросклеротик пиликчалар: ______. Гемадинамик ахамиятга эга стеноз ва окклюзиялар: ______.\n\n' +
-      'Веналар. Ташки тос, умумий сон, юза сон, чукур сон, орка катта болдир, олд катта болдир, ' +
-      'кичик болдир, сурал веналар утказувчанлиги сакланган. Кон окими спектри нафас олишга боглик холда, ' +
-      'фазали. Веналар датчик билан тулик эзиляпди. Девори юпка, бушлиги анэхоген, кушимчалар йук. ' +
-      'Веналар клапани функцияси сакланган, патологик рефлюкслар: ______. Катта тери ости венаси: ______.\n\n' +
-      'Хулоса: ______________________________________\n\n' +
-      'Врач: ______________________\n' +
-      'Хулоса диагноз хисобланмайди, даволовчи врач маслахати ва бошка клиник лаборатор текширувлар лозим!'
+    bodyHtml: withHeader(PATIENT_LINE,
+      '<p><strong><em>ОЁК АРТЕРИЯЛАРИ ва ВЕНАЛАРИ УЛЬТРАТОВУШ ТЕКШИРУВИ</em></strong></p>' +
+      '<p><strong><em>Артериялар.</em></strong> Утказувчанлиги ______. Кон окими спектри ______. Интима медиа комплекси ______мм. Атеросклеротик пиликчалар: ______. Стеноз ва окклюзиялар: ______.</p>' +
+      '<p><strong><em>Веналар.</em></strong> Утказувчанлиги ______. Девори ______. Клапан функцияси ______, патологик рефлюкслар: ______. Катта тери ости венаси: ______.</p>' +
+      '<p><strong><em>Хулоса:</em></strong> ______</p>' +
+      '<p><strong>Врач:</strong> ______</p>' +
+      '<p><em>Хулоса диагноз хисобланмайди, даволовчи врач маслахати ва бошка клиник лаборатор текширувлар лозим!</em></p>'
     ),
   },
   {
     key: 'UZI_NEYROSONOGRAFIYA',
     category: 'UZI',
     name: 'Neyrosonografiya (Bosh miya, chaqaloq)',
-    bodyText: withPatientLine(
-      'НЕЙРОСОНОГРАФИЯ\n' +
-      'Возраст: ______   Врач: ______________________\n\n' +
-      'Рисунок извилин и борозд: ______\n' +
-      'Поясная борозда: ______мм\n' +
-      'Субарахноидальная пространство справа ______мм, слева ______мм (норма до 3мм)\n' +
-      'Межполушарная щель: ______мм (норма до 3,0 мм)\n' +
-      'Верхний сагиттальный синус: ______мм (в норме до 3,0 мм)\n\n' +
-      'Боковые желудочки:                     Справа        Слева\n' +
-      'Глубина на уровне тел                  ______мм      ______мм    (от 2 до 4 мм)\n' +
-      'Глубина на уровне передних рогов       ______мм      ______мм    (от 2 до 4 мм)\n' +
-      'Затылочные рога                        ______мм      ______мм\n' +
-      'Височные рога                          ______мм      ______мм    (в норме не определяется)\n\n' +
-      'Ширина III желудочка: ______мм (до 3мм)\n' +
-      'Глубина IV желудочка: ______мм (до 4мм)\n' +
-      'Большая цистерна: ______мм (в норме 7-8мм, у недоношенных до 10мм)\n' +
-      'Сосудистые сплетения: контуры ровные, симметричные, справа ______мм, слева ______мм\n\n' +
-      'Перивентрикулярная область. Эхогенность: ______. Эхоструктура: ______\n' +
-      'ППП: ______   Полость: ______\n' +
-      'Таламус и подкорковые ядра. Эхогенность: ______. Эхоструктура: ______\n' +
-      'Мозжечок. Эхогенность: ______. Эхоструктура: ______\n' +
-      'Намёт мозжечка: симметричен. В паренхиме патологических изменений: ______\n\n' +
-      'Допплерометрия (Виллизиев круг кровообращения). Сосуды проходимы.\n' +
-      'ПМА RI ______ (норма 0,60-0,70), ВБ RI ______ (норма 0,60-0,70), СМА RI ______ (норма 0,60-0,70)\n' +
-      'Скорость кровотока в вене Галена: ______см/сек (в норме до 10,0)   ЧСС: ______ уд/мин\n\n' +
-      'Заключение: ______________________________________\n\n' +
-      'Врач: ______________________'
+    bodyHtml: withHeader('Ф.И.О: ______   Ёши: ______   Дата: ______',
+      '<p><strong>НЕЙРОСОНОГРАФИЯ</strong></p>' +
+      '<p><strong><em>Рисунок извилин и борозд:</em></strong> ______</p>' +
+      '<p><strong><em>Поясная борозда:</em></strong> ______мм <strong><em>Субарахноидальная пространство</em></strong> справа ______мм, слева ______мм (до 3мм)</p>' +
+      '<p><strong><em>Межполушарная щель:</em></strong> ______мм <strong><em>Верхний сагиттальный синус:</em></strong> ______мм</p>' +
+      '<p><strong>Боковые желудочки:</strong></p>' +
+      '<table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:12px;">' +
+      '<tr><td></td><td><strong>Справа</strong></td><td><strong>Слева</strong></td></tr>' +
+      '<tr><td>Глубина на уровне тел</td><td>______мм</td><td>______мм</td></tr>' +
+      '<tr><td>Глубина на уровне передних рогов</td><td>______мм</td><td>______мм</td></tr>' +
+      '<tr><td>Затылочные рога</td><td>______мм</td><td>______мм</td></tr>' +
+      '<tr><td>Височные рога</td><td>______мм</td><td>______мм</td></tr>' +
+      '</table>' +
+      '<p><strong><em>Ширина III желудочка:</em></strong> ______мм <strong><em>Глубина IV желудочка:</em></strong> ______мм <strong><em>Большая цистерна:</em></strong> ______мм</p>' +
+      '<p><strong>Сосудистые сплетения:</strong> справа ______мм, слева ______мм</p>' +
+      '<p><strong>Перивентрикулярная область.</strong> Эхогенность: ______ Эхоструктура: ______</p>' +
+      '<p><strong>Таламус и подкорковые ядра.</strong> Эхогенность: ______ <strong>Мозжечок.</strong> Эхогенность: ______</p>' +
+      '<p><strong>Допплерометрия:</strong> ПМА RI ______, ВБ RI ______, СМА RI ______ (норма 0,60-0,70)</p>' +
+      '<p><strong>Скорость кровотока в вене Галена:</strong> ______см/сек <strong>ЧСС:</strong> ______ уд/мин</p>' +
+      '<p><strong>Заключение:</strong> ______</p>' +
+      '<p><strong>Врач:</strong> ______</p>'
     ),
   },
   {
     key: 'UZI_MOYAK',
     category: 'UZI',
     name: 'Moyaklar UZI (Skrotal)',
-    bodyText: withPatientLine(
-      "MOYAKLARNI ULTRATOVUSH TEKSHIRUV BAYONNOMASI\n\n" +
-      "O'NG MOYAK.\n" +
-      "Joylashishi ko'ruv vaqtida normada yorg'oq bo'shlig'ida. Chetlari tekis, silliq, normada. " +
-      "Qapsulasi normada oq yaltiroq oqsil parda qoplagan.\n" +
-      "O'lchami: uzunligi ______mm (N-40-45mm), kengligi ______mm (N-20-35mm), qalinligi ______mm (N-20-25mm). Xajmi ______sm3\n" +
-      "Exogenligi ______. Rangli Dopplerda qon oqimi ______.\n" +
-      "Exostrukturasi ______, o'choqli o'zgarishlar: ______.\n" +
-      "Urug' tizimchasi venalari moyak yuqori va o'rta qismida ______mm kengaygan.\n" +
-      "Valsalva sinamasida patologik reflex: ______\n" +
-      "Yog'oq bo'shlig'ida erkin suyuqlik: ______ml\n\n" +
-      "O'NG MOYAK ORTIG'I.\n" +
-      "O'lchami ______mm. Chetlari ______. Exostrukturasi ______. Exogenligi ______.\n\n" +
-      "CHAP MOYAK.\n" +
-      "Joylashishi ko'ruv vaqtida normada yorg'oq bo'shlig'ida. Chetlari tekis, silliq, normada. " +
-      "Qapsulasi normada oq yaltiroq oqsil parda qoplagan.\n" +
-      "O'lchami: uzunligi ______mm (N-40-45mm), kengligi ______mm (N-20-35mm), qalinligi ______mm (N-20-25mm). Xajmi ______sm3 (N-20sm3)\n" +
-      "Exogenligi ______. Rangli Dopplerda qon oqimi ______.\n" +
-      "Exostrukturasi ______, o'choqli o'zgarishlar: ______.\n" +
-      "Urug' tizimchasi venalari moyak yuqori va o'rta qismida ______mm kengaygan.\n" +
-      "Valsalva sinamasida patologik reflex: ______\n" +
-      "Yog'oq bo'shlig'ida erkin suyuqlik: ______ml\n\n" +
-      "CHAP MOYAK ORTIG'I.\n" +
-      "O'lchami ______mm. Chetlari ______. Exostrukturasi ______. Exogenligi ______.\n\n" +
-      "Exografiya xulosasi: ______________________________________\n\n" +
-      "Shifokor: ______________________\n" +
-      "Xulosa diagnoz hisoblanmaydi, davolovchi shifokor maslahati va boshqa klinik-laborator tekshiruvlar lozim!"
+    bodyHtml: withHeader('Bemorni F.I.Sh: ______   Tekshiruv sanasi: ______',
+      '<p><strong>O\'NG MOYAK.</strong></p>' +
+      '<p><strong>Joylashishi</strong> ko\'ruv vaqtida normada yorg\'oq bo\'shlig\'ida. <strong>Chetlari</strong> ______. <strong>Qapsulasi</strong> ______.</p>' +
+      '<p><strong>O\'lchami:</strong> uzunligi ______mm, kengligi ______mm, qalinligi ______mm. <strong>Xajmi</strong> ______sm3</p>' +
+      '<p><strong>Exogenligi</strong> ______. Rangli Dopplerda qon oqimi ______. <strong>Exostrukturasi</strong> ______.</p>' +
+      '<p><strong>Urug\' tizimchasi venalari</strong> ______mm kengaygan. Valsalva sinamasida: ______. Erkin suyuqlik: ______ml</p>' +
+      '<p><strong>O\'NG MOYAK ORTIG\'I.</strong> O\'lchami ______mm. Chetlari ______. Exostrukturasi ______.</p>' +
+      '<p><strong>CHAP MOYAK.</strong></p>' +
+      '<p><strong>Joylashishi</strong> ko\'ruv vaqtida normada yorg\'oq bo\'shlig\'ida. <strong>Chetlari</strong> ______. <strong>Qapsulasi</strong> ______.</p>' +
+      '<p><strong>O\'lchami:</strong> uzunligi ______mm, kengligi ______mm, qalinligi ______mm. <strong>Xajmi</strong> ______sm3</p>' +
+      '<p><strong>Exogenligi</strong> ______. Rangli Dopplerda qon oqimi ______. <strong>Exostrukturasi</strong> ______.</p>' +
+      '<p><strong>Urug\' tizimchasi venalari</strong> ______mm kengaygan. Valsalva sinamasida: ______. Erkin suyuqlik: ______ml</p>' +
+      '<p><strong>CHAP MOYAK ORTIG\'I.</strong> O\'lchami ______mm. Chetlari ______. Exostrukturasi ______.</p>' +
+      '<p><strong>Exografiya xulosasi:</strong> ______</p>' +
+      '<p><strong>Shifokor:</strong> ______</p>' +
+      '<p><em>Xulosa diagnoz hisoblanmaydi, davolovchi shifokor maslahati va boshqa klinik-laborator tekshiruvlar lozim!</em></p>'
     ),
   },
 ]

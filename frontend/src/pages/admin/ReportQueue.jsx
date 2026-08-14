@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Printer, RefreshCw } from 'lucide-react'
+import { Printer, RefreshCw, FileText } from 'lucide-react'
 import { api } from '../../utils/api'
 import { useToastStore } from '../../store/toastStore'
 import { PageHeader, Icons } from '../../components/UIKit'
@@ -7,7 +7,7 @@ import { PageHeader, Icons } from '../../components/UIKit'
 export default function AdminReportQueue() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
-  const [printingId, setPrintingId] = useState(null)
+  const [busyId, setBusyId] = useState(null)
   const toast = useToastStore((s) => s.add)
 
   const load = () => {
@@ -20,15 +20,29 @@ export default function AdminReportQueue() {
 
   useEffect(() => { load() }, [])
 
-  const handlePrint = async (report) => {
-    setPrintingId(report.id)
+  const handleViewPdf = async (report) => {
+    setBusyId(report.id)
+    try {
+      const blob = await api(`/report-submissions/${report.id}/pdf`)
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (e) {
+      toast(e.message || 'PDF yaratishda xatolik', 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const handleSendToPrinter = async (report) => {
+    setBusyId(report.id)
     try {
       const footer = `\n\n───────────────────────\nShifokor: ${report.doctor_name || ''}\nSana: ${report.created_at ? new Date(report.created_at).toLocaleString('uz-UZ') : ''}`
+      const plainContent = (report.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
       await api('/print-jobs', {
         method: 'POST',
         body: JSON.stringify({
           title: report.template_label,
-          content: report.content + footer,
+          content: plainContent + footer,
           printer_type: 'a4',
         }),
       })
@@ -38,7 +52,7 @@ export default function AdminReportQueue() {
     } catch (e) {
       toast(e.message || 'Chop etishga yuborishda xatolik', 'error')
     } finally {
-      setPrintingId(null)
+      setBusyId(null)
     }
   }
 
@@ -46,7 +60,7 @@ export default function AdminReportQueue() {
     <div className="max-w-3xl">
       <PageHeader
         title="Shablonlar (Chop etishni kutayotgan)"
-        subtitle="Shifokorlar to'ldirgan UZI/Laboratoriya shablonlari — ko'rib chiqib printerga yuboring"
+        subtitle="Shifokorlar to'ldirgan UZI/Laboratoriya shablonlari — ko'rib chiqing, PDF sifatida yoki printerga yuboring"
         icon={Icons.chart}
       >
         <button onClick={load} className="btn-outline py-2 px-3 text-xs flex items-center gap-1.5">
@@ -77,18 +91,28 @@ export default function AdminReportQueue() {
                   {r.created_at ? new Date(r.created_at).toLocaleString('uz-UZ') : ''}
                 </span>
               </div>
-              <pre className="text-[10px] font-mono text-muted whitespace-pre-wrap bg-surface p-2.5 rounded-xl border border-border max-h-24 overflow-hidden">
-                {r.content}
-              </pre>
-              <div className="flex justify-end">
+              <div
+                className="bg-white text-black rounded-xl p-3 text-[11px] leading-relaxed max-h-32 overflow-y-auto"
+                style={{ fontFamily: "'Times New Roman', Cambria, serif" }}
+                dangerouslySetInnerHTML={{ __html: r.content }}
+              />
+              <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => handlePrint(r)}
-                  disabled={printingId === r.id}
+                  onClick={() => handleViewPdf(r)}
+                  disabled={busyId === r.id}
+                  className="btn-outline py-2 px-4 text-xs font-black flex items-center gap-1.5 disabled:opacity-60"
+                >
+                  <FileText className="h-3.5 w-3.5" /> PDF ko'rish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendToPrinter(r)}
+                  disabled={busyId === r.id}
                   className="btn-gold py-2 px-4 text-xs font-black flex items-center gap-1.5 disabled:opacity-60"
                 >
                   <Printer className="h-3.5 w-3.5" />
-                  {printingId === r.id ? 'Yuborilmoqda...' : 'Printerga yuborish'}
+                  {busyId === r.id ? 'Yuborilmoqda...' : 'Printerga yuborish'}
                 </button>
               </div>
             </div>

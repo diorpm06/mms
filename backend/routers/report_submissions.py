@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
@@ -10,6 +11,8 @@ from database import get_db
 from models.patient import Patient
 from models.report_submission import ReportSubmission
 from models.user import User
+from services.audit import get_client_info, log_audit
+from services.report_pdf import generate_report_pdf
 
 router = APIRouter(prefix="/api/report-submissions", tags=["report-submissions"])
 
@@ -43,6 +46,7 @@ def _row(r: ReportSubmission) -> dict:
 @router.post("")
 def create_report_submission(
     body: ReportSubmissionCreate,
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_doctor_or_admin_or_ceo),
 ):
@@ -62,6 +66,20 @@ def create_report_submission(
         status="submitted",
     )
     db.add(r)
+    db.flush()
+
+    ip, ua = get_client_info(request)
+    log_audit(
+        db,
+        user_id=user.id,
+        user_role=user.role,
+        action_type="REPORT_SUBMITTED",
+        table_name="report_submissions",
+        record_id=r.id,
+        detail_message=f"{user.full_name}: {body.template_label} — {patient.first_name} {patient.last_name}",
+        ip_address=ip,
+        device_info=ua,
+    )
     db.commit()
     db.refresh(r)
     return {"message": "Shablon adminga yuborildi", "id": r.id}
@@ -96,6 +114,33 @@ def list_patient_reports(
         .all()
     )
     return [_row(r) for r in rows]
+
+
+@router.get("/{report_id}/pdf")
+def get_report_pdf(
+    report_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    r = db.query(ReportSubmission).options(joinedload(ReportSubmission.patient)).filter(
+        ReportSubmission.id == report_id
+    ).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Topilmadi")
+
+    patient_name = f"{r.patient.first_name} {r.patient.last_name}" if r.patient else ""
+    pdf_bytes = generate_report_pdf(
+        template_label=r.template_label,
+        content_html=r.filled_data or "",
+        patient_name=patient_name,
+        doctor_name=r.doctor_name,
+        created_at_str=r.created_at.strftime("%d.%m.%Y %H:%M") if r.created_at else "",
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{r.template_label}_{r.id}.pdf"'},
+    )
 
 
 @router.patch("/{report_id}/mark-printed")

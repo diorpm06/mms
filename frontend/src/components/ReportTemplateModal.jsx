@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, Send, ChevronRight } from 'lucide-react'
 import { api } from '../utils/api'
 import { useToastStore } from '../store/toastStore'
@@ -10,14 +10,95 @@ const STATUS_LABEL = {
   printed: { text: 'Chop etilgan', cls: 'badge-cyan' },
 }
 
+const BLANK_RE = /_{4,}/
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+// Konteyner ichidagi "______" matnlarini haqiqiy <input> elementlariga almashtiradi.
+// Qolgan matn (formatlash bilan) butunlay qulflangan holicha qoladi.
+function injectBlankInputs(container, prefillFirst) {
+  const inputs = []
+
+  function processTextNode(textNode) {
+    const text = textNode.nodeValue
+    const match = BLANK_RE.exec(text)
+    if (!match) return null
+
+    const before = document.createTextNode(text.slice(0, match.index))
+    const after = document.createTextNode(text.slice(match.index + match[0].length))
+
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.className = 'mms-blank-input'
+    input.autocomplete = 'off'
+    input.spellcheck = false
+    input.size = Math.max(4, Math.min(match[0].length, 20))
+    input.style.cssText =
+      'display:inline-block;min-width:50px;border:none;border-bottom:2px solid var(--gold);' +
+      'background:transparent;font:inherit;color:var(--cyan,#22d3ee);font-weight:700;padding:0 3px;outline:none;'
+
+    if (inputs.length === 0 && prefillFirst) {
+      input.value = prefillFirst
+    }
+
+    const parent = textNode.parentNode
+    parent.insertBefore(before, textNode)
+    parent.insertBefore(input, textNode)
+    parent.insertBefore(after, textNode)
+    parent.removeChild(textNode)
+
+    inputs.push(input)
+    return after
+  }
+
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      let current = node
+      while (current && BLANK_RE.test(current.nodeValue)) {
+        current = processTextNode(current)
+      }
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      Array.from(node.childNodes).forEach(walk)
+    }
+  }
+
+  walk(container)
+  return inputs
+}
+
+// Konteynerni (to'ldirilgan qiymatlar bilan) qayta HTML matniga aylantiradi.
+function serializeFilled(node) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return escapeHtml(node.nodeValue)
+  }
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    if (node.classList && node.classList.contains('mms-blank-input')) {
+      return `<strong>${escapeHtml(node.value?.trim() || '______')}</strong>`
+    }
+    const tag = node.tagName.toLowerCase()
+    const children = Array.from(node.childNodes).map(serializeFilled).join('')
+    const style = node.getAttribute('style')
+    const extra = ['border', 'cellpadding'].map((a) =>
+      node.hasAttribute(a) ? ` ${a}="${node.getAttribute(a)}"` : ''
+    ).join('')
+    return `<${tag}${style ? ` style="${style}"` : ''}${extra}>${children}</${tag}>`
+  }
+  return ''
+}
+
 // view: 'history' | 'picker' | 'fill'
 export default function ReportTemplateModal({ patient, category, defaultTemplateKey, serviceId, onClose }) {
   const [view, setView] = useState('history')
   const [selectedKey, setSelectedKey] = useState(defaultTemplateKey || null)
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
-  const [content, setContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const fillRef = useRef(null)
   const toast = useToastStore((s) => s.add)
 
   const template = getTemplateByKey(selectedKey)
@@ -37,14 +118,12 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
   }, [patient])
 
   useEffect(() => {
-    if (template) {
+    if (view === 'fill' && template && fillRef.current) {
+      fillRef.current.innerHTML = template.bodyHtml
       const fullName = `${patient.last_name || ''} ${patient.first_name || ''}`.trim()
-      const prefilled = fullName
-        ? template.bodyText.replace('Ф.И.О: ______________________', `Ф.И.О: ${fullName}`)
-        : template.bodyText
-      setContent(prefilled)
+      injectBlankInputs(fillRef.current, fullName)
     }
-  }, [selectedKey])
+  }, [view, selectedKey])
 
   if (!patient) return null
 
@@ -60,9 +139,10 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!template) return
+    if (!template || !fillRef.current) return
     setSubmitting(true)
     try {
+      const filledHtml = Array.from(fillRef.current.childNodes).map(serializeFilled).join('')
       await api('/report-submissions', {
         method: 'POST',
         body: JSON.stringify({
@@ -71,7 +151,7 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
           template_key: template.key,
           template_label: template.name,
           category: template.category,
-          content,
+          content: filledHtml,
         }),
       })
       toast('✓ Shablon adminga yuborildi!')
@@ -162,15 +242,12 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
               </button>
             )}
             <p className="text-[11px] text-muted italic">
-              Asl blanka matni pastda — faqat o'zgarishi kerak bo'lgan raqam/natijalarni tahrirlang, qolgan matnga tegmang.
+              Asl blanka matni — faqat tagiga chizilgan (oltin rang) joylarga bosib, natijani yozing. Qolgan matn qulflangan.
             </p>
-            <textarea
-              className="input-field text-xs font-mono leading-relaxed"
-              style={{ whiteSpace: 'pre', overflowX: 'auto' }}
-              rows={22}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              spellCheck={false}
+            <div
+              ref={fillRef}
+              className="bg-white text-black rounded-xl p-5 text-[13px] leading-relaxed"
+              style={{ fontFamily: "'Times New Roman', Cambria, serif" }}
             />
 
             <div className="flex gap-2 pt-2">
@@ -204,9 +281,11 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
                       {h.created_at ? new Date(h.created_at).toLocaleString('uz-UZ') : ''}
                     </span>
                   </div>
-                  <pre className="text-[11px] font-mono whitespace-pre-wrap bg-surface p-3 rounded-xl border border-border max-h-64 overflow-y-auto">
-                    {h.content}
-                  </pre>
+                  <div
+                    className="bg-white text-black rounded-xl p-3 text-[11px] leading-relaxed max-h-64 overflow-y-auto"
+                    style={{ fontFamily: "'Times New Roman', Cambria, serif" }}
+                    dangerouslySetInnerHTML={{ __html: h.content }}
+                  />
                 </div>
               ))
             )}
