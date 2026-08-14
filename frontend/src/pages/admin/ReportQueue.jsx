@@ -4,59 +4,36 @@ import { api } from '../../utils/api'
 import { useToastStore } from '../../store/toastStore'
 import { PageHeader, Icons } from '../../components/UIKit'
 
-function buildPrintHtml(report) {
-  const rows = Object.entries(report.filled_data || {})
-    .filter(([, v]) => v)
-    .map(([k, v]) => `
-      <tr>
-        <td style="border:1px solid #000;padding:8px;font-weight:bold;">${k}</td>
-        <td style="border:1px solid #000;padding:8px;text-align:right;font-weight:bold;">${v}</td>
-      </tr>`).join('')
+function escapeHtml(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
 
+function buildPrintHtml(report) {
   return `
     <!DOCTYPE html>
     <html>
       <head>
-        <title>${report.template_label}</title>
+        <title>${escapeHtml(report.template_label)}</title>
         <style>
-          body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #000; background: #fff; }
-          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px; }
-          .header h2 { margin: 0; font-size: 20px; font-weight: 900; text-transform: uppercase; }
-          .header p { margin: 4px 0 0; font-size: 12px; font-weight: bold; }
-          .info-grid { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 12px; }
-          .info-box { border: 1px solid #000; padding: 8px 12px; border-radius: 6px; width: 48%; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
-          th, td { border: 1px solid #000; padding: 8px 10px; text-align: left; }
-          th { background: #f0f0f0; font-weight: bold; }
-          .signatures { display: flex; justify-content: space-between; margin-top: 40px; font-size: 12px; }
-          .sig-line { width: 40%; border-top: 1px solid #000; text-align: center; padding-top: 4px; font-weight: bold; }
-          @media print { body { padding: 0; } @page { margin: 10mm; } }
+          body { font-family: 'Times New Roman', Cambria, serif; padding: 20px; color: #000; background: #fff; }
+          pre {
+            font-family: 'Times New Roman', Cambria, serif;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+          }
+          .footer-note { margin-top: 24px; font-size: 11px; color: #444; }
+          @media print { body { padding: 0; } @page { margin: 15mm; } }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h2>MARJONA MED SERVICE</h2>
-          <p>${(report.category || '').toUpperCase()} TEKSHIRUV NATIJASI — ${report.template_label}</p>
-        </div>
-        <div class="info-grid">
-          <div class="info-box">
-            <p style="margin:0;"><b>Bemor F.I.Sh:</b> ${report.patient_name || ''}</p>
-            <p style="margin:4px 0 0;"><b>Shifokor:</b> ${report.doctor_name || ''}</p>
-          </div>
-          <div class="info-box" style="text-align:right;">
-            <p style="margin:0;"><b>Tekshiruv:</b> ${report.template_label}</p>
-            <p style="margin:4px 0 0;"><b>Sana:</b> ${report.created_at ? new Date(report.created_at).toLocaleString('uz-UZ') : ''}</p>
-          </div>
-        </div>
-        <table>
-          <thead><tr><th>Ko'rsatkich</th><th style="text-align:right;">Natija</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        ${report.notes ? `<p style="font-size:12px;font-style:italic;margin:10px 0;">Izoh/Xulosa: ${report.notes}</p>` : ''}
-        <div class="signatures">
-          <div class="sig-line">Shifokor Imzosi</div>
-          <div class="sig-line">Bemor Imzosi</div>
-        </div>
+        <pre>${escapeHtml(report.content)}</pre>
+        <p class="footer-note">Shifokor: ${escapeHtml(report.doctor_name)} · Sana: ${report.created_at ? new Date(report.created_at).toLocaleString('uz-UZ') : ''}</p>
       </body>
     </html>
   `
@@ -130,6 +107,9 @@ export default function AdminReportQueue() {
                   {r.created_at ? new Date(r.created_at).toLocaleString('uz-UZ') : ''}
                 </span>
               </div>
+              <pre className="text-[10px] font-mono text-muted whitespace-pre-wrap bg-surface p-2.5 rounded-xl border border-border max-h-24 overflow-hidden">
+                {r.content}
+              </pre>
               <div className="flex justify-end">
                 <button
                   type="button"

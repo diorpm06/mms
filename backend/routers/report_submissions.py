@@ -1,4 +1,3 @@
-import json
 from datetime import datetime
 from typing import Optional
 
@@ -21,8 +20,7 @@ class ReportSubmissionCreate(BaseModel):
     template_key: str
     template_label: str
     category: str
-    filled_data: dict
-    notes: Optional[str] = None
+    content: str
 
 
 def _row(r: ReportSubmission) -> dict:
@@ -34,8 +32,7 @@ def _row(r: ReportSubmission) -> dict:
         "template_key": r.template_key,
         "template_label": r.template_label,
         "category": r.category,
-        "filled_data": json.loads(r.filled_data) if r.filled_data else {},
-        "notes": r.notes,
+        "content": r.filled_data or "",
         "doctor_name": r.doctor_name,
         "status": r.status,
         "printed_at": r.printed_at.isoformat() if r.printed_at else None,
@@ -59,8 +56,7 @@ def create_report_submission(
         template_key=body.template_key,
         template_label=body.template_label,
         category=body.category,
-        filled_data=json.dumps(body.filled_data, ensure_ascii=False),
-        notes=body.notes,
+        filled_data=body.content,
         doctor_id=user.id,
         doctor_name=user.full_name,
         status="submitted",

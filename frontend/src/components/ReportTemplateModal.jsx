@@ -16,8 +16,7 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
   const [selectedKey, setSelectedKey] = useState(defaultTemplateKey || null)
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
-  const [fieldValues, setFieldValues] = useState({})
-  const [notes, setNotes] = useState('')
+  const [content, setContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const toast = useToastStore((s) => s.add)
 
@@ -39,9 +38,11 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
 
   useEffect(() => {
     if (template) {
-      const init = {}
-      template.fields.forEach((f) => { init[f.name] = '' })
-      setFieldValues(init)
+      const fullName = `${patient.last_name || ''} ${patient.first_name || ''}`.trim()
+      const prefilled = fullName
+        ? template.bodyText.replace('Ф.И.О: ______________________', `Ф.И.О: ${fullName}`)
+        : template.bodyText
+      setContent(prefilled)
     }
   }, [selectedKey])
 
@@ -70,8 +71,7 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
           template_key: template.key,
           template_label: template.name,
           category: template.category,
-          filled_data: fieldValues,
-          notes,
+          content,
         }),
       })
       toast('✓ Shablon adminga yuborildi!')
@@ -86,7 +86,7 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-      <div className="card max-w-2xl w-full p-6 relative animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto space-y-5">
+      <div className="card max-w-3xl w-full p-6 relative animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto space-y-5">
 
         <div className="flex items-center justify-between pb-4 border-b border-border">
           <div className="flex items-center gap-3">
@@ -151,7 +151,7 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
         )}
 
         {view === 'fill' && template && (
-          <form onSubmit={handleSubmit} className="space-y-4 pt-1 animate-in fade-in">
+          <form onSubmit={handleSubmit} className="space-y-3 pt-1 animate-in fade-in">
             {!defaultTemplateKey && (
               <button
                 type="button"
@@ -161,37 +161,17 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
                 ← Boshqa sohani tanlash
               </button>
             )}
-            <div className="space-y-2 card-2 p-4">
-              <h4 className="text-xs font-black text-amber uppercase tracking-wider mb-2">
-                📋 Ko'rsatkichlarni kiriting:
-              </h4>
-              {template.fields.map((f) => (
-                <div key={f.name} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/50 pb-2">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-body">{f.name}</span>
-                    {f.norm && <span className="text-[10px] text-muted block">Norma: {f.norm}{f.unit ? ` (${f.unit})` : ''}</span>}
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Qiymati..."
-                    className="input-field max-w-[220px] text-xs py-1.5 text-cyan font-bold"
-                    value={fieldValues[f.name] || ''}
-                    onChange={(e) => setFieldValues({ ...fieldValues, [f.name]: e.target.value })}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div>
-              <label className="form-label text-xs font-bold">Shifokor Izohi / Xulosa</label>
-              <textarea
-                placeholder="Umumiy xulosa yoki qo'shimcha izoh..."
-                className="input-field text-xs"
-                rows={3}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
+            <p className="text-[11px] text-muted italic">
+              Asl blanka matni pastda — faqat o'zgarishi kerak bo'lgan raqam/natijalarni tahrirlang, qolgan matnga tegmang.
+            </p>
+            <textarea
+              className="input-field text-xs font-mono leading-relaxed"
+              style={{ whiteSpace: 'pre', overflowX: 'auto' }}
+              rows={22}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              spellCheck={false}
+            />
 
             <div className="flex gap-2 pt-2">
               <Btn variant="ghost" full icon={Icons.x} type="button" onClick={onClose}>Bekor</Btn>
@@ -224,15 +204,9 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
                       {h.created_at ? new Date(h.created_at).toLocaleString('uz-UZ') : ''}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    {Object.entries(h.filled_data || {}).filter(([, v]) => v).map(([key, val]) => (
-                      <div key={key} className="bg-surface p-2.5 rounded-xl border border-border flex justify-between">
-                        <span className="text-muted text-[11px] font-medium">{key}:</span>
-                        <span className="font-bold text-cyan font-mono">{val || '—'}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {h.notes && <p className="text-[11px] text-muted italic">Izoh: {h.notes}</p>}
+                  <pre className="text-[11px] font-mono whitespace-pre-wrap bg-surface p-3 rounded-xl border border-border max-h-64 overflow-y-auto">
+                    {h.content}
+                  </pre>
                 </div>
               ))
             )}
