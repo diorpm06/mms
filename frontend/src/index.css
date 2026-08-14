@@ -253,6 +253,20 @@ html.light {
   }
   .input-field:hover:not(:focus) { border-color: var(--border-strong); }
 
+  /* Sana maydoni (type="date") kalendar belgisi qorong'i fonda ko'rinmas
+     bo'lib qolmasligi uchun — aks holda bosib bo'lmaydigandek tuyuladi. */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+    opacity: 1;
+  }
+  input[type="date"] {
+    color-scheme: dark;
+  }
+  html.light input[type="date"] {
+    color-scheme: light;
+  }
+
   /* ── Sidebar ── */
   .sidebar {
     background: var(--surface);

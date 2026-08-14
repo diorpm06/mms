@@ -87,7 +87,7 @@ export default function CeoDashboard() {
   if (loading && !data) {
     return (
       <div>
-        <h1 className="page-title mb-6">CEO Dashboard</h1>
+        <h1 className="page-title mb-6">Rahbar Dashboard</h1>
         <CardSkeleton count={4} />
       </div>
     )
@@ -115,7 +115,7 @@ export default function CeoDashboard() {
     <div>
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="page-title">CEO Dashboard</h1>
+        <h1 className="page-title">Rahbar Dashboard</h1>
         <div className="flex items-center gap-3">
           {lastUpdate && (
             <span className="text-muted text-xs hidden sm:block">

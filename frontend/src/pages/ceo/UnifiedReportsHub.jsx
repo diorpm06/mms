@@ -1299,7 +1299,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       {/* ── HEADER ─────────────────────────────────────────────────── */}
       <PageHeader
         title="📊 Klinika Barcha Hisobotlari va Moliya Markazi"
-        subtitle="CEO va Rahbariyat uchun klinikaning jamiki tushum, chiqim, maosh, yo'naltiruvchi va ombor hisobotlari bir joyda"
+        subtitle="Rahbariyat uchun klinikaning jamiki tushum, chiqim, maosh, yo'naltiruvchi va ombor hisobotlari bir joyda"
         backTo={homePath}
       />
 
@@ -1337,6 +1337,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
               className="input-field text-xs font-bold py-1.5 max-w-[140px]"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
+              onClick={(e) => { try { e.target.showPicker?.() } catch (_) {} }}
             />
             <span className="text-muted font-bold text-xs">—</span>
             <input
@@ -1344,6 +1345,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
               className="input-field text-xs font-bold py-1.5 max-w-[140px]"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
+              onClick={(e) => { try { e.target.showPicker?.() } catch (_) {} }}
             />
             <button
               type="button"

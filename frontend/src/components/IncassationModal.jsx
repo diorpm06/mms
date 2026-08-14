@@ -163,7 +163,7 @@ export default function IncassationModal({ open, onClose }) {
                   <span className="font-bold">_____________________</span>
                 </div>
                 <div className="flex justify-between items-center text-slate-900">
-                  <span>CEO / Mas'ul Imzosi:</span>
+                  <span>Rahbar / Mas'ul Imzosi:</span>
                   <span className="font-bold">_____________________</span>
                 </div>
                 <p className="text-[9px] text-slate-900 italic pt-2">

@@ -985,7 +985,7 @@ export default function CeoReferrers() {
               {/* Signature Section */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '36px', fontSize: '12px', color: '#000' }}>
                 <div style={{ width: '42%', borderTop: '1px solid #000', paddingTop: '4px', textAlign: 'center', fontWeight: 'bold' }}>
-                  Klinika Rahbari (CEO Imzosi)
+                  Klinika Rahbari Imzosi
                 </div>
                 <div style={{ width: '42%', borderTop: '1px solid #000', paddingTop: '4px', textAlign: 'center', fontWeight: 'bold' }}>
                   Yo'naltiruvchi Imzosi ({printModal.referrer.name})

@@ -76,7 +76,7 @@ export default function InternalChatModal({ open, onClose }) {
           </div>
           <div>
             <h3 className="font-extrabold text-sm leading-tight text-white">Klinika Ichki Chati</h3>
-            <span className="text-[10px] text-cyan-100 opacity-90 block">Registratura, CEO va Shifokorlar</span>
+            <span className="text-[10px] text-cyan-100 opacity-90 block">Registratura, Rahbar va Shifokorlar</span>
           </div>
         </div>
         <button
@@ -103,7 +103,7 @@ export default function InternalChatModal({ open, onClose }) {
             return (
               <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                 <span className="text-[10px] text-muted mb-0.5 px-1 font-bold">
-                  {m.sender_name} ({m.sender_role === 'ceo' ? '👑 CEO' : m.sender_role === 'doctor' ? '🩺 Shifokor' : '👤 Registratura'})
+                  {m.sender_name} ({m.sender_role === 'ceo' ? '👑 Rahbar' : m.sender_role === 'doctor' ? '🩺 Shifokor' : '👤 Registratura'})
                 </span>
                 <div
                   className={`max-w-[85%] px-3.5 py-2 rounded-2xl text-xs font-medium shadow-md leading-relaxed ${

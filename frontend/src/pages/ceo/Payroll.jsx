@@ -506,7 +506,7 @@ export default function Payroll() {
             <div className="w-48 border-b border-slate-900 mt-8" />
           </div>
           <div>
-            <p className="font-bold">CEO / Klinika Rahbari Imzosi:</p>
+            <p className="font-bold">Rahbar Imzosi:</p>
             <div className="w-48 border-b border-slate-900 mt-8" />
           </div>
         </div>

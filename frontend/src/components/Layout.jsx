@@ -112,7 +112,7 @@ export default function Layout({ role }) {
           Marjona Med Service
         </p>
         <p className="text-muted text-xs font-semibold">
-          {effectiveRole === 'doctor' ? '🩺 Shifokor' : effectiveRole === 'admin' ? '👤 Administrator (Admin)' : '👑 CEO (Boshqaruv)'}
+          {effectiveRole === 'doctor' ? '🩺 Shifokor' : effectiveRole === 'admin' ? '👤 Administrator (Admin)' : '👑 Rahbar (Boshqaruv)'}
         </p>
       </div>
 
@@ -220,7 +220,7 @@ export default function Layout({ role }) {
           <div className="flex items-center gap-2 text-xs font-bold text-muted">
             <span>🏥 Marjona Med Service CRM</span>
             <span>•</span>
-            <span className="text-gold font-mono uppercase tracking-wider">{effectiveRole} Paneli</span>
+            <span className="text-gold font-mono uppercase tracking-wider">{effectiveRole === 'ceo' ? 'Rahbar' : effectiveRole} Paneli</span>
           </div>
 
           <div className="flex items-center gap-3">

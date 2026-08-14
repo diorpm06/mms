@@ -53,7 +53,7 @@ export default function ChangePassword() {
         </div>
         <div>
           <h1 className="page-title">Parolni o'zgartirish</h1>
-          <p className="text-muted text-sm">Faqat CEO amalga oshirishi mumkin</p>
+          <p className="text-muted text-sm">Faqat Rahbar amalga oshirishi mumkin</p>
         </div>
       </div>
 
@@ -71,13 +71,13 @@ export default function ChangePassword() {
             <option value="">— Tanlang</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.full_name} ({u.role === 'ceo' ? 'CEO' : 'Admin'})
+                {u.full_name} ({u.role === 'ceo' ? 'Rahbar' : 'Admin'})
               </option>
             ))}
           </select>
           {selectedUser && (
             <p className="text-muted mt-1 text-xs">
-              Rol: <span style={{ color: 'var(--gold)' }}>{selectedUser.role === 'ceo' ? 'CEO' : 'Admin'}</span>
+              Rol: <span style={{ color: 'var(--gold)' }}>{selectedUser.role === 'ceo' ? 'Rahbar' : 'Admin'}</span>
             </p>
           )}
         </div>
