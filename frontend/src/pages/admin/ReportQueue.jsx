@@ -4,44 +4,10 @@ import { api } from '../../utils/api'
 import { useToastStore } from '../../store/toastStore'
 import { PageHeader, Icons } from '../../components/UIKit'
 
-function escapeHtml(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-}
-
-function buildPrintHtml(report) {
-  return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>${escapeHtml(report.template_label)}</title>
-        <style>
-          body { font-family: 'Times New Roman', Cambria, serif; padding: 20px; color: #000; background: #fff; }
-          pre {
-            font-family: 'Times New Roman', Cambria, serif;
-            font-size: 13px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            margin: 0;
-          }
-          .footer-note { margin-top: 24px; font-size: 11px; color: #444; }
-          @media print { body { padding: 0; } @page { margin: 15mm; } }
-        </style>
-      </head>
-      <body>
-        <pre>${escapeHtml(report.content)}</pre>
-        <p class="footer-note">Shifokor: ${escapeHtml(report.doctor_name)} · Sana: ${report.created_at ? new Date(report.created_at).toLocaleString('uz-UZ') : ''}</p>
-      </body>
-    </html>
-  `
-}
-
 export default function AdminReportQueue() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [printingId, setPrintingId] = useState(null)
   const toast = useToastStore((s) => s.add)
 
   const load = () => {
@@ -55,20 +21,24 @@ export default function AdminReportQueue() {
   useEffect(() => { load() }, [])
 
   const handlePrint = async (report) => {
-    const printWindow = window.open('', '_blank', 'width=800,height=900')
-    printWindow.document.write(buildPrintHtml(report))
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => {
-      printWindow.print()
-    }, 300)
-
+    setPrintingId(report.id)
     try {
+      const footer = `\n\n───────────────────────\nShifokor: ${report.doctor_name || ''}\nSana: ${report.created_at ? new Date(report.created_at).toLocaleString('uz-UZ') : ''}`
+      await api('/print-jobs', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: report.template_label,
+          content: report.content + footer,
+          printer_type: 'a4',
+        }),
+      })
       await api(`/report-submissions/${report.id}/mark-printed`, { method: 'PATCH' })
-      toast('✓ Chop etildi deb belgilandi')
+      toast('✓ Printerga yuborildi — bir necha soniyada chiqadi')
       load()
     } catch (e) {
-      toast(e.message || 'Belgilashda xatolik', 'error')
+      toast(e.message || 'Chop etishga yuborishda xatolik', 'error')
+    } finally {
+      setPrintingId(null)
     }
   }
 
@@ -76,7 +46,7 @@ export default function AdminReportQueue() {
     <div className="max-w-3xl">
       <PageHeader
         title="Shablonlar (Chop etishni kutayotgan)"
-        subtitle="Shifokorlar to'ldirgan UZI/Laboratoriya shablonlari — ko'rib chiqib chop eting"
+        subtitle="Shifokorlar to'ldirgan UZI/Laboratoriya shablonlari — ko'rib chiqib printerga yuboring"
         icon={Icons.chart}
       >
         <button onClick={load} className="btn-outline py-2 px-3 text-xs flex items-center gap-1.5">
@@ -114,9 +84,11 @@ export default function AdminReportQueue() {
                 <button
                   type="button"
                   onClick={() => handlePrint(r)}
-                  className="btn-gold py-2 px-4 text-xs font-black flex items-center gap-1.5"
+                  disabled={printingId === r.id}
+                  className="btn-gold py-2 px-4 text-xs font-black flex items-center gap-1.5 disabled:opacity-60"
                 >
-                  <Printer className="h-3.5 w-3.5" /> Ko'rish va Chop etish
+                  <Printer className="h-3.5 w-3.5" />
+                  {printingId === r.id ? 'Yuborilmoqda...' : 'Printerga yuborish'}
                 </button>
               </div>
             </div>

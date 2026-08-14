@@ -1,0 +1,14 @@
+[agent]
+# Backend manzili (Vercel'dagi sayt manzili, oxirida / bo'lmasin)
+api_base = https://mms-coral.vercel.app
+
+# Backend'dagi PRINT_AGENT_TOKEN bilan bir xil bo'lishi kerak
+agent_token = O_ZGARTIRING_BU_YERGA
+
+# Shu kompyuter qaysi joyga tegishli:
+#   admin_main  — klinikadagi (Admin/Registratura) printer
+#   ceo_home    — Rahbarning uyidagi printeri
+location_key = admin_main
+
+# Necha soniyada bir marta serverni tekshirish kerak
+poll_seconds = 4

@@ -55,3 +55,6 @@ backend/scratch_test_backend.py
 # Bemor ma'lumoti (PHI) bor Word shablonlari — gitga yuborilmaydi.
 # Maydonlar ro'yxati frontend/src/utils/reportTemplates.js'da strukturalangan.
 shablonlar/
+
+# Chop etish agenti — haqiqiy sozlama (agent_token bor), .example versiyasi qoladi
+print-agent/config.ini

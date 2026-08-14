@@ -16,7 +16,7 @@ from config import settings
 from database import Base, engine, run_migrations
 from routers import (
     advances, appointments, audit, auth, balance, banners, cash, chat, duty, employees, expenses,
-    incassation, inpatients, inventory, lab_results, notifications, patients, payroll, providers, queue,
+    incassation, inpatients, inventory, lab_results, notifications, patients, payroll, print_jobs, providers, queue,
     referrers, report_submissions, reports, services, sheets_backup, webhook,
 )
 
@@ -139,6 +139,7 @@ app.include_router(lab_results.router)
 app.include_router(incassation.router)
 app.include_router(banners.router)
 app.include_router(report_submissions.router)
+app.include_router(print_jobs.router)
 
 uploads_dir = "/tmp/uploads" if os.environ.get("VERCEL") else os.path.join(os.getcwd(), "uploads")
 try:

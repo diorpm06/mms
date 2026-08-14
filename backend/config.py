@@ -24,11 +24,12 @@ class Settings(BaseSettings):
     SPREADSHEET_ID: str = ""
     FRONTEND_URL: str = "http://localhost:5173"
     SHEETS_WEBHOOK_SECRET: str = ""
+    PRINT_AGENT_TOKEN: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     @field_validator(
-        "DATABASE_URL", "SECRET_KEY", "FRONTEND_URL", "SHEETS_WEBHOOK_SECRET",
+        "DATABASE_URL", "SECRET_KEY", "FRONTEND_URL", "SHEETS_WEBHOOK_SECRET", "PRINT_AGENT_TOKEN",
         mode="before",
     )
     @classmethod
