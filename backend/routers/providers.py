@@ -71,6 +71,7 @@ def create_provider(data: ProviderCreate, db: Session = Depends(get_db), _: User
             role="doctor",
             username=data.username,
             hashed_password=hash_password(data.password),
+            plain_password=data.password,
             provider_id=p.id,
             is_active=True,
         )
@@ -119,6 +120,7 @@ def update_provider(
             linked_user.full_name = p.full_name
             if password:
                 linked_user.hashed_password = hash_password(password)
+                linked_user.plain_password = password
         else:
             if not password:
                 raise HTTPException(status_code=400, detail="Yangi akkaunt uchun parol kiritishingiz shart")
@@ -127,6 +129,7 @@ def update_provider(
                 role="doctor",
                 username=username,
                 hashed_password=hash_password(password),
+                plain_password=password,
                 provider_id=p.id,
                 is_active=True,
             )

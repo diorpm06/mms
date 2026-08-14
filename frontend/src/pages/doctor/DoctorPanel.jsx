@@ -437,7 +437,7 @@ export default function DoctorPanel() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-muted font-bold">✓ Bugun qabul qildi:</span>
-                        <span className="font-extrabold text-slate-300">{doneCount} ta bemor</span>
+                        <span className="font-extrabold text-body">{doneCount} ta bemor</span>
                       </div>
                     </div>
                   </div>
@@ -481,7 +481,7 @@ export default function DoctorPanel() {
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
       {/* Toast Notification */}
       {message && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl border border-cyan-500/40 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+        <div className="fixed top-5 right-5 z-50 bg-surface text-body px-5 py-3 rounded-xl shadow-2xl border border-cyan-500/40 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
           <CheckCircle2 className="h-5 w-5 text-emerald-400" />
           <span className="text-sm font-bold">{message}</span>
         </div>
@@ -1037,12 +1037,12 @@ export default function DoctorPanel() {
 
               {data?.current_patient && (
                 <div className="pt-2 border-t border-border/60 space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-slate-800 dark:text-slate-200">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-slate-800 dark:text-body">
                     <input
                       type="checkbox"
                       checked={chargePatient}
                       onChange={(e) => setChargePatient(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-900 text-gold focus:ring-gold w-4 h-4"
+                      className="rounded border-border bg-surface text-gold focus:ring-gold w-4 h-4"
                     />
                     <span>
                       Bemor (<strong className="text-amber-600 dark:text-gold font-black">{data.current_patient.first_name} {data.current_patient.last_name}</strong>) hisobiga to'lov qo'shilsin
@@ -1050,8 +1050,8 @@ export default function DoctorPanel() {
                   </label>
 
                   {chargePatient && selectedInvItem.unit_price > 0 && (
-                    <div className="flex items-center justify-between text-xs font-mono bg-slate-950 p-2.5 rounded-xl border border-emerald-500/40 shadow-inner">
-                      <span className="text-slate-300 font-sans font-extrabold">To'lov eslatmasi summasi:</span>
+                    <div className="flex items-center justify-between text-xs font-mono bg-surface-sunken p-2.5 rounded-xl border border-emerald-500/40 shadow-inner">
+                      <span className="text-body font-sans font-extrabold">To'lov eslatmasi summasi:</span>
                       <span className="text-emerald-400 font-black text-sm">
                         {((selectedInvItem.unit_price || 0) * (Number(consumeAmount) || 1)).toLocaleString()} so'm
                       </span>
@@ -1066,7 +1066,7 @@ export default function DoctorPanel() {
             <button
               type="button"
               onClick={() => setInventoryModal(false)}
-              className="flex-1 py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all"
+              className="flex-1 py-2.5 px-4 rounded-xl border border-border bg-surface-2 hover:bg-surface-hover text-body font-bold text-xs transition-all"
             >
               Bekor Qilish
             </button>

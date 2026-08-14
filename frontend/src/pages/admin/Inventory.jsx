@@ -231,7 +231,7 @@ export default function Inventory() {
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'catalog'
               ? 'bg-gold text-slate-950 shadow-md font-black'
-              : 'bg-slate-900/60 text-slate-300 hover:bg-white/5 border border-border'
+              : 'bg-surface text-body hover:bg-white/5 border border-border'
           }`}
         >
           📦 Materiallar Qoldig'i Katalogi
@@ -242,7 +242,7 @@ export default function Inventory() {
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'logs'
               ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
-              : 'bg-slate-900/60 text-slate-300 hover:bg-white/5 border border-border'
+              : 'bg-surface text-body hover:bg-white/5 border border-border'
           }`}
         >
           📜 Ishlatilgan Materiallar va To'lovlar Tarixi
@@ -304,7 +304,7 @@ export default function Inventory() {
           <div className="card overflow-x-auto p-0 border-cyan-500/20">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gold/20 text-left text-gold bg-slate-950 whitespace-nowrap">
+                <tr className="border-b border-gold/20 text-left text-gold bg-surface-sunken whitespace-nowrap">
                   <th className="p-3 whitespace-nowrap">Material Nomi</th>
                   <th className="p-3 whitespace-nowrap">Kategoriya</th>
                   <th className="p-3 whitespace-nowrap">Mavjud Qoldiq</th>
@@ -409,7 +409,7 @@ export default function Inventory() {
 
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 text-left">
+              <tr className="bg-surface-sunken text-muted border-b border-border text-left">
                 <th className="p-3">Sana & Vaqt</th>
                 <th className="p-3">Kiritgan Xodim</th>
                 <th className="p-3">Tafsilot & Bemor Chiptasi</th>
@@ -421,12 +421,12 @@ export default function Inventory() {
                 <tr><td colSpan={4} className="p-6 text-center text-muted">Hali ishlatilgan materiallar tarixi yo'q</td></tr>
               ) : (
                 logs.map((l) => (
-                  <tr key={l.id} className="border-b border-slate-800/60 hover:bg-slate-900/60">
+                  <tr key={l.id} className="border-b border-border hover:bg-surface">
                     <td className="p-3 font-mono text-muted">{l.created_at}</td>
-                    <td className="p-3 font-bold text-white">
+                    <td className="p-3 font-bold text-body">
                       {l.user_name} <span className="text-[10px] text-muted uppercase">({l.user_role})</span>
                     </td>
-                    <td className="p-3 text-slate-200">
+                    <td className="p-3 text-body">
                       <p className="font-semibold">{l.detail_message}</p>
                     </td>
                     <td className="p-3 text-right font-mono font-bold">
@@ -591,9 +591,9 @@ export default function Inventory() {
       <Modal open={!!consumeModal} onClose={() => setConsumeModal(null)} title="Material Chiqim qilish va Bemorga biriktirish" size="md">
         {consumeModal && (
           <form onSubmit={handleConsume} className="space-y-4 pt-1">
-            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+            <div className="p-3 rounded-2xl bg-surface-sunken border border-border space-y-1">
               <span className="text-xs text-muted uppercase font-bold block">Material:</span>
-              <h4 className="text-base font-black text-white">{consumeModal.name}</h4>
+              <h4 className="text-base font-black text-body">{consumeModal.name}</h4>
               <p className="text-xs text-muted">
                 Ombordagi qoldiq: <strong className="text-cyan-400 font-mono">{consumeModal.quantity} {consumeModal.unit}</strong> | Dona narxi: <strong className="text-gold font-mono">{formatMoney(consumeModal.unit_price)}</strong>
               </p>

@@ -19,6 +19,22 @@ import PageHeader from '../../components/PageHeader'
 import Modal from '../../components/Modal'
 import { Btn, Icons, THead } from '../../components/UIKit'
 import CeoSavedReports from './SavedReports'
+import IncassationModal from '../../components/IncassationModal'
+
+const MONTH_NAMES = [
+  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+  'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr',
+]
+
+// date.toISOString() converts to UTC first, which shifts the calendar day
+// (e.g. local midnight in UTC+5 becomes the previous day) — this formats
+// using the LOCAL calendar date instead, so period boundaries stay correct.
+function toLocalDateStr(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 const TABS = [
   { id: 'all',          label: '🌐 Barchasi Jamlanma (Bir Joyda)', icon: Layers },
@@ -61,8 +77,8 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
 
   // Date Range Filters
   const now = new Date()
-  const todayStr = now.toISOString().split('T')[0]
-  const firstDayStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  const todayStr = toLocalDateStr(now)
+  const firstDayStr = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1))
 
   const [dateFrom, setDateFrom] = useState(firstDayStr)
   const [dateTo, setDateTo] = useState(todayStr)
@@ -70,14 +86,20 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [activePreset, setActivePreset] = useState('month')
 
+  // Arbitrary month/year/week selection — quick presets above only ever
+  // show the CURRENT month/year/last-7-days; these let CEO pick ANY past
+  // month, year, or calendar week instead.
+  const [pickMonth, setPickMonth] = useState(now.getMonth() + 1)
+  const [pickYear, setPickYear] = useState(now.getFullYear())
+  const [pickWeek, setPickWeek] = useState('')
+  const yearOptions = Array.from({ length: 6 }, (_, i) => now.getFullYear() - i)
+
   // Expense Modal & Inkasatsiya Modal State
   const [expenseModal, setExpenseModal] = useState(false)
   const [expenseForm, setExpenseForm] = useState({ category: 'Kommunal', amount: '', note: '' })
   const [savingExpense, setSavingExpense] = useState(false)
 
   const [incassationModal, setIncassationModal] = useState(false)
-  const [incassationAmount, setIncassationAmount] = useState('')
-  const [savingIncassation, setSavingIncassation] = useState(false)
   const [sendingTelegram, setSendingTelegram] = useState(false)
 
   const handleSendTelegramReport = async () => {
@@ -99,33 +121,34 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
   const [payrollData, setPayrollData] = useState(null)
   const [inventoryData, setInventoryData] = useState([])
   const [expensesData, setExpensesData] = useState([])
-  const [cashSummary, setCashSummary] = useState(null)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
 
   const { chartAxis, chartGrid, chartGold, chartColors, tooltipStyle } = useTheme()
   const toast = useToastStore((s) => s.add)
 
-  // Fetch all unified clinic reports in parallel for given dates
+  // Fetch all unified clinic reports in parallel for given dates.
+  // /reports/ten-day's response already contains the FULL /reports/finance
+  // payload plus referrer/provider payout breakdowns on top (backend builds
+  // it by running get_report() internally, then adding more keys) — calling
+  // both endpoints separately made the backend compute get_report() twice
+  // per page load. One call now feeds both reportsData and referrersReport.
   const fetchWithDates = useCallback(async (fromStr, toStr) => {
     setLoading(true)
     try {
-      const [dashRes, repRes, refRes, payRes, invRes, expRes, cashRes] = await Promise.all([
+      const [dashRes, refRes, payRes, invRes, expRes] = await Promise.all([
         api('/reports/dashboard').catch(() => null),
-        api(`/reports/finance?from=${fromStr}&to=${toStr}`).catch(() => null),
         api(`/reports/ten-day?from=${fromStr}&to=${toStr}`).catch(() => null),
         api(`/payroll?year=${year}&month=${month}`).catch(() => null),
         api('/inventory').catch(() => []),
         api(`/expenses?from=${fromStr}&to=${toStr}`).catch(() => []),
-        api('/cash/summary').catch(() => null),
       ])
 
       setDashboardData(dashRes)
-      setReportsData(repRes)
+      setReportsData(refRes)
       setReferrersReport(refRes)
       setPayrollData(payRes)
       setInventoryData(invRes || [])
       setExpensesData(expRes || [])
-      setCashSummary(cashRes || null)
     } catch (e) {
       toast(e.message || "Hisobotlar yuklanishida xatolik", 'error')
     } finally {
@@ -144,34 +167,78 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     let t = todayStr
 
     if (preset === 'today') {
-      f = today.toISOString().split('T')[0]
+      f = toLocalDateStr(today)
       t = f
     } else if (preset === 'yesterday') {
       const y = new Date()
       y.setDate(today.getDate() - 1)
-      f = y.toISOString().split('T')[0]
+      f = toLocalDateStr(y)
       t = f
     } else if (preset === 'week') {
       const wAgo = new Date()
       wAgo.setDate(today.getDate() - 7)
-      f = wAgo.toISOString().split('T')[0]
-      t = today.toISOString().split('T')[0]
+      f = toLocalDateStr(wAgo)
+      t = toLocalDateStr(today)
     } else if (preset === 'month') {
       const first = new Date(today.getFullYear(), today.getMonth(), 1)
-      f = first.toISOString().split('T')[0]
-      t = today.toISOString().split('T')[0]
+      f = toLocalDateStr(first)
+      t = toLocalDateStr(today)
     } else if (preset === '10day') {
       const tenAgo = new Date()
       tenAgo.setDate(today.getDate() - 10)
-      f = tenAgo.toISOString().split('T')[0]
-      t = today.toISOString().split('T')[0]
+      f = toLocalDateStr(tenAgo)
+      t = toLocalDateStr(today)
     } else if (preset === 'year') {
       const firstYear = new Date(today.getFullYear(), 0, 1)
-      f = firstYear.toISOString().split('T')[0]
-      t = today.toISOString().split('T')[0]
+      f = toLocalDateStr(firstYear)
+      t = toLocalDateStr(today)
     }
 
     setActivePreset(preset)
+    setDateFrom(f)
+    setDateTo(t)
+    fetchWithDates(f, t)
+  }
+
+  // Any past (or future) month, chosen explicitly — not just "this month"
+  const handleMonthPick = () => {
+    const first = new Date(pickYear, pickMonth - 1, 1)
+    const last = new Date(pickYear, pickMonth, 0)
+    const f = toLocalDateStr(first)
+    const t = toLocalDateStr(last)
+    setActivePreset('custom')
+    setDateFrom(f)
+    setDateTo(t)
+    fetchWithDates(f, t)
+  }
+
+  // Any past (or future) year, chosen explicitly — not just "this year"
+  const handleYearPick = () => {
+    const f = toLocalDateStr(new Date(pickYear, 0, 1))
+    const t = toLocalDateStr(new Date(pickYear, 11, 31))
+    setActivePreset('custom')
+    setDateFrom(f)
+    setDateTo(t)
+    fetchWithDates(f, t)
+  }
+
+  // Any calendar week (Mon-Sun), chosen via the native week picker
+  const handleWeekPick = (weekStr) => {
+    setPickWeek(weekStr)
+    if (!weekStr) return
+    const [yearStr, weekNumStr] = weekStr.split('-W')
+    const yr = parseInt(yearStr, 10)
+    const wk = parseInt(weekNumStr, 10)
+    const simple = new Date(yr, 0, 1 + (wk - 1) * 7)
+    const dow = simple.getDay()
+    const monday = new Date(simple)
+    if (dow <= 4) monday.setDate(simple.getDate() - dow + 1)
+    else monday.setDate(simple.getDate() + 8 - dow)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    const f = toLocalDateStr(monday)
+    const t = toLocalDateStr(sunday)
+    setActivePreset('custom')
     setDateFrom(f)
     setDateTo(t)
     fetchWithDates(f, t)
@@ -217,30 +284,6 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       toast(err.message || "Harajat saqlashda xatolik", "error")
     } finally {
       setSavingExpense(false)
-    }
-  }
-
-  // Create New Incassation Handler
-  const handleCreateIncassation = async (e) => {
-    e.preventDefault()
-    if (!incassationAmount || +incassationAmount <= 0) {
-      toast("Inkasatsiya summasini kiriting", "error")
-      return
-    }
-    setSavingIncassation(true)
-    try {
-      await api('/incassation', {
-        method: 'POST',
-        body: JSON.stringify({ amount: +incassationAmount }),
-      })
-      toast("Inkasatsiya muvaffaqiyatli saqlandi ✓")
-      setIncassationAmount('')
-      setIncassationModal(false)
-      fetchWithDates(dateFrom, dateTo)
-    } catch (err) {
-      toast(err.message || "Inkasatsiya qilishda xatolik", "error")
-    } finally {
-      setSavingIncassation(false)
     }
   }
 
@@ -634,6 +677,32 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                 )}
               </div>
             </div>
+
+            {/* Navbatchilikda (qog'oz jurnalidan) kiritilgan bemorlar — alohida ro'yxat, umumiy summaga allaqachon qo'shilgan */}
+            {(reportsData?.paper_entry_count || 0) > 0 && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <h4 className="text-xs font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  📄 Navbatchilikda (qog'oz jurnalidan) kiritilgan bemorlar — {reportsData.paper_entry_count} ta, jami {formatMoney(reportsData.paper_entry_total)}
+                </h4>
+                <p className="text-[11px] text-muted">Bu bemorlar yuqoridagi umumiy tushum va mijozlar soniga allaqachon qo'shilgan holda hisoblangan.</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <THead cols={['#', 'F.I.Sh', 'Xizmat', 'Sana / Vaqt', 'Summa']} />
+                    <tbody className="divide-y divide-border">
+                      {reportsData.paper_entry_patients.map((p, i) => (
+                        <tr key={p.id} className="hover:bg-surface-hover font-semibold">
+                          <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
+                          <td className="p-2.5 text-body font-bold">{p.full_name}</td>
+                          <td className="p-2.5 text-muted">{p.service_name}</td>
+                          <td className="p-2.5 font-mono text-amber-400">{p.visit_date} {p.visit_time}</td>
+                          <td className="p-2.5 text-right font-mono font-bold text-emerald">{formatMoney(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -976,7 +1045,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
             <Btn variant="gold" size="xs" icon={Icons.printer} onClick={handlePrintReferrersDetailed}>
               🖨️ Mukammal Hisobotni Chop Etish
             </Btn>
-            <button type="button" onClick={handleDownloadReferrersPdf} className="btn-outline py-1 px-3 text-xs font-bold text-cyan hover:text-white">
+            <button type="button" onClick={handleDownloadReferrersPdf} className="btn-outline py-1 px-3 text-xs font-bold text-cyan hover:text-body">
               📄 PDF Mukammal Hisobot
             </button>
             <button type="button" onClick={() => handleExportExcel('referrers')} className="btn-outline py-1 px-3 text-xs font-bold">
@@ -1304,9 +1373,9 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       />
 
       {/* ── PROMINENT MASTER PRINT & DATE CONTROL BAR (ONE SLEEK CARD) ── */}
-      <div className="card p-4 border-gold/40 bg-gold/5 flex flex-wrap items-center justify-between gap-4 shadow-lg">
-        
-        {/* Quick Presets & Date Pickers */}
+      <div className="card p-4 border-gold/40 bg-gold/5 flex flex-col gap-3 shadow-lg">
+
+        {/* Row 1: Quick Presets & Custom Date Range */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold text-gold uppercase mr-1">TEZKOR DAVR:</span>
           {[
@@ -1314,8 +1383,6 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
             { id: 'yesterday', label: '📅 Kecha' },
             { id: 'week', label: '7 Kun' },
             { id: '10day', label: '10-Kunlik' },
-            { id: 'month', label: 'Shu Oy' },
-            { id: 'year', label: 'Shu Yil' },
           ].map((p) => (
             <button
               key={p.id}
@@ -1359,8 +1426,47 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
           </div>
         </div>
 
-        {/* Master Print & Expand/Collapse Controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Row 2: Any Month / Year / Week — not just the current one */}
+        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gold/20">
+          <span className="text-xs font-bold text-gold uppercase mr-1">ANIQ DAVR:</span>
+          <select
+            className="input-field text-xs font-bold py-1.5 max-w-[130px]"
+            value={pickMonth}
+            onChange={(e) => setPickMonth(+e.target.value)}
+          >
+            {MONTH_NAMES.map((name, i) => (
+              <option key={name} value={i + 1}>{name}</option>
+            ))}
+          </select>
+          <select
+            className="input-field text-xs font-bold py-1.5 max-w-[90px]"
+            value={pickYear}
+            onChange={(e) => setPickYear(+e.target.value)}
+          >
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <button type="button" onClick={handleMonthPick} className="btn-outline py-1.5 px-3 text-xs font-bold whitespace-nowrap">
+            📅 Oyni ko'rsatish
+          </button>
+          <button type="button" onClick={handleYearPick} className="btn-outline py-1.5 px-3 text-xs font-bold whitespace-nowrap">
+            🗓️ Butun yilni ko'rsatish
+          </button>
+
+          <div className="w-px h-6 bg-gold/20 hidden sm:block" />
+
+          <span className="text-xs text-muted font-bold whitespace-nowrap">Hafta bo'yicha:</span>
+          <input
+            type="week"
+            className="input-field text-xs font-bold py-1.5 max-w-[160px]"
+            value={pickWeek}
+            onChange={(e) => handleWeekPick(e.target.value)}
+          />
+        </div>
+
+        {/* Row 3: Master Print & Expand/Collapse Controls */}
+        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gold/20">
           {activeTab === 'all' && (
             <>
               <button
@@ -1513,30 +1619,13 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       </Modal>
 
       {/* ── INCASSATION MODAL ────────────────────────────────────── */}
-      <Modal open={incassationModal} onClose={() => setIncassationModal(false)} title="Kassadan Inkasatsiya Yechish">
-        <form onSubmit={handleCreateIncassation} className="space-y-4">
-          <div>
-            <label className="text-xs font-bold text-muted block mb-1">Yechiladigan Summa (so'm):</label>
-            <input
-              type="number"
-              className="input-field font-mono font-bold text-sm text-gold"
-              placeholder="Masalan: 2000000"
-              value={incassationAmount}
-              onChange={(e) => setIncassationAmount(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <button type="button" className="btn-outline flex-1 text-xs" onClick={() => setIncassationModal(false)}>
-              Bekor Qilish
-            </button>
-            <button type="submit" disabled={savingIncassation} className="btn-gold flex-1 text-xs font-bold">
-              {savingIncassation ? 'Bajarilmoqda...' : '✓ Inkasatsiya Qilish'}
-            </button>
-          </div>
-        </form>
-      </Modal>
+      <IncassationModal
+        open={incassationModal}
+        onClose={() => {
+          setIncassationModal(false)
+          fetchWithDates(dateFrom, dateTo)
+        }}
+      />
 
     </div>
   )

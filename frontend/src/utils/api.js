@@ -64,7 +64,9 @@ export async function api(path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Xato yuz berdi' }))
-    throw new Error(extractErrorMessage(err))
+    const apiError = new Error(extractErrorMessage(err))
+    apiError.status = res.status
+    throw apiError
   }
 
   if (res.status === 204) return null

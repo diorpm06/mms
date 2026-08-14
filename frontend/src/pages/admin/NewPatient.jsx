@@ -57,6 +57,7 @@ export default function NewPatient({ homePath = '/admin' }) {
   const [referrers, setReferrers] = useState([])
   const [services, setServices] = useState([])
   const [providers, setProviders] = useState([])
+  const [catalogLoading, setCatalogLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [createdPatient, setCreatedPatient] = useState(null)
   const [expandedCat, setExpandedCat] = useState(null) // accordion
@@ -155,6 +156,7 @@ export default function NewPatient({ homePath = '/admin' }) {
         if (!s?.length) toast('Xizmat turlari topilmadi', 'error')
       })
       .catch((e) => toast(e.message || 'Ro\'yxatlar yuklanmadi', 'error'))
+      .finally(() => setCatalogLoading(false))
   }, [])
 
   useEffect(() => {
@@ -390,6 +392,7 @@ export default function NewPatient({ homePath = '/admin' }) {
 
     if (isPaperMode && customDate) {
       payload.custom_date = customDate
+      payload.is_paper_entry = true
     }
 
     setLoading(true)
@@ -400,7 +403,18 @@ export default function NewPatient({ homePath = '/admin' }) {
         navigate(homePath)
         return
       }
-      const res = await api('/patients', { method: 'POST', body: JSON.stringify(payload) })
+      let res
+      try {
+        res = await api('/patients', { method: 'POST', body: JSON.stringify(payload) })
+      } catch (e) {
+        if (e.status === 409) {
+          const proceed = window.confirm(`${e.message}\n\nBaribir davom etasizmi?`)
+          if (!proceed) return
+          res = await api('/patients', { method: 'POST', body: JSON.stringify({ ...payload, confirm_duplicate: true }) })
+        } else {
+          throw e
+        }
+      }
       toast('To\'lov qabul qilindi ✓')
       setCreatedPatient(res)
     } catch (e) {
@@ -446,7 +460,7 @@ export default function NewPatient({ homePath = '/admin' }) {
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                 !isPaperMode
                   ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-lg'
-                  : 'bg-white/5 border-border text-muted hover:text-white'
+                  : 'bg-white/5 border-border text-muted hover:text-body'
               }`}
             >
               🟢 Bugungi Jonli Qabul
@@ -457,7 +471,7 @@ export default function NewPatient({ homePath = '/admin' }) {
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                 isPaperMode
                   ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-lg'
-                  : 'bg-white/5 border-border text-muted hover:text-white'
+                  : 'bg-white/5 border-border text-muted hover:text-body'
               }`}
             >
               📄 Qog'oz Jurnaldan Kiritish
@@ -475,7 +489,7 @@ export default function NewPatient({ homePath = '/admin' }) {
             </div>
             <input
               type="date"
-              className="input-field font-bold text-amber-300 text-sm bg-slate-900 border-amber-500/50"
+              className="input-field font-bold text-amber-300 text-sm bg-surface border-amber-500/50"
               value={customDate}
               onChange={(e) => setCustomDate(e.target.value)}
               required
@@ -498,7 +512,7 @@ export default function NewPatient({ homePath = '/admin' }) {
               <div className="flex items-center gap-2">
                 <span className="text-base">✓</span>
                 <div>
-                  <p className="font-extrabold text-white text-xs">
+                  <p className="font-extrabold text-body text-xs">
                     BAZADAN TOPILGAN BEMOR: {selectedExistingPatient.full_name} ({selectedExistingPatient.birth_date})
                   </p>
                   <p className="text-[11px] text-emerald-200/80 font-normal">
@@ -529,10 +543,10 @@ export default function NewPatient({ homePath = '/admin' }) {
 
             {/* LIVE AUTOCOMPLETE DROPDOWN */}
             {showDropdown && suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-slate-900 border-2 border-gold/40 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto divide-y divide-border/40">
+              <div className="absolute left-0 right-0 top-full mt-1 bg-surface border-2 border-gold/40 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto divide-y divide-border/40">
                 <div className="px-3 py-2 bg-gold/10 text-gold text-[11px] font-black uppercase tracking-wider flex justify-between items-center">
                   <span>🔍 Bazada O'xshash Bemorlar Topildi ({suggestions.length})</span>
-                  <button type="button" onClick={() => setShowDropdown(false)} className="text-muted hover:text-white">✕</button>
+                  <button type="button" onClick={() => setShowDropdown(false)} className="text-muted hover:text-body">✕</button>
                 </div>
                 {suggestions.map((p) => (
                   <div
@@ -541,8 +555,8 @@ export default function NewPatient({ homePath = '/admin' }) {
                     className="p-3 hover:bg-gold/10 cursor-pointer transition-colors flex items-center justify-between text-xs"
                   >
                     <div>
-                      <p className="font-bold text-white text-sm">{p.full_name}</p>
-                      <p className="text-[11px] text-slate-300 mt-0.5">
+                      <p className="font-bold text-body text-sm">{p.full_name}</p>
+                      <p className="text-[11px] text-body mt-0.5">
                         📅 {p.birth_date} | 📍 {p.address || "Manzil ko'rsatilmagan"} | 📞 {p.phone || '—'}
                       </p>
                     </div>
@@ -681,15 +695,15 @@ export default function NewPatient({ homePath = '/admin' }) {
 
                   {/* Expanded Body: Sub-Categories inside Main Department */}
                   {isOpen && (
-                    <div className="px-4 py-3 bg-slate-950/60 border-t border-border/40 space-y-4">
+                    <div className="px-4 py-3 bg-surface-sunken border-t border-border/40 space-y-4">
                       {Object.entries(subCatsDict).map(([subCatName, list]) => {
                         const selectedInSub = list.filter((s) => isServiceSelected(s.id)).length
 
                         return (
-                          <div key={subCatName} className="space-y-2 border border-slate-800 rounded-xl p-3 bg-slate-900/60">
+                          <div key={subCatName} className="space-y-2 border border-border rounded-xl p-3 bg-surface">
                             {/* Sub-Category Header */}
                             {subCatName !== 'Umumiy' && (
-                              <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-2">
+                              <div className="flex items-center justify-between border-b border-border pb-1.5 mb-2">
                                 <span className="text-xs font-black uppercase tracking-wider text-gold flex items-center gap-1.5">
                                   📁 {subCatName}
                                 </span>
@@ -713,7 +727,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                                     className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
                                       selected
                                         ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300 shadow-sm'
-                                        : 'bg-slate-800/60 border-slate-600/60 text-slate-300 hover:border-slate-400 hover:text-slate-100'
+                                        : 'bg-surface-2 border-border text-body hover:border-border-strong hover:text-body'
                                     }`}
                                   >
                                     <span className="block font-bold">{s.name} {s.allow_custom_price && <span className="text-[9px] text-cyan-300">✏️</span>}</span>
@@ -733,7 +747,12 @@ export default function NewPatient({ homePath = '/admin' }) {
               )
             })}
 
-            {Object.keys(nestedServices).length === 0 && (
+            {catalogLoading ? (
+              <div className="py-10 text-center text-muted text-sm flex items-center justify-center gap-2">
+                <span className="h-4 w-4 rounded-full border-2 border-gold border-t-transparent animate-spin" />
+                Xizmatlar yuklanmoqda...
+              </div>
+            ) : Object.keys(nestedServices).length === 0 && (
               <div className="py-10 text-center text-muted text-sm">
                 Hali xizmat qo'shilmagan — Sozlamalardan xizmat turini kiriting
               </div>
@@ -783,7 +802,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                       return (
                         <div
                           key={svcObj.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-slate-900/80 border border-emerald-500/20 text-xs ml-3"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-surface border border-emerald-500/20 text-xs ml-3"
                         >
                           <div>
                             <div className="flex items-center gap-2">
@@ -803,13 +822,13 @@ export default function NewPatient({ homePath = '/admin' }) {
                                   value={formatWithCommas(row.price)}
                                   onChange={(e) => updateServicePrice(svcObj.id, parseDigits(e.target.value))}
                                   placeholder="0"
-                                  className="w-28 px-2 py-1 rounded-lg bg-slate-950 border border-cyan-500/60 font-mono font-bold text-cyan-300 text-xs text-center focus:outline-none focus:border-cyan-400"
+                                  className="w-28 px-2 py-1 rounded-lg bg-surface-sunken border border-cyan-500/60 font-mono font-bold text-cyan-300 text-xs text-center focus:outline-none focus:border-cyan-400"
                                 />
                                 <span className="text-[11px] text-cyan-300 font-semibold">so'm</span>
                               </div>
                             ) : (
                               <p className="text-[11px] text-muted mt-0.5">
-                                1 dona: <span className="font-mono text-slate-300">{formatMoney(unitPrice)}</span>
+                                1 dona: <span className="font-mono text-body">{formatMoney(unitPrice)}</span>
                               </p>
                             )}
 
@@ -819,7 +838,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                               <select
                                 value={row.provider_id || ''}
                                 onChange={(e) => updateServiceDoctor(svcObj.id, e.target.value)}
-                                className={`px-2 py-1 rounded-lg bg-slate-950 border text-[11px] font-bold focus:outline-none focus:border-amber-400 max-w-[240px] ${
+                                className={`px-2 py-1 rounded-lg bg-surface-sunken border text-[11px] font-bold focus:outline-none focus:border-amber-400 max-w-[240px] ${
                                   row.provider_id ? 'border-emerald-500/60 text-emerald-300' : 'border-amber-500/40 text-amber-300'
                                 }`}
                               >
@@ -838,7 +857,7 @@ export default function NewPatient({ homePath = '/admin' }) {
 
                           <div className="flex items-center gap-3 shrink-0 justify-between sm:justify-end">
                             {/* Quantity Counter (- 1 +) */}
-                            <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-xl border border-slate-700">
+                            <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border">
                               <button
                                 type="button"
                                 onClick={() => updateServiceQuantity(svcObj.id, qty - 1)}
@@ -1020,7 +1039,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                       splitSecond === 'card'
                         ? 'bg-cyan-600/20 border-cyan-500/60 text-cyan-300'
-                        : 'bg-transparent border-slate-600 text-slate-400 hover:border-slate-400'
+                        : 'bg-transparent border-border text-muted hover:border-border-strong'
                     }`}
                   >
                     💳 Karta
@@ -1031,7 +1050,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                       splitSecond === 'qr'
                         ? 'bg-violet-600/20 border-violet-500/60 text-violet-300'
-                        : 'bg-transparent border-slate-600 text-slate-400 hover:border-slate-400'
+                        : 'bg-transparent border-border text-muted hover:border-border-strong'
                     }`}
                   >
                     🔳 QR kod

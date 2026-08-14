@@ -12,7 +12,6 @@ from models.patient import Patient
 from models.report_submission import ReportSubmission
 from models.user import User
 from services.audit import get_client_info, log_audit
-from services.report_pdf import generate_report_pdf
 
 router = APIRouter(prefix="/api/report-submissions", tags=["report-submissions"])
 
@@ -122,6 +121,8 @@ def get_report_pdf(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_or_ceo),
 ):
+    from services.report_pdf import generate_report_pdf
+
     r = db.query(ReportSubmission).options(joinedload(ReportSubmission.patient)).filter(
         ReportSubmission.id == report_id
     ).first()

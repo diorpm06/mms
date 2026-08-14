@@ -9,7 +9,7 @@ export const useAuthStore = create(
       role: null,
       fullName: null,
       userId: null,
-      theme: 'dark',
+      theme: 'light',
       setAuth: (data) =>
         set({
           accessToken: data.access_token,

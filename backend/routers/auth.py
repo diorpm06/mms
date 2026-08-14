@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -29,13 +29,36 @@ class RefreshRequest(BaseModel):
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 limiter = Limiter(key_func=get_remote_address)
 
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == data.username, User.is_active == True).first()
+
+    # DB-backed lockout — IP-based rate limiting above doesn't reliably survive
+    # serverless cold starts across instances, so the real guard lives here,
+    # keyed to the account itself via the shared database.
+    if user and user.locked_until and user.locked_until > datetime.utcnow():
+        remaining_min = max(1, int((user.locked_until - datetime.utcnow()).total_seconds() // 60) + 1)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Ko'p marta noto'g'ri urinildi. {remaining_min} daqiqadan keyin qayta urinib ko'ring.",
+        )
+
     if not user or not verify_password(data.password, user.hashed_password):
+        if user:
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
+                user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+                user.failed_login_attempts = 0
+            db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login yoki parol noto'g'ri")
+
+    user.failed_login_attempts = 0
+    user.locked_until = None
     ip, device = get_client_info(request)
     session = SessionLog(user_id=user.id, ip_address=ip, device_info=device)
     db.add(session)
@@ -114,6 +137,21 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(get_current_user
     return [{"id": u.id, "full_name": u.full_name, "role": u.role} for u in db.query(User).filter(User.is_active == True).all()]
 
 
+@router.get("/users-credentials")
+def list_users_credentials(db: Session = Depends(get_db), _: User = Depends(require_ceo)):
+    """Faqat Rahbar uchun — hodimlarning joriy login va parolini doim ko'rsatib turadi."""
+    return [
+        {
+            "id": u.id,
+            "full_name": u.full_name,
+            "role": u.role,
+            "username": u.username,
+            "plain_password": u.plain_password,
+        }
+        for u in db.query(User).filter(User.is_active == True).order_by(User.role, User.full_name).all()
+    ]
+
+
 class PasswordChangeBody(BaseModel):
     user_id: int
     new_password: str = Field(min_length=6)
@@ -142,6 +180,9 @@ def change_password(
         target.username = body.new_username
 
     target.hashed_password = hash_password(body.new_password)
+    target.plain_password = body.new_password
+    target.failed_login_attempts = 0
+    target.locked_until = None
     ip, device = get_client_info(request)
     detail = f"{target.full_name} paroli o'zgartirildi"
     if body.new_username:

@@ -3,11 +3,12 @@
 @tailwind utilities;
 
 /* ─── DARK THEME ─────────────────────────────────────────── */
-:root,
 html.dark {
   --bg:             #09101f;
   --surface:        #0f172a;
   --surface-2:      #1e293b;
+  /* Karta ichidagi "botiq" bo'limlar uchun (masalan xizmat tanlash ro'yxati) */
+  --surface-sunken: #020617;
   --surface-hover:  rgba(255, 255, 255, 0.05);
   --gold:           #f59e0b;
   --gold-hover:     #fbbf24;
@@ -58,11 +59,14 @@ html.dark {
   animation-play-state: paused;
 }
 
-/* ─── LIGHT THEME ────────────────────────────────────────── */
+/* ─── LIGHT THEME (default — matches the app's default theme, so the
+   pre-JS/pre-hydration paint doesn't flash dark before flipping light) ── */
+:root,
 html.light {
   --bg:             #f1f5f9;
   --surface:        #ffffff;
   --surface-2:      #f8fafc;
+  --surface-sunken: #f1f5f9;
   --surface-hover:  #f1f5f9;
   --gold:           #d97706;
   --gold-hover:     #b45309;
@@ -101,8 +105,10 @@ html.light {
 @layer base {
   html {
     @apply font-sans antialiased;
-    /* Fallback: dark background before JS applies the theme class */
-    background-color: #09101f;
+    /* Tracks whichever theme is active (var(--bg) flips with the .dark/.light
+       class) instead of a hardcoded color — so html and body never disagree
+       and show a split background during load. */
+    background-color: var(--bg);
   }
 
   body {

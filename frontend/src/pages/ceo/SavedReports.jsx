@@ -97,7 +97,7 @@ export default function CeoSavedReports() {
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border ${
               filterType === t.id
                 ? 'bg-gold/15 border-gold/40 text-gold shadow-sm'
-                : 'bg-card border-border/60 text-slate-400 hover:text-foreground'
+                : 'bg-card border-border/60 text-muted hover:text-foreground'
             }`}
           >
             {t.label}
@@ -142,10 +142,10 @@ export default function CeoSavedReports() {
                         {r.report_type === 'daily' ? '📅 Kunlik' : '📆 10-Kunlik'}
                       </span>
                     </td>
-                    <td className="td-cell font-mono text-xs text-slate-300">
+                    <td className="td-cell font-mono text-xs text-body">
                       {r.period_start === r.period_end ? r.period_start : `${r.period_start} — ${r.period_end}`}
                     </td>
-                    <td className="td-cell font-bold text-slate-200">
+                    <td className="td-cell font-bold text-body">
                       {r.data?.patients_count ?? '—'} ta
                     </td>
                     <td className="td-cell font-bold accent-value">

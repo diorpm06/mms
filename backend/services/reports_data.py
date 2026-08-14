@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 
 from models.advance import Advance
@@ -96,14 +96,23 @@ def get_report(db: Session, start: date, end: date) -> dict:
     all_patients = patients_q.all()
     patients_count = len(all_patients)
 
-    phones_seen = set()
+    # Bemorlarning ~24% ida telefon raqami yo'q. Faqat telefon bo'yicha
+    # ajratganda ularning HAMMASI bitta odam ("") deb hisoblanib, "qayta
+    # tashrif" ga qo'shilib ketardi. Telefon bo'lmasa — ism/familiya va
+    # tug'ilgan sana bo'yicha ajratamiz.
+    seen_keys = set()
     new_count = 0
     repeat_count = 0
     for p in sorted(all_patients, key=lambda x: x.created_at):
-        if p.phone in phones_seen:
+        phone = (p.phone or "").strip()
+        if phone:
+            key = f"tel:{phone}"
+        else:
+            key = f"ism:{(p.first_name or '').strip().lower()}|{(p.last_name or '').strip().lower()}|{p.birth_date}"
+        if key in seen_keys:
             repeat_count += 1
         else:
-            phones_seen.add(p.phone)
+            seen_keys.add(key)
             new_count += 1
 
     if txs:
@@ -140,43 +149,34 @@ def get_report(db: Session, start: date, end: date) -> dict:
     )
     expense_total = sum(x.amount for x in expenses)
 
-    advance_total = (
-        db.query(func.coalesce(func.sum(Payout.amount), 0))
-        .filter(
-            Payout.recipient_type == "advance",
-            Payout.created_at >= s,
-            Payout.created_at <= e,
+    # Bitta so'rovda ikkalasi (advance + salary) — masofaviy bazaga har bir
+    # alohida so'rov ~200ms ketadi, shuning uchun kombinatsiyalash muhim
+    payout_totals = (
+        db.query(
+            func.coalesce(func.sum(case((Payout.recipient_type == "advance", Payout.amount), else_=0)), 0),
+            func.coalesce(func.sum(case((Payout.recipient_type.in_(["provider", "employee"]), Payout.amount), else_=0)), 0),
         )
-        .scalar()
+        .filter(Payout.created_at >= s, Payout.created_at <= e)
+        .first()
     )
-
-    salary_total = (
-        db.query(func.coalesce(func.sum(Payout.amount), 0))
-        .filter(
-            Payout.recipient_type.in_(["provider", "employee"]),
-            Payout.created_at >= s,
-            Payout.created_at <= e,
-        )
-        .scalar()
-    )
+    advance_total, salary_total = payout_totals
 
     net_profit = center_share - expense_total - salary_total
 
-    active_inpatients = (
-        db.query(Inpatient)
-        .filter(Inpatient.status == "yotibdi", Inpatient.is_cancelled == False)
-        .count()
-    )
-    discharged_today = (
-        db.query(Inpatient)
-        .filter(
-            Inpatient.discharged_at >= s,
-            Inpatient.discharged_at <= e,
-            Inpatient.status == "chiqdi",
-            Inpatient.is_cancelled == False,
+    inpatient_counts = (
+        db.query(
+            func.count(case((Inpatient.status == "yotibdi", Inpatient.id))),
+            func.count(case(
+                (and_(
+                    Inpatient.discharged_at >= s, Inpatient.discharged_at <= e,
+                    Inpatient.status == "chiqdi",
+                ), Inpatient.id)
+            )),
         )
-        .count()
+        .filter(Inpatient.is_cancelled == False)
+        .first()
     )
+    active_inpatients, discharged_today = inpatient_counts
     inpatient_income = (
         db.query(func.coalesce(func.sum(InpatientPayment.amount), 0))
         .filter(
@@ -262,25 +262,12 @@ def get_report(db: Session, start: date, end: date) -> dict:
     bal = db.query(Balance).first()
     current_balance = bal.current_balance if bal else 0
 
-    daily_totals_rows = (
-        db.query(
-            func.date(Transaction.created_at).label("day"),
-            func.sum(Transaction.total_amount).label("total"),
-        )
-        .filter(
-            Transaction.created_at >= s,
-            Transaction.created_at <= e,
-            Transaction.is_cancelled == False,
-        )
-        .group_by(func.date(Transaction.created_at))
-        .all()
-    )
+    # txs allaqachon shu davr uchun (is_cancelled=False bilan) yuklab olingan —
+    # kunlik jadval uchun qayta bazaga so'rov yubormasdan shu yerda guruhlaymiz
     daily_totals_map = {}
-    for row in daily_totals_rows:
-        day_val = row.day
-        if isinstance(day_val, str):
-            day_val = datetime.fromisoformat(day_val).date()
-        daily_totals_map[day_val] = int(row.total or 0)
+    for t in txs:
+        day_val = t.created_at.date()
+        daily_totals_map[day_val] = daily_totals_map.get(day_val, 0) + int(t.total_amount or 0)
 
     chart = []
     d = start
@@ -348,16 +335,9 @@ def get_report(db: Session, start: date, end: date) -> dict:
         mat_summary[item_name]["total_income"] += charged_amt
         mat_summary[item_name]["total_cost"] += consumed_amt * cost_p
 
-    mat_patients = (
-        db.query(Patient)
-        .filter(
-            Patient.created_at >= s,
-            Patient.created_at <= e,
-            Patient.is_cancelled == False,
-            Patient.diagnosis != None,
-        )
-        .all()
-    )
+    # all_patients allaqachon shu davr uchun (is_cancelled=False bilan) yuklab
+    # olingan — qayta bazaga so'rov yubormasdan shu yerdan filtrlaymiz
+    mat_patients = [p for p in all_patients if p.diagnosis]
     for p in mat_patients:
         diag = (p.diagnosis or "").strip()
         mat_name = None
@@ -393,6 +373,21 @@ def get_report(db: Session, start: date, end: date) -> dict:
     total_material_cost = sum(m["total_cost"] for m in materials_used_breakdown)
     total_material_profit = sum(m["profit"] for m in materials_used_breakdown)
     total_material_quantity = sum(m["quantity_used"] for m in materials_used_breakdown)
+
+    paper_entry_patients = [
+        {
+            "id": p.id,
+            "full_name": f"{p.first_name} {p.last_name}".strip(),
+            "service_name": p.service.name if p.service else "—",
+            "amount": int(p.payment_amount or 0),
+            "visit_date": p.created_at.strftime("%Y-%m-%d") if p.created_at else None,
+            "visit_time": p.created_at.strftime("%H:%M") if p.created_at else None,
+        }
+        for p in sorted(all_patients, key=lambda x: x.created_at)
+        if p.is_paper_entry
+    ]
+    paper_entry_count = len(paper_entry_patients)
+    paper_entry_total = sum(p["amount"] for p in paper_entry_patients)
 
     return {
         "period_start": start.isoformat(),
@@ -434,6 +429,9 @@ def get_report(db: Session, start: date, end: date) -> dict:
         "total_material_profit": int(total_material_profit),
         "total_material_quantity": int(total_material_quantity),
         "duty_today": duty_list,
+        "paper_entry_patients": paper_entry_patients,
+        "paper_entry_count": paper_entry_count,
+        "paper_entry_total": paper_entry_total,
         "income_chart": chart,
         "payment_chart": payment_chart,
         "finance_chart": finance_chart,
@@ -453,6 +451,9 @@ def admin_daily_report(db: Session, d: date) -> dict:
         "expenses": full["expenses"],
         "services_breakdown": full["services_breakdown"],
         "payment_chart": full["payment_chart"],
+        "paper_entry_patients": full["paper_entry_patients"],
+        "paper_entry_count": full["paper_entry_count"],
+        "paper_entry_total": full["paper_entry_total"],
         "report_date": d.isoformat(),
     }
     if out["patients_count"] == 0 and out["total_income"] == 0:
@@ -586,12 +587,20 @@ def income_last_n_days(db: Session, days: int = 7):
 
 def ten_day_report(db: Session, start: date, end: date) -> dict:
     """10 kunlik hisobot: foizlar, 50/50 taqsimot, avans qoplash, va to'lovlar."""
+    from collections import defaultdict
+
     from models.provider import Provider
     from models.provider_advance import ProviderAdvance
     from models.referrer import Referrer
 
     s, e = _period_range(start, end)
     base_report = get_report(db, start, end)
+
+    # Har bir referrer/provider uchun alohida so'rov o'rniga — bitta so'rovda
+    # barcha yopilmagan avanslarni olib, xotirada guruhlaymiz
+    advance_remaining_map = defaultdict(int)
+    for a in db.query(ProviderAdvance).filter(ProviderAdvance.is_settled == False).all():
+        advance_remaining_map[(a.recipient_type, a.recipient_id)] += a.remaining
 
     # 1. Detailed Service Breakdown with Commissions
     from sqlalchemy.orm import joinedload
@@ -708,16 +717,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             })
 
         # Check Advances for Referrer
-        advances = (
-            db.query(ProviderAdvance)
-            .filter(
-                ProviderAdvance.recipient_type == "referrer",
-                ProviderAdvance.recipient_id == r.id,
-                ProviderAdvance.is_settled == False,
-            )
-            .all()
-        )
-        total_advance_remaining = sum(a.remaining for a in advances)
+        total_advance_remaining = advance_remaining_map.get(("referrer", r.id), 0)
 
         advance_deducted = min(total_comm, total_advance_remaining)
         net_payable = max(0, total_comm - advance_deducted)
@@ -871,16 +871,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             total_prov_share += prov_amt
 
         # Check Advances for Provider
-        advances = (
-            db.query(ProviderAdvance)
-            .filter(
-                ProviderAdvance.recipient_type == "provider",
-                ProviderAdvance.recipient_id == pr.id,
-                ProviderAdvance.is_settled == False,
-            )
-            .all()
-        )
-        total_advance_remaining = sum(a.remaining for a in advances)
+        total_advance_remaining = advance_remaining_map.get(("provider", pr.id), 0)
 
         advance_deducted = min(total_prov_share, total_advance_remaining)
         net_payable = max(0, total_prov_share - advance_deducted)

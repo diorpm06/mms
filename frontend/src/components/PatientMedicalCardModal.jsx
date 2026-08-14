@@ -17,7 +17,7 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
   const fetchHistory = () => {
     if (!patient) return
     setLoading(true)
-    api(`/patients/${patient.id}/history`)
+    api(`/patients/${patient.id}/visits`)
       .then((res) => setHistory(res || []))
       .catch((e) => console.error(e))
       .finally(() => setLoading(false))
@@ -179,7 +179,7 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
               onClick={() => setActiveTab('ehr')}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
                 activeTab === 'ehr'
-                  ? 'bg-gold text-white font-black shadow-md'
+                  ? 'bg-gold text-slate-950 font-black shadow-md'
                   : 'bg-surface-2 text-muted hover:text-body border border-border'
               }`}
             >
@@ -192,7 +192,7 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
               onClick={() => setActiveTab('visits')}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
                 activeTab === 'visits'
-                  ? 'bg-cyan text-white font-black shadow-md'
+                  ? 'bg-cyan text-body font-black shadow-md'
                   : 'bg-surface-2 text-muted hover:text-body border border-border'
               }`}
             >

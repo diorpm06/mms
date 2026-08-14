@@ -3,6 +3,8 @@ import { api } from '../../utils/api'
 import { useToastStore } from '../../store/toastStore'
 import { KeyRound, Eye, EyeOff } from 'lucide-react'
 
+const ROLE_LABEL = { ceo: 'Rahbar', admin: 'Admin', doctor: 'Shifokor' }
+
 export default function ChangePassword() {
   const [users,      setUsers]      = useState([])
   const [userId,     setUserId]     = useState('')
@@ -13,9 +15,8 @@ export default function ChangePassword() {
   const [loading,    setLoading]    = useState(false)
   const toast = useToastStore((s) => s.add)
 
-  useEffect(() => {
-    api('/auth/users').then(setUsers).catch(() => {})
-  }, [])
+  const loadUsers = () => api('/auth/users-credentials').then(setUsers).catch(() => {})
+  useEffect(() => { loadUsers() }, [])
 
   const submit = async () => {
     if (!userId) { toast("Foydalanuvchi tanlang", 'error'); return }
@@ -33,6 +34,7 @@ export default function ChangePassword() {
       setConfirm('')
       setUserId('')
       setUsername('')
+      loadUsers()
     } catch (e) {
       toast(e.message, 'error')
     } finally {
@@ -43,8 +45,8 @@ export default function ChangePassword() {
   const selectedUser = users.find((u) => u.id === +userId)
 
   return (
-    <div className="max-w-md">
-      <div className="mb-6 flex items-center gap-3">
+    <div className="max-w-4xl space-y-6">
+      <div className="mb-2 flex items-center gap-3">
         <div
           className="rounded-xl p-2.5"
           style={{ background: 'var(--gold-dim)' }}
@@ -57,7 +59,37 @@ export default function ChangePassword() {
         </div>
       </div>
 
-      <div className="card space-y-5">
+      {/* Hodimlarning joriy login/paroli — doim ko'rinib turadi */}
+      <div className="card space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-gold">Hodimlarning joriy login va paroli</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border text-gold font-bold text-left bg-surface-2">
+                <th className="p-2.5">F.I.Sh</th>
+                <th className="p-2.5">Rol</th>
+                <th className="p-2.5">Login</th>
+                <th className="p-2.5">Parol</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {users.map((u) => (
+                <tr key={u.id} className="hover:bg-surface-hover font-semibold">
+                  <td className="p-2.5 text-body font-bold">{u.full_name}</td>
+                  <td className="p-2.5 text-muted">{ROLE_LABEL[u.role] || u.role}</td>
+                  <td className="p-2.5 font-mono">{u.username}</td>
+                  <td className="p-2.5 font-mono text-gold">{u.plain_password || '— (eski, hali o\'zgartirilmagan)'}</td>
+                </tr>
+              ))}
+              {users.length === 0 && (
+                <tr><td colSpan={4} className="p-4 text-center text-muted italic">Yuklanmoqda...</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card space-y-5 max-w-md">
         {/* User selector */}
         <div>
           <label className="text-muted mb-1.5 block text-xs font-medium uppercase tracking-wide">
@@ -71,13 +103,13 @@ export default function ChangePassword() {
             <option value="">— Tanlang</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.full_name} ({u.role === 'ceo' ? 'Rahbar' : 'Admin'})
+                {u.full_name} ({ROLE_LABEL[u.role] || u.role})
               </option>
             ))}
           </select>
           {selectedUser && (
             <p className="text-muted mt-1 text-xs">
-              Rol: <span style={{ color: 'var(--gold)' }}>{selectedUser.role === 'ceo' ? 'Rahbar' : 'Admin'}</span>
+              Rol: <span style={{ color: 'var(--gold)' }}>{ROLE_LABEL[selectedUser.role] || selectedUser.role}</span>
             </p>
           )}
         </div>

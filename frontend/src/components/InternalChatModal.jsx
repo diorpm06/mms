@@ -67,21 +67,21 @@ export default function InternalChatModal({ open, onClose }) {
     >
       {/* Header */}
       <div
-        className="p-4 text-white flex items-center justify-between shadow-md"
+        className="p-4 text-body flex items-center justify-between shadow-md"
         style={{ background: 'linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%)' }}
       >
         <div className="flex items-center gap-2.5">
           <div className="rounded-xl p-1.5 bg-white/10">
-            <MessageSquare className="h-5 w-5 text-white" />
+            <MessageSquare className="h-5 w-5 text-body" />
           </div>
           <div>
-            <h3 className="font-extrabold text-sm leading-tight text-white">Klinika Ichki Chati</h3>
+            <h3 className="font-extrabold text-sm leading-tight text-body">Klinika Ichki Chati</h3>
             <span className="text-[10px] text-cyan-100 opacity-90 block">Registratura, Rahbar va Shifokorlar</span>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-xl hover:bg-white/20 text-white transition-all"
+          className="p-1.5 rounded-xl hover:bg-white/20 text-body transition-all"
           title="Yopish"
         >
           <X className="h-5 w-5" />

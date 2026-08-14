@@ -1,43 +1,54 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { useTheme } from './hooks/useTheme'
 import Toast from './components/Toast'
 import Layout from './components/Layout'
 import Login from './pages/Login'
-import CeoDashboard from './pages/ceo/Dashboard'
-import CeoPatients from './pages/ceo/Patients'
-import CeoServices from './pages/ceo/Services'
-import AdminReportQueue from './pages/admin/ReportQueue'
-import CeoReferrers from './pages/ceo/Referrers'
-import CeoProviders from './pages/ceo/Providers'
-import CeoEmployees from './pages/ceo/Employees'
-import CeoBalance from './pages/ceo/Balance'
-import CeoAdvances from './pages/ceo/Advances'
-import CeoSavedReports from './pages/ceo/SavedReports'
-import CeoReports from './pages/ceo/Reports'
-import CeoActivity from './pages/ceo/Activity'
-import CeoDuty from './pages/ceo/Duty'
-import CeoInpatients from './pages/ceo/Inpatients'
-import CeoCash from './pages/ceo/Cash'
-import ChangePassword from './pages/ceo/ChangePassword'
-import CeoBackup from './pages/ceo/Backup'
-import CeoExpenses from './pages/ceo/Expenses'
-import AdminDashboard from './pages/admin/Dashboard'
-import NewPatient from './pages/admin/NewPatient'
-import Search from './pages/admin/Search'
-import TodayPatients from './pages/admin/TodayPatients'
-import AdminExpenses from './pages/admin/Expenses'
-import AdminCatalog from './pages/admin/Catalog'
-import AdminReports from './pages/admin/Reports'
-import TvQueueDisplay from './pages/TvQueueDisplay'
-import DoctorPanel from './pages/doctor/DoctorPanel'
-import Appointments from './pages/admin/Appointments'
-import Inventory from './pages/admin/Inventory'
-import Payroll from './pages/ceo/Payroll'
-import BannersManager from './components/BannersManager'
-import TvManagerDashboard from './pages/TvManagerDashboard'
-import UnifiedReportsHub from './pages/ceo/UnifiedReportsHub'
+
+// Route-level code splitting: every role only downloads the pages it
+// actually visits, instead of one bundle containing all CEO/Admin/Doctor
+// screens up front. Login/Layout/Toast stay eager since they're needed
+// immediately on every visit.
+const CeoDashboard = lazy(() => import('./pages/ceo/Dashboard'))
+const CeoPatients = lazy(() => import('./pages/ceo/Patients'))
+const CeoServices = lazy(() => import('./pages/ceo/Services'))
+const AdminReportQueue = lazy(() => import('./pages/admin/ReportQueue'))
+const CeoReferrers = lazy(() => import('./pages/ceo/Referrers'))
+const CeoProviders = lazy(() => import('./pages/ceo/Providers'))
+const CeoEmployees = lazy(() => import('./pages/ceo/Employees'))
+const CeoBalance = lazy(() => import('./pages/ceo/Balance'))
+const CeoAdvances = lazy(() => import('./pages/ceo/Advances'))
+const CeoSavedReports = lazy(() => import('./pages/ceo/SavedReports'))
+const CeoActivity = lazy(() => import('./pages/ceo/Activity'))
+const CeoDuty = lazy(() => import('./pages/ceo/Duty'))
+const CeoInpatients = lazy(() => import('./pages/ceo/Inpatients'))
+const CeoCash = lazy(() => import('./pages/ceo/Cash'))
+const ChangePassword = lazy(() => import('./pages/ceo/ChangePassword'))
+const CeoBackup = lazy(() => import('./pages/ceo/Backup'))
+const CeoExpenses = lazy(() => import('./pages/ceo/Expenses'))
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'))
+const NewPatient = lazy(() => import('./pages/admin/NewPatient'))
+const Search = lazy(() => import('./pages/admin/Search'))
+const TodayPatients = lazy(() => import('./pages/admin/TodayPatients'))
+const AdminExpenses = lazy(() => import('./pages/admin/Expenses'))
+const AdminCatalog = lazy(() => import('./pages/admin/Catalog'))
+const AdminReports = lazy(() => import('./pages/admin/Reports'))
+const TvQueueDisplay = lazy(() => import('./pages/TvQueueDisplay'))
+const DoctorPanel = lazy(() => import('./pages/doctor/DoctorPanel'))
+const Appointments = lazy(() => import('./pages/admin/Appointments'))
+const Inventory = lazy(() => import('./pages/admin/Inventory'))
+const Payroll = lazy(() => import('./pages/ceo/Payroll'))
+const TvManagerDashboard = lazy(() => import('./pages/TvManagerDashboard'))
+const UnifiedReportsHub = lazy(() => import('./pages/ceo/UnifiedReportsHub'))
+
+function PageLoader() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="h-8 w-8 rounded-full border-4 border-gold border-t-transparent animate-spin" />
+    </div>
+  )
+}
 
 function PrivateRoute({ children, roles }) {
   const { accessToken, role } = useAuthStore()
@@ -91,6 +102,7 @@ function AppRoutes() {
   return (
     <BrowserRouter>
       <Toast />
+      <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/tv" element={<TvQueueDisplay />} />
@@ -144,10 +156,35 @@ function AppRoutes() {
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }
 
 export default function App() {
+  // Zustand persist rehydrates localStorage asynchronously (one tick after
+  // first mount). Without this gate, pages' first-mount API calls fire
+  // before the saved accessToken is loaded into the store, get a 401 with
+  // no token to retry with, and show a premature error toast before the
+  // real (successful) data arrives moments later.
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated())
+
+  useEffect(() => {
+    if (hydrated) return
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true)
+      return
+    }
+    return useAuthStore.persist.onFinishHydration(() => setHydrated(true))
+  }, [hydrated])
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div className="h-8 w-8 rounded-full border-4 border-gold border-t-transparent animate-spin" />
+      </div>
+    )
+  }
+
   return <AppRoutes />
 }

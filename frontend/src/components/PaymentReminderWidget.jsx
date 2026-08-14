@@ -125,7 +125,7 @@ export default function PaymentReminderWidget() {
           <button
             type="button"
             onClick={() => setIsMinimized(false)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-amber-500/50 bg-slate-950/85 hover:bg-slate-900 text-amber-300 shadow-xl backdrop-blur-md transition-all hover:scale-105 group"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-amber-500/50 bg-surface-sunken hover:bg-surface text-amber-300 shadow-xl backdrop-blur-md transition-all hover:scale-105 group"
             title="To'lov eslatmalarini ochish"
           >
             <span className="relative flex h-2 w-2">
@@ -139,7 +139,7 @@ export default function PaymentReminderWidget() {
             <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-500/30">
               {formatMoney(totalAmount)}
             </span>
-            <ChevronUp className="h-3.5 w-3.5 text-slate-400 group-hover:text-white" />
+            <ChevronUp className="h-3.5 w-3.5 text-muted group-hover:text-body" />
           </button>
         </div>
 
@@ -157,7 +157,7 @@ export default function PaymentReminderWidget() {
       {/* Floating Bottom-Right Container - Compact & Translucent */}
       <div className="fixed bottom-4 right-4 z-50 w-72 max-w-[288px] space-y-2 font-sans opacity-90 hover:opacity-100 transition-opacity duration-200 animate-in slide-in-from-bottom-4">
         {/* Header Bar with Minimize Button */}
-        <div className="flex items-center justify-between px-3 py-1.5 rounded-t-xl bg-slate-900/90 border border-amber-500/40 text-[11px] font-bold text-amber-300 backdrop-blur-md shadow-md">
+        <div className="flex items-center justify-between px-3 py-1.5 rounded-t-xl bg-surface border border-amber-500/40 text-[11px] font-bold text-amber-300 backdrop-blur-md shadow-md">
           <span className="flex items-center gap-1.5 text-[11px] font-black text-amber-400">
             <Bell className="h-3.5 w-3.5 animate-pulse text-amber-400" />
             To'lov Kutilmoqda ({pendingItems.length})
@@ -165,7 +165,7 @@ export default function PaymentReminderWidget() {
           <button
             type="button"
             onClick={() => setIsMinimized(true)}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] transition-colors"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-2 hover:bg-surface-hover text-body hover:text-body text-[10px] transition-colors"
             title="Kichiklashtirish / Yashirish"
           >
             <ChevronDown className="h-3.5 w-3.5" />
@@ -179,7 +179,7 @@ export default function PaymentReminderWidget() {
             <div
               key={item.id}
               onClick={() => setActiveModalItem(item)}
-              className="relative overflow-hidden rounded-xl border border-amber-500/40 bg-slate-950/85 p-3 shadow-xl backdrop-blur-md transition-all hover:border-amber-400 hover:bg-slate-950/95 cursor-pointer group"
+              className="relative overflow-hidden rounded-xl border border-amber-500/40 bg-surface-sunken p-3 shadow-xl backdrop-blur-md transition-all hover:border-amber-400 hover:bg-surface-sunken cursor-pointer group"
             >
               {/* Glowing Accent Line */}
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600" />
@@ -189,7 +189,7 @@ export default function PaymentReminderWidget() {
                 <span className="flex h-5 px-2 items-center justify-center rounded-md bg-amber-500/20 font-mono font-black text-amber-300 text-[11px] border border-amber-500/30">
                   🎫 {item.ticket_number}
                 </span>
-                <span className="text-[10px] font-medium text-slate-400">
+                <span className="text-[10px] font-medium text-muted">
                   {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
@@ -197,13 +197,13 @@ export default function PaymentReminderWidget() {
               {/* Body Info */}
               <div className="py-2 space-y-1">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="font-extrabold text-xs text-slate-100 truncate max-w-[170px]" title={item.full_name}>
+                  <span className="font-extrabold text-xs text-body truncate max-w-[170px]" title={item.full_name}>
                     👤 {item.full_name}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between gap-1 text-[11px]">
-                  <span className="text-slate-400 font-medium truncate max-w-[130px]" title={item.reason}>
+                  <span className="text-muted font-medium truncate max-w-[130px]" title={item.reason}>
                     🩺 {item.reason}
                   </span>
                   <span className="font-mono font-black text-xs text-emerald-400 shrink-0">
@@ -213,7 +213,7 @@ export default function PaymentReminderWidget() {
               </div>
 
               {/* Action Button at Bottom */}
-              <div className="pt-1.5 border-t border-slate-800/80">
+              <div className="pt-1.5 border-t border-border">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -236,35 +236,35 @@ export default function PaymentReminderWidget() {
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <form
             onSubmit={handlePaySubmit}
-            className="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar"
+            className="bg-surface border border-amber-500/50 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-xl">💳</span>
                 <div>
                   <h4 className="font-black text-amber-400 text-base tracking-wide">To'lov Eslatmasi va Qabul Qilish</h4>
-                  <p className="text-[11px] text-slate-400 font-medium">Quyida bu pul nimalar hisobiga kelib chiqqani ro'yxati ko'rsatilgan</p>
+                  <p className="text-[11px] text-muted font-medium">Quyida bu pul nimalar hisobiga kelib chiqqani ro'yxati ko'rsatilgan</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveModalItem(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                className="text-muted hover:text-body p-1 rounded-lg hover:bg-surface-2 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Patient Info Box */}
-            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-xs flex justify-between items-center">
+            <div className="bg-surface-sunken p-3 rounded-xl border border-border text-xs flex justify-between items-center">
               <div>
-                <span className="text-slate-400 text-[10px] block uppercase font-bold">Bemor:</span>
-                <strong className="text-white text-sm font-extrabold">{activeModalItem.full_name}</strong>
-                {activeModalItem.phone && <span className="text-slate-400 text-[11px] block">📱 {activeModalItem.phone}</span>}
+                <span className="text-muted text-[10px] block uppercase font-bold">Bemor:</span>
+                <strong className="text-body text-sm font-extrabold">{activeModalItem.full_name}</strong>
+                {activeModalItem.phone && <span className="text-muted text-[11px] block">📱 {activeModalItem.phone}</span>}
               </div>
               <div className="text-right">
-                <span className="text-slate-400 text-[10px] block uppercase font-bold">Navbat chiptasi:</span>
+                <span className="text-muted text-[10px] block uppercase font-bold">Navbat chiptasi:</span>
                 <span className="inline-block bg-amber-500/20 text-amber-300 font-mono font-black text-xs px-2 py-0.5 rounded border border-amber-500/40">
                   🎫 {activeModalItem.ticket_number}
                 </span>
@@ -272,12 +272,12 @@ export default function PaymentReminderWidget() {
             </div>
 
             {/* Breakdown List ("Nimalar Hisobiga Kelib Chiqqani Ro'yxati") */}
-            <div className="space-y-2 bg-slate-950 p-3.5 rounded-xl border border-amber-500/30">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="space-y-2 bg-surface-sunken p-3.5 rounded-xl border border-amber-500/30">
+              <div className="flex items-center justify-between border-b border-border pb-2">
                 <span className="text-[11px] font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
                   📋 To'lov Tarkibi va Manbasi:
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono font-bold">
+                <span className="text-[10px] text-muted font-mono font-bold">
                   {(activeModalItem.breakdown || []).length} ta positsiya
                 </span>
               </div>
@@ -287,14 +287,14 @@ export default function PaymentReminderWidget() {
                   activeModalItem.breakdown.map((bItem, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs hover:border-slate-700 transition-colors"
+                      className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-surface border border-border text-xs hover:border-border transition-colors"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="font-extrabold text-slate-100 truncate text-xs">
+                        <div className="font-extrabold text-body truncate text-xs">
                           {bItem.title || bItem.service_name}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-400 mt-1">
-                          <span className="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300 font-medium">
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted mt-1">
+                          <span className="bg-surface-2 px-1.5 py-0.5 rounded text-amber-300 font-medium">
                             📁 {bItem.category || 'Umumiy'}
                           </span>
                           {bItem.provider_name && (
@@ -318,14 +318,14 @@ export default function PaymentReminderWidget() {
                     </div>
                   ))
                 ) : (
-                  <div className="text-xs text-slate-300 p-2">
+                  <div className="text-xs text-body p-2">
                     {activeModalItem.reason || activeModalItem.service_name}
                   </div>
                 )}
               </div>
 
-              <div className="flex justify-between items-center pt-2.5 border-t border-slate-800 font-bold">
-                <span className="text-slate-200 text-xs uppercase tracking-wide">Jami To'lov Summasi:</span>
+              <div className="flex justify-between items-center pt-2.5 border-t border-border font-bold">
+                <span className="text-body text-xs uppercase tracking-wide">Jami To'lov Summasi:</span>
                 <span className="text-emerald-400 font-mono text-lg font-black tracking-tight">
                   {formatMoney(activeModalItem.amount)}
                 </span>
@@ -334,7 +334,7 @@ export default function PaymentReminderWidget() {
 
             {/* Select Pay Type (4 Options Grid) */}
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-100 uppercase tracking-wider block">
+              <label className="text-xs font-black text-body uppercase tracking-wider block">
                 To'lov Turini Tanlang:
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -351,7 +351,7 @@ export default function PaymentReminderWidget() {
                     className={`py-2.5 px-3 rounded-xl border text-xs font-extrabold transition-all text-left flex items-center justify-between ${
                       selectedPayType === t.id
                         ? 'border-amber-400 bg-amber-500/25 text-amber-300 shadow-md scale-[1.02]'
-                        : 'border-slate-700 bg-slate-800/80 text-slate-200 hover:bg-slate-800 hover:border-slate-500'
+                        : 'border-border bg-surface-2 text-body hover:bg-surface-2 hover:border-border-strong'
                     }`}
                   >
                     <span>{t.label}</span>
@@ -363,33 +363,33 @@ export default function PaymentReminderWidget() {
 
             {/* Aralash / Split Inputs */}
             {selectedPayType === 'aralash' && (
-              <div className="p-3 bg-slate-950 rounded-xl border border-amber-500/30 space-y-2.5 text-xs animate-in fade-in">
+              <div className="p-3 bg-surface-sunken rounded-xl border border-amber-500/30 space-y-2.5 text-xs animate-in fade-in">
                 <div className="text-amber-300 font-extrabold text-[11px] uppercase tracking-wide">
                   🔀 Aralash To'lov Taqsimoti:
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[10px] text-slate-300 font-bold block mb-1">Naqd Summasi:</label>
+                    <label className="text-[10px] text-body font-bold block mb-1">Naqd Summasi:</label>
                     <input
                       type="number"
                       value={cashAmountInput}
                       onChange={(e) => handleCashChange(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono font-bold text-xs focus:border-amber-400 focus:outline-none"
+                      className="w-full bg-surface border border-border rounded-lg p-2 text-body font-mono font-bold text-xs focus:border-amber-400 focus:outline-none"
                       placeholder="0"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-300 font-bold block mb-1">Karta Summasi:</label>
+                    <label className="text-[10px] text-body font-bold block mb-1">Karta Summasi:</label>
                     <input
                       type="number"
                       value={cardAmountInput}
                       onChange={(e) => setCardAmountInput(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono font-bold text-xs focus:border-amber-400 focus:outline-none"
+                      className="w-full bg-surface border border-border rounded-lg p-2 text-body font-mono font-bold text-xs focus:border-amber-400 focus:outline-none"
                       placeholder="0"
                     />
                   </div>
                 </div>
-                <div className="text-[10px] text-slate-400 text-right font-mono font-semibold">
+                <div className="text-[10px] text-muted text-right font-mono font-semibold">
                   Jami: <strong className="text-emerald-400">{formatMoney((Number(cashAmountInput) || 0) + (Number(cardAmountInput) || 0))}</strong> / {formatMoney(activeModalItem.amount)}
                 </div>
               </div>
@@ -400,7 +400,7 @@ export default function PaymentReminderWidget() {
               <button
                 type="button"
                 onClick={() => setActiveModalItem(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-surface-2 hover:bg-surface-hover text-body text-xs font-bold border border-border transition-colors"
               >
                 Bekor qilish
               </button>

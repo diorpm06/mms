@@ -306,12 +306,12 @@ export default function Payroll() {
       {/* PRINTABLE & SCREEN TABLE CONTAINER */}
       <div id="payroll-print-container" className="card p-6 space-y-4">
         {/* Printable Header */}
-        <div className="hidden print:block pb-4 border-b-2 border-slate-800 text-center">
+        <div className="hidden print:block pb-4 border-b-2 border-border text-center">
           <h1 className="text-2xl font-black uppercase text-slate-900">MARJONA MED SERVICE</h1>
           <h2 className="text-sm font-bold uppercase text-slate-600 mt-1">
             SHIFOKORLAR VA XODIMLAR OYLIK MAOSH QAYDNOMASI ({month}/{year})
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Sana: {new Date().toLocaleDateString('uz-UZ')}</p>
+          <p className="text-xs text-muted mt-0.5">Sana: {new Date().toLocaleDateString('uz-UZ')}</p>
         </div>
 
         {/* Tab Switcher */}
@@ -379,7 +379,7 @@ export default function Payroll() {
               <div className="overflow-x-auto border border-border/60 rounded-xl">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-slate-800/60 text-slate-300 border-b border-border/40 text-left">
+                    <tr className="bg-surface-2 text-body border-b border-border/40 text-left">
                       <th className="p-2.5">Shifokor</th>
                       <th className="p-2.5">Bemorlar</th>
                       <th className="p-2.5">Tushum</th>
@@ -394,7 +394,7 @@ export default function Payroll() {
                         <td className="p-2.5 font-bold text-foreground">{p.name} ({p.specialization})</td>
                         <td className="p-2.5 font-bold text-cyan-400">{p.patient_count} ta</td>
                         <td className="p-2.5 font-mono text-muted">{formatMoney(p.gross_total)}</td>
-                        <td className="p-2.5 font-mono font-bold text-slate-200">{formatMoney(p.earned_share)}</td>
+                        <td className="p-2.5 font-mono font-bold text-body">{formatMoney(p.earned_share)}</td>
                         <td className="p-2.5 font-mono text-rose-400 font-bold">
                           {p.advance_deducted > 0 ? `-${formatMoney(p.advance_deducted)}` : '0'}
                         </td>
@@ -414,7 +414,7 @@ export default function Payroll() {
               <div className="overflow-x-auto border border-border/60 rounded-xl">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-slate-800/60 text-slate-300 border-b border-border/40 text-left">
+                    <tr className="bg-surface-2 text-body border-b border-border/40 text-left">
                       <th className="p-2.5">Yo'naltiruvchi</th>
                       <th className="p-2.5">Bemorlar</th>
                       <th className="p-2.5">Jami Summa</th>
@@ -429,7 +429,7 @@ export default function Payroll() {
                         <td className="p-2.5 font-bold text-foreground">{r.name}</td>
                         <td className="p-2.5 font-bold text-cyan-400">{r.patient_count} ta</td>
                         <td className="p-2.5 font-mono text-muted">{formatMoney(r.gross_total)}</td>
-                        <td className="p-2.5 font-mono font-bold text-slate-200">{formatMoney(r.earned_commission)}</td>
+                        <td className="p-2.5 font-mono font-bold text-body">{formatMoney(r.earned_commission)}</td>
                         <td className="p-2.5 font-mono text-rose-400 font-bold">
                           {r.advance_deducted > 0 ? `-${formatMoney(r.advance_deducted)}` : '0'}
                         </td>
@@ -483,7 +483,7 @@ export default function Payroll() {
                         </td>
                         <td className="p-3 font-bold text-cyan-400 print:text-slate-900">{r.patients_count} ta</td>
                         <td className="p-3 font-mono text-muted print:text-slate-700">{formatMoney(r.total_income)}</td>
-                        <td className="p-3 font-mono font-bold text-slate-300 print:text-slate-900">{formatMoney(r.doctor_share)}</td>
+                        <td className="p-3 font-mono font-bold text-body print:text-slate-900">{formatMoney(r.doctor_share)}</td>
                         <td className="p-3 font-mono text-rose-400 print:text-red-600 font-bold">
                           {r.advances > 0 ? `-${formatMoney(r.advances)}` : '0'}
                         </td>
@@ -503,11 +503,11 @@ export default function Payroll() {
         <div className="hidden print:flex pt-12 justify-between text-xs text-slate-800">
           <div>
             <p className="font-bold">Bosh Buxgalter Imzosi:</p>
-            <div className="w-48 border-b border-slate-900 mt-8" />
+            <div className="w-48 border-b border-border mt-8" />
           </div>
           <div>
             <p className="font-bold">Rahbar Imzosi:</p>
-            <div className="w-48 border-b border-slate-900 mt-8" />
+            <div className="w-48 border-b border-border mt-8" />
           </div>
         </div>
       </div>

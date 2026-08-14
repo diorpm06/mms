@@ -138,7 +138,7 @@ export default function CeoAdvances() {
                         {a.recipient_type === 'provider' ? '👨‍⚕️ Shifokor' : "🤝 Yo'naltiruvchi"}
                       </span>
                     </td>
-                    <td className="td-cell font-bold text-slate-200">{formatMoney(a.amount)}</td>
+                    <td className="td-cell font-bold text-body">{formatMoney(a.amount)}</td>
                     <td className="td-cell font-black text-rose-400 font-mono">
                       {formatMoney(a.remaining)}
                     </td>
@@ -188,7 +188,7 @@ export default function CeoAdvances() {
                 className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                   form.recipient_type === 'provider'
                     ? 'bg-cyan-600 text-white border-cyan-500'
-                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                    : 'bg-surface-2 text-muted border-border'
                 }`}
                 onClick={() =>
                   setForm({
@@ -205,7 +205,7 @@ export default function CeoAdvances() {
                 className={`py-2 rounded-xl text-xs font-bold border transition-all ${
                   form.recipient_type === 'referrer'
                     ? 'bg-amber-600 text-white border-amber-500'
-                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                    : 'bg-surface-2 text-muted border-border'
                 }`}
                 onClick={() =>
                   setForm({

@@ -10,7 +10,6 @@ from models.patient import Patient
 from models.payout import Payout
 from models.transaction import Transaction
 from models.user import User
-from services.export import export_excel, export_pdf
 from services.reports_data import (
     admin_daily_report,
     daily_report,
@@ -234,6 +233,7 @@ def export_report_excel(
     db: Session = Depends(get_db),
     _: User = Depends(require_ceo),
 ):
+    from services.export import export_excel
     report = _resolve_report(db, type, date_param, year, month, from_date, to_date)
     content = export_excel(report)
     return Response(
@@ -267,6 +267,7 @@ def export_report_pdf(
             headers={"Content-Disposition": f"attachment; filename=Yonaltiruvchilar_Hisobot_{f_date}_{t_date}.pdf"},
         )
 
+    from services.export import export_pdf
     report = _resolve_report(db, type, date_param, year, month, from_date, to_date)
     content = export_pdf(report)
     return Response(
@@ -369,6 +370,7 @@ def save_daily_report(
 ):
     import json
     from models.saved_report import SavedReport
+    from services.export import export_pdf
 
     d = date_param or date.today()
     rep = daily_report(db, d)
@@ -409,6 +411,7 @@ def save_ten_day_report(
 ):
     import json
     from models.saved_report import SavedReport
+    from services.export import export_pdf
 
     rep = ten_day_report(db, from_date, to_date)
     pdf_bytes = export_pdf(rep, title=f"Marjona Med — 10-Kunlik Hisobot ({from_date.strftime('%d.%m')} — {to_date.strftime('%d.%m.%Y')})")

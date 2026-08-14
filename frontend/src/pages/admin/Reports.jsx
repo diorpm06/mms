@@ -205,6 +205,40 @@ export default function AdminReports() {
           </div>
         )}
       </div>
+
+      {/* Navbatchilikda (qog'oz jurnalidan) kiritilgan bemorlar — alohida ro'yxat */}
+      {(report.paper_entry_count || 0) > 0 && (
+        <div className="card">
+          <h3 className="text-amber-400 mb-1 font-bold text-sm uppercase tracking-wide">
+            📄 Navbatchilikda kiritilgan bemorlar — {report.paper_entry_count} ta, jami {formatMoney(report.paper_entry_total)}
+          </h3>
+          <p className="text-muted text-[11px] mb-3">Ish vaqtidan tashqari qog'ozga yozilib, keyin tizimga kiritilgan bemorlar. Yuqoridagi umumiy statistikaga allaqachon qo'shilgan.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-gold font-bold text-left bg-surface-2">
+                  <th className="p-3">#</th>
+                  <th className="p-3">F.I.Sh</th>
+                  <th className="p-3">Xizmat</th>
+                  <th className="p-3">Vaqt</th>
+                  <th className="p-3 text-right">Summa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {report.paper_entry_patients.map((p, i) => (
+                  <tr key={p.id} className="hover:bg-surface-hover font-semibold">
+                    <td className="p-3 text-muted font-mono">#{i + 1}</td>
+                    <td className="p-3 text-body font-bold">{p.full_name}</td>
+                    <td className="p-3 text-muted">{p.service_name}</td>
+                    <td className="p-3 font-mono text-amber-400">{p.visit_time}</td>
+                    <td className="p-3 text-right font-mono font-bold text-emerald">{formatMoney(p.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

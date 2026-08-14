@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel, Field
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
@@ -333,6 +333,39 @@ async def create_patient(
         first_name_clean = parts[0]
         last_name_clean = parts[1]
 
+    # Bir xil F.I.Sh + tug'ilgan sana bilan bemor SHU KUNI allaqachon ro'yxatga
+    # olingan bo'lsa — bu tasodifiy ikki marta kiritish ehtimoli juda yuqori
+    # (ism-familiya boshqa odamda ham bo'lishi mumkin, lekin xuddi shu tug'ilgan
+    # sana bilan ham mos kelishi ehtimoli juda kam). Qayta tashrif bo'lsa,
+    # admin buni tasdiqlab (confirm_duplicate) davom ettirishi mumkin.
+    if not data.confirm_duplicate:
+        dup_day = data.custom_date or date.today()
+        dup_start = datetime.combine(dup_day, datetime.min.time())
+        dup_end = datetime.combine(dup_day, datetime.max.time())
+        existing = (
+            db.query(Patient)
+            .filter(
+                func.lower(Patient.first_name) == first_name_clean.lower(),
+                func.lower(Patient.last_name) == last_name_clean.lower(),
+                Patient.birth_date == data.birth_date,
+                Patient.created_at >= dup_start,
+                Patient.created_at <= dup_end,
+                Patient.is_cancelled == False,
+            )
+            .order_by(Patient.created_at.desc())
+            .first()
+        )
+        if existing:
+            time_str = existing.created_at.strftime("%H:%M")
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Bu bemor ({first_name_clean} {last_name_clean}, {data.birth_date}) "
+                    f"shu kuni soat {time_str} da allaqachon ro'yxatdan o'tkazilgan. "
+                    f"Agar bu haqiqatan ham qayta/boshqa tashrif bo'lsa, tasdiqlab davom eting."
+                ),
+            )
+
     ip, device = get_client_info(request)
     created_patients = []
     total_batch_paid = 0
@@ -358,7 +391,17 @@ async def create_patient(
             }
         department_groups[dep_key]["items"].append(item)
 
-    for dep_key, dep_data in department_groups.items():
+    # Chegirma va naqd/karta summasi bo'limlar orasida ulush bo'yicha
+    # bo'linadi. int() har bir bo'lakni pastga yaxlitlagani uchun yig'indi
+    # asl summadan 1-2 so'm kam chiqib, bemordan ekranda ko'rsatilgandan
+    # ko'proq olinar edi. Qoldiqni oxirgi bo'limga qo'shib, yig'indi aniq
+    # to'g'ri chiqishini ta'minlaymiz.
+    _groups = list(department_groups.items())
+    _allocated_discount = 0
+    _allocated_cash = 0
+
+    for _gidx, (dep_key, dep_data) in enumerate(_groups):
+        _is_last_group = _gidx == len(_groups) - 1
         group_items = dep_data["items"]
         primary_item = group_items[0]
 
@@ -397,18 +440,28 @@ async def create_patient(
 
         group_raw_price = sum(it["price"] for it in group_items)
         if total_raw_price > 0 and discount_total > 0:
-            group_discount = int((group_raw_price / total_raw_price) * discount_total)
+            if _is_last_group:
+                group_discount = max(0, discount_total - _allocated_discount)
+            else:
+                group_discount = int((group_raw_price / total_raw_price) * discount_total)
+            group_discount = min(group_discount, group_raw_price)
         else:
             group_discount = 0
+        _allocated_discount += group_discount
 
         final_group_price = max(0, group_raw_price - group_discount)
 
         group_cash = 0
         group_card = 0
         if data.payment_type in ("split", "aralash"):
-            batch_final_total = max(1, sum(max(0, it["price"] - (int((it["price"] / total_raw_price) * discount_total) if total_raw_price > 0 and discount_total > 0 else 0)) for it in service_items))
+            batch_final_total = max(1, total_raw_price - discount_total)
             ratio = final_group_price / batch_final_total
-            group_cash = int((data.cash_amount or 0) * ratio)
+            if _is_last_group:
+                group_cash = max(0, (data.cash_amount or 0) - _allocated_cash)
+            else:
+                group_cash = int((data.cash_amount or 0) * ratio)
+            group_cash = min(group_cash, final_group_price)
+            _allocated_cash += group_cash
             group_card = max(0, final_group_price - group_cash)
         elif data.payment_type in ("cash", "naqd"):
             group_cash = final_group_price
@@ -458,6 +511,7 @@ async def create_patient(
             queue_status=initial_queue_status,
             cabinet=svc_cabinet,
             created_at=visit_created_at,
+            is_paper_entry=bool(data.is_paper_entry or data.custom_date),
         )
         db.add(patient)
         db.flush()
@@ -722,6 +776,10 @@ def patient_visits(patient_id: int, db: Session = Depends(get_db), _: User = Dep
             "payment_type": v.payment_type,
             "created_at": v.created_at.isoformat(),
             "is_cancelled": v.is_cancelled,
+            # Bemor tibbiy kartasida tashrif tarixi bilan birga ko'rsatiladi
+            "diagnosis": v.diagnosis,
+            "complaints": v.complaints,
+            "prescription": v.prescription,
         }
         for v in visits
     ]

@@ -17,5 +17,8 @@ class User(Base):
     provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    plain_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     provider = relationship("Provider")

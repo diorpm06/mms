@@ -117,6 +117,35 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"template_key migration warning: {e}")
 
+    # patients.is_paper_entry — qog'oz jurnalidan (navbatchilikda) kiritilgan
+    # bemorlarni hisobotlarda alohida ko'rsatish uchun
+    try:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN is_paper_entry BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+    except Exception as e:
+        logger.warning(f"is_paper_entry migration warning: {e}")
+
+    # users.plain_password / failed_login_attempts / locked_until — CEO uchun
+    # joriy login/parolni ko'rsatish va login sahifasida ko'p urinishni bloklash uchun
+    for stmt in (
+        "ALTER TABLE users ADD COLUMN plain_password VARCHAR(255)",
+        "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN locked_until TIMESTAMP",
+    ):
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"users auth-security migration warning: {e}")
+
     # Ko'p so'raladigan ustunlarga indeks — SQLite va PostgreSQL'da bir xil sintaksis
     try:
         with engine.connect() as conn:

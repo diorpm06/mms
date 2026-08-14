@@ -17,10 +17,11 @@ from models.inpatient import Inpatient, InpatientPayment
 from models.banner import Banner
 from models.report_submission import ReportSubmission
 from models.print_job import PrintJob
+from models.saved_report import SavedReport
 
 __all__ = [
     "User", "Patient", "Service", "Referrer", "Provider", "ProviderService", "Employee",
     "Transaction", "Expense", "Balance", "BalanceHistory", "Payout",
     "SalaryLog", "AuditLog", "SessionLog", "Advance", "DutyLog",
-    "Inpatient", "InpatientPayment", "Banner", "ReportSubmission", "PrintJob",
+    "Inpatient", "InpatientPayment", "Banner", "ReportSubmission", "PrintJob", "SavedReport",
 ]

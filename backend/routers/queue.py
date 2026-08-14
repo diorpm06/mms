@@ -46,10 +46,18 @@ def _format_patient_queue_item(p: Patient, public: bool = False) -> dict:
     if not updated_str.endswith("Z"):
         updated_str += "Z"
 
+    # TV taxtasi (public=True) internetda autentifikatsiyasiz ochiq. Bemorni
+    # chaqirish uchun ismi kerak, lekin familiyani to'liq va qaysi tahlil
+    # topshirganini ochiq ko'rsatish — tibbiy maxfiylik buzilishi. Shuning
+    # uchun jamoat ko'rinishida familiya qisqartiriladi.
+    last_name_display = p.last_name
+    if public and (p.last_name or "").strip():
+        last_name_display = f"{p.last_name.strip()[0]}."
+
     item = {
         "id": p.id,
         "first_name": p.first_name,
-        "last_name": p.last_name,
+        "last_name": last_name_display,
         "ticket_number": p.ticket_number or f"A-{p.id:03d}",
         "queue_status": p.queue_status or "kutmoqda",
         "cabinet": p.cabinet or (f"{p.provider.specialization}" if p.provider else "Qabulxona"),
@@ -59,7 +67,16 @@ def _format_patient_queue_item(p: Patient, public: bool = False) -> dict:
         "provider_name": p.provider.full_name if p.provider else None,
         "provider_specialization": p.provider.specialization if p.provider else None,
         "service_id": p.service_id,
-        "service_name": p.service.name if p.service else None,
+        # Jamoat ko'rinishida aniq tahlil nomi ("Gepatit B tahlili") o'rniga
+        # faqat bo'lim ("Laboratoriya") beriladi — TV "Navbat turi" shu bilan
+        # ishlaydi, lekin bemorning tashxisi oshkor bo'lmaydi.
+        "service_name": (
+            # Kategoriya "Laboratoriya: KOAGULOGRAMMA" ko'rinishida ham bo'lishi
+            # mumkin — jamoat ko'rinishi uchun faqat bosh qismini olamiz.
+            ((p.service.category or "Umumiy").split(":")[0].strip() or "Umumiy")
+            if (public and p.service)
+            else (p.service.name if p.service else None)
+        ),
         "service_category": p.service.category if p.service else None,
         "template_key": p.service.template_key if p.service else None,
     }

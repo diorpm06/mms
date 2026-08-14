@@ -218,6 +218,8 @@ class PatientCreate(BaseModel):
     discount_amount: Optional[int] = Field(default=0, ge=0)
     discount_reason: Optional[str] = None
     custom_date: Optional[date] = None
+    is_paper_entry: Optional[bool] = False
+    confirm_duplicate: Optional[bool] = False
 
     @field_validator("phone")
     @classmethod

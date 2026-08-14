@@ -558,7 +558,7 @@ export default function CeoProviders() {
                 const selectedCount = catIds.filter((id) => current.includes(id)).length
 
                 return (
-                  <div key={catName} className="space-y-2 border border-border/40 rounded-xl p-2.5 bg-slate-950/40">
+                  <div key={catName} className="space-y-2 border border-border/40 rounded-xl p-2.5 bg-surface-sunken">
                     <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-gold text-xs uppercase tracking-wider">

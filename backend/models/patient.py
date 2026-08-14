@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -33,6 +33,7 @@ class Patient(CancelMixin, TimestampMixin, Base):
     prescription: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    is_paper_entry: Mapped[bool] = mapped_column(Boolean, default=False)
 
     referrer = relationship("Referrer", foreign_keys=[referrer_id])
     provider = relationship("Provider")

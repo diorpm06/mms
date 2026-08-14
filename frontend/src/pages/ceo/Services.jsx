@@ -291,7 +291,7 @@ export default function CeoServices() {
             {searchQuery && (
               <button
                 type="button"
-                className="absolute right-3 text-muted hover:text-foreground text-xs font-bold bg-slate-800 rounded-full w-5 h-5 flex items-center justify-center transition-colors"
+                className="absolute right-3 text-muted hover:text-foreground text-xs font-bold bg-surface-2 rounded-full w-5 h-5 flex items-center justify-center transition-colors"
                 onClick={() => setSearchQuery('')}
               >
                 ✕
@@ -415,7 +415,7 @@ export default function CeoServices() {
                       ).map(([subCatName, subSvcs]) => (
                         <div key={subCatName} className="space-y-1">
                           {subCatName !== 'Umumiy' && (
-                            <div className="px-4 py-2 bg-slate-900/80 border-y border-border/40 flex items-center justify-between text-xs font-black text-gold uppercase tracking-wider">
+                            <div className="px-4 py-2 bg-surface border-y border-border/40 flex items-center justify-between text-xs font-black text-gold uppercase tracking-wider">
                               <span>📁 {subCatName}</span>
                               <span className="text-[10px] text-muted font-bold">{subSvcs.length} ta xizmat</span>
                             </div>

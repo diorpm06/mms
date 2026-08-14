@@ -1,6 +1,17 @@
 <!DOCTYPE html>
-<html lang="uz" class="dark">
+<html lang="uz" class="light">
   <head>
+    <script>
+      // Apply the saved theme synchronously, before first paint — avoids a
+      // flash of the wrong theme while the app JS loads and hydrates.
+      (function () {
+        try {
+          var raw = localStorage.getItem('marjona-auth');
+          var theme = raw ? JSON.parse(raw).state.theme : 'light';
+          document.documentElement.className = theme === 'dark' ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/assets/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />

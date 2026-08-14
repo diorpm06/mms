@@ -515,7 +515,7 @@ export default function CeoReferrers() {
           className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all ${
             activeTab === 'catalog'
               ? 'bg-gold text-slate-950 shadow-md'
-              : 'bg-slate-900/60 text-slate-300 hover:bg-white/5 border border-border'
+              : 'bg-surface text-body hover:bg-white/5 border border-border'
           }`}
         >
           <span>🤝 Yo'naltiruvchilar Katalogi va Balanslar</span>
@@ -527,7 +527,7 @@ export default function CeoReferrers() {
           className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all ${
             activeTab === '10day'
               ? 'bg-cyan-500 text-slate-950 shadow-md'
-              : 'bg-slate-900/60 text-slate-300 hover:bg-white/5 border border-border'
+              : 'bg-surface text-body hover:bg-white/5 border border-border'
           }`}
         >
           <span>📊 10-Kunlik Hisobot va To'lovlar (Statistika)</span>
@@ -678,7 +678,7 @@ export default function CeoReferrers() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     tenDaySegment === seg.id
                       ? 'bg-cyan-400 text-slate-950 font-black shadow-md'
-                      : 'bg-slate-900/60 text-slate-300 hover:bg-white/5 border border-border'
+                      : 'bg-surface text-body hover:bg-white/5 border border-border'
                   }`}
                 >
                   {seg.label}
@@ -773,7 +773,7 @@ export default function CeoReferrers() {
                           <td className="td-muted font-mono font-bold whitespace-nowrap">#{idx + 1}</td>
                           <td className="td-cell font-bold whitespace-nowrap">
                             <div className="whitespace-nowrap">
-                              <span className="text-white font-bold">{r.name}</span>
+                              <span className="text-body font-bold">{r.name}</span>
                               {r.phone && <span className="text-[10px] text-muted block font-mono">{r.phone}</span>}
                             </div>
                           </td>
@@ -897,7 +897,7 @@ export default function CeoReferrers() {
       {printModal && (
         <Modal open={true} onClose={() => setPrintModal(null)} title="10-Kunlik Yo'naltiruvchi Hujjatini Chop Etish" size="lg">
           <div className="space-y-4 pt-1">
-            <div className="flex justify-between items-center bg-slate-900/60 p-3 rounded-xl border border-border">
+            <div className="flex justify-between items-center bg-surface p-3 rounded-xl border border-border">
               <span className="text-xs text-muted font-bold">
                 🖨️ Printerga chiqarish tayyor. Nusxa hujjati avtomatik shakllandi.
               </span>
@@ -907,7 +907,7 @@ export default function CeoReferrers() {
             </div>
 
             {/* Printable Paper Preview Container */}
-            <div className="border border-slate-700 bg-white text-slate-950 p-6 rounded-xl shadow-2xl max-h-[60vh] overflow-y-auto" id="printable-voucher-content">
+            <div className="border border-border bg-white text-slate-950 p-6 rounded-xl shadow-2xl max-h-[60vh] overflow-y-auto" id="printable-voucher-content">
               {/* Header */}
               <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: '10px', marginBottom: '16px' }}>
                 <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '900', color: '#000', textTransform: 'uppercase' }}>
