@@ -244,31 +244,12 @@ async def serve_root():
     include_in_schema=False,
 )
 async def spa_fallback(request: Request, full_path: str):
+    """SPA catch-all — aniq API routelari bu yerga yetib kelmaydi."""
     method = request.method
 
-    # VAQTINCHA DEBUG: /api/* uchun to'liq ma'lumot qaytaramiz
-    # (Bu login ham ishlamayotganini aniqlash uchun)
+    # Noma'lum API yoki uploads endpointi — 404
     if full_path.startswith(("api/", "uploads/")):
-        all_routes = []
-        for r in app.routes:
-            route_info = {"name": getattr(r, "name", "?"), "path": getattr(r, "path", "?")}
-            if hasattr(r, "methods"):
-                route_info["methods"] = sorted(list(r.methods or []))
-            all_routes.append(route_info)
-        return {
-            "debug": True,
-            "caught_by_fallback": True,
-            "full_path": full_path,
-            "scope_path": request.scope.get("path", ""),
-            "raw_path": request.scope.get("raw_path", b"").decode(errors="replace"),
-            "query_string": request.scope.get("query_string", b"").decode(errors="replace"),
-            "method": method,
-            "headers": {
-                k.decode(errors="replace"): v.decode(errors="replace")
-                for k, v in request.scope.get("headers", [])
-            },
-            "registered_routes": all_routes,
-        }
+        raise HTTPException(status_code=404, detail=f"API endpoint topilmadi: /{full_path}")
 
     # GET/HEAD → SPA index.html
     if method in ("GET", "HEAD"):
@@ -284,3 +265,4 @@ async def spa_fallback(request: Request, full_path: str):
         )
 
     raise HTTPException(status_code=405, detail=f"Method Not Allowed: {method} /{full_path}")
+
