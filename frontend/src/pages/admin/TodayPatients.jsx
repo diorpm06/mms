@@ -94,16 +94,20 @@ export default function TodayPatients() {
     const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
     let cashAmt = Number(editForm.cash_amount) || 0
     let cardAmt = Number(editForm.card_amount) || 0
+    let clickAmt = Number(editForm.click_amount) || 0
+    let qrAmt = Number(editForm.qr_amount) || 0
 
     if (editForm.payment_type === 'split') {
-      if (cashAmt < 0 || cardAmt < 0) {
+      if (cashAmt < 0 || cardAmt < 0 || clickAmt < 0 || qrAmt < 0) {
         toast("Aralash to'lov miqdorini to'g'ri kiriting", 'error')
         return
       }
-      if (cashAmt + cardAmt !== totalToPay) {
-        toast(`Naqd (${formatMoney(cashAmt)}) va Karta (${formatMoney(cardAmt)}) yig'indisi to'lanadigan summa (${formatMoney(totalToPay)})ga teng bo'lishi kerak!`, 'error')
+      const sumEntered = cashAmt + cardAmt + clickAmt + qrAmt
+      if (sumEntered !== totalToPay) {
+        toast(`Kiritilgan to'lovlar yig'indisi (${formatMoney(sumEntered)}) to'lanadigan summa (${formatMoney(totalToPay)})ga teng bo'lishi kerak!`, 'error')
         return
       }
+      cardAmt = cardAmt + clickAmt + qrAmt
     } else if (editForm.payment_type === 'cash') {
       cashAmt = totalToPay
       cardAmt = 0
@@ -812,28 +816,7 @@ export default function TodayPatients() {
               <Btn variant="ghost" full icon={Icons.x} onClick={() => setEditPatient(null)}>
                 Yopish
               </Btn>
-              <Btn variant="gold" full icon={Icons.save} loading={saving} onClick={() => {
-                const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
-                let cash = Number(editForm.cash_amount) || 0
-                let card = Number(editForm.card_amount) || 0
-                let click = Number(editForm.click_amount) || 0
-                let qr = Number(editForm.qr_amount) || 0
-
-                if (editForm.payment_type === 'split') {
-                  if (cash + card + click + qr !== totalToPay) {
-                    alert(`To'lovlar yig'indisi ${formatMoney(totalToPay)} bo'lishi kerak!`);
-                    return;
-                  }
-                  card = card + click + qr;
-                } else if (editForm.payment_type === 'cash') {
-                    cash = totalToPay; card = 0;
-                } else if (editForm.payment_type === 'card') {
-                    cash = 0; card = totalToPay;
-                } else if (editForm.payment_type === 'click') {
-                    cash = 0; card = 0; // Backend may handle click separately
-                }
-                handleSaveEdit({ ...editForm, cash_amount: cash, card_amount: card });
-              }}>
+              <Btn variant="gold" full icon={Icons.save} loading={saving} onClick={handleSaveEdit}>
                 Saqlash
               </Btn>
             </div>
