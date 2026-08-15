@@ -63,6 +63,7 @@ export default function NewPatient({ homePath = '/admin' }) {
   const [createdPatient, setCreatedPatient] = useState(null)
   const [expandedCat, setExpandedCat] = useState(null) // accordion
   const [splitSecond, setSplitSecond] = useState('card') // 'card' | 'qr'
+  const [discountTargetServiceId, setDiscountTargetServiceId] = useState('auto')
   const [newRefModal, setNewRefModal] = useState(false)
   const [newRefForm, setNewRefForm] = useState({ full_name: '', phone: '' })
   const [savingRef, setSavingRef] = useState(false)
@@ -427,6 +428,7 @@ export default function NewPatient({ homePath = '/admin' }) {
       qr_amount: qrAmt,
       discount_amount: computedDiscount,
       discount_reason: computedDiscount > 0 ? form.discount_reason || 'Chegirma' : null,
+      discount_target_service_id: discountTargetServiceId !== 'auto' ? Number(discountTargetServiceId) : null,
       services: validServices.map((s) => ({
         service_id: +s.service_id,
         provider_id: s.provider_id ? +s.provider_id : null,
@@ -1110,31 +1112,62 @@ export default function NewPatient({ homePath = '/admin' }) {
           </div>
 
           {form.discount_type !== 'none' && (
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <div>
-                <label className="text-[11px] text-muted block mb-1">
-                  {form.discount_type === 'percent' ? 'Chegirma foizi (%)' : 'Chegirma summasi (so\'m)'}
-                </label>
-                <input
-                  type={form.discount_type === 'percent' ? 'number' : 'text'}
-                  className="input-field font-mono font-bold"
-                  placeholder={form.discount_type === 'percent' ? '10%' : '15,000'}
-                  value={form.discount_type === 'amount' ? formatWithCommas(form.discount_value) : form.discount_value}
-                  onChange={(e) => {
-                    const val = form.discount_type === 'amount' ? parseDigits(e.target.value) : e.target.value
-                    setForm({ ...form, discount_value: val })
-                  }}
-                />
+            <div className="space-y-3 pt-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] text-muted block mb-1">
+                    {form.discount_type === 'percent' ? 'Chegirma foizi (%)' : 'Chegirma summasi (so\'m)'}
+                  </label>
+                  <input
+                    type={form.discount_type === 'percent' ? 'number' : 'text'}
+                    className="input-field font-mono font-bold"
+                    placeholder={form.discount_type === 'percent' ? '10%' : '15,000'}
+                    value={form.discount_type === 'amount' ? formatWithCommas(form.discount_value) : form.discount_value}
+                    onChange={(e) => {
+                      const val = form.discount_type === 'amount' ? parseDigits(e.target.value) : e.target.value
+                      setForm({ ...form, discount_value: val })
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted block mb-1">Chegirma sababi / Izoh</label>
+                  <input
+                    className="input-field"
+                    placeholder="Pensioner / Nogiron / Aksiya"
+                    value={form.discount_reason}
+                    onChange={(e) => setForm({ ...form, discount_reason: e.target.value })}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-[11px] text-muted block mb-1">Chegirma sababi / Izoh</label>
-                <input
-                  className="input-field"
-                  placeholder="Pensioner / Nogiron / Aksiya"
-                  value={form.discount_reason}
-                  onChange={(e) => setForm({ ...form, discount_reason: e.target.value })}
-                />
-              </div>
+
+              {/* Chegirma aynan qaysi xizmatga qo'llansin */}
+              {selectedServices.filter((s) => s.service_id).length > 1 && (
+                <div className="p-3 rounded-xl bg-cyan-950/50 border border-cyan-500/40 space-y-1.5">
+                  <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                    🎯 Chegirma aynan qaysi xizmatdan ayirilsin?
+                  </label>
+                  <select
+                    value={discountTargetServiceId}
+                    onChange={(e) => setDiscountTargetServiceId(e.target.value)}
+                    className="w-full input-field text-xs font-bold text-cyan-200 bg-surface border-cyan-500/50 cursor-pointer"
+                  >
+                    <option value="auto">⭐ Tanlangan 1-xizmatga to'liq qo'llansin (Tavsiya etiladi — butun summa bo'ladi)</option>
+                    {selectedServices.filter((s) => s.service_id).map((s) => {
+                      const svcObj = services.find((x) => String(x.id) === String(s.service_id))
+                      if (!svcObj) return null
+                      const price = (Number(s.price) || svcObj.price) * (Number(s.quantity) || 1)
+                      return (
+                        <option key={svcObj.id} value={svcObj.id}>
+                          {svcObj.name} ({formatMoney(price)})
+                        </option>
+                      )
+                    })}
+                  </select>
+                  <p className="text-[10px] text-cyan-400 font-medium">
+                    💡 Chegirma muayyan xizmatga biriktirilsa, boshqa xizmatlar narxi butunligicha saqlanib, qoldiqli raqamlar hosil bo'lmaydi.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

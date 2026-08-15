@@ -220,6 +220,7 @@ class PatientCreate(BaseModel):
     qr_amount: Optional[int] = 0
     discount_amount: Optional[int] = Field(default=0, ge=0)
     discount_reason: Optional[str] = None
+    discount_target_service_id: Optional[int] = None
     custom_date: Optional[date] = None
     is_paper_entry: Optional[bool] = False
     confirm_duplicate: Optional[bool] = False

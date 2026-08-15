@@ -519,13 +519,22 @@ async def create_patient(
             initial_queue_status = "yakunlandi"
 
         group_raw_price = sum(it["price"] for it in group_items)
+        target_sid = data.discount_target_service_id
+
         if total_raw_price > 0 and discount_total > 0:
-            if _is_last_group:
-                group_discount = max(0, discount_total - _allocated_discount)
+            if target_sid:
+                group_has_target = any(it["service_id"] == target_sid for it in group_items)
+                if group_has_target:
+                    rem_disc = max(0, discount_total - _allocated_discount)
+                    group_discount = min(rem_disc, group_raw_price)
+                else:
+                    group_discount = 0
             else:
-                raw_disc = (group_raw_price / total_raw_price) * discount_total
-                group_discount = int(round(raw_disc / 100) * 100)
-            group_discount = min(group_discount, group_raw_price)
+                if _gidx == 0:
+                    group_discount = min(discount_total, group_raw_price)
+                else:
+                    rem_disc = max(0, discount_total - _allocated_discount)
+                    group_discount = min(rem_disc, group_raw_price)
         else:
             group_discount = 0
         _allocated_discount += group_discount
