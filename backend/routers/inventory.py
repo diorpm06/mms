@@ -153,7 +153,7 @@ def update_inventory_item(
     if body.notes is not None:
         item.notes = body.notes
 
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now()
     db.commit()
     db.refresh(item)
     return _item_row(item, user.role)
@@ -170,7 +170,7 @@ def restock_item(
     if not item:
         raise HTTPException(status_code=404, detail="Material topilmadi")
     item.quantity += body.amount
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now()
     db.commit()
     db.refresh(item)
     return _item_row(item, user.role)
@@ -190,7 +190,7 @@ def consume_item(
         raise HTTPException(status_code=400, detail=f"Omborda yetarli emas! Mavjud: {item.quantity} {item.unit}")
 
     item.quantity -= body.amount
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now()
 
     # Find patient by patient_id, ticket_number, or patient_name
     from models.patient import Patient

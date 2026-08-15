@@ -16,7 +16,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
     provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     plain_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

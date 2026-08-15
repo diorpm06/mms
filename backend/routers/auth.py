@@ -41,8 +41,8 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     # DB-backed lockout — IP-based rate limiting above doesn't reliably survive
     # serverless cold starts across instances, so the real guard lives here,
     # keyed to the account itself via the shared database.
-    if user and user.locked_until and user.locked_until > datetime.utcnow():
-        remaining_min = max(1, int((user.locked_until - datetime.utcnow()).total_seconds() // 60) + 1)
+    if user and user.locked_until and user.locked_until > datetime.now():
+        remaining_min = max(1, int((user.locked_until - datetime.now()).total_seconds() // 60) + 1)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Ko'p marta noto'g'ri urinildi. {remaining_min} daqiqadan keyin qayta urinib ko'ring.",
@@ -52,7 +52,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
-                user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+                user.locked_until = datetime.now() + timedelta(minutes=LOCKOUT_MINUTES)
                 user.failed_login_attempts = 0
             db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login yoki parol noto'g'ri")
@@ -71,7 +71,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
         record_id=user.id,
         ip_address=ip,
         device_info=device,
-        detail_message=f"{user.full_name} tizimga kirdi — {datetime.utcnow().strftime('%d.%m.%Y %H:%M')}",
+        detail_message=f"{user.full_name} tizimga kirdi — {datetime.now().strftime('%d.%m.%Y %H:%M')}",
     )
     db.commit()
     token_data = {"sub": str(user.id), "role": user.role, "session_id": str(session.id)}
@@ -110,7 +110,7 @@ def logout(request: Request, user: User = Depends(get_current_user), db: Session
         .first()
     )
     if session:
-        session.logout_at = datetime.utcnow()
+        session.logout_at = datetime.now()
         session.duration_seconds = int((session.logout_at - session.login_at).total_seconds())
     log_audit(
         db,

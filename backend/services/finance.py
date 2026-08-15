@@ -121,7 +121,7 @@ def process_payment(db: Session, patient: Patient) -> Transaction:
 
     bal = get_or_create_balance(db)
     bal.current_balance += center_amount
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
 
     log_balance_change(
         db,
@@ -141,7 +141,7 @@ def process_payment(db: Session, patient: Patient) -> Transaction:
         payment_type=patient.payment_type,
         cash_amount=patient.cash_amount or 0,
         card_amount=patient.card_amount or 0,
-        created_at=patient.created_at or datetime.utcnow(),
+        created_at=patient.created_at or datetime.now(),
     )
     db.add(tx)
     return tx
@@ -150,7 +150,7 @@ def process_payment(db: Session, patient: Patient) -> Transaction:
 def process_expense(db: Session, amount: int, description: str) -> Balance:
     bal = get_or_create_balance(db)
     bal.current_balance -= amount
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     log_balance_change(db, -amount, "expense", description)
     return bal
 
@@ -190,7 +190,7 @@ def process_ten_day_payouts(db: Session, period_start: date, period_end: date) -
         log_balance_change(db, -prov.balance, "payout", f"10 kunlik: provider {prov.full_name}")
         prov.balance = 0
 
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     db.add_all(payouts)
     return payouts
 
@@ -217,7 +217,7 @@ def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int
         period_end=today,
     )
     bal.current_balance -= obj.balance
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     source_label = source or "Manba ko'rsatilmagan"
     who = f"yo'naltiruvchi #{recipient_id}" if recipient_type == "referrer" else f"provider #{recipient_id}"
     log_balance_change(db, -obj.balance, "payout", f"Qo'lda chiqarim ({source_label}): {who}")
@@ -228,7 +228,7 @@ def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int
 
 def process_monthly_salaries(db: Session) -> list[SalaryLog]:
     bal = get_or_create_balance(db)
-    month = datetime.utcnow().strftime("%Y-%m")
+    month = datetime.now().strftime("%Y-%m")
     logs = []
     total_salary = 0
 
@@ -254,7 +254,7 @@ def process_monthly_salaries(db: Session) -> list[SalaryLog]:
             f"{emp.full_name} — {month} (oylik {emp.monthly_salary}, avans {adv_total})",
         )
 
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     return logs
 
 
@@ -264,13 +264,13 @@ def pay_employee_salary(db: Session, employee_id: int) -> SalaryLog:
         raise HTTPException(status_code=404, detail="Xodim topilmadi")
 
     bal = get_or_create_balance(db)
-    month = datetime.utcnow().strftime("%Y-%m")
+    month = datetime.now().strftime("%Y-%m")
     adv_total = _employee_advances_total_for_month(db, emp.id, month)
     payout_amount = max(0, emp.monthly_salary - adv_total)
     if bal.current_balance < payout_amount:
         raise HTTPException(status_code=400, detail="Balans yetarli emas")
     bal.current_balance -= payout_amount
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     log = SalaryLog(employee_id=emp.id, amount=payout_amount, month=month)
     db.add(log)
     log_balance_change(
@@ -298,7 +298,7 @@ def _employee_advances_total_for_month(db: Session, employee_id: int, month: str
 
 
 def employee_payroll_summary(db: Session, employee_id: int, month: str | None = None) -> dict:
-    m = month or datetime.utcnow().strftime("%Y-%m")
+    m = month or datetime.now().strftime("%Y-%m")
     year, mon = m.split("-")
     advances = (
         db.query(Advance)
@@ -347,10 +347,10 @@ def cancel_patient_payment(db: Session, patient: Patient, tx: Transaction) -> No
         provider.balance = max(0, provider.balance - tx.provider_amount)
     bal = get_or_create_balance(db)
     bal.current_balance = max(0, bal.current_balance - tx.center_amount)
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     log_balance_change(db, -tx.center_amount, "cancel", f"Bekor: mijoz #{patient.id}")
     tx.is_cancelled = True
-    tx.cancelled_at = datetime.utcnow()
+    tx.cancelled_at = datetime.now()
     tx.cancel_reason = patient.cancel_reason
 
 
@@ -359,7 +359,7 @@ def process_advance(db: Session, amount: int, description: str) -> Balance:
     if bal.current_balance < amount:
         raise HTTPException(status_code=400, detail="Balans yetarli emas")
     bal.current_balance -= amount
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     log_balance_change(db, -amount, "advance", description)
     return bal
 
@@ -367,7 +367,7 @@ def process_advance(db: Session, amount: int, description: str) -> Balance:
 def cancel_advance(db: Session, amount: int) -> Balance:
     bal = get_or_create_balance(db)
     bal.current_balance += amount
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     log_balance_change(db, amount, "advance_cancel", "Avans bekor qilindi")
     return bal
 
@@ -387,7 +387,7 @@ def process_inpatient_payment(
     provider.balance += provider_amount
     bal = get_or_create_balance(db)
     bal.current_balance += center_amount
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     log_balance_change(
         db, center_amount, "income",
         f"Yotgan #{inpatient.id}: {inpatient.first_name} {inpatient.last_name}",

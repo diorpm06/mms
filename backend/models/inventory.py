@@ -17,4 +17,4 @@ class InventoryItem(TimestampMixin, Base):
     unit_price: Mapped[int] = mapped_column(Integer, default=0) # Sotilish narxi (Kassa narxi)
     cost_price: Mapped[int] = mapped_column(Integer, default=0) # Tavar haqiqiy narxi (Tan narxi)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

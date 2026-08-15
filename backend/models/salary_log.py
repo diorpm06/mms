@@ -13,6 +13,6 @@ class SalaryLog(Base):
     employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"))
     amount: Mapped[int] = mapped_column(Integer)
     month: Mapped[str] = mapped_column(String(7))  # YYYY-MM
-    paid_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    paid_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     employee = relationship("Employee")

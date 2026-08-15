@@ -13,5 +13,5 @@ class CancelMixin:
 
 class TimestampMixin:
     updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True
+        DateTime, default=datetime.now, onupdate=datetime.now, nullable=True
     )

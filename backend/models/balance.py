@@ -11,7 +11,7 @@ class Balance(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     current_balance: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class BalanceHistory(Base):
@@ -21,4 +21,4 @@ class BalanceHistory(Base):
     amount: Mapped[int] = mapped_column(Integer)  # positive=in, negative=out
     entry_type: Mapped[str] = mapped_column(String(50))  # income|expense|salary|adjustment
     description: Mapped[str] = mapped_column(String(500))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

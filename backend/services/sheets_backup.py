@@ -52,7 +52,7 @@ def _parse_date(v: Any) -> date:
 def _parse_datetime(v: Any) -> datetime:
     s = str(v or "").strip()
     if not s:
-        return datetime.utcnow()
+        return datetime.now()
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%d.%m.%Y %H:%M", "%Y-%m-%d"):
         try:
             return datetime.strptime(s, fmt)
@@ -61,7 +61,7 @@ def _parse_datetime(v: Any) -> datetime:
     try:
         return datetime.fromisoformat(s)
     except ValueError:
-        return datetime.utcnow()
+        return datetime.now()
 
 
 def _payment_type(v: Any) -> str:
@@ -241,6 +241,6 @@ def sync_from_configured_url(db: Session) -> dict:
         return {"inserted": 0, "exists": 0, "skipped": 0, "errors": ["URL ulanmagan yoki o'chirilgan"]}
     rows = fetch_rows_from_backup_url(cfg["url"], cfg.get("token", ""))
     result = import_rows_to_db(db, rows)
-    cfg["last_sync_at"] = datetime.utcnow().isoformat()
+    cfg["last_sync_at"] = datetime.now().isoformat()
     save_backup_config(cfg)
     return result

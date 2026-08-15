@@ -1,3 +1,18 @@
+import os as _os
+import time as _time
+
+# Vaqt mintaqasi — boshqa importlardan OLDIN o'rnatiladi.
+# Server UTC'da ishlaydi (Vercel), klinika esa Toshkentda (UTC+5). Shu sababli
+# barcha vaqtlar 5 soat orqada saqlanardi: chekdagi soat, hisobot kunlari va
+# navbat raqamining kunlik yangilanishi ham noto'g'ri edi.
+# DIQQAT: TZ faqat tzset() mavjud bo'lgan tizimlarda (Linux/macOS — Vercel
+# shu yerda ishlaydi) o'rnatiladi. Windows "Asia/Tashkent" yozuvini tushunmaydi
+# va TZ o'rnatilsa UTC'ga tushib qoladi — ya'ni lokal ishlab chiqishni buzadi.
+# Windows'da tizimning o'z mintaqasi ishlatiladi.
+if hasattr(_time, "tzset"):
+    _os.environ.setdefault("TZ", "Asia/Tashkent")
+    _time.tzset()
+
 import logging
 from contextlib import asynccontextmanager
 from urllib.parse import parse_qs, urlencode

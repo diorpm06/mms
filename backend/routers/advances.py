@@ -120,7 +120,7 @@ def settle_advance(
     if advance.remaining <= 0:
         advance.remaining = 0
         advance.is_settled = True
-        advance.settled_at = datetime.utcnow()
+        advance.settled_at = datetime.now()
 
     db.commit()
     return {"message": f"{deduct:,} so'm avans qoplandi", "remaining": advance.remaining, "is_settled": advance.is_settled}

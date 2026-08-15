@@ -19,12 +19,12 @@ class Inpatient(CancelMixin, Base):
     doctor_id: Mapped[int] = mapped_column(ForeignKey("providers.id"))
     referrer_id: Mapped[int | None] = mapped_column(ForeignKey("referrers.id"), nullable=True)
     diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
-    admitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    admitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     discharged_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     daily_rate: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(20), default="yotmoqda")  # yotmoqda | chiqdi
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     doctor = relationship("Provider", foreign_keys=[doctor_id])
     referrer = relationship("Referrer")
@@ -42,6 +42,6 @@ class InpatientPayment(CancelMixin, Base):
     period_start: Mapped[date] = mapped_column(Date)
     period_end: Mapped[date] = mapped_column(Date)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     inpatient = relationship("Inpatient", back_populates="payments")

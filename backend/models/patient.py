@@ -31,7 +31,7 @@ class Patient(CancelMixin, TimestampMixin, Base):
     diagnosis: Mapped[str | None] = mapped_column(String(500), nullable=True)
     complaints: Mapped[str | None] = mapped_column(String(500), nullable=True)
     prescription: Mapped[str | None] = mapped_column(String(1000), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     is_paper_entry: Mapped[bool] = mapped_column(Boolean, default=False)
 

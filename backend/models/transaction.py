@@ -21,7 +21,7 @@ class Transaction(CancelMixin, Base):
     payment_type: Mapped[str] = mapped_column(String(10))
     cash_amount: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
     card_amount: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
 
     patient = relationship("Patient")
     referrer = relationship("Referrer")

@@ -395,7 +395,7 @@ def save_daily_report(
     else:
         saved.pdf_data = pdf_bytes
         saved.json_data = json.dumps(rep, default=str)
-        saved.created_at = datetime.utcnow()
+        saved.created_at = datetime.now()
 
     db.commit()
     db.refresh(saved)

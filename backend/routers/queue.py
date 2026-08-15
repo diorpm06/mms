@@ -36,12 +36,12 @@ class CallPatientBody(BaseModel):
 
 
 def _format_patient_queue_item(p: Patient, public: bool = False) -> dict:
-    created_dt = p.created_at or datetime.utcnow()
+    created_dt = p.created_at or datetime.now()
     created_str = created_dt.isoformat()
     if not created_str.endswith("Z"):
         created_str += "Z"
 
-    updated_dt = p.updated_at or p.created_at or datetime.utcnow()
+    updated_dt = p.updated_at or p.created_at or datetime.now()
     updated_str = updated_dt.isoformat()
     if not updated_str.endswith("Z"):
         updated_str += "Z"
@@ -141,7 +141,7 @@ def get_live_queue(db: Session = Depends(get_db)):
     finished.sort(key=lambda x: x["updated_at"], reverse=True)
 
     return {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now().isoformat(),
         "stats": {
             "total": len(patients),
             "calling": len(calling),
@@ -246,7 +246,7 @@ def get_pending_payments(
             "cabinet": first_p.cabinet,
             "amount": total_amount,
             "payment_type": first_p.payment_type,
-            "created_at": first_p.created_at.isoformat() if first_p.created_at else datetime.utcnow().isoformat(),
+            "created_at": first_p.created_at.isoformat() if first_p.created_at else datetime.now().isoformat(),
             "breakdown": breakdown,
         })
 
@@ -452,7 +452,7 @@ def doctor_call_next(
         cur_query = cur_query.filter(Patient.provider_id == target_provider_id)
     for cp in cur_query.all():
         cp.queue_status = "yakunlandi"
-        cp.updated_at = datetime.utcnow()
+        cp.updated_at = datetime.now()
 
     provider = db.query(Provider).filter(Provider.id == target_provider_id).first() if target_provider_id else None
 
@@ -515,7 +515,7 @@ def doctor_call_next(
 
     next_patient.queue_status = "qabulda"
     next_patient.cabinet = assigned_cabinet
-    next_patient.updated_at = datetime.utcnow()
+    next_patient.updated_at = datetime.now()
 
     db.commit()
     db.refresh(next_patient)
@@ -548,7 +548,7 @@ def recall_current_patient(
     if not cur_p:
         return {"message": "Qayta chaqirish uchun qabulda bemor topilmadi", "patient": None}
 
-    cur_p.updated_at = datetime.utcnow()
+    cur_p.updated_at = datetime.now()
     db.commit()
     db.refresh(cur_p)
     return {"message": f"Bemor {cur_p.ticket_number} qayta chaqirildi", "patient": _format_patient_queue_item(cur_p)}
@@ -568,7 +568,7 @@ def recall_patient(
 
     _assert_patient_ownership(p, user)
     p.queue_status = "qabulda"
-    p.updated_at = datetime.utcnow()
+    p.updated_at = datetime.now()
 
     db.commit()
     db.refresh(p)
@@ -596,7 +596,7 @@ def update_patient_queue_status(
     p.queue_status = data.queue_status
     if data.cabinet is not None:
         p.cabinet = data.cabinet
-    p.updated_at = datetime.utcnow()
+    p.updated_at = datetime.now()
 
     db.commit()
     db.refresh(p)
@@ -615,7 +615,7 @@ def complete_patient_visit(
     _assert_patient_ownership(p, user)
 
     p.queue_status = "yakunlandi"
-    p.updated_at = datetime.utcnow()
+    p.updated_at = datetime.now()
 
     db.commit()
     db.refresh(p)
@@ -634,7 +634,7 @@ def skip_patient_visit(
     _assert_patient_ownership(p, user)
 
     p.queue_status = "o'tkazib yuborildi"
-    p.updated_at = datetime.utcnow()
+    p.updated_at = datetime.now()
 
     db.commit()
     db.refresh(p)
@@ -658,7 +658,7 @@ def call_patient(
     p.queue_status = "qabulda"
     if data.cabinet:
         p.cabinet = data.cabinet
-    p.updated_at = datetime.utcnow()
+    p.updated_at = datetime.now()
 
     db.commit()
     db.refresh(p)

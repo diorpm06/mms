@@ -15,7 +15,7 @@ class DutyLog(Base):
     shift: Mapped[str] = mapped_column(String(20))  # kunduz | tun
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     employee = relationship("Employee")
     creator = relationship("User", foreign_keys=[created_by])

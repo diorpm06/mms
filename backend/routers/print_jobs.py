@@ -97,7 +97,7 @@ def mark_print_job_printed(
     if not j:
         raise HTTPException(status_code=404, detail="Topilmadi")
     j.status = "printed"
-    j.printed_at = datetime.utcnow()
+    j.printed_at = datetime.now()
     db.commit()
     return {"message": "OK"}
 

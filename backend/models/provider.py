@@ -24,6 +24,6 @@ class Provider(Base):
     fixed_salary: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
     balance: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     services = relationship("Service", secondary="provider_services", lazy="selectin")

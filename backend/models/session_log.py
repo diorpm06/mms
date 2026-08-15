@@ -11,7 +11,7 @@ class SessionLog(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    login_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    login_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     logout_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(50), nullable=True)
     device_info: Mapped[str | None] = mapped_column(String(255), nullable=True)

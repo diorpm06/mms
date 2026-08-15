@@ -25,4 +25,4 @@ class Service(Base):
     allow_custom_price: Mapped[bool] = mapped_column(Boolean, default=False)  # Admin can enter custom price
     template_key: Mapped[str | None] = mapped_column(String(50), nullable=True)  # frontend reportTemplates.js key
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

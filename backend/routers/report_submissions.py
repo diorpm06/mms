@@ -155,6 +155,6 @@ def mark_report_printed(
         raise HTTPException(status_code=404, detail="Topilmadi")
     r.status = "printed"
     r.printed_by = user.id
-    r.printed_at = datetime.utcnow()
+    r.printed_at = datetime.now()
     db.commit()
     return {"message": "Chop etildi deb belgilandi"}

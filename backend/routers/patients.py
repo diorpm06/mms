@@ -411,7 +411,7 @@ async def create_patient(
             initial_queue_status = "yakunlandi"
         else:
             target_day = date.today()
-            visit_created_at = datetime.utcnow()
+            visit_created_at = datetime.now()
 
         start = datetime.combine(target_day, datetime.min.time())
         end = datetime.combine(target_day, datetime.max.time())
@@ -601,7 +601,7 @@ def update_patient(
     updates = data.model_dump(exclude_unset=True, exclude={"reason"})
     for k, v in updates.items():
         setattr(p, k, v)
-    p.updated_at = datetime.utcnow()
+    p.updated_at = datetime.now()
     ip, device = get_client_info(request)
     log_audit(
         db, user_id=user.id, user_role=user.role, action_type="UPDATE",
@@ -628,10 +628,10 @@ def cancel_patient(
     if not tx:
         raise HTTPException(status_code=400, detail="Tranzaksiya topilmadi")
     p.is_cancelled = True
-    p.cancelled_at = datetime.utcnow()
+    p.cancelled_at = datetime.now()
     p.is_cancelled = True
     p.cancel_reason = body.reason
-    p.updated_at = datetime.utcnow()
+    p.updated_at = datetime.now()
     cancel_patient_payment(db, p, tx)
     ip, device = get_client_info(request)
     log_audit(
@@ -673,7 +673,7 @@ def reissue_ticket(
     new_ticket_num = f"{svc_prefix}-{prefix_count + 1:03d}"
     p.ticket_number = new_ticket_num
     p.queue_status = "kutmoqda"
-    p.updated_at = datetime.utcnow()
+    p.updated_at = datetime.now()
 
     db.commit()
     db.refresh(p)
@@ -725,7 +725,7 @@ def mark_patient_paid(
             p.cash_amount = 0
             p.card_amount = amount
 
-        p.updated_at = datetime.utcnow()
+        p.updated_at = datetime.now()
 
         tx = db.query(Transaction).filter(Transaction.patient_id == p.id, Transaction.is_cancelled == False).first()
         if tx:
@@ -809,7 +809,7 @@ def save_medical_record(
     if body.prescription is not None:
         p.prescription = body.prescription
 
-    p.updated_at = datetime.utcnow()
+    p.updated_at = datetime.now()
     db.commit()
     db.refresh(p)
     return _patient_row(p)

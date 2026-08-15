@@ -45,8 +45,8 @@ def _append_row(patient_data: dict[str, Any]) -> None:
         date_str = created.strftime("%d.%m.%Y")
         time_str = created.strftime("%H:%M")
     else:
-        date_str = datetime.utcnow().strftime("%d.%m.%Y")
-        time_str = datetime.utcnow().strftime("%H:%M")
+        date_str = datetime.now().strftime("%d.%m.%Y")
+        time_str = datetime.now().strftime("%H:%M")
 
     row = [
         patient_data.get("row_num", ""),

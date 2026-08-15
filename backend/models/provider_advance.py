@@ -19,5 +19,5 @@ class ProviderAdvance(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_settled: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     settled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

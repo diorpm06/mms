@@ -14,4 +14,4 @@ class Employee(Base):
     position: Mapped[str] = mapped_column(String(255))
     monthly_salary: Mapped[int] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

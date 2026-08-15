@@ -70,7 +70,7 @@ def job_daily_report():
         else:
             saved.pdf_data = pdf_bytes
             saved.json_data = json.dumps(rep, default=str)
-            saved.created_at = datetime.utcnow()
+            saved.created_at = datetime.now()
 
         msg = format_daily_message(db)
         _run_async(send_telegram_message(msg, section="reports"))

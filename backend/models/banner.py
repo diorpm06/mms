@@ -11,7 +11,7 @@ class Banner(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     image_url: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     # Rasm baza ichida saqlanadi. Vercel'da disk vaqtinchalik (/tmp har safar
     # server qayta ishga tushganda tozalanadi), shuning uchun faylga yozilgan
     # rasm bir necha daqiqadan keyin yo'qolib, TV ekranda banner ko'rinmasdi.

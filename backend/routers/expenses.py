@@ -116,10 +116,10 @@ def cancel_expense(
     from services.finance import get_or_create_balance, log_balance_change
     bal = get_or_create_balance(db)
     bal.current_balance += e.amount
-    bal.updated_at = datetime.utcnow()
+    bal.updated_at = datetime.now()
     log_balance_change(db, e.amount, "expense_cancel", f"Harajat bekor: {e.description}")
     e.is_cancelled = True
-    e.cancelled_at = datetime.utcnow()
+    e.cancelled_at = datetime.now()
     e.cancelled_by = user.id
     e.cancel_reason = body.reason
     db.commit()

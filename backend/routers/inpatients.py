@@ -72,7 +72,7 @@ def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
 
 
 def _calc_days(i: Inpatient) -> int:
-    end = i.discharged_at or datetime.utcnow()
+    end = i.discharged_at or datetime.now()
     return max(1, (end.date() - i.admitted_at.date()).days + 1)
 
 
@@ -305,7 +305,7 @@ def cancel_inpatient(
     if not inp or inp.is_cancelled:
         raise HTTPException(status_code=400, detail="Topilmadi")
     inp.is_cancelled = True
-    inp.cancelled_at = datetime.utcnow()
+    inp.cancelled_at = datetime.now()
     inp.cancelled_by = user.id
     inp.cancel_reason = body.reason
     ip, device = get_client_info(request)

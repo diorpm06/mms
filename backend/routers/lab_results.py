@@ -66,7 +66,7 @@ def create_lab_result(
         "rjson": body.results_json,
         "doc": user.full_name,
         "notes": body.notes,
-        "created": datetime.utcnow().isoformat(),
+        "created": datetime.now().isoformat(),
     })
     db.commit()
     return {"message": "Tahlil natijasi saqlandi ✓"}

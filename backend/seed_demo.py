@@ -86,7 +86,7 @@ def main():
                 payment_amount=svc.price,
                 payment_type="cash" if pay_type == 0 else "card",
                 created_by=creator.id,
-                created_at=datetime.utcnow() - timedelta(hours=i * 2),
+                created_at=datetime.now() - timedelta(hours=i * 2),
             )
             db.add(p)
             db.flush()

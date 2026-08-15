@@ -125,7 +125,7 @@ def close_shift_and_incassate(
         "inc": body.incassation_amount,
         "var": variance,
         "notes": body.notes,
-        "created": datetime.utcnow().isoformat(),
+        "created": datetime.now().isoformat(),
     })
     db.commit()
 

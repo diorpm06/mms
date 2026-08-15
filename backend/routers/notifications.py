@@ -46,7 +46,7 @@ def get_notifications(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    since = datetime.utcnow() - timedelta(hours=48)
+    since = datetime.now() - timedelta(hours=48)
     q = db.query(AuditLog).filter(AuditLog.created_at >= since)
 
     if current_user.role == "admin":

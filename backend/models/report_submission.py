@@ -25,7 +25,7 @@ class ReportSubmission(Base):
     status: Mapped[str] = mapped_column(String(20), default="submitted")  # submitted | printed
     printed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     printed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
 
     patient = relationship("Patient")
     service = relationship("Service")

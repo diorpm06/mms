@@ -83,7 +83,7 @@ async def pay_salary(employee_id: int, db: Session = Depends(get_db), _: User = 
     summary = employee_payroll_summary(db, employee_id)
     log = pay_employee_salary(db, employee_id)
     db.commit()
-    report = daily_report(db, datetime.utcnow().date())
+    report = daily_report(db, datetime.now().date())
     await send_telegram_message(
         f"💼 Qo'lda maosh: {log.amount:,} so'm (xodim #{employee_id})".replace(",", " "),
         section="finance",
