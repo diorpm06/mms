@@ -818,6 +818,17 @@ def patient_visits(patient_id: int, db: Session = Depends(get_db), _: User = Dep
             "diagnosis": v.diagnosis,
             "complaints": v.complaints,
             "prescription": v.prescription,
+            "discount_amount": v.discount_amount or 0,
+            "discount_reason": v.discount_reason,
+            # Tashrifda olingan barcha xizmatlar (service_name faqat asosiysi)
+            "services": [
+                {
+                    "service_name": ps.service.name if ps.service else None,
+                    "quantity": ps.quantity,
+                    "total_price": ps.total_price,
+                }
+                for ps in (v.services_detail or [])
+            ],
         }
         for v in visits
     ]

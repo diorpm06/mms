@@ -113,9 +113,16 @@ export default function CeoPatients() {
     }
     uniquePatientsMap[key].visit_count += 1
     uniquePatientsMap[key].total_spent += (p.payment_amount || 0)
-    if (p.service_name && !uniquePatientsMap[key].services.includes(p.service_name)) {
-      uniquePatientsMap[key].services.push(p.service_name)
-    }
+    // Bemor bir tashrifda bir nechta xizmat olgan bo'lishi mumkin —
+    // hammasini olamiz (service_name faqat asosiysini beradi).
+    const names = (p.services || []).length
+      ? p.services.map((s) => s.service_name).filter(Boolean)
+      : (p.service_name ? [p.service_name] : [])
+    names.forEach((n) => {
+      if (!uniquePatientsMap[key].services.includes(n)) {
+        uniquePatientsMap[key].services.push(n)
+      }
+    })
   })
   const uniquePatientsList = Object.values(uniquePatientsMap)
 
@@ -348,8 +355,22 @@ export default function CeoPatients() {
                   </div>
                 ) : (
                   <div>
-                    <span className="text-[10px] font-bold text-muted uppercase block mb-1">Xizmat Nomi:</span>
-                    <span className="font-extrabold text-cyan text-xs">{p.service_name}</span>
+                    <span className="text-[10px] font-bold text-muted uppercase block mb-1">
+                      {(p.services || []).length > 1 ? `Xizmatlar (${p.services.length} ta):` : 'Xizmat Nomi:'}
+                    </span>
+                    {(p.services || []).length > 1 ? (
+                      <div className="space-y-0.5">
+                        {p.services.map((s, i) => (
+                          <span key={i} className="font-extrabold text-cyan text-xs block">
+                            • {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="font-extrabold text-cyan text-xs">
+                        {p.services?.[0]?.service_name || p.service_name}
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -519,7 +540,19 @@ export default function CeoPatients() {
 
                   <td className="p-3 text-muted font-mono text-xs">{p.phone || '—'}</td>
 
-                  <td className="p-3 text-cyan font-extrabold text-xs">{p.service_name}</td>
+                  <td className="p-3 text-cyan font-extrabold text-xs">
+                    {(p.services || []).length > 1 ? (
+                      <div className="space-y-0.5">
+                        {p.services.map((s, i) => (
+                          <span key={i} className="block">
+                            {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      p.services?.[0]?.service_name || p.service_name
+                    )}
+                  </td>
 
                   <td className="p-3 font-mono">
                     <span className="font-black text-emerald text-sm">{formatMoney(p.payment_amount)}</span>

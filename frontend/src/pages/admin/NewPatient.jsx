@@ -482,36 +482,38 @@ export default function NewPatient({ homePath = '/admin' }) {
     const isArrow = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)
     if (!isArrow) return
 
-    // SELECT: strelkalar qiymatni o'zgartiradi — tegmaymiz
+    // SELECT: strelkalar qiymatni tanlaydi — tegmaymiz
     if (tag === 'SELECT') return
 
-    // Matn maydoni: ↑/↓ keyingi-oldingi maydonga o'tadi,
-    // ←/→ esa kursorni siljitish uchun o'z holicha qoladi
-    if (tag === 'INPUT' || tag === 'TEXTAREA') {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return
-      e.preventDefault()
-      const items = getFocusables().filter(
-        (x) => x.tagName === 'INPUT' || x.tagName === 'SELECT' || x.tagName === 'TEXTAREA'
-      )
-      const i = items.indexOf(el)
-      if (i === -1) return
-      const next = items[e.key === 'ArrowDown' ? i + 1 : i - 1]
-      if (next) { next.focus(); next.select?.() }
-      return
+    const horizontal = e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+
+    // Matn maydonida ←/→ avval kursorni siljitadi. Kursor chetiga yetgandagina
+    // qo'shni maydonga o'tadi — shunda ham yozish, ham yurish qulay bo'ladi.
+    if (horizontal && (tag === 'INPUT' || tag === 'TEXTAREA')) {
+      const isText = !['checkbox', 'radio', 'date', 'week', 'number'].includes(el.type)
+      if (isText && el.selectionStart !== el.selectionEnd) return
+      const caret = el.selectionStart ?? 0
+      const len = (el.value || '').length
+      if (isText && e.key === 'ArrowLeft' && caret > 0) return
+      if (isText && e.key === 'ArrowRight' && caret < len) return
     }
 
-    // Tugmalar: guruh ichida yurish (xizmatlar, to'lov turi)
-    const group = el.closest('[data-kbd-group]')
-    const scope = group || formRef.current
-    const buttons = Array.from(scope.querySelectorAll('button:not([disabled])'))
-      .filter((b) => b.offsetParent !== null)
-    const i = buttons.indexOf(el)
+    // Barcha maydon va tugmalar bo'yicha erkin yurish (DOM tartibida).
+    // Guruh bilan cheklamaymiz — foydalanuvchi istalgan yo'nalishda
+    // ro'yxatning boshi va oxiri orasida aylanib yura oladi.
+    const items = getFocusables()
+    const i = items.indexOf(el)
     if (i === -1) return
 
     e.preventDefault()
     const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight'
-    const next = buttons[fwd ? i + 1 : i - 1]
-    if (next) next.focus()
+    const next = items[(i + (fwd ? 1 : -1) + items.length) % items.length]
+    if (next) {
+      next.focus()
+      if (next.select && next.tagName === 'INPUT') {
+        try { next.select() } catch (_) {}
+      }
+    }
   }
 
   const handleCloseReceipt = () => {
@@ -527,16 +529,6 @@ export default function NewPatient({ homePath = '/admin' }) {
       {createdPatient && (
         <PaymentTicketModal open={!!createdPatient} patient={createdPatient} onClose={handleCloseReceipt} />
       )}
-
-      {/* Klaviatura yordami */}
-      <div className="mb-3 text-[11px] text-muted flex flex-wrap items-center gap-x-4 gap-y-1">
-        <span className="font-bold text-gold">⌨️ Klaviatura:</span>
-        <span><kbd className="kbd">Enter</kbd> keyingi maydon</span>
-        <span><kbd className="kbd">↑</kbd><kbd className="kbd">↓</kbd> maydonlar orasida</span>
-        <span><kbd className="kbd">←</kbd><kbd className="kbd">→</kbd> tugmalar orasida</span>
-        <span><kbd className="kbd">Space</kbd> belgilash</span>
-        <span><kbd className="kbd">Ctrl</kbd>+<kbd className="kbd">Enter</kbd> saqlash</span>
-      </div>
 
       <div ref={formRef} onKeyDown={handleFormKeyDown} className="card space-y-5">
 
