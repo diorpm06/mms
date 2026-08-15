@@ -37,17 +37,97 @@ def _expense_out(e: Expense) -> dict:
     }
 
 
+def sync_advances_and_salaries_to_expenses(db: Session):
+    from datetime import timedelta
+    from models.advance import Advance
+    from models.provider_advance import ProviderAdvance
+    from models.salary_log import SalaryLog
+    from models.employee import Employee
+    from models.provider import Provider
+
+    changed = False
+    advances = db.query(Advance).filter(Advance.is_cancelled == False).all()
+    for a in advances:
+        emp = db.query(Employee).filter(Employee.id == a.employee_id).first()
+        emp_name = emp.full_name if emp else f"Xodim #{a.employee_id}"
+        desc_text = f"Avans: {emp_name}" + (f" — {a.note}" if a.note else "")
+        exists = db.query(Expense).filter(
+            Expense.category == "Avans",
+            Expense.amount == a.amount,
+            Expense.created_at >= a.created_at - timedelta(seconds=10),
+            Expense.created_at <= a.created_at + timedelta(seconds=10),
+        ).first()
+        if not exists:
+            db.add(Expense(
+                description=f"[MANBA: Naqt kassa] {desc_text}",
+                amount=a.amount,
+                category="Avans",
+                created_at=a.created_at,
+                created_by=a.created_by or 1,
+            ))
+            changed = True
+
+    prov_advances = db.query(ProviderAdvance).all()
+    for pa in prov_advances:
+        p_name = "Noma'lum"
+        if pa.recipient_type == "provider":
+            p = db.query(Provider).filter(Provider.id == pa.recipient_id).first()
+            if p: p_name = p.full_name
+        desc_text = f"Avans: {p_name}" + (f" — {pa.note}" if pa.note else "")
+        exists = db.query(Expense).filter(
+            Expense.category == "Avans",
+            Expense.amount == pa.amount,
+            Expense.created_at >= pa.created_at - timedelta(seconds=10),
+            Expense.created_at <= pa.created_at + timedelta(seconds=10),
+        ).first()
+        if not exists:
+            db.add(Expense(
+                description=f"[MANBA: Naqt kassa] {desc_text}",
+                amount=pa.amount,
+                category="Avans",
+                created_at=pa.created_at,
+                created_by=1,
+            ))
+            changed = True
+
+    salaries = db.query(SalaryLog).all()
+    for s in salaries:
+        emp = db.query(Employee).filter(Employee.id == s.employee_id).first()
+        emp_name = emp.full_name if emp else f"Xodim #{s.employee_id}"
+        exists = db.query(Expense).filter(
+            Expense.category == "Oylik",
+            Expense.amount == s.amount,
+            Expense.created_at >= s.paid_at - timedelta(seconds=10),
+            Expense.created_at <= s.paid_at + timedelta(seconds=10),
+        ).first()
+        if not exists:
+            db.add(Expense(
+                description=f"[MANBA: Naqt kassa] Oylik: {emp_name}",
+                amount=s.amount,
+                category="Oylik",
+                created_at=s.paid_at,
+                created_by=1,
+            ))
+            changed = True
+
+    if changed:
+        db.commit()
+
+
 @router.get("", response_model=list[ExpenseOut])
 def list_expenses(
     month: int | None = None,
     year: int | None = None,
-    # Sana oralig'i. Ilgari bu parametrlar qo'llab-quvvatlanmasdi va e'tiborsiz
-    # qoldirilardi — ya'ni davr tanlansa ham BARCHA harajatlar qaytardi.
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_or_ceo),
 ):
+    try:
+        sync_advances_and_salaries_to_expenses(db)
+    except Exception as err:
+        print("Expense sync error:", err)
+
     q = db.query(Expense).filter(Expense.is_cancelled == False)
     if from_date and to_date:
         q = q.filter(
