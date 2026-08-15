@@ -8,6 +8,7 @@ from auth_utils import require_admin_or_ceo, require_ceo
 from database import get_db
 from models.advance import Advance
 from models.employee import Employee
+from models.expense import Expense
 from models.user import User
 from schemas import EmployeeCreate, EmployeeOut, EmployeeUpdate
 from services.audit import get_client_info, log_audit
@@ -82,13 +83,23 @@ def delete_employee(
 
 
 @router.post("/{employee_id}/pay-salary")
-async def pay_salary(employee_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)):
+async def pay_salary(employee_id: int, db: Session = Depends(get_db), user: User = Depends(require_admin_or_ceo)):
     summary = employee_payroll_summary(db, employee_id)
     log = pay_employee_salary(db, employee_id)
+    emp = db.query(Employee).filter(Employee.id == employee_id).first()
+    emp_name = emp.full_name if emp else f"#{employee_id}"
+    if log and log.amount > 0:
+        exp = Expense(
+            description=f"[MANBA: Naqt kassa] Oylik: {emp_name}",
+            amount=log.amount,
+            created_by=user.id,
+            category="Oylik",
+        )
+        db.add(exp)
     db.commit()
     report = daily_report(db, datetime.now().date())
     await send_telegram_message(
-        f"💼 Qo'lda maosh: {log.amount:,} so'm (xodim #{employee_id})".replace(",", " "),
+        f"💼 Qo'lda maosh: {log.amount:,} so'm ({emp_name})".replace(",", " "),
         section="finance",
     )
     return {
@@ -147,7 +158,17 @@ def give_employee_advance(
     )
     db.add(adv)
     # Pul kassadan chiqadi
-    process_advance(db, body.amount, f"Avans: {emp.full_name}" + (f" — {body.note}" if body.note else ""))
+    desc = f"Avans: {emp.full_name}" + (f" — {body.note}" if body.note else "")
+    process_advance(db, body.amount, desc)
+
+    # Harajatlar ro'yxatida ham ko'rinishi uchun Expense jadvaliga qo'shamiz
+    exp = Expense(
+        description=f"[MANBA: Naqt kassa] {desc}",
+        amount=body.amount,
+        created_by=user.id,
+        category="Avans",
+    )
+    db.add(exp)
 
     ip, device = get_client_info(request)
     log_audit(

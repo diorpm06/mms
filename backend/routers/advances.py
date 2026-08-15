@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from auth_utils import require_admin_or_ceo, require_ceo
 from database import get_db
+from models.expense import Expense
 from models.provider import Provider
 from models.provider_advance import ProviderAdvance
 from models.referrer import Referrer
@@ -58,7 +59,7 @@ def list_advances(
 def create_advance(
     data: ProviderAdvanceCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin_or_ceo),
+    user: User = Depends(require_admin_or_ceo),
 ):
     if data.recipient_type not in ("provider", "referrer"):
         raise HTTPException(status_code=400, detail="Recipient type 'provider' yoki 'referrer' bo'lishi kerak")
@@ -85,7 +86,18 @@ def create_advance(
     )
     db.add(advance)
     from services.finance import process_advance
-    process_advance(db, data.amount, f"Avans: {name}" + (f" — {data.note}" if data.note else ""))
+    desc = f"Avans: {name}" + (f" — {data.note}" if data.note else "")
+    process_advance(db, data.amount, desc)
+
+    # Harajatlar ro'yxatida ham ko'rinishi uchun Expense jadvaliga qo'shamiz
+    exp = Expense(
+        description=f"[MANBA: Naqt kassa] {desc}",
+        amount=data.amount,
+        created_by=user.id,
+        category="Avans",
+    )
+    db.add(exp)
+
     db.commit()
     db.refresh(advance)
 

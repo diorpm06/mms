@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from auth_utils import hash_password, require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
 from database import get_db
+from models.expense import Expense
 from models.provider import Provider, ProviderService
 from models.user import User
 from schemas import ProviderCreate, ProviderOut, ProviderUpdate
@@ -174,9 +175,20 @@ def payout_provider(
     provider_id: int,
     body: PayoutBody,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin_or_ceo),
+    user: User = Depends(require_admin_or_ceo),
 ):
+    p = db.query(Provider).filter(Provider.id == provider_id).first()
     payout = payout_recipient_balance(db, "provider", provider_id, source=body.source)
+    if payout and payout.amount > 0:
+        doc_name = p.full_name if p else f"#{provider_id}"
+        src = body.source or "Naqt kassa"
+        exp = Expense(
+            description=f"[MANBA: {src}] Shifokor maoshi: {doc_name}",
+            amount=payout.amount,
+            created_by=user.id,
+            category="Oylik",
+        )
+        db.add(exp)
     db.commit()
     return {"message": "Balans chiqarildi", "amount": payout.amount, "source": body.source}
 
