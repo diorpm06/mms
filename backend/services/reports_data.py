@@ -132,8 +132,11 @@ def get_report(db: Session, start: date, end: date) -> dict:
             elif ptype == "qr":
                 qr += t.total_amount
             elif ptype in ("split", "aralash"):
+                # Aralash to'lovda Click/QR qismi kartadan ajratiladi
                 cash += (t.cash_amount or 0)
                 card += (t.card_amount or 0)
+                click += (t.click_amount or 0)
+                qr += (t.qr_amount or 0)
             else:
                 card += t.total_amount
         referrer_share = sum(t.referrer_amount for t in txs)
@@ -155,6 +158,8 @@ def get_report(db: Session, start: date, end: date) -> dict:
             elif ptype in ("split", "aralash"):
                 cash += (p.cash_amount or 0)
                 card += (p.card_amount or 0)
+                click += (p.click_amount or 0)
+                qr += (p.qr_amount or 0)
             else:
                 card += amt
         referrer_share = sum((getattr(p, "referrer_amount", 0) or 0) for p in all_patients)
@@ -502,7 +507,10 @@ def get_report(db: Session, start: date, end: date) -> dict:
             {
                 "id": ex.id,
                 "category": ex.category or "Boshqa",
-                "description": (ex.description.split("] ", 1)[1] if "] " in ex.description else ex.description),
+                "description": (
+                    (ex.description.split("] ", 1)[1].strip() if "] " in ex.description and ex.description.split("] ", 1)[1].strip() not in ("", "-") else ex.description.replace("[MANBA:", "").replace("]", "").strip())
+                    if ex.description else (ex.category or "Harajat")
+                ),
                 "amount": int(ex.amount),
                 "created_at": ex.created_at.isoformat() if ex.created_at else None,
             }

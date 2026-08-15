@@ -215,6 +215,9 @@ class PatientCreate(BaseModel):
     payment_type: str  # cash | card | click | qr | split
     cash_amount: Optional[int] = 0
     card_amount: Optional[int] = 0
+    # Aralash to'lovda Click/Payme va QR qismlari — kartadan alohida
+    click_amount: Optional[int] = 0
+    qr_amount: Optional[int] = 0
     discount_amount: Optional[int] = Field(default=0, ge=0)
     discount_reason: Optional[str] = None
     custom_date: Optional[date] = None

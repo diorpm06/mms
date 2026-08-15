@@ -117,6 +117,24 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"template_key migration warning: {e}")
 
+    # patients/transactions: click_amount, qr_amount — aralash to'lovda Click va QR
+    # qismlarini kartadan ajratib yozish uchun
+    for stmt in (
+        "ALTER TABLE patients ADD COLUMN click_amount INTEGER DEFAULT 0",
+        "ALTER TABLE patients ADD COLUMN qr_amount INTEGER DEFAULT 0",
+        "ALTER TABLE transactions ADD COLUMN click_amount INTEGER DEFAULT 0",
+        "ALTER TABLE transactions ADD COLUMN qr_amount INTEGER DEFAULT 0",
+    ):
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"click/qr amount migration warning: {e}")
+
     # patients.is_paper_entry — qog'oz jurnalidan (navbatchilikda) kiritilgan
     # bemorlarni hisobotlarda alohida ko'rsatish uchun
     try:

@@ -89,6 +89,8 @@ class PatientUpdate(BaseModel):
     payment_type: str | None = None
     cash_amount: int | None = None
     card_amount: int | None = None
+    click_amount: int | None = None
+    qr_amount: int | None = None
     # Xizmatlar ro'yxati qayta yuborilsa — eskisi almashtiriladi va
     # to'lov summasi qaytadan hisoblanadi (chegirma saqlanib qoladi).
     services: list[EditServiceItem] | None = None
@@ -97,6 +99,43 @@ class PatientUpdate(BaseModel):
 
 class CancelBody(BaseModel):
     reason: str = Field(min_length=3)
+
+
+def _apply_payment_split(p: Patient, data: "PatientUpdate") -> None:
+    """
+    To'lov turiga qarab naqd/karta/click/qr taqsimotini qayta yozadi.
+
+    Ilgari aralash to'lovda naqd bo'lmagan qismning HAMMASI card_amount ga
+    tushardi — Click yoki QR tanlansa ham hisobotda "Karta" bo'lib chiqardi.
+    """
+    ptype = (p.payment_type or "").lower()
+    jami = p.payment_amount or 0
+    p.cash_amount = p.card_amount = p.click_amount = p.qr_amount = 0
+
+    if ptype in ("cash", "naqd"):
+        p.cash_amount = jami
+    elif ptype in ("later", "keyinroq", "nasiya", "qarz"):
+        pass
+    elif ptype in ("click", "payme"):
+        p.click_amount = jami
+    elif ptype == "qr":
+        p.qr_amount = jami
+    elif ptype in ("split", "aralash"):
+        naqd = data.cash_amount if data.cash_amount is not None else (p.cash_amount or 0)
+        p.cash_amount = min(max(0, naqd), jami)
+        qolgan = jami - p.cash_amount
+        klik = max(0, data.click_amount or 0)
+        qr = max(0, data.qr_amount or 0)
+        karta = max(0, data.card_amount or 0)
+        soralgan = karta + klik + qr
+        if soralgan > 0 and (klik or qr):
+            p.click_amount = int(qolgan * klik / soralgan)
+            p.qr_amount = int(qolgan * qr / soralgan)
+            p.card_amount = max(0, qolgan - p.click_amount - p.qr_amount)
+        else:
+            p.card_amount = qolgan
+    else:
+        p.card_amount = jami
 
 
 def _patient_row(p: Patient) -> dict:
@@ -113,6 +152,8 @@ def _patient_row(p: Patient) -> dict:
         "payment_amount": p.payment_amount,
         "payment_type": p.payment_type,
         "cash_amount": p.cash_amount or 0,
+        "click_amount": p.click_amount or 0,
+        "qr_amount": p.qr_amount or 0,
         "card_amount": p.card_amount or 0,
         "discount_amount": p.discount_amount or 0,
         "discount_reason": p.discount_reason,
@@ -492,6 +533,8 @@ async def create_patient(
 
         group_cash = 0
         group_card = 0
+        group_click = 0
+        group_qr = 0
         if data.payment_type in ("split", "aralash"):
             batch_final_total = max(1, total_raw_price - discount_total)
             ratio = final_group_price / batch_final_total
@@ -501,15 +544,27 @@ async def create_patient(
                 group_cash = int((data.cash_amount or 0) * ratio)
             group_cash = min(group_cash, final_group_price)
             _allocated_cash += group_cash
-            group_card = max(0, final_group_price - group_cash)
+            # Naqd bo'lmagan qism Click/QR ga bo'linishi mumkin — ilgari hammasi
+            # kartaga yozilib, hisobotda "Karta" bo'lib chiqardi.
+            noncash = max(0, final_group_price - group_cash)
+            req_click = data.click_amount or 0
+            req_qr = data.qr_amount or 0
+            req_noncash = (data.card_amount or 0) + req_click + req_qr
+            if req_noncash > 0 and (req_click or req_qr):
+                group_click = int(noncash * req_click / req_noncash)
+                group_qr = int(noncash * req_qr / req_noncash)
+                group_card = max(0, noncash - group_click - group_qr)
+            else:
+                group_card = noncash
         elif data.payment_type in ("cash", "naqd"):
             group_cash = final_group_price
-            group_card = 0
         elif data.payment_type in ("later", "keyinroq", "nasiya", "qarz"):
-            group_cash = 0
-            group_card = 0
+            pass
+        elif data.payment_type in ("click", "payme"):
+            group_click = final_group_price
+        elif data.payment_type == "qr":
+            group_qr = final_group_price
         else:
-            group_cash = 0
             group_card = final_group_price
 
         assigned_provider_id = primary_item.get("provider_id")
@@ -543,6 +598,8 @@ async def create_patient(
             payment_type=data.payment_type,
             cash_amount=group_cash,
             card_amount=group_card,
+            click_amount=group_click,
+            qr_amount=group_qr,
             discount_amount=group_discount,
             discount_reason=data.discount_reason,
             created_by=user.id,
@@ -693,38 +750,19 @@ def update_patient(
         p.service_id = first_sid
         p.payment_amount = max(0, raw_total - (p.discount_amount or 0))
         # Naqd/karta taqsimotini yangi summaga moslaymiz
-        if (p.payment_type or "") in ("cash", "naqd"):
-            p.cash_amount, p.card_amount = p.payment_amount, 0
-        elif (p.payment_type or "") in ("later", "keyinroq", "nasiya", "qarz"):
-            p.cash_amount, p.card_amount = 0, 0
-        elif (p.payment_type or "") in ("split", "aralash"):
-            c_val = data.cash_amount if data.cash_amount is not None else (p.cash_amount or 0)
-            c_val = min(max(0, c_val), p.payment_amount)
-            p.cash_amount = c_val
-            p.card_amount = max(0, p.payment_amount - c_val)
-        else:
-            p.cash_amount, p.card_amount = 0, p.payment_amount
+        _apply_payment_split(p, data)
         db.flush()
     else:
         # Xizmatlar ro'yxati alohida yangilanmagan bo'lsa ham payment_type / cash_amount o'zgargan bo'lishi mumkin
-        if (p.payment_type or "") in ("cash", "naqd"):
-            p.cash_amount, p.card_amount = p.payment_amount, 0
-        elif (p.payment_type or "") in ("later", "keyinroq", "nasiya", "qarz"):
-            p.cash_amount, p.card_amount = 0, 0
-        elif (p.payment_type or "") in ("split", "aralash"):
-            c_val = data.cash_amount if data.cash_amount is not None else (p.cash_amount or 0)
-            c_val = min(max(0, c_val), p.payment_amount)
-            p.cash_amount = c_val
-            p.card_amount = max(0, p.payment_amount - c_val)
-        else:
-            p.cash_amount, p.card_amount = 0, p.payment_amount
+        _apply_payment_split(p, data)
 
     p.updated_at = datetime.now()
 
     # Pulga ta'sir qiladigan maydon o'zgargan bo'lsa, taqsimotni qaytadan
     # hisoblaymiz. Aks holda (masalan yo'naltiruvchi keyin qo'shilsa) uning
     # ulushi hech qachon hisoblanmay qolardi.
-    money_fields = {"referrer_id", "provider_id", "service_id", "payment_amount", "payment_type", "cash_amount", "card_amount"}
+    money_fields = {"referrer_id", "provider_id", "service_id", "payment_amount", "payment_type",
+                    "cash_amount", "card_amount", "click_amount", "qr_amount"}
     if new_services is not None or (money_fields & set(updates.keys())):
         tx = (
             db.query(Transaction)

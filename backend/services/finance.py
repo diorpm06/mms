@@ -148,6 +148,8 @@ def process_payment(db: Session, patient: Patient) -> Transaction:
         center_amount=center_amount,
         payment_type=patient.payment_type,
         cash_amount=patient.cash_amount or 0,
+        click_amount=patient.click_amount or 0,
+        qr_amount=patient.qr_amount or 0,
         card_amount=patient.card_amount or 0,
         created_at=patient.created_at or datetime.now(),
     )
@@ -197,6 +199,8 @@ def reprice_patient_payment(db: Session, patient: Patient, tx: Transaction) -> T
     tx.center_amount = center_amount
     tx.payment_type = patient.payment_type
     tx.cash_amount = patient.cash_amount or 0
+    tx.click_amount = patient.click_amount or 0
+    tx.qr_amount = patient.qr_amount or 0
     tx.card_amount = patient.card_amount or 0
 
     log_balance_change(

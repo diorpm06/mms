@@ -41,6 +41,8 @@ export default function TodayPatients() {
       payment_type: p.payment_type || 'cash',
       cash_amount: initialCash,
       card_amount: initialCard,
+      click_amount: p.click_amount || 0,
+      qr_amount: p.qr_amount || 0,
       reason: '',
     })
     // Bemorning hozirgi xizmatlari (tahrirlash uchun nusxa)
@@ -107,15 +109,19 @@ export default function TodayPatients() {
         toast(`Kiritilgan to'lovlar yig'indisi (${formatMoney(sumEntered)}) to'lanadigan summa (${formatMoney(totalToPay)})ga teng bo'lishi kerak!`, 'error')
         return
       }
-      cardAmt = cardAmt + clickAmt + qrAmt
+      // Ilgari shu yerda Click va QR kartaga qo'shib yuborilardi va hisobotda
+      // "Karta" bo'lib chiqardi — endi har biri o'z maydonida ketadi.
     } else if (editForm.payment_type === 'cash') {
       cashAmt = totalToPay
-      cardAmt = 0
+      cardAmt = 0; clickAmt = 0; qrAmt = 0
     } else if (editForm.payment_type === 'later') {
-      cashAmt = 0
-      cardAmt = 0
+      cashAmt = 0; cardAmt = 0; clickAmt = 0; qrAmt = 0
+    } else if (editForm.payment_type === 'click') {
+      cashAmt = 0; cardAmt = 0; qrAmt = 0; clickAmt = totalToPay
+    } else if (editForm.payment_type === 'qr') {
+      cashAmt = 0; cardAmt = 0; clickAmt = 0; qrAmt = totalToPay
     } else {
-      cashAmt = 0
+      cashAmt = 0; clickAmt = 0; qrAmt = 0
       cardAmt = totalToPay
     }
 
@@ -128,6 +134,8 @@ export default function TodayPatients() {
           payment_type: editForm.payment_type,
           cash_amount: cashAmt,
           card_amount: cardAmt,
+          click_amount: clickAmt,
+          qr_amount: qrAmt,
           services: editServices.map((s) => ({
             service_id: s.service_id,
             quantity: s.quantity,
@@ -471,7 +479,13 @@ export default function TodayPatients() {
                     <span className="badge badge-gold ml-1.5 text-[10px] uppercase font-bold">{paymentLabel(p.payment_type)}</span>
                     {p.payment_type === 'split' && (
                       <span className="block text-[10px] text-cyan-400 font-bold font-mono mt-0.5">
-                        💵 {formatMoney(p.cash_amount || 0)} N + 💳/📱 {formatMoney(p.card_amount || 0)} K
+                        {/* Har bir usul o'z nomi bilan ko'rinadi — avval hammasi "K" edi */}
+                        {[
+                          (p.cash_amount || 0) > 0 && `💵 ${formatMoney(p.cash_amount)} naqd`,
+                          (p.card_amount || 0) > 0 && `💳 ${formatMoney(p.card_amount)} karta`,
+                          (p.click_amount || 0) > 0 && `📱 ${formatMoney(p.click_amount)} Click`,
+                          (p.qr_amount || 0) > 0 && `🔳 ${formatMoney(p.qr_amount)} QR`,
+                        ].filter(Boolean).join('  +  ')}
                       </span>
                     )}
                     {p.discount_amount > 0 && (

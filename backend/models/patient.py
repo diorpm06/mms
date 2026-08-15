@@ -23,6 +23,10 @@ class Patient(CancelMixin, TimestampMixin, Base):
     payment_type: Mapped[str] = mapped_column(String(10))
     cash_amount: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
     card_amount: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
+    # Aralash to'lovda Click/Payme va QR qismlari kartadan alohida yozilishi kerak —
+    # ilgari hammasi card_amount ga qo'shilib ketardi va hisobotda "Karta" bo'lib chiqardi.
+    click_amount: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
+    qr_amount: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
     ticket_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     queue_status: Mapped[str] = mapped_column(String(20), default="kutmoqda")
     cabinet: Mapped[str | None] = mapped_column(String(100), nullable=True)

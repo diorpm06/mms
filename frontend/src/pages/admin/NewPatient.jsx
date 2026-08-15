@@ -384,14 +384,25 @@ export default function NewPatient({ homePath = '/admin' }) {
     let cashAmt = Number(form.cash_amount) || 0
     let cardAmt = Number(form.card_amount) || 0
 
+    // Aralash to'lovda 2-usul Karta/Click/QR bo'lishi mumkin — o'z maydoniga
+    // yozilmasa, hisobotda hammasi "Karta" bo'lib chiqadi.
+    let clickAmt = 0
+    let qrAmt = 0
+
     if (form.payment_type === 'split') {
       if (cashAmt + cardAmt !== finalPrice) {
         toast(`Aralash to'lov yig'indisi (${formatMoney(cashAmt + cardAmt)}) jami summasiga (${formatMoney(finalPrice)}) teng bo'lishi kerak!`, 'error')
         return
       }
+      if (splitSecond === 'click') { clickAmt = cardAmt; cardAmt = 0 }
+      else if (splitSecond === 'qr') { qrAmt = cardAmt; cardAmt = 0 }
     } else if (form.payment_type === 'cash') {
       cashAmt = finalPrice
       cardAmt = 0
+    } else if (form.payment_type === 'click') {
+      cashAmt = 0; cardAmt = 0; clickAmt = finalPrice
+    } else if (form.payment_type === 'qr') {
+      cashAmt = 0; cardAmt = 0; qrAmt = finalPrice
     } else {
       cashAmt = 0
       cardAmt = finalPrice
@@ -412,6 +423,8 @@ export default function NewPatient({ homePath = '/admin' }) {
       payment_type: form.payment_type,
       cash_amount: cashAmt,
       card_amount: cardAmt,
+      click_amount: clickAmt,
+      qr_amount: qrAmt,
       discount_amount: computedDiscount,
       discount_reason: computedDiscount > 0 ? form.discount_reason || 'Chegirma' : null,
       services: validServices.map((s) => ({

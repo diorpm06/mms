@@ -355,8 +355,9 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     let expRowsHtml = ''
     expenses.filter(ex => (ex.amount || 0) > 0).forEach((ex, idx) => {
       const cat = ex.category || 'Boshqa'
-      const desc = ex.description || ex.note || ''
-      const detail = (desc && desc !== cat) ? `${cat} — ${desc}` : (desc || cat)
+      let desc = (ex.description || ex.note || '').trim()
+      if (desc === '-') desc = ''
+      const detail = (desc && desc !== cat) ? `${cat} — ${desc}` : cat
       expRowsHtml += `<tr>
         <td style="text-align: center;">${idx + 1}</td>
         <td>${detail}</td>

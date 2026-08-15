@@ -196,8 +196,10 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
                 amt = ex.get("amount", 0)
                 if amt > 0:
                     cat = ex.get("category", "Boshqa") or "Boshqa"
-                    desc = ex.get("description", "") or ""
-                    detail = f"{cat} — {desc}" if desc and desc != cat else (desc or cat)
+                    desc = (ex.get("description", "") or "").strip()
+                    if desc == "-":
+                        desc = ""
+                    detail = f"{cat} — {desc}" if desc and desc != cat else cat
                     exp_data.append([
                         str(exp_idx),
                         detail,
