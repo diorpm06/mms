@@ -8,8 +8,25 @@ import { TableSkeleton } from '../../components/Skeleton'
 import { Btn, Icons, PageHeader, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
 import { REPORT_TEMPLATES } from '../../utils/reportTemplates'
 
+// Kategoriya "Asosiy bo'lim: Ichki bo'lim" ko'rinishida saqlanadi
+// (masalan "Laboratoriya: GORMONLAR"). Quyidagi ikki yordamchi shu
+// yozuvni bo'lish va yig'ish uchun.
+function splitCategory(raw) {
+  const s = String(raw || 'Umumiy').trim()
+  const i = s.indexOf(':')
+  if (i === -1) return { main: s, sub: '' }
+  return { main: s.slice(0, i).trim(), sub: s.slice(i + 1).trim() }
+}
+
+function joinCategory(main, sub) {
+  const m = String(main || 'Umumiy').trim()
+  const s = String(sub || '').trim()
+  return s ? `${m}: ${s}` : m
+}
+
 const EMPTY_SVC = {
   name: '',
+  sub_category: '',
   price: '',
   cabinet: '1-Xona',
   requires_queue: true,
@@ -122,16 +139,25 @@ export default function CeoServices() {
   }, {})
 
   /* ─── handlers ─── */
-  const openAddService = (catName) => {
+  const openAddService = (catName, subCat = '') => {
     setEdit(null)
     const isLab = String(catName || '').toLowerCase().includes('laborat') || String(catName || '').toLowerCase().includes('labaratt')
     setForm({
       ...EMPTY_SVC,
+      sub_category: subCat,
       cabinet: isLab ? '-' : '1-Xona',
       referrer_commission_percent: isLab ? '22' : '',
     })
     setActiveCat(catName)
     setSvcModal(true)
+  }
+
+  // Bo'lim ichidagi mavjud ichki bo'limlar ro'yxati (tanlash uchun)
+  const getSubCategories = (mainCat) => {
+    const subs = (grouped[mainCat] || [])
+      .map((s) => splitCategory(s.category).sub)
+      .filter(Boolean)
+    return Array.from(new Set(subs)).sort()
   }
 
   const openEditBolim = (oldName) => {
@@ -182,10 +208,12 @@ export default function CeoServices() {
   const openEditService = (s) => {
     setEdit(s)
     const cat = s.category || 'Umumiy'
+    const { main, sub } = splitCategory(cat)
     const isLab = String(cat).toLowerCase().includes('laborat') || String(cat).toLowerCase().includes('labaratt')
-    setActiveCat(cat)
+    setActiveCat(main)
     setForm({
       name: s.name,
+      sub_category: sub,
       price: s.price ? String(s.price) : '',
       cabinet: s.cabinet || (isLab ? '-' : '1-Xona'),
       requires_queue: s.requires_queue !== false,
@@ -206,10 +234,11 @@ export default function CeoServices() {
       toast('Nom va narx kiriting', 'error'); return
     }
     try {
-      const inheritedPrefix = getCategoryPrefixLetter(activeCat, grouped[activeCat] || [])
+      const mainCat = splitCategory(activeCat).main
+      const inheritedPrefix = getCategoryPrefixLetter(mainCat, grouped[mainCat] || [])
       const body = {
         name: form.name,
-        category: activeCat,
+        category: joinCategory(mainCat, form.sub_category),
         price: parseInt(form.price, 10) || 0,
         cabinet: form.cabinet || '1-Xona',
         requires_queue: form.requires_queue,
@@ -417,7 +446,17 @@ export default function CeoServices() {
                           {subCatName !== 'Umumiy' && (
                             <div className="px-4 py-2 bg-surface border-y border-border/40 flex items-center justify-between text-xs font-black text-gold uppercase tracking-wider">
                               <span>📁 {subCatName}</span>
-                              <span className="text-[10px] text-muted font-bold">{subSvcs.length} ta xizmat</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted font-bold">{subSvcs.length} ta xizmat</span>
+                                <button
+                                  type="button"
+                                  onClick={() => openAddService(catName, subCatName)}
+                                  className="btn-outline py-0.5 px-2 text-[10px] font-bold normal-case"
+                                  title={`"${subCatName}" ichiga xizmat qo'shish`}
+                                >
+                                  + Xizmat
+                                </button>
+                              </div>
                             </div>
                           )}
                           {subSvcs.map((s) => (
@@ -497,6 +536,31 @@ export default function CeoServices() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="input-field text-xs font-semibold"
             />
+          </div>
+
+          {/* Ichki bo'lim — bo'lim ichida guruhlash uchun (ixtiyoriy) */}
+          <div>
+            <label className="form-label font-bold">
+              Ichki bo'lim <span className="text-muted font-normal">(ixtiyoriy)</span>
+            </label>
+            <input
+              type="text"
+              list="sub-category-list"
+              placeholder="Masalan: ELEKTROLITLAR — bo'sh qoldirsangiz to'g'ridan-to'g'ri bo'limga tushadi"
+              value={form.sub_category}
+              onChange={(e) => setForm({ ...form, sub_category: e.target.value })}
+              className="input-field text-xs font-semibold"
+            />
+            <datalist id="sub-category-list">
+              {getSubCategories(splitCategory(activeCat).main).map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+            <p className="text-[10px] text-muted mt-1">
+              Saqlanadi: <span className="font-mono text-gold">
+                {joinCategory(splitCategory(activeCat).main, form.sub_category)}
+              </span>
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
