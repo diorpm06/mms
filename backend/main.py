@@ -244,6 +244,17 @@ async def spa_fallback(request: Request, full_path: str):
     if full_path.startswith(("api/", "uploads/")):
         raise HTTPException(status_code=404, detail="Not Found")
 
+    # Ildizdagi statik fayllar (logo.png, instagram-qr.png, manifest.json,
+    # sound/... ). Faqat /assets ulangani uchun bular SPA index.html'ga tushib
+    # ketardi — natijada chekdagi <img src="/logo.png"> rasm o'rniga HTML olib,
+    # logotip ko'rinmasdi.
+    if method in ("GET", "HEAD") and full_path and FRONTEND_DIST:
+        candidate = os.path.realpath(os.path.join(FRONTEND_DIST, full_path))
+        dist_root = os.path.realpath(FRONTEND_DIST)
+        # Papkadan tashqariga chiqishга yo'l qo'ymaymiz (../ hujumi)
+        if candidate.startswith(dist_root + os.sep) and os.path.isfile(candidate):
+            return FileResponse(candidate)
+
     # GET/HEAD → SPA index.html
     if method in ("GET", "HEAD"):
         idx = _get_index_html_path()
