@@ -375,6 +375,33 @@ def get_report(db: Session, start: date, end: date) -> dict:
     total_material_profit = sum(m["profit"] for m in materials_used_breakdown)
     total_material_quantity = sum(m["quantity_used"] for m in materials_used_breakdown)
 
+    # Chegirmalar. Ilgari hisobotda umuman ko'rsatilmasdi — Rahbar qancha
+    # chegirma berilganini va sababini ko'ra olmasdi. Bemor bir necha bo'limga
+    # bo'linsa chegirma ham bo'lakka bo'linadi, shuning uchun bitta tashrif
+    # sifatida (ism + sana + sabab bo'yicha) birlashtirib ko'rsatamiz.
+    _disc_map = {}
+    for p in all_patients:
+        d = p.discount_amount or 0
+        if d <= 0:
+            continue
+        key = (
+            f"{(p.first_name or '').strip().lower()}|{(p.last_name or '').strip().lower()}"
+            f"|{p.created_at:%Y-%m-%d %H:%M}|{(p.discount_reason or '').strip().lower()}"
+        )
+        if key not in _disc_map:
+            _disc_map[key] = {
+                "patient_name": f"{p.first_name or ''} {p.last_name or ''}".strip(),
+                "reason": p.discount_reason or "Sabab ko'rsatilmagan",
+                "amount": 0,
+                "paid": 0,
+                "date": p.created_at.strftime("%d.%m.%Y %H:%M") if p.created_at else "",
+            }
+        _disc_map[key]["amount"] += d
+        _disc_map[key]["paid"] += p.payment_amount or 0
+
+    discounts_list = sorted(_disc_map.values(), key=lambda x: -x["amount"])
+    total_discount = sum(x["amount"] for x in discounts_list)
+
     paper_entry_patients = [
         {
             "id": p.id,
@@ -430,6 +457,10 @@ def get_report(db: Session, start: date, end: date) -> dict:
         "total_material_profit": int(total_material_profit),
         "total_material_quantity": int(total_material_quantity),
         "duty_today": duty_list,
+        # Chegirmagacha bo'lgan to'liq summa va berilgan chegirmalar ro'yxati
+        "gross_income": int(total_income) + int(total_discount),
+        "total_discount": int(total_discount),
+        "discounts": discounts_list,
         "paper_entry_patients": paper_entry_patients,
         "paper_entry_count": paper_entry_count,
         "paper_entry_total": paper_entry_total,
@@ -455,6 +486,9 @@ def admin_daily_report(db: Session, d: date) -> dict:
         "paper_entry_patients": full["paper_entry_patients"],
         "paper_entry_count": full["paper_entry_count"],
         "paper_entry_total": full["paper_entry_total"],
+        "gross_income": full["gross_income"],
+        "total_discount": full["total_discount"],
+        "discounts": full["discounts"],
         "report_date": d.isoformat(),
     }
     if out["patients_count"] == 0 and out["total_income"] == 0:

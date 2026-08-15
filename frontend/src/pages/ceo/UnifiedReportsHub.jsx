@@ -609,6 +609,12 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
               <div className="stat-card">
                 <span className="text-xs font-bold text-muted uppercase">Jami Kelgan Tushum</span>
                 <p className="text-2xl font-black text-emerald font-mono mt-1">{formatMoney(reportsData?.total_income || 0)}</p>
+                {(reportsData?.total_discount || 0) > 0 && (
+                  <p className="text-[11px] text-muted mt-1 leading-snug">
+                    To'liq summa {formatMoney(reportsData.gross_income)}<br />
+                    <span className="text-amber-400 font-bold">chegirma −{formatMoney(reportsData.total_discount)}</span>
+                  </p>
+                )}
               </div>
               <div className="stat-card">
                 <span className="text-xs font-bold text-muted uppercase">Harajatlar (-)</span>
@@ -677,6 +683,35 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                 )}
               </div>
             </div>
+
+            {/* Berilgan chegirmalar — sababi bilan */}
+            {(reportsData?.discounts || []).length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <h4 className="text-xs font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  🏷️ Berilgan chegirmalar — {reportsData.discounts.length} ta, jami {formatMoney(reportsData.total_discount)}
+                </h4>
+                <p className="text-[11px] text-muted">
+                  Xizmatlar to'liq summasi {formatMoney(reportsData.gross_income)} — chegirmadan keyin {formatMoney(reportsData.total_income)} tushdi.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <THead cols={['#', 'Bemor', 'Sababi', 'Vaqt', 'To\'lagan', 'Chegirma']} />
+                    <tbody className="divide-y divide-border">
+                      {reportsData.discounts.map((d, i) => (
+                        <tr key={i} className="hover:bg-surface-hover font-semibold">
+                          <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
+                          <td className="p-2.5 text-body font-bold">{d.patient_name}</td>
+                          <td className="p-2.5 text-muted">{d.reason}</td>
+                          <td className="p-2.5 font-mono text-muted">{d.date}</td>
+                          <td className="p-2.5 text-right font-mono text-emerald">{formatMoney(d.paid)}</td>
+                          <td className="p-2.5 text-right font-mono font-bold text-amber-400">-{formatMoney(d.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Navbatchilikda (qog'oz jurnalidan) kiritilgan bemorlar — alohida ro'yxat, umumiy summaga allaqachon qo'shilgan */}
             {(reportsData?.paper_entry_count || 0) > 0 && (

@@ -71,6 +71,8 @@ export default function AdminReports() {
   const stats = [
     { label: 'Mijozlar keldi', value: `${report.patients_count} nafar` },
     { label: 'Yangi / Qayta', value: `${report.new_patients} / ${report.repeat_patients}` },
+    { label: 'Xizmatlar to\'liq summasi', value: formatMoney(report.gross_income ?? report.total_income) },
+    { label: 'Chegirmalar (-)', value: `-${formatMoney(report.total_discount || 0)}` },
     { label: 'Jami tushgan mablag\'', value: formatMoney(report.total_income) },
     { label: 'Naqd', value: formatMoney(report.cash) },
     { label: 'Karta', value: formatMoney(report.card) },
@@ -205,6 +207,44 @@ export default function AdminReports() {
           </div>
         )}
       </div>
+
+      {/* Berilgan chegirmalar — sababi bilan */}
+      {(report.discounts || []).length > 0 && (
+        <div className="card">
+          <h3 className="text-amber-400 mb-1 font-bold text-sm uppercase tracking-wide">
+            🏷️ Berilgan chegirmalar — {report.discounts.length} ta, jami {formatMoney(report.total_discount)}
+          </h3>
+          <p className="text-muted text-[11px] mb-3">
+            Xizmatlar to'liq summasi {formatMoney(report.gross_income)} edi, chegirmadan keyin {formatMoney(report.total_income)} tushdi.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-gold font-bold text-left bg-surface-2">
+                  <th className="p-3">#</th>
+                  <th className="p-3">Bemor</th>
+                  <th className="p-3">Sababi</th>
+                  <th className="p-3">Vaqt</th>
+                  <th className="p-3 text-right">To'lagan</th>
+                  <th className="p-3 text-right">Chegirma</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {report.discounts.map((d, i) => (
+                  <tr key={i} className="hover:bg-surface-hover font-semibold">
+                    <td className="p-3 text-muted font-mono">#{i + 1}</td>
+                    <td className="p-3 text-body font-bold">{d.patient_name}</td>
+                    <td className="p-3 text-muted">{d.reason}</td>
+                    <td className="p-3 font-mono text-muted">{d.date}</td>
+                    <td className="p-3 text-right font-mono text-emerald">{formatMoney(d.paid)}</td>
+                    <td className="p-3 text-right font-mono font-bold text-amber-400">-{formatMoney(d.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Navbatchilikda (qog'oz jurnalidan) kiritilgan bemorlar — alohida ro'yxat */}
       {(report.paper_entry_count || 0) > 0 && (
