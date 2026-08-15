@@ -1,0 +1,75 @@
+name: Kunlik zaxira nusxa (Supabase)
+
+# Supabase bepul tarifida avtomatik zaxira yo'q — shuning uchun bazaning
+# to'liq nusxasini har kuni GitHub o'zi olib, artifact sifatida saqlaydi.
+on:
+  schedule:
+    # Har kuni 21:00 UTC = Toshkent vaqti bilan 02:00 (klinika yopilgandan keyin)
+    - cron: "0 21 * * *"
+  # Dashboard'dagi "Run workflow" tugmasi bilan istalgan paytda qo'lda ham ishga tushadi
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Sana belgilash
+        id: vars
+        run: echo "stamp=$(date -u +'%Y-%m-%d_%H%M')" >> "$GITHUB_OUTPUT"
+
+      # Serverda Postgres 17 ishlaydi — pg_dump ham 17 bo'lishi shart,
+      # aks holda "server version mismatch" xatosi chiqadi.
+      - name: PostgreSQL 17 klientini o'rnatish
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Bazadan nusxa olish
+        env:
+          # GitHub → Settings → Secrets and variables → Actions da qo'shiladi.
+          # DIQQAT: port 6543 emas, 5432 bo'lishi kerak (pg_dump session rejim talab qiladi).
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::BACKUP_DATABASE_URL secret sozlanmagan"
+            exit 1
+          fi
+          pg_dump "$DATABASE_URL" \
+            --no-owner --no-privileges --clean --if-exists \
+            | gzip -9 > "backup-${{ steps.vars.outputs.stamp }}.sql.gz"
+          ls -lh backup-*.sql.gz
+
+      - name: Nusxa bo'sh emasligini tekshirish
+        run: |
+          f="backup-${{ steps.vars.outputs.stamp }}.sql.gz"
+          size=$(stat -c%s "$f")
+          echo "Hajmi: $size bayt"
+          # Bo'sh yoki juda kichik fayl = nusxa muvaffaqiyatsiz
+          if [ "$size" -lt 10000 ]; then
+            echo "::error::Zaxira juda kichik ($size bayt) — nusxa to'liq olinmagan"
+            exit 1
+          fi
+          # Ichida asosiy jadvallar borligini tasdiqlash
+          for t in patients services providers transactions; do
+            if ! zcat "$f" | grep -q "CREATE TABLE public.$t"; then
+              echo "::error::Zaxirada '$t' jadvali topilmadi"
+              exit 1
+            fi
+          done
+          echo "Tekshiruvdan o'tdi: barcha asosiy jadvallar mavjud"
+
+      - name: Zaxirani saqlash
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ steps.vars.outputs.stamp }}
+          path: backup-*.sql.gz
+          retention-days: 90
+          if-no-files-found: error

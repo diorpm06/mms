@@ -8,7 +8,7 @@ import PageHeader from '../../components/PageHeader'
 import PaymentTicketModal from '../../components/PaymentTicketModal'
 import Modal from '../../components/Modal'
 import { Btn, Icons } from '../../components/UIKit'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Search, X } from 'lucide-react'
 
 const empty = {
   full_name: '',
@@ -57,6 +57,7 @@ export default function NewPatient({ homePath = '/admin' }) {
   const [referrers, setReferrers] = useState([])
   const [services, setServices] = useState([])
   const [providers, setProviders] = useState([])
+  const [serviceQuery, setServiceQuery] = useState('')
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [createdPatient, setCreatedPatient] = useState(null)
@@ -299,8 +300,18 @@ export default function NewPatient({ homePath = '/admin' }) {
   }
   const finalPrice = Math.max(0, totalBasePrice - computedDiscount)
 
+  // Filter services by search query
+  const filteredServices = services.filter((s) => {
+    if (!serviceQuery.trim()) return true
+    const q = serviceQuery.toLowerCase().trim()
+    const nameMatch = (s.name || '').toLowerCase().includes(q)
+    const catMatch = (s.category || '').toLowerCase().includes(q)
+    const priceMatch = String(s.price || '').includes(q)
+    return nameMatch || catMatch || priceMatch
+  })
+
   // Group services into 2 levels: Main Department -> Sub-Category -> Services list
-  const nestedServices = services.reduce((acc, s) => {
+  const nestedServices = filteredServices.reduce((acc, s) => {
     let rawCat = (s.category || 'Umumiy').trim()
     let mainCat = rawCat
     let subCat = 'Umumiy'
@@ -436,8 +447,18 @@ export default function NewPatient({ homePath = '/admin' }) {
           throw e
         }
       }
-      toast('To\'lov qabul qilindi ✓')
-      setCreatedPatient(res)
+      if (isPaperMode) {
+        toast('Navbatchilik bemori bazaga saqlandi ✓')
+      } else {
+        toast('To\'lov qabul qilindi ✓')
+        setCreatedPatient(res)
+      }
+      setForm(empty)
+      setSelectedServices([])
+      setServiceQuery('')
+      setSelectedExistingPatient(null)
+      setSuggestions([])
+      setShowDropdown(false)
     } catch (e) {
       toast(e.message, 'error')
     } finally {
@@ -721,21 +742,61 @@ export default function NewPatient({ homePath = '/admin' }) {
         </div>
 
         {/* 2. ACCORDION CATEGORY → SERVICE SELECTION */}
-        <div className="border-t border-border pt-4 space-y-2">
-          <div className="flex items-center justify-between mb-1">
+        <div className="border-t border-border pt-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-gold flex items-center gap-1.5">
               🩺 Xizmatlarni tanlang
             </h3>
             {selectedServices.filter((s) => s.service_id).length > 0 && (
-              <span className="badge badge-gold text-xs font-bold">
+              <span className="badge badge-gold text-xs font-bold self-start sm:self-auto">
                 {selectedServices.filter((s) => s.service_id).length} ta tanlandi
               </span>
             )}
           </div>
 
+          {/* SERVICE SEARCH INPUT */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gold/70">
+              <Search className="h-4 w-4" />
+            </div>
+            <input
+              type="text"
+              value={serviceQuery}
+              onChange={(e) => setServiceQuery(e.target.value)}
+              placeholder="🔍 Xizmat nomi yoki bo'lim bo'yicha qidirish (masalan: UZI, Qon, Rentgen, Stomatologiya)..."
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-surface border border-gold/30 font-semibold text-xs sm:text-sm text-foreground placeholder:text-muted/60 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold/50 transition-all shadow-inner"
+            />
+            {serviceQuery && (
+              <button
+                type="button"
+                onClick={() => setServiceQuery('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-rose-400 transition-colors"
+                title="Qidiruvni tozalash"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {serviceQuery.trim() && (
+            <div className="flex items-center justify-between text-xs text-muted px-1">
+              <span>
+                Qidiruv natijasi: <strong className="text-gold font-bold">{filteredServices.length}</strong> ta xizmat topildi
+              </span>
+              <button
+                type="button"
+                onClick={() => setServiceQuery('')}
+                className="text-gold font-bold hover:underline text-[11px]"
+              >
+                Barchasini ko'rsatish (tozalash)
+              </button>
+            </div>
+          )}
+
           <div className="rounded-2xl border border-border overflow-hidden">
             {Object.entries(nestedServices).map(([mainCatName, subCatsDict]) => {
-              const isOpen = expandedCat === mainCatName
+              const isSearchActive = serviceQuery.trim().length > 0
+              const isOpen = expandedCat === mainCatName || isSearchActive
               const allServicesInMain = Object.values(subCatsDict).flat()
               const selectedInMain = allServicesInMain.filter((s) => isServiceSelected(s.id))
               const selectedCount = selectedInMain.length
@@ -745,7 +806,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                   {/* Category Header — Main Department */}
                   <button
                     type="button"
-                    onClick={() => setExpandedCat(isOpen ? null : mainCatName)}
+                    onClick={() => setExpandedCat(isOpen && !isSearchActive ? null : mainCatName)}
                     className={`w-full flex items-center justify-between px-4 py-3.5 transition-all hover:bg-white/[0.03] text-left ${
                       selectedCount > 0 ? 'bg-emerald-500/10' : ''
                     }`}
@@ -844,13 +905,23 @@ export default function NewPatient({ homePath = '/admin' }) {
                 <span className="h-4 w-4 rounded-full border-2 border-gold border-t-transparent animate-spin" />
                 Xizmatlar yuklanmoqda...
               </div>
+            ) : filteredServices.length === 0 && serviceQuery.trim() ? (
+              <div className="py-10 text-center text-muted text-sm space-y-2">
+                <p className="font-medium">"{serviceQuery}" bo'yicha hech qanday xizmat topilmadi</p>
+                <button
+                  type="button"
+                  onClick={() => setServiceQuery('')}
+                  className="px-3 py-1.5 rounded-xl bg-gold/10 text-gold border border-gold/30 text-xs font-bold hover:bg-gold/20 transition-all"
+                >
+                  Qidiruvni tozalash
+                </button>
+              </div>
             ) : Object.keys(nestedServices).length === 0 && (
               <div className="py-10 text-center text-muted text-sm">
                 Hali xizmat qo'shilmagan — Sozlamalardan xizmat turini kiriting
               </div>
             )}
           </div>
-
         </div>
 
         {/* 2.5 TANLANGAN XIZMATLAR VA SONI (MIQDORI) CARD */}

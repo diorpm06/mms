@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Plus, Check, Stethoscope, User, Calendar, CreditCard, DollarSign } from 'lucide-react'
+import { X, Plus, Check, Stethoscope, User, Calendar, CreditCard, DollarSign, Search } from 'lucide-react'
 import { api } from '../utils/api'
 import { formatMoney } from '../utils/format'
 import { useToastStore } from '../store/toastStore'
@@ -15,6 +15,7 @@ const PAYMENT_TYPES = [
 
 export default function ReRegisterPatientModal({ open, patient, onClose, onSuccess }) {
   const [services, setServices] = useState([])
+  const [serviceSearch, setServiceSearch] = useState('')
   const [providers, setProviders] = useState([])
   const [referrers, setReferrers] = useState([])
   
@@ -134,18 +135,43 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4 pt-1">
           {/* Select Service */}
-          <div>
-            <label className="form-label text-xs font-bold text-cyan">🏢 Xizmat turini tanlang *</label>
+          <div className="space-y-1.5">
+            <label className="form-label text-xs font-bold text-cyan mb-0">🏢 Xizmat turini tanlang *</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="🔍 Xizmat qidirish (masalan: UZI)..."
+                value={serviceSearch}
+                onChange={(e) => setServiceSearch(e.target.value)}
+                className="w-full pl-8 pr-8 py-1.5 rounded-lg bg-surface border border-cyan-500/40 text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-cyan-400 font-medium"
+              />
+              <Search className="h-3.5 w-3.5 text-cyan-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              {serviceSearch && (
+                <button
+                  type="button"
+                  onClick={() => setServiceSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-rose-400 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
             <select
               className="input-field font-bold text-xs text-cyan py-2"
               value={selectedServiceId}
               onChange={(e) => handleServiceChange(e.target.value)}
             >
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.category ? `[${s.category}] ` : ''}{s.name} — {formatMoney(s.price)}
-                </option>
-              ))}
+              {services
+                .filter((s) => {
+                  if (!serviceSearch.trim()) return true
+                  const q = serviceSearch.toLowerCase().trim()
+                  return (s.name || '').toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q)
+                })
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.category ? `[${s.category}] ` : ''}{s.name} — {formatMoney(s.price)}
+                  </option>
+                ))}
             </select>
           </div>
 

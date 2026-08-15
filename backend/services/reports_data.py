@@ -417,12 +417,43 @@ def get_report(db: Session, start: date, end: date) -> dict:
     paper_entry_count = len(paper_entry_patients)
     paper_entry_total = sum(p["amount"] for p in paper_entry_patients)
 
+    live_patients = [p for p in all_patients if not p.is_paper_entry]
+    live_count = len(live_patients)
+    live_total = sum(int(p.payment_amount or 0) for p in live_patients)
+
+    # Bekor qilingan to'lovlar
+    cancelled_patients = (
+        db.query(Patient)
+        .filter(
+            Patient.created_at >= s,
+            Patient.created_at <= e,
+            Patient.is_cancelled == True,
+        )
+        .all()
+    )
+    cancelled_count = len(cancelled_patients)
+    cancelled_total = sum(int(p.payment_amount or 0) for p in cancelled_patients)
+    cancelled_list = [
+        {
+            "id": p.id,
+            "patient_name": f"{p.first_name or ''} {p.last_name or ''}".strip(),
+            "service_name": p.service.name if p.service else "—",
+            "amount": int(p.payment_amount or 0),
+            "payment_type": p.payment_type or "naqd",
+            "cancel_reason": p.cancel_reason or "Sabab ko'rsatilmagan",
+            "date": p.cancelled_at.strftime("%d.%m.%Y %H:%M") if p.cancelled_at else (p.created_at.strftime("%d.%m.%Y %H:%M") if p.created_at else ""),
+        }
+        for p in cancelled_patients
+    ]
+
     return {
         "period_start": start.isoformat(),
         "period_end": end.isoformat(),
         "patients_count": patients_count,
         "new_patients": new_count,
         "repeat_patients": repeat_count,
+        "live_patients_count": live_count,
+        "live_patients_total": live_total,
         "total_income": int(total_income),
         "cash": int(cash),
         "card": int(card),
@@ -464,6 +495,9 @@ def get_report(db: Session, start: date, end: date) -> dict:
         "paper_entry_patients": paper_entry_patients,
         "paper_entry_count": paper_entry_count,
         "paper_entry_total": paper_entry_total,
+        "cancelled_count": cancelled_count,
+        "cancelled_total": cancelled_total,
+        "cancelled_list": cancelled_list,
         "income_chart": chart,
         "payment_chart": payment_chart,
         "finance_chart": finance_chart,
@@ -477,6 +511,8 @@ def admin_daily_report(db: Session, d: date) -> dict:
         "patients_count": full["patients_count"],
         "new_patients": full["new_patients"],
         "repeat_patients": full["repeat_patients"],
+        "live_patients_count": full["live_patients_count"],
+        "live_patients_total": full["live_patients_total"],
         "total_income": full["total_income"],
         "cash": full["cash"],
         "card": full["card"],
@@ -486,6 +522,9 @@ def admin_daily_report(db: Session, d: date) -> dict:
         "paper_entry_patients": full["paper_entry_patients"],
         "paper_entry_count": full["paper_entry_count"],
         "paper_entry_total": full["paper_entry_total"],
+        "cancelled_count": full["cancelled_count"],
+        "cancelled_total": full["cancelled_total"],
+        "cancelled_list": full["cancelled_list"],
         "gross_income": full["gross_income"],
         "total_discount": full["total_discount"],
         "discounts": full["discounts"],

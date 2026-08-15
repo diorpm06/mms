@@ -738,6 +738,33 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                 </div>
               </div>
             )}
+
+            {/* Bekor qilingan to'lovlar — alohida ro'yxat va summa */}
+            {(reportsData?.cancelled_count || 0) > 0 && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <h4 className="text-xs font-extrabold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                  🔴 Bekor Qilingan To'lovlar — {reportsData.cancelled_count} ta, jami -{formatMoney(reportsData.cancelled_total)}
+                </h4>
+                <p className="text-[11px] text-muted">Bemor to'lovidan voz kechganda bekor qilingan yozuvlar (kassadan va balansdan chiqarilgan).</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <THead cols={['#', 'Bemor F.I.Sh', 'Xizmat', 'Bekor Qilish Sababi', 'Vaqt', 'Qaytarilgan Summa']} />
+                    <tbody className="divide-y divide-border">
+                      {reportsData.cancelled_list.map((c, i) => (
+                        <tr key={c.id || i} className="hover:bg-rose-500/10 font-semibold text-rose-200">
+                          <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
+                          <td className="p-2.5 text-body font-bold">{c.patient_name}</td>
+                          <td className="p-2.5 text-muted">{c.service_name}</td>
+                          <td className="p-2.5 italic text-rose-300">{c.cancel_reason}</td>
+                          <td className="p-2.5 font-mono text-muted">{c.date}</td>
+                          <td className="p-2.5 text-right font-mono font-bold text-rose-400">-{formatMoney(c.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -112,6 +112,7 @@ def _patient_row(p: Patient) -> dict:
         "created_by": p.created_by,
         "is_cancelled": p.is_cancelled,
         "cancel_reason": p.cancel_reason,
+        "is_paper_entry": bool(p.is_paper_entry),
         "ticket_number": p.ticket_number or f"A-{p.id:03d}",
         "queue_status": p.queue_status or "kutmoqda",
         "cabinet": p.cabinet,
@@ -316,16 +317,29 @@ async def create_patient(
     # Construct list of services to create
     service_items = []
     if data.services and len(data.services) > 0:
+        consolidated = {}
         for s in data.services:
-            svc = db.query(Service).filter(Service.id == s.service_id, Service.is_active == True).first()
+            key = (s.service_id, s.provider_id)
+            if key not in consolidated:
+                consolidated[key] = {
+                    "service_id": s.service_id,
+                    "provider_id": s.provider_id,
+                    "price": s.price,
+                    "quantity": s.quantity if (s.quantity and s.quantity > 0) else 1,
+                }
+            else:
+                consolidated[key]["quantity"] += (s.quantity if (s.quantity and s.quantity > 0) else 1)
+
+        for key, item in consolidated.items():
+            svc = db.query(Service).filter(Service.id == item["service_id"], Service.is_active == True).first()
             if not svc:
-                raise HTTPException(status_code=400, detail=f"Xizmat (ID: {s.service_id}) topilmadi")
-            qty = s.quantity if (s.quantity and s.quantity > 0) else 1
-            unit_price = s.price if s.price is not None else svc.price
+                raise HTTPException(status_code=400, detail=f"Xizmat (ID: {item['service_id']}) topilmadi")
+            qty = item["quantity"]
+            unit_price = item["price"] if item["price"] is not None else svc.price
             price = unit_price * qty
             service_items.append({
-                "service_id": s.service_id,
-                "provider_id": s.provider_id,
+                "service_id": item["service_id"],
+                "provider_id": item["provider_id"],
                 "price": price,
                 "quantity": qty,
                 "unit_price": unit_price,
@@ -798,15 +812,30 @@ def patient_visits(patient_id: int, db: Session = Depends(get_db), _: User = Dep
     p = db.query(Patient).filter(Patient.id == patient_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
+
+    phone_clean = (p.phone or "").strip()
+    first_clean = (p.first_name or "").strip().lower()
+    last_clean = (p.last_name or "").strip().lower()
+
+    if phone_clean and phone_clean not in ("-", "None", "", "null"):
+        filter_clause = or_(
+            Patient.phone == phone_clean,
+            (func.lower(Patient.first_name) == first_clean) & (func.lower(Patient.last_name) == last_clean)
+        )
+    else:
+        if p.birth_date:
+            filter_clause = (
+                (func.lower(Patient.first_name) == first_clean) &
+                (func.lower(Patient.last_name) == last_clean) &
+                (Patient.birth_date == p.birth_date)
+            )
+        else:
+            filter_clause = (Patient.id == p.id)
+
     visits = (
         db.query(Patient)
         .options(joinedload(Patient.service), joinedload(Patient.provider))
-        .filter(
-            or_(
-                Patient.phone == p.phone,
-                (Patient.first_name == p.first_name) & (Patient.last_name == p.last_name),
-            )
-        )
+        .filter(filter_clause)
         .order_by(Patient.created_at.desc())
         .all()
     )

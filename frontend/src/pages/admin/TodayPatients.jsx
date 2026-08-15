@@ -105,7 +105,12 @@ export default function TodayPatients() {
     setCabinetInput(patient.cabinet || `${patient.provider_name || '1'}-xona`)
   }
 
+  const [entryFilter, setEntryFilter] = useState('all') // 'all' | 'live' | 'paper'
+
   const filteredPatients = patients.filter((p) => {
+    if (entryFilter === 'live' && p.is_paper_entry) return false
+    if (entryFilter === 'paper' && !p.is_paper_entry) return false
+
     if (!searchQuery) return true
     const q = searchQuery.toLowerCase()
     return (
@@ -119,6 +124,8 @@ export default function TodayPatients() {
 
   // Stats
   const total     = patients.length
+  const liveCount = patients.filter(p => !p.is_paper_entry).length
+  const paperCount= patients.filter(p => p.is_paper_entry).length
   const waiting   = patients.filter(p => p.queue_status === 'kutmoqda').length
   const inRoom    = patients.filter(p => p.queue_status === 'qabulda').length
   const done      = patients.filter(p => p.queue_status === 'yakunlandi').length
@@ -174,12 +181,58 @@ export default function TodayPatients() {
         </div>
       </PageHeader>
 
+      {/* FILTER TABS: JONLI VS NAVBATCHILIK */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-surface-2 rounded-2xl border border-border">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setEntryFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              entryFilter === 'all'
+                ? 'bg-gold text-slate-950 shadow-md font-black'
+                : 'bg-surface text-muted hover:text-body border border-border'
+            }`}
+          >
+            📋 Barcha Bemorlar ({total})
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntryFilter('live')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              entryFilter === 'live'
+                ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                : 'bg-surface text-emerald-400 hover:text-emerald-300 border border-border'
+            }`}
+          >
+            🟢 Jonli Kelganlar ({liveCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntryFilter('paper')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              entryFilter === 'paper'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                : 'bg-surface text-amber-400 hover:text-amber-300 border border-border'
+            }`}
+          >
+            📄 Navbatchilik / Qog'oz Jurnali ({paperCount})
+          </button>
+        </div>
+
+        <div className="text-[11px] font-bold text-muted px-2">
+          {entryFilter === 'live' && "Faqat bugun klinikaga jonli kelgan bemorlar ko'rsatilmoqda"}
+          {entryFilter === 'paper' && "Faqat navbatchilik/qog'oz jurnalidan kiritilgan bemorlar ko'rsatilmoqda"}
+          {entryFilter === 'all' && `Jonli: ${liveCount} ta | Navbatchilik: ${paperCount} ta`}
+        </div>
+      </div>
+
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           { label: 'Jami Bemorlar', value: total,  color: 'var(--text)' },
+          { label: '🟢 Jonli Qabul', value: liveCount, color: '#34d399' },
+          { label: '📄 Navbatchilik', value: paperCount, color: '#fbbf24' },
           { label: '⏳ Kutmoqda', value: waiting, color: 'var(--gold)' },
-          { label: '🟢 Qabulda',  value: inRoom,  color: 'var(--success)' },
           { label: '✓ Yakunlandi', value: done,   color: 'var(--text-muted)' },
         ].map(s => (
           <div key={s.label} className="card-2 flex flex-col items-center py-3">
@@ -220,8 +273,15 @@ export default function TodayPatients() {
 
                   {/* Bemor */}
                   <td className="td-cell whitespace-nowrap">
-                    <span className="font-bold block text-body">{p.first_name} {p.last_name}</span>
-                    <span className="text-[11px] text-muted font-mono">{p.phone}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-body">{p.first_name} {p.last_name}</span>
+                      {p.is_paper_entry ? (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold">📄 Navbatchilik</span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold">🟢 Jonli</span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted font-mono block">{p.phone}</span>
                   </td>
 
                   {/* Xizmat & Shifokor — bemor bir nechta xizmat olgan bo'lsa
@@ -275,8 +335,8 @@ export default function TodayPatients() {
                   </td>
 
                   {/* Action Buttons */}
-                  <td className="py-2.5 px-3 whitespace-nowrap text-right">
-                    {p.is_cancelled && (
+                  <td className="py-2 px-3 whitespace-nowrap text-right align-middle">
+                    {p.is_cancelled ? (
                       <div className="text-right">
                         <span className="badge badge-danger text-[10px] font-black uppercase">
                           ✗ Bekor qilingan
@@ -287,9 +347,8 @@ export default function TodayPatients() {
                           </span>
                         )}
                       </div>
-                    )}
-                    {!p.is_cancelled && (
-                      <ActionRow>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-1 min-w-[250px] max-w-[280px] ml-auto">
                         {/* Karta */}
                         <Btn
                           variant="gold"
@@ -299,16 +358,6 @@ export default function TodayPatients() {
                           title="Bemor elektron kartochkasi va retseptlari"
                         >
                           Karta
-                        </Btn>
-
-                        {/* Qayta Yozish */}
-                        <Btn
-                          variant="cyan"
-                          size="xs"
-                          onClick={() => setReRegisterPatient(p)}
-                          title="Bemorni boshqa xizmatga qayta yozish"
-                        >
-                          ➕ Yozish
                         </Btn>
 
                         {/* Chek */}
@@ -322,7 +371,8 @@ export default function TodayPatients() {
                           Chek
                         </Btn>
 
-                        {p.queue_status !== 'qabulda' && p.queue_status !== 'yakunlandi' && (
+                        {/* Chaqir / Tugatish */}
+                        {p.queue_status !== 'qabulda' && p.queue_status !== 'yakunlandi' ? (
                           <Btn
                             variant="success"
                             size="xs"
@@ -332,9 +382,7 @@ export default function TodayPatients() {
                           >
                             Chaqir
                           </Btn>
-                        )}
-
-                        {p.queue_status === 'qabulda' && (
+                        ) : p.queue_status === 'qabulda' ? (
                           <Btn
                             variant="info"
                             size="xs"
@@ -344,8 +392,21 @@ export default function TodayPatients() {
                           >
                             Tugatish
                           </Btn>
+                        ) : (
+                          <div className="flex items-center justify-center text-[10px] font-bold text-muted border border-border/40 rounded-xl px-1">✓ Yakunlandi</div>
                         )}
 
+                        {/* Qayta Yozish */}
+                        <Btn
+                          variant="cyan"
+                          size="xs"
+                          onClick={() => setReRegisterPatient(p)}
+                          title="Bemorni boshqa xizmatga qayta yozish"
+                        >
+                          ➕ Yozish
+                        </Btn>
+
+                        {/* Qayta Navbat */}
                         <Btn
                           variant="outline"
                           size="xs"
@@ -354,11 +415,10 @@ export default function TodayPatients() {
                           onClick={() => handleReissueTicket(p)}
                           title="Navbati o'tib ketganda qayta navbat berish"
                         >
-                          Qayta Navbat
+                          Navbat
                         </Btn>
 
-                        {/* Bemor to'lovdan keyin voz kechsa — yozuv o'chmaydi,
-                            "bekor qilingan" bo'lib qoladi, pul qaytariladi */}
+                        {/* Bekor */}
                         <Btn
                           variant="danger"
                           size="xs"
@@ -368,7 +428,7 @@ export default function TodayPatients() {
                         >
                           Bekor
                         </Btn>
-                      </ActionRow>
+                      </div>
                     )}
                   </td>
                 </tr>

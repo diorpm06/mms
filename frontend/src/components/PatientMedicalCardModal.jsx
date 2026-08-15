@@ -73,9 +73,12 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
     }, 300)
   }
 
-  const totalSpent = history.reduce((acc, h) => acc + (h.payment_amount || 0), 0) + (patient.payment_amount || 0)
-  const totalVisitsCount = history.length + 1
-  const lastVisit = history.length > 0 ? history[0].created_at : patient.created_at
+  const activeVisits = history.filter(h => !h.is_cancelled)
+  const totalSpent = activeVisits.length > 0 
+    ? activeVisits.reduce((acc, h) => acc + (h.payment_amount || 0), 0) 
+    : (patient.is_cancelled ? 0 : (patient.payment_amount || 0))
+  const totalVisitsCount = activeVisits.length > 0 ? activeVisits.length : 1
+  const lastVisit = activeVisits.length > 0 ? activeVisits[0].created_at : patient.created_at
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
@@ -202,8 +205,8 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
           </div>
 
           {/* TAB 1: EHR MEDICAL DIAGNOSES & PRESCRIPTIONS */}
-          {(activeTab === 'ehr' || true) && (
-            <div className={activeTab !== 'ehr' ? 'no-print hidden' : 'space-y-4'}>
+          {activeTab === 'ehr' && (
+            <div className="space-y-4">
               {loading ? (
                 <p className="text-xs text-muted italic text-center py-6">Yuklanmoqda...</p>
               ) : history.length === 0 && !patient.diagnosis && !patient.prescription ? (
@@ -274,8 +277,8 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
           )}
 
           {/* TAB 2: VISITS & PAYMENTS TABLE */}
-          {(activeTab === 'visits' || true) && (
-            <div className={activeTab !== 'visits' ? 'no-print hidden' : 'space-y-3'}>
+          {activeTab === 'visits' && (
+            <div className="space-y-3">
               <div className="card-2 p-0 overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>

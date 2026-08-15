@@ -69,14 +69,15 @@ export default function AdminReports() {
     .slice(0, 8)
 
   const stats = [
-    { label: 'Mijozlar keldi', value: `${report.patients_count} nafar` },
-    { label: 'Yangi / Qayta', value: `${report.new_patients} / ${report.repeat_patients}` },
-    { label: 'Xizmatlar to\'liq summasi', value: formatMoney(report.gross_income ?? report.total_income) },
+    { label: 'Jami Mijozlar', value: `${report.patients_count} nafar` },
+    { label: '🟢 Jonli Qabul', value: `${report.live_patients_count || 0} nafar (${formatMoney(report.live_patients_total || 0)})` },
+    { label: "📄 Navbatchilik (qog'oz)", value: `${report.paper_entry_count || 0} nafar (${formatMoney(report.paper_entry_total || 0)})` },
+    { label: '🔴 Bekor Qilinganlar (-)', value: `${report.cancelled_count || 0} nafar (-${formatMoney(report.cancelled_total || 0)})` },
+    { label: "Xizmatlar to'liq summasi", value: formatMoney(report.gross_income ?? report.total_income) },
     { label: 'Chegirmalar (-)', value: `-${formatMoney(report.total_discount || 0)}` },
-    { label: 'Jami tushgan mablag\'', value: formatMoney(report.total_income) },
+    { label: "Jami tushgan mablag'", value: formatMoney(report.total_income) },
     { label: 'Naqd', value: formatMoney(report.cash) },
     { label: 'Karta', value: formatMoney(report.card) },
-    { label: 'Harajatlar', value: formatMoney(report.expenses) },
   ]
 
   return (
@@ -272,6 +273,44 @@ export default function AdminReports() {
                     <td className="p-3 text-muted">{p.service_name}</td>
                     <td className="p-3 font-mono text-amber-400">{p.visit_time}</td>
                     <td className="p-3 text-right font-mono font-bold text-emerald">{formatMoney(p.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Bekor qilingan to'lovlar — alohida ro'yxat va summa */}
+      {(report.cancelled_count || 0) > 0 && (
+        <div className="card border border-rose-500/40 bg-rose-500/5">
+          <h3 className="text-rose-400 mb-1 font-bold text-sm uppercase tracking-wide flex items-center gap-2">
+            <span>🔴 Bekor Qilingan To'lovlar — {report.cancelled_count} ta, jami -{formatMoney(report.cancelled_total)}</span>
+          </h3>
+          <p className="text-muted text-[11px] mb-3">
+            Bemor to'lovidan voz kechganda bekor qilingan yozuvlar (kassadan va balansdan chiqarilgan).
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-rose-500/30 text-rose-300 font-bold text-left bg-rose-950/40">
+                  <th className="p-3">#</th>
+                  <th className="p-3">Bemor F.I.Sh</th>
+                  <th className="p-3">Xizmat Nomi</th>
+                  <th className="p-3">Bekor Qilish Sababi</th>
+                  <th className="p-3">Vaqt</th>
+                  <th className="p-3 text-right">Qaytarilgan Summa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-rose-500/20">
+                {report.cancelled_list.map((c, i) => (
+                  <tr key={c.id || i} className="hover:bg-rose-500/10 font-semibold text-rose-200">
+                    <td className="p-3 font-mono opacity-80">#{i + 1}</td>
+                    <td className="p-3 font-bold text-foreground">{c.patient_name}</td>
+                    <td className="p-3">{c.service_name}</td>
+                    <td className="p-3 italic text-rose-300">{c.cancel_reason}</td>
+                    <td className="p-3 font-mono text-muted">{c.date}</td>
+                    <td className="p-3 text-right font-mono font-bold text-rose-400">-{formatMoney(c.amount)}</td>
                   </tr>
                 ))}
               </tbody>

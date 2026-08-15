@@ -218,7 +218,11 @@ def report_patient_visits(patient_id: int, db: Session = Depends(get_db), _: Use
     p = db.query(Patient).filter(Patient.id == patient_id).first()
     if not p:
         return []
-    visits = db.query(Patient).filter(Patient.phone == p.phone).order_by(Patient.created_at.desc()).all()
+    phone_clean = (p.phone or "").strip()
+    if phone_clean and phone_clean not in ("-", "None", "", "null"):
+        visits = db.query(Patient).filter(Patient.phone == phone_clean).order_by(Patient.created_at.desc()).all()
+    else:
+        visits = db.query(Patient).filter(Patient.id == p.id).all()
     return [{"id": v.id, "amount": v.payment_amount, "created_at": v.created_at.isoformat()} for v in visits]
 
 
