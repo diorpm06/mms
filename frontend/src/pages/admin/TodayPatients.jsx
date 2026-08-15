@@ -710,12 +710,13 @@ export default function TodayPatients() {
                 onChange={(e) => {
                   const newType = e.target.value
                   const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
-                  const half = Math.round(totalToPay / 2)
                   setEditForm({
                     ...editForm,
                     payment_type: newType,
-                    cash_amount: newType === 'split' ? (editForm.cash_amount || half) : newType === 'cash' ? totalToPay : 0,
-                    card_amount: newType === 'split' ? (editForm.card_amount || (totalToPay - half)) : newType === 'cash' || newType === 'later' ? 0 : totalToPay,
+                    cash_amount: newType === 'cash' ? totalToPay : 0,
+                    card_amount: newType === 'card' ? totalToPay : 0,
+                    click_amount: newType === 'click' ? totalToPay : 0,
+                    qr_amount: newType === 'qr' ? totalToPay : 0,
                   })
                 }}
               >
@@ -737,40 +738,46 @@ export default function TodayPatients() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="form-label font-bold text-xs">💵 Naqd qismi (so'm)</label>
+                    <label className="form-label font-bold text-xs">💵 Naqd (so'm)</label>
                     <input
                       type="number"
                       min={0}
                       className="input-field text-xs font-mono font-bold"
                       value={editForm.cash_amount}
-                      onChange={(e) => {
-                        const c = Math.max(0, Number(e.target.value) || 0)
-                        const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
-                        setEditForm({
-                          ...editForm,
-                          cash_amount: c,
-                          card_amount: Math.max(0, totalToPay - c),
-                        })
-                      }}
+                      onChange={(e) => setEditForm({ ...editForm, cash_amount: Number(e.target.value) || 0 })}
                     />
                   </div>
 
                   <div>
-                    <label className="form-label font-bold text-xs">💳 Karta qismi (so'm)</label>
+                    <label className="form-label font-bold text-xs">💳 Karta (so'm)</label>
                     <input
                       type="number"
                       min={0}
                       className="input-field text-xs font-mono font-bold"
                       value={editForm.card_amount}
-                      onChange={(e) => {
-                        const card = Math.max(0, Number(e.target.value) || 0)
-                        const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
-                        setEditForm({
-                          ...editForm,
-                          card_amount: card,
-                          cash_amount: Math.max(0, totalToPay - card),
-                        })
-                      }}
+                      onChange={(e) => setEditForm({ ...editForm, card_amount: Number(e.target.value) || 0 })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label font-bold text-xs">📱 Click (so'm)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="input-field text-xs font-mono font-bold"
+                      value={editForm.click_amount}
+                      onChange={(e) => setEditForm({ ...editForm, click_amount: Number(e.target.value) || 0 })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="form-label font-bold text-xs">🔳 QR Kod (so'm)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="input-field text-xs font-mono font-bold"
+                      value={editForm.qr_amount}
+                      onChange={(e) => setEditForm({ ...editForm, qr_amount: Number(e.target.value) || 0 })}
                     />
                   </div>
                 </div>
@@ -778,7 +785,7 @@ export default function TodayPatients() {
                 <div className="flex justify-between items-center text-xs font-mono font-extrabold pt-1 border-t border-gold/20 text-body">
                   <span>Yig'indi:</span>
                   <span className="text-emerald">
-                    {formatMoney(Number(editForm.cash_amount || 0) + Number(editForm.card_amount || 0))} / {formatMoney(Math.max(0, editTotal - (editPatient?.discount_amount || 0)))}
+                    {formatMoney(Number(editForm.cash_amount || 0) + Number(editForm.card_amount || 0) + Number(editForm.click_amount || 0) + Number(editForm.qr_amount || 0))} / {formatMoney(Math.max(0, editTotal - (editPatient?.discount_amount || 0)))}
                   </span>
                 </div>
               </div>
@@ -805,7 +812,28 @@ export default function TodayPatients() {
               <Btn variant="ghost" full icon={Icons.x} onClick={() => setEditPatient(null)}>
                 Yopish
               </Btn>
-              <Btn variant="gold" full icon={Icons.save} loading={saving} onClick={handleSaveEdit}>
+              <Btn variant="gold" full icon={Icons.save} loading={saving} onClick={() => {
+                const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
+                let cash = Number(editForm.cash_amount) || 0
+                let card = Number(editForm.card_amount) || 0
+                let click = Number(editForm.click_amount) || 0
+                let qr = Number(editForm.qr_amount) || 0
+
+                if (editForm.payment_type === 'split') {
+                  if (cash + card + click + qr !== totalToPay) {
+                    alert(`To'lovlar yig'indisi ${formatMoney(totalToPay)} bo'lishi kerak!`);
+                    return;
+                  }
+                  card = card + click + qr;
+                } else if (editForm.payment_type === 'cash') {
+                    cash = totalToPay; card = 0;
+                } else if (editForm.payment_type === 'card') {
+                    cash = 0; card = totalToPay;
+                } else if (editForm.payment_type === 'click') {
+                    cash = 0; card = 0; // Backend may handle click separately
+                }
+                handleSaveEdit({ ...editForm, cash_amount: cash, card_amount: card });
+              }}>
                 Saqlash
               </Btn>
             </div>

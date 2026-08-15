@@ -1196,7 +1196,7 @@ export default function NewPatient({ homePath = '/admin' }) {
               {/* Second method selector */}
               <div>
                 <label className="text-[11px] font-bold text-cyan-400 block mb-1.5">
-                  {splitSecond === 'card' ? '💳' : '🔳'} 2-usulni tanlang:
+                  {splitSecond === 'card' ? '💳' : splitSecond === 'click' ? '📱' : '🔳'} 2-usulni tanlang:
                 </label>
                 <div className="flex gap-2 mb-2">
                   <button
@@ -1209,6 +1209,17 @@ export default function NewPatient({ homePath = '/admin' }) {
                     }`}
                   >
                     💳 Karta
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSplitSecond('click')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                      splitSecond === 'click'
+                        ? 'bg-blue-600/20 border-blue-500/60 text-blue-300'
+                        : 'bg-transparent border-border text-muted hover:border-border-strong'
+                    }`}
+                  >
+                    📱 Click / Payme
                   </button>
                   <button
                     type="button"
