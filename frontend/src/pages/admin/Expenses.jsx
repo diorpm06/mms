@@ -172,31 +172,6 @@ export default function AdminExpenses() {
                 <option key={e.value} value={e.value}>{e.label}</option>
               ))}
             </select>
-
-            {empSummary && (
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="p-2 rounded-xl bg-surface-2 border border-border">
-                  <span className="block text-[10px] text-muted uppercase font-bold">Oylik</span>
-                  <span className="block text-sm font-mono font-black text-body">{formatMoney(empSummary.base_salary)}</span>
-                </div>
-                <div className="p-2 rounded-xl bg-surface-2 border border-border">
-                  <span className="block text-[10px] text-muted uppercase font-bold">Olingan avans</span>
-                  <span className="block text-sm font-mono font-black text-amber-400">{formatMoney(empSummary.advances_total)}</span>
-                </div>
-                <div className="p-2 rounded-xl bg-surface-2 border border-border">
-                  <span className="block text-[10px] text-muted uppercase font-bold">Qoladi</span>
-                  <span className="block text-sm font-mono font-black text-emerald">
-                    {formatMoney(Math.max(0, empSummary.base_salary - empSummary.advances_total))}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <p className="text-[11px] text-muted">
-              {category === 'Avans'
-                ? "Avans oylikdan ayiriladi — Rahbar hisobotida «oylik / olingan avans / qolgan» ko'rinishida chiqadi."
-                : "Oylik to'lash: qolgan summa (oylik − olingan avanslar) to'lanadi."}
-            </p>
           </div>
         )}
 

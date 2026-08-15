@@ -174,7 +174,7 @@ def payout_provider(
     provider_id: int,
     body: PayoutBody,
     db: Session = Depends(get_db),
-    _: User = Depends(require_ceo),
+    _: User = Depends(require_admin_or_ceo),
 ):
     payout = payout_recipient_balance(db, "provider", provider_id, source=body.source)
     db.commit()

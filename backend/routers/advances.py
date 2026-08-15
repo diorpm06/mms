@@ -58,7 +58,7 @@ def list_advances(
 def create_advance(
     data: ProviderAdvanceCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_ceo),
+    _: User = Depends(require_admin_or_ceo),
 ):
     if data.recipient_type not in ("provider", "referrer"):
         raise HTTPException(status_code=400, detail="Recipient type 'provider' yoki 'referrer' bo'lishi kerak")
@@ -107,7 +107,7 @@ def settle_advance(
     advance_id: int,
     amount: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_ceo),
+    _: User = Depends(require_admin_or_ceo),
 ):
     advance = db.query(ProviderAdvance).filter(ProviderAdvance.id == advance_id).first()
     if not advance:
