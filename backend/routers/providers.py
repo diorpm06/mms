@@ -189,8 +189,18 @@ def payout_provider(
             category="Oylik",
         )
         db.add(exp)
+    qoplandi = getattr(payout, "settled_from_advance", 0) or 0
     db.commit()
-    return {"message": "Balans chiqarildi", "amount": payout.amount, "source": body.source}
+    msg = "Balans chiqarildi"
+    if qoplandi:
+        msg = (f"{qoplandi:,} so'm avans qarzidan qoplandi"
+               + (f", qo'lga {payout.amount:,} so'm berildi" if payout.amount else ", qo'lga pul berilmadi"))
+    return {
+        "message": msg,
+        "amount": payout.amount,
+        "settled_from_advance": qoplandi,
+        "source": body.source,
+    }
 
 
 from datetime import date, datetime
@@ -199,6 +209,43 @@ from models.patient import Patient
 from models.employee import Employee
 from models.advance import Advance
 from models.provider_advance import ProviderAdvance
+
+
+@router.get("/advance-summaries")
+def all_provider_advances(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """
+    Har bir shifokorning qoplanmagan avansi — bitta so'rovda.
+
+    Avans ProviderAdvance jadvaliga yozilardi, lekin CEO panelidagi
+    "Shifokorlar" bo'limida uni ko'rsatadigan joy yo'q edi: faqat balans
+    chiqardi. Shu sababli avans berilgani ko'rinmasdi.
+    """
+    out = {}
+    for pr in db.query(Provider).all():
+        advances = (
+            db.query(ProviderAdvance)
+            .filter(
+                ProviderAdvance.recipient_type == "provider",
+                ProviderAdvance.recipient_id == pr.id,
+                ProviderAdvance.is_settled == False,
+            )
+            .all()
+        )
+        # remaining maydoni bo'lsa qoplanmagan qismini, bo'lmasa to'liq summani olamiz
+        jami = int(sum((getattr(a, "remaining", None) or a.amount) for a in advances))
+        balans = int(pr.balance or 0)
+        out[str(pr.id)] = {
+            "advances_total": jami,
+            "advances_count": len(advances),
+            "balance": balans,
+            # Ishlagani avansdan kam bo'lsa — shifokor qarzda
+            "remaining": max(0, balans - jami),
+            "debt": max(0, jami - balans),
+        }
+    return out
 
 
 @router.get("/{provider_id}/payroll-summary")

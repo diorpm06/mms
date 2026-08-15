@@ -523,7 +523,8 @@ async def create_patient(
             if _is_last_group:
                 group_discount = max(0, discount_total - _allocated_discount)
             else:
-                group_discount = int((group_raw_price / total_raw_price) * discount_total)
+                raw_disc = (group_raw_price / total_raw_price) * discount_total
+                group_discount = int(round(raw_disc / 100) * 100)
             group_discount = min(group_discount, group_raw_price)
         else:
             group_discount = 0
@@ -541,7 +542,8 @@ async def create_patient(
             if _is_last_group:
                 group_cash = max(0, (data.cash_amount or 0) - _allocated_cash)
             else:
-                group_cash = int((data.cash_amount or 0) * ratio)
+                raw_cash = (data.cash_amount or 0) * ratio
+                group_cash = int(round(raw_cash / 100) * 100)
             group_cash = min(group_cash, final_group_price)
             _allocated_cash += group_cash
             # Naqd bo'lmagan qism Click/QR ga bo'linishi mumkin — ilgari hammasi

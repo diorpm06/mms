@@ -69,5 +69,15 @@ def payout_referrer(
     _: User = Depends(require_admin_or_ceo),
 ):
     payout = payout_recipient_balance(db, "referrer", referrer_id, source=body.source)
+    qoplandi = getattr(payout, "settled_from_advance", 0) or 0
     db.commit()
-    return {"message": "Balans chiqarildi", "amount": payout.amount, "source": body.source}
+    msg = "Balans chiqarildi"
+    if qoplandi:
+        msg = (f"{qoplandi:,} so'm avans qarzidan qoplandi"
+               + (f", qo'lga {payout.amount:,} so'm berildi" if payout.amount else ", qo'lga pul berilmadi"))
+    return {
+        "message": msg,
+        "amount": payout.amount,
+        "settled_from_advance": qoplandi,
+        "source": body.source,
+    }

@@ -71,6 +71,7 @@ export default function CeoProviders() {
   const [edit, setEdit] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [payoutSource, setPayoutSource] = useState('Naqt kassa')
+  const [advances, setAdvances] = useState({})
   const [advanceModal, setAdvanceModal] = useState(false)
   const [selectedProviderForAdvance, setSelectedProviderForAdvance] = useState(null)
   const [advanceAmount, setAdvanceAmount] = useState('1000000')
@@ -103,6 +104,8 @@ export default function CeoProviders() {
   const load = () => {
     api('/providers?active_only=false').then(setItems)
     api('/services/all').then((s) => setAllServices(s || [])).catch(() => {})
+    // Berilgan avanslar — avval bu ma'lumot bu bo'limda umuman ko'rinmasdi
+    api('/providers/advance-summaries').then((a) => setAdvances(a || {})).catch(() => setAdvances({}))
   }
   useEffect(() => { load() }, [])
 
@@ -330,7 +333,8 @@ export default function CeoProviders() {
                 </div>
 
                 {/* Balance & Actions */}
-                <div className="flex items-center justify-between bg-surface-2 p-3 rounded-xl border border-border/60">
+                <div className="bg-surface-2 p-3 rounded-xl border border-border/60 space-y-2">
+                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-[10px] font-extrabold text-muted uppercase block">Ish Haq Balansi</span>
                     <span className="font-black text-emerald font-mono text-base">{formatMoney(p.balance)}</span>
@@ -345,6 +349,27 @@ export default function CeoProviders() {
                       💵 Chiqarish
                     </button>
                   )}
+                 </div>
+
+                 {/* Berilgan avans — ilgari bu yerda umuman ko'rinmasdi */}
+                 {advances[p.id]?.advances_total > 0 && (
+                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60">
+                     <div>
+                       <span className="text-[10px] font-extrabold text-muted uppercase block">Avans olgan</span>
+                       <span className="font-black text-amber-400 font-mono text-sm">
+                         −{formatMoney(advances[p.id].advances_total)}
+                       </span>
+                     </div>
+                     <div>
+                       <span className="text-[10px] font-extrabold text-muted uppercase block">
+                         {advances[p.id].debt > 0 ? 'Qarzi' : 'Qoladi'}
+                       </span>
+                       <span className={`font-black font-mono text-sm ${advances[p.id].debt > 0 ? 'text-rose-400' : 'text-gold'}`}>
+                         {formatMoney(advances[p.id].debt > 0 ? advances[p.id].debt : advances[p.id].remaining)}
+                       </span>
+                     </div>
+                   </div>
+                 )}
                 </div>
 
                 {/* Bottom Action Row */}
@@ -401,7 +426,7 @@ export default function CeoProviders() {
         /* ── TABLE VIEW FOR DOCTORS ── */
         <div className="card overflow-x-auto p-0 border-cyan-500/20 shadow-lg">
           <table className="w-full text-xs">
-            <THead cols={['Shifokor', 'Mutaxassislik', 'Bajaradigan Xizmatlari', 'Telefon / Login', 'Oylik / KPI Stavka', 'Status', 'Balans', 'Harakatlar']} />
+            <THead cols={['Shifokor', 'Mutaxassislik', 'Bajaradigan Xizmatlari', 'Telefon / Login', 'Oylik / KPI Stavka', 'Status', 'Balans', 'Avans olgan', 'Qoladi / Qarzi', 'Harakatlar']} />
             <tbody className="divide-y divide-border font-semibold">
               {items.length === 0 ? (
                 <tr><td colSpan={8} className="py-8"><EmptyState icon="🩺" message="Hali shifokor qo'shilmagan" action={<Btn variant="cyan" icon={Icons.plus} onClick={handleOpenAdd}>Qo'shish</Btn>} /></td></tr>
@@ -441,6 +466,14 @@ export default function CeoProviders() {
                       )}
                     </td>
                     <td className="p-3 font-black font-mono text-emerald text-sm">{formatMoney(p.balance)}</td>
+                    <td className="p-3 font-mono font-bold text-amber-400 text-sm">
+                      {advances[p.id]?.advances_total > 0 ? `−${formatMoney(advances[p.id].advances_total)}` : '—'}
+                    </td>
+                    <td className={`p-3 font-mono font-black text-sm ${advances[p.id]?.debt > 0 ? 'text-rose-400' : 'text-gold'}`}>
+                      {advances[p.id]?.debt > 0
+                        ? `${formatMoney(advances[p.id].debt)} qarz`
+                        : formatMoney(advances[p.id] ? advances[p.id].remaining : (p.balance || 0))}
+                    </td>
                     <td className="p-3">
                       <ActionRow>
                         {p.balance > 0 && isAct && (

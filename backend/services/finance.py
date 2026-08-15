@@ -268,24 +268,64 @@ def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int
     if not obj or obj.balance <= 0:
         raise HTTPException(status_code=400, detail="Chiqariladigan balans yo'q")
 
+    # Oldin berilgan avanslar birinchi navbatda qoplanadi. Ilgari bu hisobga
+    # olinmasdi: avans olgan shifokorga balansi TO'LIQ yana to'lanardi, ya'ni
+    # klinika bir ishni ikki marta to'lardi. (Xodimlarda bu to'g'ri ishlaydi.)
+    from models.provider_advance import ProviderAdvance
+
+    advances = (
+        db.query(ProviderAdvance)
+        .filter(
+            ProviderAdvance.recipient_type == recipient_type,
+            ProviderAdvance.recipient_id == recipient_id,
+            ProviderAdvance.is_settled == False,
+        )
+        .order_by(ProviderAdvance.created_at.asc())
+        .all()
+    )
+
+    ishlagani = int(obj.balance)
+    qoplanadi = 0
+    qoldiq = ishlagani
+    for adv in advances:
+        if qoldiq <= 0:
+            break
+        ayiriladi = min(qoldiq, int(adv.remaining or 0))
+        if ayiriladi <= 0:
+            continue
+        adv.remaining = int(adv.remaining) - ayiriladi
+        if adv.remaining <= 0:
+            adv.remaining = 0
+            adv.is_settled = True
+            adv.settled_at = datetime.now()
+        qoplanadi += ayiriladi
+        qoldiq -= ayiriladi
+
+    beriladi = max(0, ishlagani - qoplanadi)
+
     bal = get_or_create_balance(db)
-    if bal.current_balance < obj.balance:
+    if bal.current_balance < beriladi:
         raise HTTPException(status_code=400, detail="Balans yetarli emas")
 
     payout = Payout(
         recipient_type=recipient_type,
         recipient_id=recipient_id,
-        amount=obj.balance,
+        amount=beriladi,
         period_start=today,
         period_end=today,
     )
-    bal.current_balance -= obj.balance
-    bal.updated_at = datetime.now()
     source_label = source or "Manba ko'rsatilmagan"
     who = f"yo'naltiruvchi #{recipient_id}" if recipient_type == "referrer" else f"provider #{recipient_id}"
-    log_balance_change(db, -obj.balance, "payout", f"Qo'lda chiqarim ({source_label}): {who}")
+    if beriladi > 0:
+        bal.current_balance -= beriladi
+        bal.updated_at = datetime.now()
+        log_balance_change(db, -beriladi, "payout", f"Qo'lda chiqarim ({source_label}): {who}")
+    if qoplanadi > 0:
+        # Pul chiqmaydi — faqat avans qarzi yopiladi, shuning uchun kassa yozuvi yo'q
+        log_balance_change(db, 0, "advance_settle", f"Avansdan qoplandi: {who} — {qoplanadi:,} so'm")
     obj.balance = 0
     db.add(payout)
+    payout.settled_from_advance = qoplanadi  # javobda ko'rsatish uchun (bazaga yozilmaydi)
     return payout
 
 
