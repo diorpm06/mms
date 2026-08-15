@@ -116,6 +116,23 @@ export default function CeoReferrers() {
     }
   }
 
+  const handleDelete = async (r) => {
+    // Yozuv butunlay o'chmaydi (backend is_active=false qiladi), shuning uchun
+    // eski hisobotlar va to'lovlar tarixi buzilmaydi.
+    let msg = `"${r.full_name}" ro'yxatdan olib tashlansinmi?\n\nU yangi bemor qabulida tanlanmaydigan bo'ladi. Eski hisobotlar va to'lovlar tarixi saqlanib qoladi.`
+    if (r.balance > 0) {
+      msg = `DIQQAT: "${r.full_name}" da chiqarilmagan ${formatMoney(r.balance)} balans bor!\n\nAvval "Chiqarish" tugmasi bilan hisob-kitob qilish tavsiya etiladi.\n\nBaribir ro'yxatdan olib tashlansinmi?`
+    }
+    if (!window.confirm(msg)) return
+    try {
+      await api(`/referrers/${r.id}`, { method: 'DELETE' })
+      toast("Yo'naltiruvchi ro'yxatdan olib tashlandi")
+      load()
+    } catch (e) {
+      toast(e.message, 'error')
+    }
+  }
+
   const payout = async (id) => {
     try {
       const res = await api(`/referrers/${id}/payout`, {
@@ -602,6 +619,15 @@ export default function CeoReferrers() {
                           </Btn>
                           <Btn variant="outline" size="xs" icon={Icons.edit} onClick={() => { setEdit(r); setForm(r); setModal(true) }} title="Tahrirlash">
                             Tahrir
+                          </Btn>
+                          <Btn
+                            variant="danger"
+                            size="xs"
+                            icon={Icons.trash}
+                            onClick={() => handleDelete(r)}
+                            title="O'chirish (ro'yxatdan olib tashlash)"
+                          >
+                            O'chirish
                           </Btn>
                         </ActionRow>
                       </td>

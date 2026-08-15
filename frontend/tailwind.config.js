@@ -1,3 +1,5 @@
+import colors from 'tailwindcss/colors'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
@@ -23,6 +25,18 @@ export default {
         card: 'var(--surface)',
         muted: 'var(--surface-2)',
         'muted-foreground': 'var(--text-muted)',
+        // text-foreground 23 joyda ishlatilgan, lekin e'lon qilinmagani uchun
+        // CSS umuman chiqmasdi — matn ota-elementdan rang olib, oq fonda
+        // ko'rinmay qolardi (xizmatlar ro'yxatidagi ma'lumot qatori).
+        foreground: 'var(--text)',
+        body: 'var(--bg)',
+        'surface-1': 'var(--surface)',
+        'gold-dim': 'var(--gold-dim)',
+        'gold-glow': 'var(--gold-glow)',
+        // DEFAULT qo'shiladi, lekin raqamli shkala (bg-cyan-500 va h.k.)
+        // buzilmasligi uchun asl ranglar yoyib beriladi.
+        cyan: { ...colors.cyan, DEFAULT: 'var(--color-cyan)' },
+        emerald: { ...colors.emerald, DEFAULT: 'var(--color-emerald)' },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
