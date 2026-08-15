@@ -193,7 +193,7 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="no-print absolute top-4 right-4 p-2 rounded-xl text-muted hover:text-foreground hover:bg-muted transition-all"
+          className="no-print absolute top-4 right-4 p-2 rounded-xl text-muted hover:text-foreground hover:bg-surface-2 transition-all"
         >
           <X className="h-5 w-5" />
         </button>

@@ -110,7 +110,7 @@ export default function IncassationModal({ open, onClose }) {
         
         <button
           onClick={onClose}
-          className="no-print absolute top-4 right-4 p-2 rounded-xl text-muted hover:text-foreground hover:bg-muted transition-all"
+          className="no-print absolute top-4 right-4 p-2 rounded-xl text-muted hover:text-foreground hover:bg-surface-2 transition-all"
         >
           <X className="h-5 w-5" />
         </button>
@@ -191,7 +191,7 @@ export default function IncassationModal({ open, onClose }) {
               <p className="text-xs text-muted">Yuklanmoqda...</p>
             ) : (
               <div className="space-y-3.5 text-xs">
-                <div className="p-3 rounded-2xl bg-muted/30 border border-border space-y-1.5">
+                <div className="p-3 rounded-2xl bg-surface-2/30 border border-border space-y-1.5">
                   <div className="flex justify-between"><span className="text-muted">Bugungi naqd tushum:</span><strong className="text-emerald-400 font-mono">{formatMoney(shiftData?.cash_payments)}</strong></div>
                   <div className="flex justify-between"><span className="text-muted">Bugungi karta tushum:</span><strong className="text-cyan-400 font-mono">{formatMoney(shiftData?.card_payments)}</strong></div>
                   <div className="flex justify-between"><span className="text-muted">Bugungi naqd harajat:</span><strong className="text-rose-400 font-mono">-{formatMoney(shiftData?.today_expenses)}</strong></div>

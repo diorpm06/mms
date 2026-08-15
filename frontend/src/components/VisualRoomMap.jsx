@@ -39,7 +39,7 @@ export default function VisualRoomMap({ activeInpatients, onAdmitRoom, onDischar
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {Object.entries(roomsMap).map(([roomName, beds]) => (
-          <div key={roomName} className="card border-2 border-border/80 p-4 space-y-3 bg-muted/10 hover:border-gold/30 transition-all">
+          <div key={roomName} className="card border-2 border-border/80 p-4 space-y-3 bg-surface-2/10 hover:border-gold/30 transition-all">
             <div className="flex items-center justify-between border-b border-border pb-2">
               <span className="font-black text-sm text-gold">{roomName}</span>
               <span className="text-[10px] font-bold text-muted uppercase">2 Kishi</span>

@@ -319,7 +319,7 @@ export default function Payroll() {
           <button
             type="button"
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'doctors' ? 'bg-gold text-slate-950 font-black shadow-md' : 'bg-muted/40 text-muted'
+              activeTab === 'doctors' ? 'bg-gold text-slate-950 font-black shadow-md' : 'bg-surface-2/40 text-muted'
             }`}
             onClick={() => setActiveTab('doctors')}
           >
@@ -328,7 +328,7 @@ export default function Payroll() {
           <button
             type="button"
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'staff' ? 'bg-gold text-slate-950 font-black shadow-md' : 'bg-muted/40 text-muted'
+              activeTab === 'staff' ? 'bg-gold text-slate-950 font-black shadow-md' : 'bg-surface-2/40 text-muted'
             }`}
             onClick={() => setActiveTab('staff')}
           >
@@ -337,7 +337,7 @@ export default function Payroll() {
           <button
             type="button"
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'ten_day' ? 'bg-purple-600 text-white font-black shadow-md' : 'bg-muted/40 text-muted'
+              activeTab === 'ten_day' ? 'bg-purple-600 text-white font-black shadow-md' : 'bg-surface-2/40 text-muted'
             }`}
             onClick={() => setActiveTab('ten_day')}
           >
@@ -467,7 +467,7 @@ export default function Payroll() {
                     <tr><td colSpan={8} className="p-4 text-center text-muted text-xs italic">Ushbu oyda xodimlar topilmadi</td></tr>
                   ) : (
                     activeRows.map((r) => (
-                      <tr key={r.id} className="border-b border-border/40 hover:bg-muted/20 text-xs">
+                      <tr key={r.id} className="border-b border-border/40 hover:bg-surface-2/20 text-xs">
                         <td className="p-3 font-bold text-foreground print:text-slate-900">{r.name}</td>
                         <td className="p-3 text-muted print:text-slate-700">{r.role} ({r.cabinet || '—'})</td>
                         <td className="p-3">

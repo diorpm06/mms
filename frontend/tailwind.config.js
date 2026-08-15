@@ -23,13 +23,17 @@ export default {
         'surface-sunken': 'var(--surface-sunken)',
         'surface-hover': 'var(--surface-hover)',
         card: 'var(--surface)',
-        muted: 'var(--surface-2)',
-        'muted-foreground': 'var(--text-muted)',
+        // DIQQAT: bu yerga 'muted' yoki 'body' deb nom qo'shmang!
+        // index.css da .text-muted va .text-body komponent class'lari bor;
+        // xuddi shu nomdagi rang kaliti Tailwind'da .text-muted / .text-body
+        // utility'sini yaratadi va u komponent qatlamini bosib ketadi —
+        // natijada matn fon rangiga aylanib, oq fonda ko'rinmay qoladi.
+        // Fon uchun bg-surface-2 / bg-app ishlatilsin.
+        app: 'var(--bg)',
         // text-foreground 23 joyda ishlatilgan, lekin e'lon qilinmagani uchun
         // CSS umuman chiqmasdi — matn ota-elementdan rang olib, oq fonda
         // ko'rinmay qolardi (xizmatlar ro'yxatidagi ma'lumot qatori).
         foreground: 'var(--text)',
-        body: 'var(--bg)',
         'surface-1': 'var(--surface)',
         'gold-dim': 'var(--gold-dim)',
         'gold-glow': 'var(--gold-glow)',

@@ -914,7 +914,7 @@ export default function NewPatient({ homePath = '/admin' }) {
         )}
 
         {/* 3. CHEGARMA VA AKSIYA SEKSIYASI */}
-        <div className="border border-border rounded-xl p-3.5 bg-muted/20 space-y-3">
+        <div className="border border-border rounded-xl p-3.5 bg-surface-2/20 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">🏷️ Chegirma / Aksiya</span>
             <div className="flex gap-1.5">
@@ -923,7 +923,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                   key={t}
                   type="button"
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                    form.discount_type === t ? 'bg-cyan-600 text-white shadow-sm' : 'bg-muted text-muted-foreground'
+                    form.discount_type === t ? 'bg-cyan-600 text-white shadow-sm' : 'bg-surface-2 text-muted'
                   }`}
                   onClick={() => setForm({ ...form, discount_type: t, discount_value: t === 'none' ? '' : form.discount_value })}
                 >

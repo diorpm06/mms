@@ -290,7 +290,7 @@ export default function Inventory() {
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                     categoryFilter === cat
                       ? 'bg-cyan-600 text-white shadow-md'
-                      : 'bg-muted/40 text-muted hover:text-foreground'
+                      : 'bg-surface-2/40 text-muted hover:text-foreground'
                   }`}
                   onClick={() => setCategoryFilter(cat)}
                 >
@@ -322,7 +322,7 @@ export default function Inventory() {
                   <tr><td colSpan={isCEO ? 8 : 7} className="p-4 text-center text-muted text-xs italic">Materiallar topilmadi</td></tr>
                 ) : (
                   filteredItems.map((i) => (
-                    <tr key={i.id} className="border-b border-border/40 hover:bg-muted/20 text-xs whitespace-nowrap">
+                    <tr key={i.id} className="border-b border-border/40 hover:bg-surface-2/20 text-xs whitespace-nowrap">
                       <td className="p-3 font-bold text-foreground whitespace-nowrap">{i.name}</td>
                       <td className="p-3 text-muted whitespace-nowrap">{i.category}</td>
                       <td className="p-3 font-mono font-extrabold text-cyan-400 text-sm whitespace-nowrap">

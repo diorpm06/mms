@@ -176,7 +176,7 @@ export default function Layout({ role }) {
   )
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-body font-sans text-body transition-colors duration-200">
+    <div className="flex h-screen w-screen overflow-hidden bg-app font-sans text-body transition-colors duration-200">
       {/* Desktop Sidebar (Independent Left Scroll Area) */}
       <aside className="hidden md:flex md:w-64 flex-shrink-0 h-screen overflow-hidden border-r border-border/40">
         <SidebarContent />

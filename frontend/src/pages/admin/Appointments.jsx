@@ -164,7 +164,7 @@ export default function Appointments() {
               <tr><td colSpan={7} className="p-6 text-center text-muted text-xs italic">Ushbu sanada oldindan yozilishlar yo'q</td></tr>
             ) : (
               appointments.map((a) => (
-                <tr key={a.id} className="border-b border-border/40 hover:bg-muted/20 text-xs">
+                <tr key={a.id} className="border-b border-border/40 hover:bg-surface-2/20 text-xs">
                   <td className="p-3 font-mono font-bold text-cyan-400 flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5" />
                     {a.appointment_time}
