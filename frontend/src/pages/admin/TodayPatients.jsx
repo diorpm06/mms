@@ -32,9 +32,15 @@ export default function TodayPatients() {
 
   const openEdit = (p) => {
     setEditPatient(p)
+    const paidAmt = Math.max(0, (p.payment_amount || 0))
+    const initialCash = p.cash_amount ?? (p.payment_type === 'cash' ? paidAmt : p.payment_type === 'split' ? Math.round(paidAmt / 2) : 0)
+    const initialCard = p.card_amount ?? (p.payment_type === 'split' ? paidAmt - initialCash : (p.payment_type !== 'cash' && p.payment_type !== 'later') ? paidAmt : 0)
+
     setEditForm({
       referrer_id: p.referrer_id || '',
       payment_type: p.payment_type || 'cash',
+      cash_amount: initialCash,
+      card_amount: initialCard,
       reason: '',
     })
     // Bemorning hozirgi xizmatlari (tahrirlash uchun nusxa)
@@ -84,6 +90,31 @@ export default function TodayPatients() {
       toast('Kamida bitta xizmat qolishi kerak', 'error')
       return
     }
+
+    const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
+    let cashAmt = Number(editForm.cash_amount) || 0
+    let cardAmt = Number(editForm.card_amount) || 0
+
+    if (editForm.payment_type === 'split') {
+      if (cashAmt < 0 || cardAmt < 0) {
+        toast("Aralash to'lov miqdorini to'g'ri kiriting", 'error')
+        return
+      }
+      if (cashAmt + cardAmt !== totalToPay) {
+        toast(`Naqd (${formatMoney(cashAmt)}) va Karta (${formatMoney(cardAmt)}) yig'indisi to'lanadigan summa (${formatMoney(totalToPay)})ga teng bo'lishi kerak!`, 'error')
+        return
+      }
+    } else if (editForm.payment_type === 'cash') {
+      cashAmt = totalToPay
+      cardAmt = 0
+    } else if (editForm.payment_type === 'later') {
+      cashAmt = 0
+      cardAmt = 0
+    } else {
+      cashAmt = 0
+      cardAmt = totalToPay
+    }
+
     setSaving(true)
     try {
       await api(`/patients/${editPatient.id}`, {
@@ -91,6 +122,8 @@ export default function TodayPatients() {
         body: JSON.stringify({
           referrer_id: editForm.referrer_id ? Number(editForm.referrer_id) : null,
           payment_type: editForm.payment_type,
+          cash_amount: cashAmt,
+          card_amount: cardAmt,
           services: editServices.map((s) => ({
             service_id: s.service_id,
             quantity: s.quantity,
@@ -672,22 +705,88 @@ export default function TodayPatients() {
             <div>
               <label className="form-label font-bold">To'lov turi</label>
               <select
-                className="input-field text-sm"
+                className="input-field text-sm font-bold"
                 value={editForm.payment_type}
-                onChange={(e) => setEditForm({ ...editForm, payment_type: e.target.value })}
+                onChange={(e) => {
+                  const newType = e.target.value
+                  const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
+                  const half = Math.round(totalToPay / 2)
+                  setEditForm({
+                    ...editForm,
+                    payment_type: newType,
+                    cash_amount: newType === 'split' ? (editForm.cash_amount || half) : newType === 'cash' ? totalToPay : 0,
+                    card_amount: newType === 'split' ? (editForm.card_amount || (totalToPay - half)) : newType === 'cash' || newType === 'later' ? 0 : totalToPay,
+                  })
+                }}
               >
                 <option value="cash">💵 Naqd</option>
                 <option value="card">💳 Karta (terminal)</option>
                 <option value="click">📱 Click / Payme</option>
                 <option value="qr">🔳 QR Kod</option>
-                <option value="split">🔀 Aralash</option>
+                <option value="split">🔀 Aralash (Naqd + Karta)</option>
                 <option value="later">⏳ Keyinroq (nasiya)</option>
               </select>
             </div>
 
+            {/* ARALASH TO'LOV BULINISHI */}
+            {editForm.payment_type === 'split' && (
+              <div className="p-3.5 rounded-2xl border border-gold/40 bg-gold/5 space-y-3 animate-in fade-in">
+                <span className="text-xs font-bold uppercase tracking-wider text-gold block">
+                  🔀 Aralash to'lov taqsimoti
+                </span>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="form-label font-bold text-xs">💵 Naqd qismi (so'm)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="input-field text-xs font-mono font-bold"
+                      value={editForm.cash_amount}
+                      onChange={(e) => {
+                        const c = Math.max(0, Number(e.target.value) || 0)
+                        const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
+                        setEditForm({
+                          ...editForm,
+                          cash_amount: c,
+                          card_amount: Math.max(0, totalToPay - c),
+                        })
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="form-label font-bold text-xs">💳 Karta qismi (so'm)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="input-field text-xs font-mono font-bold"
+                      value={editForm.card_amount}
+                      onChange={(e) => {
+                        const card = Math.max(0, Number(e.target.value) || 0)
+                        const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
+                        setEditForm({
+                          ...editForm,
+                          card_amount: card,
+                          cash_amount: Math.max(0, totalToPay - card),
+                        })
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs font-mono font-extrabold pt-1 border-t border-gold/20 text-body">
+                  <span>Yig'indi:</span>
+                  <span className="text-emerald">
+                    {formatMoney(Number(editForm.cash_amount || 0) + Number(editForm.card_amount || 0))} / {formatMoney(Math.max(0, editTotal - (editPatient?.discount_amount || 0)))}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="p-3 rounded-xl bg-surface-2 border border-border text-[11px] text-muted">
               Saqlanganda pul taqsimoti qayta hisoblanadi — yo'naltiruvchi va
-              shifokor ulushi hamda kassa balansi avtomatik to'g'rilanadi.
+              shifokor ulushi hamda kassa balansi (Naqd va Karta alohida) avtomatik to'g'rilanadi.
             </div>
 
             <div>

@@ -87,6 +87,8 @@ class PatientUpdate(BaseModel):
     service_id: int | None = None
     payment_amount: int | None = None
     payment_type: str | None = None
+    cash_amount: int | None = None
+    card_amount: int | None = None
     # Xizmatlar ro'yxati qayta yuborilsa — eskisi almashtiriladi va
     # to'lov summasi qaytadan hisoblanadi (chegirma saqlanib qoladi).
     services: list[EditServiceItem] | None = None
@@ -695,16 +697,34 @@ def update_patient(
             p.cash_amount, p.card_amount = p.payment_amount, 0
         elif (p.payment_type or "") in ("later", "keyinroq", "nasiya", "qarz"):
             p.cash_amount, p.card_amount = 0, 0
-        elif (p.payment_type or "") not in ("split", "aralash"):
+        elif (p.payment_type or "") in ("split", "aralash"):
+            c_val = data.cash_amount if data.cash_amount is not None else (p.cash_amount or 0)
+            c_val = min(max(0, c_val), p.payment_amount)
+            p.cash_amount = c_val
+            p.card_amount = max(0, p.payment_amount - c_val)
+        else:
             p.cash_amount, p.card_amount = 0, p.payment_amount
         db.flush()
+    else:
+        # Xizmatlar ro'yxati alohida yangilanmagan bo'lsa ham payment_type / cash_amount o'zgargan bo'lishi mumkin
+        if (p.payment_type or "") in ("cash", "naqd"):
+            p.cash_amount, p.card_amount = p.payment_amount, 0
+        elif (p.payment_type or "") in ("later", "keyinroq", "nasiya", "qarz"):
+            p.cash_amount, p.card_amount = 0, 0
+        elif (p.payment_type or "") in ("split", "aralash"):
+            c_val = data.cash_amount if data.cash_amount is not None else (p.cash_amount or 0)
+            c_val = min(max(0, c_val), p.payment_amount)
+            p.cash_amount = c_val
+            p.card_amount = max(0, p.payment_amount - c_val)
+        else:
+            p.cash_amount, p.card_amount = 0, p.payment_amount
 
     p.updated_at = datetime.now()
 
     # Pulga ta'sir qiladigan maydon o'zgargan bo'lsa, taqsimotni qaytadan
     # hisoblaymiz. Aks holda (masalan yo'naltiruvchi keyin qo'shilsa) uning
     # ulushi hech qachon hisoblanmay qolardi.
-    money_fields = {"referrer_id", "provider_id", "service_id", "payment_amount", "payment_type"}
+    money_fields = {"referrer_id", "provider_id", "service_id", "payment_amount", "payment_type", "cash_amount", "card_amount"}
     if new_services is not None or (money_fields & set(updates.keys())):
         tx = (
             db.query(Transaction)
