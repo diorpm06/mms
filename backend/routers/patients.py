@@ -665,12 +665,17 @@ def cancel_patient(
     tx = db.query(Transaction).filter(Transaction.patient_id == p.id, Transaction.is_cancelled == False).first()
     if not tx:
         raise HTTPException(status_code=400, detail="Tranzaksiya topilmadi")
+    # DIQQAT: tartib muhim. cancel_patient_payment() ichida
+    # "patient.is_cancelled bo'lsa rad et" tekshiruvi bor — shuning uchun
+    # bayroqni oldindan qo'ysak, pul qaytarish funksiyasi o'z ishini
+    # bajarmay xato qaytarardi va bekor qilish umuman ishlamasdi.
+    # Avval pulni qaytaramiz, keyin bemorni belgilaymiz.
+    cancel_patient_payment(db, p, tx)
     p.is_cancelled = True
     p.cancelled_at = datetime.now()
-    p.is_cancelled = True
+    p.cancelled_by = user.id          # kim bekor qilgani yozib qo'yiladi
     p.cancel_reason = body.reason
     p.updated_at = datetime.now()
-    cancel_patient_payment(db, p, tx)
     ip, device = get_client_info(request)
     log_audit(
         db, user_id=user.id, user_role=user.role, action_type="CANCEL",

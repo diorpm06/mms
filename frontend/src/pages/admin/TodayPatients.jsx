@@ -18,7 +18,35 @@ export default function TodayPatients() {
   const [reissuingId, setReissuingId] = useState(null)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [cancelPatient, setCancelPatient] = useState(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelling, setCancelling] = useState(false)
   const toast = useToastStore((s) => s.add)
+
+  // Bemor to'lovdan keyin voz kechsa: yozuv o'chmaydi, "bekor qilingan"
+  // holatiga o'tadi va pul (klinika, shifokor, yo'naltiruvchi ulushi)
+  // avtomatik qaytariladi.
+  const handleCancelPayment = async () => {
+    if (cancelReason.trim().length < 3) {
+      toast('Bekor qilish sababini yozing (kamida 3 harf)', 'error')
+      return
+    }
+    setCancelling(true)
+    try {
+      await api(`/patients/${cancelPatient.id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: cancelReason.trim() }),
+      })
+      toast("To'lov bekor qilindi — yozuv saqlanib qoldi")
+      setCancelPatient(null)
+      setCancelReason('')
+      fetchPatients()
+    } catch (e) {
+      toast(e.message || 'Bekor qilishda xatolik', 'error')
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   const handleDownloadDailyPdf = async () => {
     setDownloadingPdf(true)
@@ -248,6 +276,18 @@ export default function TodayPatients() {
 
                   {/* Action Buttons */}
                   <td className="py-2.5 px-3 whitespace-nowrap text-right">
+                    {p.is_cancelled && (
+                      <div className="text-right">
+                        <span className="badge badge-danger text-[10px] font-black uppercase">
+                          ✗ Bekor qilingan
+                        </span>
+                        {p.cancel_reason && (
+                          <span className="block text-[10px] text-muted mt-0.5 no-underline">
+                            {p.cancel_reason}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {!p.is_cancelled && (
                       <ActionRow>
                         {/* Karta */}
@@ -316,6 +356,18 @@ export default function TodayPatients() {
                         >
                           Qayta Navbat
                         </Btn>
+
+                        {/* Bemor to'lovdan keyin voz kechsa — yozuv o'chmaydi,
+                            "bekor qilingan" bo'lib qoladi, pul qaytariladi */}
+                        <Btn
+                          variant="danger"
+                          size="xs"
+                          icon={Icons.x}
+                          onClick={() => { setCancelPatient(p); setCancelReason('') }}
+                          title="To'lovni bekor qilish (yozuv saqlanadi)"
+                        >
+                          Bekor
+                        </Btn>
                       </ActionRow>
                     )}
                   </td>
@@ -362,6 +414,48 @@ export default function TodayPatients() {
                 onClick={() => handleUpdateStatus(callingId, 'qabulda', cabinetInput)}
               >
                 Chaqirish
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TO'LOVNI BEKOR QILISH */}
+      {cancelPatient && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div>
+              <h3 className="text-lg font-black text-rose-400">To'lovni bekor qilish</h3>
+              <p className="text-xs text-muted mt-1">
+                <strong className="text-body">{cancelPatient.first_name} {cancelPatient.last_name}</strong>
+                {' — '}{formatMoney(cancelPatient.payment_amount)}
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-2 border border-border text-[11px] text-muted space-y-1">
+              <p>• Yozuv <strong className="text-body">o'chmaydi</strong> — "bekor qilingan" bo'lib turadi</p>
+              <p>• Pul kassadan, shifokor va yo'naltiruvchi hisobidan qaytariladi</p>
+              <p>• Hisobotlarda bu tashrif hisobga olinmaydi</p>
+            </div>
+
+            <div>
+              <label className="form-label font-bold">Bekor qilish sababi *</label>
+              <input
+                className="input-field text-sm"
+                placeholder="Masalan: bemor xizmatdan voz kechdi"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCancelPayment() }}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Btn variant="ghost" full icon={Icons.x} onClick={() => setCancelPatient(null)}>
+                Yopish
+              </Btn>
+              <Btn variant="danger" full loading={cancelling} onClick={handleCancelPayment}>
+                Ha, bekor qilinsin
               </Btn>
             </div>
           </div>
