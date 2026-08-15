@@ -229,10 +229,12 @@ export default function TodayPatients() {
   }
 
   const [entryFilter, setEntryFilter] = useState('all') // 'all' | 'live' | 'paper'
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState('all') // 'all' | 'split' | 'click' | 'cash' | 'card' | 'later'
 
   const filteredPatients = patients.filter((p) => {
     if (entryFilter === 'live' && p.is_paper_entry) return false
     if (entryFilter === 'paper' && !p.is_paper_entry) return false
+    if (paymentTypeFilter !== 'all' && (p.payment_type || '').toLowerCase() !== paymentTypeFilter) return false
 
     if (!searchQuery) return true
     const q = searchQuery.toLowerCase()
@@ -365,6 +367,40 @@ export default function TodayPatients() {
         ))}
       </div>
 
+      {/* To'lov turi bo'yicha tezkor filtrlar */}
+      <div className="flex flex-wrap items-center gap-1.5 p-2 bg-surface-2/80 rounded-2xl border border-border">
+        <span className="text-xs font-bold text-muted px-2">To'lov turi bo'yicha:</span>
+        {[
+          { id: 'all', label: 'Barchasi' },
+          { id: 'split', label: '🔀 Aralash' },
+          { id: 'click', label: '📱 Click / Payme' },
+          { id: 'cash', label: '💵 Naqd' },
+          { id: 'card', label: '💳 Karta' },
+          { id: 'later', label: '⏳ Nasiya' },
+        ].map((f) => {
+          const count = f.id === 'all'
+            ? patients.length
+            : patients.filter((p) => (p.payment_type || '').toLowerCase() === f.id).length
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setPaymentTypeFilter(f.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                paymentTypeFilter === f.id
+                  ? 'bg-gold text-slate-950 shadow-md font-black scale-105'
+                  : 'bg-surface-1 text-muted hover:text-body hover:bg-surface-2'
+              }`}
+            >
+              {f.label}{' '}
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-black/20 font-mono">
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
       {/* Table */}
       <div className="card overflow-x-auto p-0 border-cyan-500/20">
         <table className="w-full text-sm">
@@ -433,6 +469,11 @@ export default function TodayPatients() {
                   <td className="td-cell whitespace-nowrap">
                     <span className="accent-value font-mono font-black text-emerald">{formatMoney(p.payment_amount)}</span>
                     <span className="badge badge-gold ml-1.5 text-[10px] uppercase font-bold">{paymentLabel(p.payment_type)}</span>
+                    {p.payment_type === 'split' && (
+                      <span className="block text-[10px] text-cyan-400 font-bold font-mono mt-0.5">
+                        💵 {formatMoney(p.cash_amount || 0)} N + 💳/📱 {formatMoney(p.card_amount || 0)} K
+                      </span>
+                    )}
                     {p.discount_amount > 0 && (
                       <span className="block text-[10px] text-amber font-bold mt-0.5">
                         🏷️ chegirma −{formatMoney(p.discount_amount)}
