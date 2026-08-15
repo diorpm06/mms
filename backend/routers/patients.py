@@ -70,6 +70,12 @@ def _next_ticket(db: Session) -> str:
 router = APIRouter(prefix="/api/patients", tags=["patients"])
 
 
+class EditServiceItem(BaseModel):
+    service_id: int
+    quantity: int = 1
+    price: int | None = None      # bo'sh bo'lsa katalog narxi olinadi
+
+
 class PatientUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
@@ -81,6 +87,9 @@ class PatientUpdate(BaseModel):
     service_id: int | None = None
     payment_amount: int | None = None
     payment_type: str | None = None
+    # Xizmatlar ro'yxati qayta yuborilsa — eskisi almashtiriladi va
+    # to'lov summasi qaytadan hisoblanadi (chegirma saqlanib qoladi).
+    services: list[EditServiceItem] | None = None
     reason: str = Field(min_length=3)
 
 
@@ -651,15 +660,52 @@ def update_patient(
         raise HTTPException(status_code=400, detail="Bekor qilingan yozuvni tahrirlab bo'lmaydi")
     old = _patient_row(p)
     updates = data.model_dump(exclude_unset=True, exclude={"reason"})
+    new_services = updates.pop("services", None)
+
     for k, v in updates.items():
         setattr(p, k, v)
+
+    # Xizmatlar ro'yxati yangilangan bo'lsa — eskisini almashtiramiz va
+    # to'lov summasini qaytadan hisoblaymiz (chegirma o'zgarmaydi).
+    if new_services is not None:
+        if not new_services:
+            raise HTTPException(status_code=400, detail="Kamida bitta xizmat bo'lishi kerak")
+
+        db.query(PatientService).filter(PatientService.patient_id == p.id).delete()
+        raw_total = 0
+        first_sid = None
+        for it in new_services:
+            svc = db.query(Service).filter(Service.id == it["service_id"]).first()
+            if not svc:
+                raise HTTPException(status_code=400, detail=f"Xizmat topilmadi (ID: {it['service_id']})")
+            qty = max(1, int(it.get("quantity") or 1))
+            unit = it["price"] if it.get("price") is not None else svc.price
+            line = int(unit) * qty
+            raw_total += line
+            first_sid = first_sid or svc.id
+            db.add(PatientService(
+                patient_id=p.id, service_id=svc.id,
+                quantity=qty, unit_price=int(unit), total_price=line,
+            ))
+
+        p.service_id = first_sid
+        p.payment_amount = max(0, raw_total - (p.discount_amount or 0))
+        # Naqd/karta taqsimotini yangi summaga moslaymiz
+        if (p.payment_type or "") in ("cash", "naqd"):
+            p.cash_amount, p.card_amount = p.payment_amount, 0
+        elif (p.payment_type or "") in ("later", "keyinroq", "nasiya", "qarz"):
+            p.cash_amount, p.card_amount = 0, 0
+        elif (p.payment_type or "") not in ("split", "aralash"):
+            p.cash_amount, p.card_amount = 0, p.payment_amount
+        db.flush()
+
     p.updated_at = datetime.now()
 
     # Pulga ta'sir qiladigan maydon o'zgargan bo'lsa, taqsimotni qaytadan
     # hisoblaymiz. Aks holda (masalan yo'naltiruvchi keyin qo'shilsa) uning
     # ulushi hech qachon hisoblanmay qolardi.
     money_fields = {"referrer_id", "provider_id", "service_id", "payment_amount", "payment_type"}
-    if money_fields & set(updates.keys()):
+    if new_services is not None or (money_fields & set(updates.keys())):
         tx = (
             db.query(Transaction)
             .filter(Transaction.patient_id == p.id, Transaction.is_cancelled == False)

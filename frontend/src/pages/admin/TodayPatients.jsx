@@ -23,6 +23,9 @@ export default function TodayPatients() {
   const [cancelling, setCancelling] = useState(false)
   const [editPatient, setEditPatient] = useState(null)
   const [editForm, setEditForm] = useState({ referrer_id: '', payment_type: '', reason: '' })
+  const [editServices, setEditServices] = useState([])
+  const [allServices, setAllServices] = useState([])
+  const [addServiceId, setAddServiceId] = useState('')
   const [referrers, setReferrers] = useState([])
   const [saving, setSaving] = useState(false)
   const toast = useToastStore((s) => s.add)
@@ -34,8 +37,40 @@ export default function TodayPatients() {
       payment_type: p.payment_type || 'cash',
       reason: '',
     })
+    // Bemorning hozirgi xizmatlari (tahrirlash uchun nusxa)
+    setEditServices(
+      (p.services || []).map((s) => ({
+        service_id: s.service_id,
+        service_name: s.service_name,
+        quantity: s.quantity || 1,
+        price: s.unit_price ?? s.total_price,
+      }))
+    )
+    setAddServiceId('')
     if (!referrers.length) api('/referrers').then(setReferrers).catch(() => {})
+    if (!allServices.length) api('/services').then(setAllServices).catch(() => {})
   }
+
+  const removeEditService = (i) =>
+    setEditServices((prev) => prev.filter((_, idx) => idx !== i))
+
+  const changeEditQty = (i, q) =>
+    setEditServices((prev) => prev.map((s, idx) =>
+      idx === i ? { ...s, quantity: Math.max(1, Number(q) || 1) } : s))
+
+  const addEditService = (sid) => {
+    if (!sid) return
+    const svc = allServices.find((x) => String(x.id) === String(sid))
+    if (!svc) return
+    setEditServices((prev) => [
+      ...prev,
+      { service_id: svc.id, service_name: svc.name, quantity: 1, price: svc.price },
+    ])
+    setAddServiceId('')
+  }
+
+  const editTotal = editServices.reduce(
+    (a, s) => a + (Number(s.price) || 0) * (Number(s.quantity) || 1), 0)
 
   // Yo'naltiruvchi yoki to'lov turi xato kiritilgan bo'lsa tuzatish uchun.
   // Backend pul taqsimotini avtomatik qayta hisoblaydi (yo'naltiruvchi
@@ -45,6 +80,10 @@ export default function TodayPatients() {
       toast("O'zgartirish sababini yozing (kamida 3 harf)", 'error')
       return
     }
+    if (!editServices.length) {
+      toast('Kamida bitta xizmat qolishi kerak', 'error')
+      return
+    }
     setSaving(true)
     try {
       await api(`/patients/${editPatient.id}`, {
@@ -52,6 +91,11 @@ export default function TodayPatients() {
         body: JSON.stringify({
           referrer_id: editForm.referrer_id ? Number(editForm.referrer_id) : null,
           payment_type: editForm.payment_type,
+          services: editServices.map((s) => ({
+            service_id: s.service_id,
+            quantity: s.quantity,
+            price: Number(s.price) || 0,
+          })),
           reason: editForm.reason.trim(),
         }),
       })
@@ -543,6 +587,72 @@ export default function TodayPatients() {
                 <strong className="text-body">{editPatient.first_name} {editPatient.last_name}</strong>
                 {' — '}{formatMoney(editPatient.payment_amount)} · {editPatient.ticket_number}
               </p>
+            </div>
+
+            {/* XIZMATLAR */}
+            <div>
+              <label className="form-label font-bold">Xizmatlar</label>
+              <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                {editServices.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2 rounded-xl bg-surface-2 border border-border">
+                    <span className="flex-1 text-xs font-bold text-body">{s.service_name}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={s.quantity}
+                      onChange={(e) => changeEditQty(i, e.target.value)}
+                      className="w-14 px-1.5 py-1 rounded-lg bg-surface border border-border text-center text-xs font-mono font-bold"
+                      title="Soni"
+                    />
+                    <span className="w-24 text-right text-xs font-mono text-emerald">
+                      {formatMoney((Number(s.price) || 0) * (Number(s.quantity) || 1))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeEditService(i)}
+                      className="text-rose-400 hover:bg-rose-500/15 rounded-lg px-1.5 py-0.5 text-xs font-bold"
+                      title="Olib tashlash"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {!editServices.length && (
+                  <p className="text-[11px] text-rose-400 italic">Xizmat qolmadi — kamida bittasi kerak</p>
+                )}
+              </div>
+
+              <select
+                className="input-field text-xs mt-2"
+                value={addServiceId}
+                onChange={(e) => addEditService(e.target.value)}
+              >
+                <option value="">+ Xizmat qo'shish...</option>
+                {allServices.filter((x) => x.is_active !== false).map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name} — {formatMoney(x.price)}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex justify-between mt-2 pt-2 border-t border-border text-xs font-bold">
+                <span className="text-muted">Xizmatlar summasi:</span>
+                <span className="font-mono text-body">{formatMoney(editTotal)}</span>
+              </div>
+              {(editPatient.discount_amount || 0) > 0 && (
+                <>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted">Chegirma (o'zgarmaydi):</span>
+                    <span className="font-mono text-amber-400">-{formatMoney(editPatient.discount_amount)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-black">
+                    <span>To'lanadigan:</span>
+                    <span className="font-mono text-emerald">
+                      {formatMoney(Math.max(0, editTotal - editPatient.discount_amount))}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div>
