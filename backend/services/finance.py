@@ -15,6 +15,15 @@ from models.salary_log import SalaryLog
 from models.transaction import Transaction
 from models.inpatient import Inpatient
 
+# To'lov turlari bir joyda. Tizimda tarixan ikki xil atama ishlatilgan
+# (ingliz "cash/card" va o'zbek "naqd/karta"), shuning uchun har bir modul
+# o'zicha ro'yxat tuzib, ba'zilari (masalan click, qr) hisobdan tushib
+# qolardi. Yangi to'lov turi qo'shilsa — faqat shu yerga qo'shiladi.
+CASH_TYPES = ("cash", "naqd")
+CARD_TYPES = ("card", "karta", "click", "payme", "qr", "terminal")
+LATER_TYPES = ("later", "keyinroq", "nasiya", "qarz")
+SPLIT_TYPES = ("split", "aralash")
+
 
 def get_or_create_balance(db: Session) -> Balance:
     bal = db.query(Balance).first()

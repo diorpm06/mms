@@ -42,8 +42,21 @@ def cash_register(
         Patient.is_cancelled == False,
     ).all()
 
-    cash_in = sum(t.total_amount for t in txs if t.payment_type == "cash")
-    card_in = sum(t.total_amount for t in txs if t.payment_type == "card")
+    # Avval faqat aniq "cash"/"card" sanalardi — "naqd", "karta", "click",
+    # "qr" bilan qilingan to'lovlar kassa hisobotiga umuman tushmasdi.
+    # Aralash to'lovda summa cash_amount/card_amount bo'yicha bo'linadi.
+    from services.finance import CARD_TYPES, CASH_TYPES
+
+    cash_in = sum(
+        (t.cash_amount or 0) if (t.cash_amount or t.card_amount)
+        else (t.total_amount if t.payment_type in CASH_TYPES else 0)
+        for t in txs
+    )
+    card_in = sum(
+        (t.card_amount or 0) if (t.cash_amount or t.card_amount)
+        else (t.total_amount if t.payment_type in CARD_TYPES else 0)
+        for t in txs
+    )
     total_in = cash_in + card_in
 
     expenses = (

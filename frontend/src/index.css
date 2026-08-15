@@ -157,6 +157,28 @@ html.light {
 
   .text-body   { color: var(--text); }
 
+  /* Klaviatura tugmasi belgisi (yordam matnlarida) */
+  .kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  /* Klaviatura bilan yurganda fokus aniq ko'rinsin */
+  .card button:focus-visible,
+  .card input:focus-visible,
+  .card select:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+  }
+
   /* ── Card ── */
   .card {
     @apply rounded-2xl p-5;

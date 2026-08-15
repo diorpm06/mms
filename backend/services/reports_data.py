@@ -117,12 +117,13 @@ def get_report(db: Session, start: date, end: date) -> dict:
 
     if txs:
         total_income = sum(t.total_amount for t in txs)
+        from services.finance import CARD_TYPES, CASH_TYPES
         cash = sum(
-            (t.cash_amount if t.cash_amount else (t.total_amount if t.payment_type in ("cash", "naqd") else 0))
+            (t.cash_amount if t.cash_amount else (t.total_amount if t.payment_type in CASH_TYPES else 0))
             for t in txs
         )
         card = sum(
-            (t.card_amount if t.card_amount else (t.total_amount if t.payment_type in ("card", "karta", "click", "qr") else 0))
+            (t.card_amount if t.card_amount else (t.total_amount if t.payment_type in CARD_TYPES else 0))
             for t in txs
         )
         referrer_share = sum(t.referrer_amount for t in txs)

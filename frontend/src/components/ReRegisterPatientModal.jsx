@@ -7,7 +7,8 @@ import { Btn, Icons } from './UIKit'
 
 const PAYMENT_TYPES = [
   { id: 'naqd', label: '💵 Naqd pul' },
-  { id: 'karta', label: '💳 Karta (Click/Payme/Terminal)' },
+  { id: 'karta', label: '💳 Karta (Terminal)' },
+  { id: 'click', label: '📱 Click / Payme' },
   { id: 'aralash', label: '⚖️ Aralash (Naqd + Karta)' },
   { id: 'later', label: '⏳ Keyinroq to\'lash (Nasiya)' },
 ]
@@ -84,7 +85,11 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
         discount_amount: Number(discountAmount) || 0,
         discount_reason: discountReason || null,
         cash_amount: paymentType === 'aralash' ? Number(cashAmount) : (paymentType === 'naqd' ? finalAmount : 0),
-        card_amount: paymentType === 'aralash' ? Number(cardAmount) : (paymentType === 'karta' ? finalAmount : 0),
+        // Click/Payme ham naqd bo'lmagan to'lov — 'karta' bilan bir qatorda
+        // hisoblanmasa, summa na naqdga na kartaga tushmay yo'qolib ketardi.
+        card_amount: paymentType === 'aralash'
+          ? Number(cardAmount)
+          : (['karta', 'click'].includes(paymentType) ? finalAmount : 0),
       }
 
       const res = await api('/patients', {

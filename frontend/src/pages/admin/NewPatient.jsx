@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../utils/api'
 import { formatMoney, formatWithCommas, parseDigits } from '../../utils/format'
@@ -424,6 +424,59 @@ export default function NewPatient({ homePath = '/admin' }) {
     }
   }
 
+  // ── KLAVIATURA BILAN BOSHQARISH ────────────────────────────────────
+  // Sichqonchasiz ishlash uchun: Enter — keyingi maydon, strelkalar —
+  // tugmalar (xizmat, to'lov turi) orasida yurish, Ctrl+Enter — saqlash.
+  const formRef = useRef(null)
+
+  const getFocusables = () => {
+    if (!formRef.current) return []
+    return Array.from(
+      formRef.current.querySelectorAll('input, select, textarea, button:not([disabled])')
+    ).filter((el) => el.offsetParent !== null && !el.hasAttribute('data-kbd-skip'))
+  }
+
+  const handleFormKeyDown = (e) => {
+    const el = e.target
+    const tag = el.tagName
+
+    // Ctrl+Enter — istalgan joydan saqlash
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      if (!loading) submit()
+      return
+    }
+
+    // Enter matn maydonida — keyingi maydonga o'tadi (forma yuborilmaydi)
+    if (e.key === 'Enter' && (tag === 'INPUT' || tag === 'SELECT')) {
+      e.preventDefault()
+      const items = getFocusables()
+      const i = items.indexOf(el)
+      const next = items.slice(i + 1).find((x) => x.tagName === 'INPUT' || x.tagName === 'SELECT')
+      if (next) next.focus()
+      else items[i + 1]?.focus()
+      return
+    }
+
+    // Strelkalar — bir guruh ichidagi tugmalar orasida yurish
+    if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      // Matn maydonida strelka o'z vazifasini bajarsin (kursor siljishi)
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+
+      const group = el.closest('[data-kbd-group]')
+      const scope = group || formRef.current
+      const buttons = Array.from(scope.querySelectorAll('button:not([disabled])'))
+        .filter((b) => b.offsetParent !== null)
+      const i = buttons.indexOf(el)
+      if (i === -1) return
+
+      e.preventDefault()
+      const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight'
+      const next = buttons[fwd ? i + 1 : i - 1]
+      if (next) next.focus()
+    }
+  }
+
   const handleCloseReceipt = () => {
     setCreatedPatient(null)
     navigate(homePath)
@@ -438,7 +491,16 @@ export default function NewPatient({ homePath = '/admin' }) {
         <PaymentTicketModal open={!!createdPatient} patient={createdPatient} onClose={handleCloseReceipt} />
       )}
 
-      <div className="card space-y-5">
+      {/* Klaviatura yordami */}
+      <div className="mb-3 text-[11px] text-muted flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="font-bold text-gold">⌨️ Klaviatura:</span>
+        <span><kbd className="kbd">Enter</kbd> keyingi maydon</span>
+        <span><kbd className="kbd">↑</kbd><kbd className="kbd">↓</kbd><kbd className="kbd">←</kbd><kbd className="kbd">→</kbd> tanlash</span>
+        <span><kbd className="kbd">Space</kbd> belgilash</span>
+        <span><kbd className="kbd">Ctrl</kbd>+<kbd className="kbd">Enter</kbd> saqlash</span>
+      </div>
+
+      <div ref={formRef} onKeyDown={handleFormKeyDown} className="card space-y-5">
 
         {/* MODE SELECTOR: LIVE INTAKE VS PAPER SHIFT JOURNAL ENTRY */}
         <div className="p-3.5 rounded-2xl border border-gold/30 bg-gold/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -716,7 +778,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                             )}
 
                             {/* Service Buttons Grid */}
-                            <div className="flex flex-wrap gap-2">
+                            <div data-kbd-group="services" className="flex flex-wrap gap-2">
                               {list.map((s) => {
                                 const selected = isServiceSelected(s.id)
                                 return (
@@ -966,13 +1028,16 @@ export default function NewPatient({ homePath = '/admin' }) {
         {/* 4. TO'LOV USULI */}
         <div className="space-y-3">
           <label className="form-label">💳 To'lov Usulini Tanlang</label>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div data-kbd-group="payment" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             {[
-              { id: 'cash',  label: '💵 Naqd',    desc: 'Naqd Pul' },
-              { id: 'click', label: '💳 Karta',   desc: 'Karta / Click' },
-              { id: 'split', label: '🔀 Aralash', desc: 'Naqd + Karta' },
-              { id: 'later', label: '⏳ Keyinroq', desc: 'Nasiya / Qarz' },
-              { id: 'qr',    label: '🔳 QR Kod',  desc: 'QR to\'lov' },
+              { id: 'cash',  label: '💵 Naqd',        desc: 'Naqd Pul' },
+              // Ilgari "Karta" tugmasining qiymati 'click' edi — shuning uchun
+              // Karta tanlansa ham hamma joyda "Click" deb ko'rinardi.
+              { id: 'card',  label: '💳 Karta',       desc: 'Terminal / Bank kartasi' },
+              { id: 'click', label: '📱 Click/Payme', desc: 'Click, Payme' },
+              { id: 'split', label: '🔀 Aralash',     desc: 'Naqd + Karta' },
+              { id: 'later', label: '⏳ Keyinroq',    desc: 'Nasiya / Qarz' },
+              { id: 'qr',    label: '🔳 QR Kod',      desc: 'QR to\'lov' },
             ].map((pm) => (
               <button
                 key={pm.id}

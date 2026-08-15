@@ -44,6 +44,11 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
     ? patient.card_amount
     : patientList.reduce((acc, p) => acc + (p.card_amount || 0), 0)
 
+  // Chegirma bo'limlar orasida bo'linadi (har bir bo'lim alohida yozuv),
+  // shuning uchun chekda ko'rsatish uchun hammasini yig'amiz.
+  const totalDiscount = patientList.reduce((acc, p) => acc + (p.discount_amount || 0), 0)
+  const discountReason = patientList.find((p) => p.discount_reason)?.discount_reason || ''
+
   const dateStr = firstPatient.created_at
     ? new Date(firstPatient.created_at).toLocaleString('uz-UZ')
     : new Date().toLocaleString('uz-UZ')
@@ -270,6 +275,19 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
                   : paymentLabel(firstPatient.payment_type)}
               </strong>
             </div>
+
+            {totalDiscount > 0 && (
+              <>
+                <div className="flex justify-between pt-1 text-slate-600">
+                  <span>Xizmatlar summasi:</span>
+                  <span className="font-mono">{formatMoney(totalAmount + totalDiscount)}</span>
+                </div>
+                <div className="flex justify-between text-slate-900 font-bold">
+                  <span>🏷️ Chegirma{discountReason ? ` (${discountReason})` : ''}:</span>
+                  <span className="font-mono">-{formatMoney(totalDiscount)}</span>
+                </div>
+              </>
+            )}
 
             <div className="flex justify-between pt-1 font-bold text-xs border-t-2 border-slate-900 my-1">
               <span>{isPayLater ? "TO'LANISHI KERAK SUMMA:" : "TO'LANGAN SUMMA:"}</span>

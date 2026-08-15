@@ -37,10 +37,13 @@ export function paymentLabel(type) {
     case 'karta':
       return '💳 Karta'
     case 'click':
-      return '📱 Click'
-    case 'qr':
     case 'payme':
+      return '📱 Click/Payme'
+    case 'qr':
       return '🔳 QR Code'
+    case 'split':
+    case 'aralash':
+      return '🔀 Aralash'
     case 'later':
     case 'keyinroq':
     case 'nasiya':
