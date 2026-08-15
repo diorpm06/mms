@@ -1,15 +1,17 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from auth_utils import require_ceo
+from auth_utils import require_admin_or_ceo, require_ceo
 from database import get_db
+from models.advance import Advance
 from models.employee import Employee
 from models.user import User
 from schemas import EmployeeCreate, EmployeeOut, EmployeeUpdate
-from services.finance import employee_payroll_summary, pay_employee_salary
+from services.audit import get_client_info, log_audit
+from services.finance import employee_payroll_summary, pay_employee_salary, process_advance
 from services.reports_data import daily_report
 from services.salary_reminder import load_salary_reminder, save_salary_reminder
 from services.telegram_notify import send_telegram_message
@@ -28,7 +30,8 @@ class SalaryReminderBody(BaseModel):
 def list_employees(
     include_inactive: bool = Query(True),
     db: Session = Depends(get_db),
-    _: User = Depends(require_ceo)
+    # Admin ham ko'ra oladi — avans/oylik berishda xodimni tanlash uchun
+    _: User = Depends(require_admin_or_ceo)
 ):
     q = db.query(Employee)
     if not include_inactive:
@@ -79,7 +82,7 @@ def delete_employee(
 
 
 @router.post("/{employee_id}/pay-salary")
-async def pay_salary(employee_id: int, db: Session = Depends(get_db), _: User = Depends(require_ceo)):
+async def pay_salary(employee_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)):
     summary = employee_payroll_summary(db, employee_id)
     log = pay_employee_salary(db, employee_id)
     db.commit()
@@ -102,6 +105,70 @@ async def pay_salary(employee_id: int, db: Session = Depends(get_db), _: User = 
 from models.salary_log import SalaryLog
 
 
+class AdvanceBody(BaseModel):
+    amount: int = Field(gt=0)
+    note: str | None = None
+
+
+@router.post("/{employee_id}/advance")
+def give_employee_advance(
+    employee_id: int,
+    body: AdvanceBody,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    """
+    Xodimga avans berish. Ilgari Advance modeli va maoshdan ayirish mantig'i
+    bor edi, lekin avansni YARATADIGAN endpoint yo'q edi — ya'ni avans berib
+    bo'lmasdi. Endi admin ham bera oladi.
+    """
+    emp = db.query(Employee).filter(Employee.id == employee_id, Employee.is_active == True).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Xodim topilmadi")
+
+    summary = employee_payroll_summary(db, employee_id)
+    qolgan = summary["base_salary"] - summary["advances_total"]
+    if body.amount > qolgan:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Avans oylikdan oshib ketadi. Oylik: {summary['base_salary']:,} so'm, "
+                f"berilgan avans: {summary['advances_total']:,} so'm, "
+                f"berish mumkin: {max(0, qolgan):,} so'm"
+            ),
+        )
+
+    adv = Advance(
+        employee_id=employee_id,
+        amount=body.amount,
+        note=body.note or f"{emp.full_name} uchun avans",
+        created_by=user.id,
+    )
+    db.add(adv)
+    # Pul kassadan chiqadi
+    process_advance(db, body.amount, f"Avans: {emp.full_name}" + (f" — {body.note}" if body.note else ""))
+
+    ip, device = get_client_info(request)
+    log_audit(
+        db, user_id=user.id, user_role=user.role, action_type="ADVANCE",
+        table_name="advances", record_id=emp.id,
+        ip_address=ip, device_info=device,
+        detail_message=f"Avans berildi: {emp.full_name} — {body.amount:,} so'm",
+    )
+    db.commit()
+
+    yangi = employee_payroll_summary(db, employee_id)
+    return {
+        "message": f"{emp.full_name} ga {body.amount:,} so'm avans berildi",
+        "employee_name": emp.full_name,
+        "amount": body.amount,
+        "monthly_salary": yangi["base_salary"],
+        "advances_total": yangi["advances_total"],
+        "remaining": max(0, yangi["base_salary"] - yangi["advances_total"]),
+    }
+
+
 @router.get("/{employee_id}/salary-history")
 def salary_history(employee_id: int, db: Session = Depends(get_db), _: User = Depends(require_ceo)):
     logs = (
@@ -119,7 +186,7 @@ def get_payroll_summary(
     employee_id: int,
     month: str | None = Query(None, description="YYYY-MM"),
     db: Session = Depends(get_db),
-    _: User = Depends(require_ceo),
+    _: User = Depends(require_admin_or_ceo),
 ):
     if month:
         try:

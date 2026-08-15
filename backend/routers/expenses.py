@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel as _BaseModel, Field
@@ -41,11 +41,20 @@ def _expense_out(e: Expense) -> dict:
 def list_expenses(
     month: int | None = None,
     year: int | None = None,
+    # Sana oralig'i. Ilgari bu parametrlar qo'llab-quvvatlanmasdi va e'tiborsiz
+    # qoldirilardi — ya'ni davr tanlansa ham BARCHA harajatlar qaytardi.
+    from_date: date | None = Query(None, alias="from"),
+    to_date: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_or_ceo),
 ):
     q = db.query(Expense).filter(Expense.is_cancelled == False)
-    if year and month:
+    if from_date and to_date:
+        q = q.filter(
+            Expense.created_at >= datetime.combine(from_date, datetime.min.time()),
+            Expense.created_at <= datetime.combine(to_date, datetime.max.time()),
+        )
+    elif year and month:
         q = q.filter(
             extract("year", Expense.created_at) == year,
             extract("month", Expense.created_at) == month,
