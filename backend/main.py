@@ -5,13 +5,25 @@ import time as _time
 # Server UTC'da ishlaydi (Vercel), klinika esa Toshkentda (UTC+5). Shu sababli
 # barcha vaqtlar 5 soat orqada saqlanardi: chekdagi soat, hisobot kunlari va
 # navbat raqamining kunlik yangilanishi ham noto'g'ri edi.
-# DIQQAT: TZ faqat tzset() mavjud bo'lgan tizimlarda (Linux/macOS — Vercel
-# shu yerda ishlaydi) o'rnatiladi. Windows "Asia/Tashkent" yozuvini tushunmaydi
-# va TZ o'rnatilsa UTC'ga tushib qoladi — ya'ni lokal ishlab chiqishni buzadi.
-# Windows'da tizimning o'z mintaqasi ishlatiladi.
+# DIQQAT: TZ faqat tzset() mavjud bo'lgan tizimlarda (Linux — Vercel shu
+# yerda ishlaydi) o'rnatiladi. Windows "Asia/Tashkent" yozuvini tushunmaydi
+# va TZ o'rnatilsa UTC'ga tushib qoladi — ya'ni lokal muhitni buzadi.
 if hasattr(_time, "tzset"):
-    _os.environ.setdefault("TZ", "Asia/Tashkent")
+    import datetime as _dt
+
+    def _tz_ok() -> bool:
+        """Mintaqa haqiqatan qo'llanganini tekshiradi (Toshkent UTC+5)."""
+        utc = _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None)
+        return round((_dt.datetime.now() - utc).total_seconds() / 3600) == 5
+
+    _os.environ["TZ"] = "Asia/Tashkent"
     _time.tzset()
+    if not _tz_ok():
+        # Konteynerda tzdata fayllari bo'lmasa IANA nomi tanilmaydi. POSIX
+        # ko'rinishi hech qanday qo'shimcha fayl talab qilmaydi (O'zbekistonda
+        # yozgi vaqt yo'q, shuning uchun qat'iy +5 to'g'ri).
+        _os.environ["TZ"] = "UZT-5"
+        _time.tzset()
 
 import logging
 from contextlib import asynccontextmanager
