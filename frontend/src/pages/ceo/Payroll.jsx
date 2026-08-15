@@ -452,46 +452,55 @@ export default function Payroll() {
                   <tr className="border-b border-gold/20 text-left text-gold print:text-slate-900">
                     <th className="p-3">F.I.Sh</th>
                     <th className="p-3">Lavozimi / Xona</th>
-                    <th className="p-3">Stavka / Oylik Turi</th>
+                    <th className="p-3">Stavka / Turi</th>
                     <th className="p-3">Mijozlar Soni</th>
                     <th className="p-3">Jami Tushum</th>
-                    <th className="p-3">Hisoblangan Maosh</th>
+                    <th className="p-3">Fiksa Maosh</th>
+                    <th className="p-3">KPI / Ulush (%)</th>
+                    <th className="p-3">Jami Ishlangan (=)</th>
                     <th className="p-3">Avans (-)</th>
                     <th className="p-3 text-right">Qo'lga Tegadigan Maosh (=)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={8} className="p-4 text-center text-muted text-xs">Yuklanmoqda...</td></tr>
+                    <tr><td colSpan={10} className="p-4 text-center text-muted text-xs">Yuklanmoqda...</td></tr>
                   ) : activeRows.length === 0 ? (
-                    <tr><td colSpan={8} className="p-4 text-center text-muted text-xs italic">Ushbu oyda xodimlar topilmadi</td></tr>
+                    <tr><td colSpan={10} className="p-4 text-center text-muted text-xs italic">Ushbu oyda xodimlar topilmadi</td></tr>
                   ) : (
-                    activeRows.map((r) => (
-                      <tr key={r.id} className="border-b border-border/40 hover:bg-surface-2/20 text-xs">
-                        <td className="p-3 font-bold text-foreground print:text-slate-900">{r.name}</td>
-                        <td className="p-3 text-muted print:text-slate-700">{r.role} ({r.cabinet || '—'})</td>
-                        <td className="p-3">
-                          {r.fixed_salary > 0 && r.percent > 0 ? (
-                            <span className="badge badge-gold font-mono text-[10px]">{formatMoney(r.fixed_salary)} + {r.percent}% KPI</span>
-                          ) : r.fixed_salary > 0 ? (
-                            <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[10px] font-bold">{formatMoney(r.fixed_salary)} (Oylik)</span>
-                          ) : r.percent > 0 ? (
-                            <span className="badge badge-gold font-mono text-[10px]">{r.percent}% (KPI)</span>
-                          ) : (
-                            <span className="text-muted text-[11px] italic">—</span>
-                          )}
-                        </td>
-                        <td className="p-3 font-bold text-cyan-400 print:text-slate-900">{r.patients_count} ta</td>
-                        <td className="p-3 font-mono text-muted print:text-slate-700">{formatMoney(r.total_income)}</td>
-                        <td className="p-3 font-mono font-bold text-body print:text-slate-900">{formatMoney(r.doctor_share)}</td>
-                        <td className="p-3 font-mono text-rose-400 print:text-red-600 font-bold">
-                          {r.advances > 0 ? `-${formatMoney(r.advances)}` : '0'}
-                        </td>
-                        <td className="p-3 text-right font-mono text-base font-black text-gold print:text-slate-900">
-                          {formatMoney(r.net_salary)}
-                        </td>
-                      </tr>
-                    ))
+                    activeRows.map((r) => {
+                      const fixedSalary = r.fixed_salary || 0
+                      const kpiEarned = r.kpi_earned ?? ((r.doctor_share || 0) - fixedSalary)
+                      const totalEarned = r.doctor_share || (fixedSalary + Math.max(0, kpiEarned))
+                      return (
+                        <tr key={r.id} className="border-b border-border/40 hover:bg-surface-2/20 text-xs">
+                          <td className="p-3 font-bold text-foreground print:text-slate-900">{r.name}</td>
+                          <td className="p-3 text-muted print:text-slate-700">{r.role} ({r.cabinet || '—'})</td>
+                          <td className="p-3">
+                            {r.fixed_salary > 0 && r.percent > 0 ? (
+                              <span className="badge badge-gold font-mono text-[10px]">{formatMoney(r.fixed_salary)} + {r.percent}% KPI</span>
+                            ) : r.fixed_salary > 0 ? (
+                              <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[10px] font-bold">{formatMoney(r.fixed_salary)} (Oylik)</span>
+                            ) : r.percent > 0 ? (
+                              <span className="badge badge-gold font-mono text-[10px]">{r.percent}% (KPI)</span>
+                            ) : (
+                              <span className="text-muted text-[11px] italic">—</span>
+                            )}
+                          </td>
+                          <td className="p-3 font-bold text-cyan-400 print:text-slate-900">{r.patients_count} ta</td>
+                          <td className="p-3 font-mono text-muted print:text-slate-700">{formatMoney(r.total_income)}</td>
+                          <td className="p-3 font-mono text-blue-300 font-bold">{fixedSalary > 0 ? formatMoney(fixedSalary) : '—'}</td>
+                          <td className="p-3 font-mono text-cyan font-bold">{kpiEarned > 0 ? formatMoney(kpiEarned) : '—'}</td>
+                          <td className="p-3 font-mono font-bold text-gold print:text-slate-900">{formatMoney(totalEarned)}</td>
+                          <td className="p-3 font-mono text-rose-400 print:text-red-600 font-bold">
+                            {r.advances > 0 ? `-${formatMoney(r.advances)}` : '0'}
+                          </td>
+                          <td className="p-3 text-right font-mono text-base font-black text-emerald font-black print:text-slate-900">
+                            {formatMoney(r.net_salary)}
+                          </td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>

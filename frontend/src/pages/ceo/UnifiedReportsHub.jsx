@@ -1254,20 +1254,27 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
         {!isCollapsed && (
           <div className="overflow-x-auto animate-fadeIn">
             <table className="w-full text-xs">
-              <THead cols={['#', 'Xodim / Shifokor F.I.Sh', 'Lavozimi / Xona', 'Mijozlar', 'Jami Tushum', 'Ishlangan Ulush', 'Avanslar (-)', 'Qo\'lga Tegadigan Maosh (=)']} />
+              <THead cols={['#', 'Xodim / Shifokor F.I.Sh', 'Lavozimi / Xona', 'Mijozlar', 'Jami Tushum', 'Fiksa Maosh', 'KPI / Ulush (%)', 'Jami Ishlangan (=)', 'Avanslar (-)', 'Qo\'lga Tegadigan Maosh (=)']} />
               <tbody className="divide-y divide-border">
-                {[...(payrollData?.doctors || []), ...(payrollData?.staff || [])].map((d, i) => (
-                  <tr key={i} className="hover:bg-surface-hover font-semibold">
-                    <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
-                    <td className="p-2.5 text-body font-bold">{d.name}</td>
-                    <td className="p-2.5 text-muted">{d.role} ({d.cabinet || '—'})</td>
-                    <td className="p-2.5 text-center font-mono font-bold text-cyan">{d.patients_count || 0} nafar</td>
-                    <td className="p-2.5 text-right font-mono text-muted">{formatMoney(d.total_income || 0)}</td>
-                    <td className="p-2.5 text-right font-mono text-gold font-bold">{formatMoney(d.doctor_share || 0)}</td>
-                    <td className="p-2.5 text-right font-mono text-rose-400">{d.advances > 0 ? `-${formatMoney(d.advances)}` : '0'}</td>
-                    <td className="p-2.5 text-right font-mono text-emerald font-black text-sm">{formatMoney(d.net_salary || 0)}</td>
-                  </tr>
-                ))}
+                {[...(payrollData?.doctors || []), ...(payrollData?.staff || [])].map((d, i) => {
+                  const fixedSalary = d.fixed_salary || 0
+                  const kpiEarned = d.kpi_earned ?? ((d.doctor_share || 0) - fixedSalary)
+                  const totalEarned = d.doctor_share || (fixedSalary + Math.max(0, kpiEarned))
+                  return (
+                    <tr key={i} className="hover:bg-surface-hover font-semibold">
+                      <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
+                      <td className="p-2.5 text-body font-bold">{d.name}</td>
+                      <td className="p-2.5 text-muted">{d.role} ({d.cabinet || '—'})</td>
+                      <td className="p-2.5 text-center font-mono font-bold text-cyan">{d.patients_count || 0} nafar</td>
+                      <td className="p-2.5 text-right font-mono text-muted">{formatMoney(d.total_income || 0)}</td>
+                      <td className="p-2.5 text-right font-mono text-blue-300 font-bold">{fixedSalary > 0 ? formatMoney(fixedSalary) : '—'}</td>
+                      <td className="p-2.5 text-right font-mono text-cyan font-bold">{kpiEarned > 0 ? formatMoney(kpiEarned) : '—'}</td>
+                      <td className="p-2.5 text-right font-mono text-gold font-black">{formatMoney(totalEarned)}</td>
+                      <td className="p-2.5 text-right font-mono text-rose-400">{d.advances > 0 ? `-${formatMoney(d.advances)}` : '0'}</td>
+                      <td className="p-2.5 text-right font-mono text-emerald font-black text-sm">{formatMoney(d.net_salary || 0)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

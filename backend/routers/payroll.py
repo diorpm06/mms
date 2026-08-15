@@ -60,7 +60,7 @@ def get_monthly_payroll(
 
         # Calculate doctor share (fixed base salary + percentage of revenue)
         base_fixed = getattr(p, 'fixed_salary', 0) or 0
-        doctor_share = base_fixed
+        kpi_earned = 0
 
         for pt in patients:
             price = pt.payment_amount
@@ -80,7 +80,9 @@ def get_monthly_payroll(
                 ref_doc_split_pct=ref_doc_split_pct if pt.referrer_id else None,
                 ref_doc_split_sum=ref_doc_split_sum if pt.referrer_id else 0,
             )
-            doctor_share += prov_amt
+            kpi_earned += prov_amt
+
+        doctor_share = base_fixed + kpi_earned
 
         # Advances for doctor (matching name if employee entry exists)
         advances = 0
@@ -109,6 +111,7 @@ def get_monthly_payroll(
             "cabinet": getattr(p, 'specialization', 'Shifokor'),
             "percent": getattr(p, 'percentage', 0) or 0,
             "fixed_salary": base_fixed,
+            "kpi_earned": kpi_earned,
             "patients_count": total_patients,
             "total_income": total_income,
             "doctor_share": doctor_share,
@@ -147,6 +150,8 @@ def get_monthly_payroll(
             "role": e.position or "Xodim",
             "cabinet": "—",
             "percent": 0,
+            "fixed_salary": base_salary,
+            "kpi_earned": 0,
             "patients_count": 0,
             "total_income": 0,
             "doctor_share": base_salary,
