@@ -16,7 +16,7 @@ from models.transaction import Transaction
 from models.user import User
 from schemas import PatientCreate
 from services.audit import get_client_info, log_audit
-from services.finance import cancel_patient_payment, process_payment
+from services.finance import cancel_patient_payment, process_payment, reprice_patient_payment
 from services.reports_data import daily_report
 from services.sheets import add_patient_to_sheets
 from services.sheets_backup import push_row_to_backup_url
@@ -642,7 +642,7 @@ def update_patient(
     data: PatientUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(require_ceo),
+    user: User = Depends(require_admin_or_ceo),
 ):
     p = db.query(Patient).filter(Patient.id == patient_id).first()
     if not p:
@@ -654,6 +654,20 @@ def update_patient(
     for k, v in updates.items():
         setattr(p, k, v)
     p.updated_at = datetime.now()
+
+    # Pulga ta'sir qiladigan maydon o'zgargan bo'lsa, taqsimotni qaytadan
+    # hisoblaymiz. Aks holda (masalan yo'naltiruvchi keyin qo'shilsa) uning
+    # ulushi hech qachon hisoblanmay qolardi.
+    money_fields = {"referrer_id", "provider_id", "service_id", "payment_amount", "payment_type"}
+    if money_fields & set(updates.keys()):
+        tx = (
+            db.query(Transaction)
+            .filter(Transaction.patient_id == p.id, Transaction.is_cancelled == False)
+            .first()
+        )
+        if tx:
+            reprice_patient_payment(db, p, tx)
+
     ip, device = get_client_info(request)
     log_audit(
         db, user_id=user.id, user_role=user.role, action_type="UPDATE",

@@ -21,7 +21,49 @@ export default function TodayPatients() {
   const [cancelPatient, setCancelPatient] = useState(null)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelling, setCancelling] = useState(false)
+  const [editPatient, setEditPatient] = useState(null)
+  const [editForm, setEditForm] = useState({ referrer_id: '', payment_type: '', reason: '' })
+  const [referrers, setReferrers] = useState([])
+  const [saving, setSaving] = useState(false)
   const toast = useToastStore((s) => s.add)
+
+  const openEdit = (p) => {
+    setEditPatient(p)
+    setEditForm({
+      referrer_id: p.referrer_id || '',
+      payment_type: p.payment_type || 'cash',
+      reason: '',
+    })
+    if (!referrers.length) api('/referrers').then(setReferrers).catch(() => {})
+  }
+
+  // Yo'naltiruvchi yoki to'lov turi xato kiritilgan bo'lsa tuzatish uchun.
+  // Backend pul taqsimotini avtomatik qayta hisoblaydi (yo'naltiruvchi
+  // ulushi, shifokor ulushi va kassa balansi to'g'rilanadi).
+  const handleSaveEdit = async () => {
+    if (editForm.reason.trim().length < 3) {
+      toast("O'zgartirish sababini yozing (kamida 3 harf)", 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      await api(`/patients/${editPatient.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          referrer_id: editForm.referrer_id ? Number(editForm.referrer_id) : null,
+          payment_type: editForm.payment_type,
+          reason: editForm.reason.trim(),
+        }),
+      })
+      toast("Saqlandi — pul taqsimoti qayta hisoblandi")
+      setEditPatient(null)
+      fetchPatients()
+    } catch (e) {
+      toast(e.message || 'Saqlashda xatolik', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   // Bemor to'lovdan keyin voz kechsa: yozuv o'chmaydi, "bekor qilingan"
   // holatiga o'tadi va pul (klinika, shifokor, yo'naltiruvchi ulushi)
@@ -418,6 +460,17 @@ export default function TodayPatients() {
                           Navbat
                         </Btn>
 
+                        {/* Xato kiritilgan yo'naltiruvchi / to'lov turini tuzatish */}
+                        <Btn
+                          variant="outline"
+                          size="xs"
+                          icon={Icons.edit}
+                          onClick={() => openEdit(p)}
+                          title="Yo'naltiruvchi yoki to'lov turini tuzatish"
+                        >
+                          Tahrir
+                        </Btn>
+
                         {/* Bekor */}
                         <Btn
                           variant="danger"
@@ -474,6 +527,77 @@ export default function TodayPatients() {
                 onClick={() => handleUpdateStatus(callingId, 'qabulda', cabinetInput)}
               >
                 Chaqirish
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* YOZUVNI TAHRIRLASH (yo'naltiruvchi / to'lov turi) */}
+      {editPatient && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div>
+              <h3 className="text-lg font-black text-gold">Yozuvni tuzatish</h3>
+              <p className="text-xs text-muted mt-1">
+                <strong className="text-body">{editPatient.first_name} {editPatient.last_name}</strong>
+                {' — '}{formatMoney(editPatient.payment_amount)} · {editPatient.ticket_number}
+              </p>
+            </div>
+
+            <div>
+              <label className="form-label font-bold">Yo'naltiruvchi</label>
+              <select
+                className="input-field text-sm"
+                value={editForm.referrer_id}
+                onChange={(e) => setEditForm({ ...editForm, referrer_id: e.target.value })}
+              >
+                <option value="">— Yo'naltiruvchi yo'q</option>
+                {referrers.map((r) => (
+                  <option key={r.id} value={r.id}>{r.full_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label font-bold">To'lov turi</label>
+              <select
+                className="input-field text-sm"
+                value={editForm.payment_type}
+                onChange={(e) => setEditForm({ ...editForm, payment_type: e.target.value })}
+              >
+                <option value="cash">💵 Naqd</option>
+                <option value="card">💳 Karta (terminal)</option>
+                <option value="click">📱 Click / Payme</option>
+                <option value="qr">🔳 QR Kod</option>
+                <option value="split">🔀 Aralash</option>
+                <option value="later">⏳ Keyinroq (nasiya)</option>
+              </select>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-2 border border-border text-[11px] text-muted">
+              Saqlanganda pul taqsimoti qayta hisoblanadi — yo'naltiruvchi va
+              shifokor ulushi hamda kassa balansi avtomatik to'g'rilanadi.
+            </div>
+
+            <div>
+              <label className="form-label font-bold">O'zgartirish sababi *</label>
+              <input
+                className="input-field text-sm"
+                placeholder="Masalan: yo'naltiruvchi qo'shilmay qolgan edi"
+                value={editForm.reason}
+                onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit() }}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Btn variant="ghost" full icon={Icons.x} onClick={() => setEditPatient(null)}>
+                Yopish
+              </Btn>
+              <Btn variant="gold" full icon={Icons.save} loading={saving} onClick={handleSaveEdit}>
+                Saqlash
               </Btn>
             </div>
           </div>

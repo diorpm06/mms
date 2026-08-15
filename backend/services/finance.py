@@ -98,6 +98,14 @@ def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None,
     ref_doc_split_pct = service.referrer_doctor_split_percent if service else None
     ref_doc_split_sum = service.referrer_doctor_split_sum if service else 0
 
+    # DIQQAT: yo'naltiruvchi ko'rsatilmagan bo'lsa komissiya umuman
+    # hisoblanmasligi kerak. Ilgari komissiya xizmat sozlamasidan olinib,
+    # yo'naltiruvchi yo'q bo'lsa ham klinika ulushidan ayirilardi va hech
+    # kimga berilmasdi — pul yo'qolib ketardi.
+    if not referrer:
+        ref_comm_pct = 0
+        ref_comm_sum = 0
+
     referrer_amount, provider_amount, center_amount = calculate_financial_split(
         total=total,
         provider_percentage=provider_pct,
@@ -144,6 +152,57 @@ def process_payment(db: Session, patient: Patient) -> Transaction:
         created_at=patient.created_at or datetime.now(),
     )
     db.add(tx)
+    return tx
+
+
+def reprice_patient_payment(db: Session, patient: Patient, tx: Transaction) -> Transaction:
+    """
+    Bemor yozuvi tahrirlangandan keyin pulni qaytadan taqsimlaydi.
+
+    Masalan yo'naltiruvchi keyinchalik qo'shilsa, uning ulushi hisoblanishi
+    va balanslar to'g'rilanishi kerak. Buning uchun avvalgi taqsimot
+    balanslardan ayiriladi, so'ng yangisi qo'shiladi.
+    """
+    # 1) Eski taqsimotni orqaga qaytaramiz
+    if tx.referrer_id:
+        old_ref = db.query(Referrer).filter(Referrer.id == tx.referrer_id).first()
+        if old_ref:
+            old_ref.balance = max(0, old_ref.balance - (tx.referrer_amount or 0))
+    if tx.provider_id:
+        old_prov = db.query(Provider).filter(Provider.id == tx.provider_id).first()
+        if old_prov:
+            old_prov.balance = max(0, old_prov.balance - (tx.provider_amount or 0))
+
+    bal = get_or_create_balance(db)
+    bal.current_balance = max(0, bal.current_balance - (tx.center_amount or 0))
+
+    # 2) Yangi taqsimotni hisoblaymiz
+    provider, referrer, referrer_amount, provider_amount, center_amount = _split_amounts(
+        patient.payment_amount, patient.referrer_id, patient.provider_id, db,
+        service_id=patient.service_id,
+    )
+    if referrer:
+        referrer.balance += referrer_amount
+    if provider:
+        provider.balance += provider_amount
+    bal.current_balance += center_amount
+    bal.updated_at = datetime.now()
+
+    # 3) Tranzaksiyani yangilaymiz
+    tx.total_amount = patient.payment_amount
+    tx.referrer_id = patient.referrer_id
+    tx.referrer_amount = referrer_amount
+    tx.provider_id = provider.id if provider else None
+    tx.provider_amount = provider_amount
+    tx.center_amount = center_amount
+    tx.payment_type = patient.payment_type
+    tx.cash_amount = patient.cash_amount or 0
+    tx.card_amount = patient.card_amount or 0
+
+    log_balance_change(
+        db, center_amount - (0), "correction",
+        f"Tahrirlandi: mijoz #{patient.id} {patient.first_name} {patient.last_name}",
+    )
     return tx
 
 
