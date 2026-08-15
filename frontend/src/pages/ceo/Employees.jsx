@@ -22,15 +22,19 @@ export default function CeoEmployees() {
   const [paySummary,   setPaySummary]   = useState(null)
   const [historyEmp,   setHistoryEmp]   = useState(null)
   const [history,      setHistory]      = useState([])
+  // Har bir xodimning shu oydagi avans holati (id -> {base_salary, advances_total, payable_salary})
+  const [payroll,      setPayroll]      = useState({})
   const [reminder,     setReminder]     = useState({ enabled: false, time: '09:00', day_of_month: 1, month: 0 })
   const toast = useToastStore((s) => s.add)
 
   const load = async () => {
-    const [emps, rem] = await Promise.all([
+    const [emps, rem, pr] = await Promise.all([
       api('/employees?include_inactive=true'),
-      api('/employees/salary-reminder/config')
+      api('/employees/salary-reminder/config'),
+      api('/employees/payroll-summaries').catch(() => ({})),
     ])
     setItems(emps)
+    setPayroll(pr || {})
     setReminder({
       enabled: !!rem.enabled,
       time: rem.time || '09:00',
@@ -272,11 +276,28 @@ export default function CeoEmployees() {
                       </div>
                     </div>
 
-                    <div className="bg-surface-2 p-3 rounded-xl border border-border/60 flex items-center justify-between">
+                    <div className="bg-surface-2 p-3 rounded-xl border border-border/60 space-y-2">
                       <div>
                         <span className="text-[10px] font-extrabold text-muted uppercase block">Belgilangan Oylik Maosh</span>
                         <span className="font-black text-emerald font-mono text-base">{formatMoney(e.monthly_salary)}</span>
                       </div>
+                      {/* Bu oyda avans olingan bo'lsa — qancha olgani va qancha qolgani */}
+                      {payroll[e.id]?.advances_total > 0 && (
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60">
+                          <div>
+                            <span className="text-[10px] font-extrabold text-muted uppercase block">Avans olgan</span>
+                            <span className="font-black text-amber-400 font-mono text-sm">
+                              −{formatMoney(payroll[e.id].advances_total)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-extrabold text-muted uppercase block">Qolgan</span>
+                            <span className="font-black text-gold font-mono text-sm">
+                              {formatMoney(payroll[e.id].payable_salary)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-2 flex items-center justify-between gap-1.5 flex-wrap">
@@ -344,7 +365,7 @@ export default function CeoEmployees() {
             /* ── TABLE VIEW FOR STAFF EMPLOYEES ── */
             <div className="card overflow-x-auto p-0 border-gold/20 shadow-lg">
               <table className="w-full text-xs">
-                <THead cols={['#', 'Xodim F.I.Sh', 'Lavozimi', 'Oylik Maosh', 'Status', 'Harakatlar']} />
+                <THead cols={['#', 'Xodim F.I.Sh', 'Lavozimi', 'Oylik Maosh', 'Avans olgan', 'Qolgan', 'Status', 'Harakatlar']} />
                 <tbody className="divide-y divide-border font-semibold">
                   {items.map((e, idx) => {
                     const isAct = e.is_active !== false
@@ -354,6 +375,12 @@ export default function CeoEmployees() {
                         <td className="p-3 font-extrabold text-body">{e.full_name}</td>
                         <td className="p-3 text-muted font-bold">{e.position}</td>
                         <td className="p-3 font-mono font-black text-emerald text-sm">{formatMoney(e.monthly_salary)}</td>
+                        <td className="p-3 font-mono font-bold text-amber-400 text-sm">
+                          {payroll[e.id]?.advances_total > 0 ? `−${formatMoney(payroll[e.id].advances_total)}` : '—'}
+                        </td>
+                        <td className="p-3 font-mono font-black text-gold text-sm">
+                          {payroll[e.id] ? formatMoney(payroll[e.id].payable_salary) : formatMoney(e.monthly_salary)}
+                        </td>
                         <td className="p-3">
                           {isAct ? (
                             <span className="badge badge-success text-[10px] font-bold">🟢 Faol</span>

@@ -84,6 +84,8 @@ def create_advance(
         is_settled=False,
     )
     db.add(advance)
+    from services.finance import process_advance
+    process_advance(db, data.amount, f"Avans: {name}" + (f" — {data.note}" if data.note else ""))
     db.commit()
     db.refresh(advance)
 

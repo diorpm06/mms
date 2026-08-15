@@ -169,6 +169,34 @@ def give_employee_advance(
     }
 
 
+@router.get("/payroll-summaries")
+def all_payroll_summaries(
+    month: str | None = Query(None, description="YYYY-MM"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """
+    Barcha faol xodimlarning oylik/avans holati — bitta so'rovda.
+    Rahbar panelida har bir xodim kartasida "oylik / olingan avans / qolgan"
+    ko'rinib turishi uchun (avval bu faqat «Maosh berish» oynasini
+    ochgandagina ko'rinardi).
+    """
+    if month:
+        try:
+            datetime.strptime(month, "%Y-%m")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="month formati noto'g'ri, YYYY-MM bo'lishi kerak") from e
+    out = {}
+    for emp in db.query(Employee).filter(Employee.is_active == True).all():
+        s = employee_payroll_summary(db, emp.id, month)
+        out[str(emp.id)] = {
+            "base_salary": s["base_salary"],
+            "advances_total": s["advances_total"],
+            "payable_salary": s["payable_salary"],
+        }
+    return out
+
+
 @router.get("/{employee_id}/salary-history")
 def salary_history(employee_id: int, db: Session = Depends(get_db), _: User = Depends(require_ceo)):
     logs = (

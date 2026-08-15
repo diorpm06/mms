@@ -32,39 +32,81 @@ export default function AdminExpenses() {
 
   useEffect(() => { loadToday() }, [])
 
-  // Xodim ro'yxati faqat kerak bo'lganda yuklanadi
+  // Xodimlar va Shifokorlar ro'yxati birga yuklanadi
   useEffect(() => {
     if (isStaffPayment && !employees.length) {
-      api('/employees?include_inactive=false').then(setEmployees).catch(() => {})
+      Promise.all([
+        api('/employees?include_inactive=false').catch(() => []),
+        api('/providers?active_only=true').catch(() => []),
+      ]).then(([empList, provList]) => {
+        const formattedProv = (provList || []).map((p) => ({
+          value: `prov_${p.id}`,
+          type: 'provider',
+          rawId: p.id,
+          label: `🩺 ${p.full_name} — Shifokor (${p.specialization || 'Umumiy'})`,
+        }))
+        const formattedEmp = (empList || []).map((e) => ({
+          value: `emp_${e.id}`,
+          type: 'employee',
+          rawId: e.id,
+          label: `👤 ${e.full_name} — ${e.position || 'Xodim'}`,
+        }))
+        setEmployees([...formattedProv, ...formattedEmp])
+      })
     }
     if (!isStaffPayment) { setEmployeeId(''); setEmpSummary(null) }
   }, [isStaffPayment])
 
-  // Tanlangan xodimning oylik/avans holati
+  // Tanlangan xodim/shifokorning oylik/avans holati
   useEffect(() => {
     if (!employeeId) { setEmpSummary(null); return }
-    api(`/employees/${employeeId}/payroll-summary`)
-      .then(setEmpSummary)
+    const [type, rawId] = employeeId.split('_')
+    const endpoint = type === 'prov' ? `/providers/${rawId}/payroll-summary` : `/employees/${rawId}/payroll-summary`
+    api(endpoint)
+      .then((res) => {
+        setEmpSummary({
+          base_salary: res.base_salary || res.monthly_salary || 0,
+          advances_total: res.advances_total || 0,
+          remaining: res.remaining ?? Math.max(0, (res.base_salary || 0) - (res.advances_total || 0)),
+        })
+      })
       .catch(() => setEmpSummary(null))
   }, [employeeId])
 
   const submit = async () => {
     const summa = parseInt(parseDigits(amount), 10) || 0
-    if (!summa) { toast('Summa kiriting', 'error'); return }
+    if (!summa && category !== 'Oylik') { toast('Summa kiriting', 'error'); return }
 
     if (isStaffPayment) {
-      if (!employeeId) { toast('Xodimni tanlang', 'error'); return }
+      if (!employeeId) { toast('Xodim yoki shifokorni tanlang', 'error'); return }
+      const [type, rawId] = employeeId.split('_')
       setLoading(true)
       try {
         if (category === 'Avans') {
-          const res = await api(`/employees/${employeeId}/advance`, {
-            method: 'POST',
-            body: JSON.stringify({ amount: summa, note: description || null }),
-          })
-          toast(`${res.employee_name}: avans ${formatMoney(res.amount)} — qolgan oylik ${formatMoney(res.remaining)}`)
+          if (type === 'prov') {
+            const res = await api('/advances', {
+              method: 'POST',
+              body: JSON.stringify({ recipient_type: 'provider', recipient_id: +rawId, amount: summa, note: description || null }),
+            })
+            toast(`Shifokor ${res.recipient_name}: avans ${formatMoney(res.amount)} berildi ✓`)
+          } else {
+            const res = await api(`/employees/${rawId}/advance`, {
+              method: 'POST',
+              body: JSON.stringify({ amount: summa, note: description || null }),
+            })
+            toast(`${res.employee_name}: avans ${formatMoney(res.amount)} — qolgan oylik ${formatMoney(res.remaining)}`)
+          }
         } else {
-          const res = await api(`/employees/${employeeId}/pay-salary`, { method: 'POST' })
-          toast(`Maosh to'landi: ${formatMoney(res.amount)}`)
+          if (type === 'prov') {
+            const res = await api(`/providers/${rawId}/payout`, {
+              method: 'POST',
+              body: JSON.stringify({ source }),
+            })
+            toast(`Shifokor maoshi to'landi: ${formatMoney(res.amount)} ✓`)
+          } else {
+            const res = await api(`/employees/${rawId}/pay-salary`, { method: 'POST' })
+            toast(`Maosh to'landi: ${formatMoney(res.amount)}`)
+          }
         }
         setDescription(''); setAmount(''); setEmployeeId(''); setCategory('')
         loadToday()
@@ -124,10 +166,10 @@ export default function AdminExpenses() {
               👤 {category} kim uchun?
             </span>
 
-            <select className="input-field" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
-              <option value="">— Xodimni tanlang</option>
+            <select className="input-field font-semibold" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+              <option value="">— Xodim yoki shifokorni tanlang —</option>
               {employees.map((e) => (
-                <option key={e.id} value={e.id}>{e.full_name} — {e.position}</option>
+                <option key={e.value} value={e.value}>{e.label}</option>
               ))}
             </select>
 

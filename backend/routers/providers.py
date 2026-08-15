@@ -179,3 +179,97 @@ def payout_provider(
     payout = payout_recipient_balance(db, "provider", provider_id, source=body.source)
     db.commit()
     return {"message": "Balans chiqarildi", "amount": payout.amount, "source": body.source}
+
+
+from datetime import date, datetime
+from sqlalchemy import func
+from models.patient import Patient
+from models.employee import Employee
+from models.advance import Advance
+from models.provider_advance import ProviderAdvance
+
+
+@router.get("/{provider_id}/payroll-summary")
+def get_provider_payroll_summary(
+    provider_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    today = date.today()
+    start_dt = datetime(today.year, today.month, 1)
+    if today.month == 12:
+        end_dt = datetime(today.year + 1, 1, 1)
+    else:
+        end_dt = datetime(today.year, today.month + 1, 1)
+
+    p = db.query(Provider).filter(Provider.id == provider_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Shifokor topilmadi")
+
+    patients = (
+        db.query(Patient)
+        .filter(
+            Patient.provider_id == p.id,
+            Patient.created_at >= start_dt,
+            Patient.created_at < end_dt,
+            Patient.is_cancelled == False,
+        )
+        .all()
+    )
+
+    base_fixed = getattr(p, 'fixed_salary', 0) or 0
+    kpi_earned = 0
+    from services.finance import calculate_financial_split
+    for pt in patients:
+        svc = pt.service
+        ref_comm_sum = svc.referrer_commission_sum if svc else 0
+        ref_comm_pct = (svc.referrer_commission_percent if (svc and svc.referrer_commission_percent) else 0) if pt.referrer_id else 0
+        ref_doc_split_pct = svc.referrer_doctor_split_percent if svc else None
+        ref_doc_split_sum = svc.referrer_doctor_split_sum if svc else 0
+
+        _, prov_amt, _ = calculate_financial_split(
+            total=pt.payment_amount or 0,
+            provider_percentage=p.percentage or 0,
+            referrer_percentage=ref_comm_pct,
+            referrer_commission_sum=ref_comm_sum,
+            ref_doc_split_pct=ref_doc_split_pct if pt.referrer_id else None,
+            ref_doc_split_sum=ref_doc_split_sum if pt.referrer_id else 0,
+        )
+        kpi_earned += prov_amt
+
+    doctor_share = base_fixed + kpi_earned
+
+    adv_sum = (
+        db.query(func.coalesce(func.sum(ProviderAdvance.amount), 0))
+        .filter(
+            ProviderAdvance.recipient_type == "provider",
+            ProviderAdvance.recipient_id == p.id,
+            ProviderAdvance.created_at >= start_dt,
+            ProviderAdvance.created_at < end_dt,
+        )
+        .scalar()
+    )
+    advances_total = int(adv_sum or 0)
+
+    emp = db.query(Employee).filter(Employee.full_name == p.full_name).first()
+    if emp:
+        adv_sum_emp = (
+            db.query(func.coalesce(func.sum(Advance.amount), 0))
+            .filter(
+                Advance.employee_id == emp.id,
+                Advance.created_at >= start_dt,
+                Advance.created_at < end_dt,
+                Advance.is_cancelled == False,
+            )
+            .scalar()
+        )
+        advances_total += int(adv_sum_emp or 0)
+
+    return {
+        "base_salary": doctor_share,
+        "fixed_salary": base_fixed,
+        "kpi_earned": kpi_earned,
+        "advances_total": advances_total,
+        "remaining": max(0, doctor_share - advances_total),
+    }
+
