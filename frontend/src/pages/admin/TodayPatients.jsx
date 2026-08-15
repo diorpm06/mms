@@ -196,9 +196,25 @@ export default function TodayPatients() {
                     <span className="text-[11px] text-muted font-mono">{p.phone}</span>
                   </td>
 
-                  {/* Xizmat & Shifokor */}
-                  <td className="td-cell whitespace-nowrap">
-                    <span className="font-bold block text-cyan">{p.service_name}</span>
+                  {/* Xizmat & Shifokor — bemor bir nechta xizmat olgan bo'lsa
+                      hammasi ko'rsatiladi (avval faqat bittasi ko'rinardi) */}
+                  <td className="td-cell">
+                    {(p.services || []).length > 1 ? (
+                      <div className="space-y-0.5">
+                        {p.services.map((s, i) => (
+                          <div key={i} className="flex items-baseline gap-1.5">
+                            <span className="font-bold text-cyan text-xs">
+                              {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+                            </span>
+                            <span className="text-[10px] text-muted font-mono">{formatMoney(s.total_price)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="font-bold block text-cyan">
+                        {p.services?.[0]?.service_name || p.service_name}
+                      </span>
+                    )}
                     <span className="text-[11px] text-muted font-medium">{p.provider_name || '—'}</span>
                   </td>
 
@@ -206,6 +222,16 @@ export default function TodayPatients() {
                   <td className="td-cell whitespace-nowrap">
                     <span className="accent-value font-mono font-black text-emerald">{formatMoney(p.payment_amount)}</span>
                     <span className="badge badge-gold ml-1.5 text-[10px] uppercase font-bold">{paymentLabel(p.payment_type)}</span>
+                    {p.discount_amount > 0 && (
+                      <span className="block text-[10px] text-amber font-bold mt-0.5">
+                        🏷️ chegirma −{formatMoney(p.discount_amount)}
+                      </span>
+                    )}
+                    {(p.services || []).length > 1 && (
+                      <span className="block text-[10px] text-muted mt-0.5">
+                        {p.services.length} ta xizmat
+                      </span>
+                    )}
                   </td>
 
                   {/* Kabinet */}

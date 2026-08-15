@@ -39,3 +39,7 @@ class Patient(CancelMixin, TimestampMixin, Base):
     provider = relationship("Provider")
     service = relationship("Service")
     creator = relationship("User", foreign_keys=[created_by])
+    # Bemor olgan barcha xizmatlar (service_id faqat asosiysini saqlaydi)
+    services_detail = relationship(
+        "PatientService", cascade="all, delete-orphan", lazy="selectin"
+    )

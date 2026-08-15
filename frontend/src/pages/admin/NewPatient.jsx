@@ -349,6 +349,27 @@ export default function NewPatient({ homePath = '/admin' }) {
     }
 
     // Validate split payment
+    // Katta chegirmadan ogohlantirish. Ilgari tizim jim qabul qilardi va
+    // xizmat narxi chegirma maydoniga xato kiritilsa bemor 0 so'm to'lab
+    // ketardi (hisobotlarda "to'lov miqdori g'alati" bo'lib ko'rinardi).
+    if (computedDiscount > 0 && totalBasePrice > 0) {
+      const pct = Math.round((computedDiscount / totalBasePrice) * 100)
+      if (finalPrice <= 0) {
+        if (!window.confirm(
+          `DIQQAT: chegirma butun summani qopladi.\n\n` +
+          `Xizmatlar: ${formatMoney(totalBasePrice)}\n` +
+          `Chegirma: -${formatMoney(computedDiscount)} (${pct}%)\n` +
+          `To'lanadigan: 0 so'm\n\n` +
+          `Bemor bepul qabul qilinsinmi?`
+        )) return
+      } else if (pct >= 50) {
+        if (!window.confirm(
+          `Chegirma juda katta: ${pct}% (-${formatMoney(computedDiscount)}).\n` +
+          `To'lanadigan summa: ${formatMoney(finalPrice)}\n\nDavom etasizmi?`
+        )) return
+      }
+    }
+
     let cashAmt = Number(form.cash_amount) || 0
     let cardAmt = Number(form.card_amount) || 0
 
@@ -458,23 +479,39 @@ export default function NewPatient({ homePath = '/admin' }) {
       return
     }
 
-    // Strelkalar — bir guruh ichidagi tugmalar orasida yurish
-    if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-      // Matn maydonida strelka o'z vazifasini bajarsin (kursor siljishi)
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+    const isArrow = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)
+    if (!isArrow) return
 
-      const group = el.closest('[data-kbd-group]')
-      const scope = group || formRef.current
-      const buttons = Array.from(scope.querySelectorAll('button:not([disabled])'))
-        .filter((b) => b.offsetParent !== null)
-      const i = buttons.indexOf(el)
-      if (i === -1) return
+    // SELECT: strelkalar qiymatni o'zgartiradi — tegmaymiz
+    if (tag === 'SELECT') return
 
+    // Matn maydoni: ↑/↓ keyingi-oldingi maydonga o'tadi,
+    // ←/→ esa kursorni siljitish uchun o'z holicha qoladi
+    if (tag === 'INPUT' || tag === 'TEXTAREA') {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return
       e.preventDefault()
-      const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight'
-      const next = buttons[fwd ? i + 1 : i - 1]
-      if (next) next.focus()
+      const items = getFocusables().filter(
+        (x) => x.tagName === 'INPUT' || x.tagName === 'SELECT' || x.tagName === 'TEXTAREA'
+      )
+      const i = items.indexOf(el)
+      if (i === -1) return
+      const next = items[e.key === 'ArrowDown' ? i + 1 : i - 1]
+      if (next) { next.focus(); next.select?.() }
+      return
     }
+
+    // Tugmalar: guruh ichida yurish (xizmatlar, to'lov turi)
+    const group = el.closest('[data-kbd-group]')
+    const scope = group || formRef.current
+    const buttons = Array.from(scope.querySelectorAll('button:not([disabled])'))
+      .filter((b) => b.offsetParent !== null)
+    const i = buttons.indexOf(el)
+    if (i === -1) return
+
+    e.preventDefault()
+    const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight'
+    const next = buttons[fwd ? i + 1 : i - 1]
+    if (next) next.focus()
   }
 
   const handleCloseReceipt = () => {
@@ -495,7 +532,8 @@ export default function NewPatient({ homePath = '/admin' }) {
       <div className="mb-3 text-[11px] text-muted flex flex-wrap items-center gap-x-4 gap-y-1">
         <span className="font-bold text-gold">⌨️ Klaviatura:</span>
         <span><kbd className="kbd">Enter</kbd> keyingi maydon</span>
-        <span><kbd className="kbd">↑</kbd><kbd className="kbd">↓</kbd><kbd className="kbd">←</kbd><kbd className="kbd">→</kbd> tanlash</span>
+        <span><kbd className="kbd">↑</kbd><kbd className="kbd">↓</kbd> maydonlar orasida</span>
+        <span><kbd className="kbd">←</kbd><kbd className="kbd">→</kbd> tugmalar orasida</span>
         <span><kbd className="kbd">Space</kbd> belgilash</span>
         <span><kbd className="kbd">Ctrl</kbd>+<kbd className="kbd">Enter</kbd> saqlash</span>
       </div>

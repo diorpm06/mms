@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
 from database import get_db
 from models.patient import Patient
+from models.patient_service import PatientService
 from models.provider import Provider
 from models.referrer import Referrer
 from models.service import Service
@@ -120,6 +121,19 @@ def _patient_row(p: Patient) -> dict:
         "service_category": p.service.category if p.service else "Umumiy",
         "category": p.service.category if p.service else "Umumiy",
         "creator_name": p.creator.full_name if p.creator else None,
+        # Bemor olgan BARCHA xizmatlar. service_name faqat asosiy (birinchi)
+        # xizmatni ko'rsatadi — ro'yxatlarda hammasi ko'rinishi uchun shu kerak.
+        "services": [
+            {
+                "service_id": ps.service_id,
+                "service_name": ps.service.name if ps.service else None,
+                "category": ps.service.category if ps.service else "Umumiy",
+                "quantity": ps.quantity,
+                "unit_price": ps.unit_price,
+                "total_price": ps.total_price,
+            }
+            for ps in (p.services_detail or [])
+        ],
     }
 
 
@@ -526,18 +540,42 @@ async def create_patient(
             detail_message=f"Yangi mijoz qo'shildi: {patient.last_name} {patient.first_name}",
         )
         sub_items = []
+        services_detail = []
         for it in group_items:
             s_obj = db.query(Service).filter(Service.id == it["service_id"]).first()
             if s_obj:
+                qty = it.get("quantity", 1)
+                unit = it.get("unit_price") or (it["price"] // max(qty, 1))
                 sub_items.append({
                     "service_name": s_obj.name,
                     "category": s_obj.category or "Umumiy",
                     "price": it["price"],
-                    "quantity": it.get("quantity", 1),
+                    "quantity": qty,
                 })
-        
+                services_detail.append({
+                    "service_id": s_obj.id,
+                    "service_name": s_obj.name,
+                    "category": s_obj.category or "Umumiy",
+                    "quantity": qty,
+                    "unit_price": unit,
+                    "total_price": it["price"],
+                })
+                # Har bir xizmatni alohida saqlaymiz. Ilgari faqat guruhning
+                # birinchi xizmati (patients.service_id) qolib, qolganlari
+                # yo'qolib ketardi.
+                db.add(PatientService(
+                    patient_id=patient.id,
+                    service_id=it["service_id"],
+                    quantity=qty,
+                    unit_price=unit,
+                    total_price=it["price"],
+                ))
+
         row_dict = _patient_row(patient)
         row_dict["sub_items"] = sub_items
+        # Yozuvlar hali flush qilinmagani uchun bog'lanish bo'sh qaytadi —
+        # javobga shu yerda to'g'ridan-to'g'ri qo'yamiz.
+        row_dict["services"] = services_detail
         created_patients.append(row_dict)
 
     db.commit()
