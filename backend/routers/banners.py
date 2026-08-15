@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import uuid
@@ -25,10 +26,38 @@ class BannerCreate(BaseModel):
     image_url: str
 
 
+def _row(b: Banner) -> dict:
+    """image_data javobga qo'shilmaydi (og'ir) — o'rniga havola beriladi."""
+    return {
+        "id": b.id,
+        "title": b.title,
+        "image_url": f"/api/banners/{b.id}/image" if b.image_data else b.image_url,
+        # Yangi havolada fayl kengaytmasi yo'q, shuning uchun TV ekran video
+        # ekanini shu maydon orqali aniqlaydi (aks holda video <img> ga tushib
+        # qolardi).
+        "content_type": b.content_type,
+        "created_at": b.created_at.isoformat() if b.created_at else None,
+    }
+
+
 @router.get("")
 def get_banners(db: Session = Depends(get_db)):
     """TV ekrani uchun barcha faol banner reklamalar ro'yxatini olish."""
-    return db.query(Banner).order_by(Banner.created_at.desc()).all()
+    rows = db.query(Banner).order_by(Banner.created_at.desc()).all()
+    return [_row(b) for b in rows]
+
+
+@router.get("/{banner_id}/image")
+def get_banner_image(banner_id: int, db: Session = Depends(get_db)):
+    """Rasmni bazadan uzatadi. TV ekrani ochiq bo'lgani uchun autentifikatsiyasiz."""
+    b = db.query(Banner).filter(Banner.id == banner_id).first()
+    if not b or not b.image_data:
+        raise HTTPException(status_code=404, detail="Rasm topilmadi")
+    return Response(
+        content=b.image_data,
+        media_type=b.content_type or "image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.post("")
@@ -52,21 +81,25 @@ async def upload_banner_file(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ceo),
 ):
-    """Admin panel orqali rasm faylini yuklash."""
-    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    filename = f"banner_{uuid.uuid4().hex[:10]}.{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
-
+    """Admin panel orqali rasm faylini yuklash — rasm bazaga saqlanadi."""
     content = await file.read()
-    with open(filepath, "wb") as f:
-        f.write(content)
+    if not content:
+        raise HTTPException(status_code=400, detail="Fayl bo'sh")
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Rasm hajmi 5 MB dan oshmasligi kerak")
 
-    image_url = f"/uploads/{filename}"
-    banner = Banner(title=title or file.filename, image_url=image_url)
+    banner = Banner(
+        title=title or file.filename,
+        image_url="",  # quyida haqiqiy havola bilan almashtiriladi
+        image_data=content,
+        content_type=file.content_type or "image/jpeg",
+    )
     db.add(banner)
+    db.flush()
+    banner.image_url = f"/api/banners/{banner.id}/image"
     db.commit()
     db.refresh(banner)
-    return banner
+    return _row(banner)
 
 
 @router.delete("/{banner_id}")

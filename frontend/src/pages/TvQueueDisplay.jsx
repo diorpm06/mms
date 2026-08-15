@@ -775,9 +775,14 @@ export default function TvQueueDisplay() {
             {/* Custom Uploaded Banner Image/Video Slider OR Default Promo Banner */}
             {banners.length > 0 ? (
               (() => {
-                const rawUrl = banners[currentSlideIndex % banners.length].image_url || ''
+                const banner = banners[currentSlideIndex % banners.length]
+                const rawUrl = banner.image_url || ''
                 const bannerUrl = rawUrl.startsWith('http') ? rawUrl : (rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`)
-                const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(bannerUrl)
+                // Bazadan uzatilgan havolada kengaytma yo'q, shuning uchun avval
+                // content_type ga qaraymiz, keyin havola kengaytmasiga.
+                const isVideo = banner.content_type
+                  ? banner.content_type.startsWith('video/')
+                  : /\.(mp4|webm|ogg|mov)$/i.test(bannerUrl)
 
                 return (
                   <div key={slideAnimKey} className="w-full h-full absolute inset-0 transition-all duration-700 animate-in slide-in-from-right duration-500">

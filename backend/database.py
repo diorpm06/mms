@@ -146,6 +146,21 @@ def run_migrations():
         except Exception as e:
             logger.warning(f"users auth-security migration warning: {e}")
 
+    # banners.image_data / content_type — rasm baza ichida saqlanadi
+    for stmt in (
+        "ALTER TABLE banners ADD COLUMN image_data BYTEA",
+        "ALTER TABLE banners ADD COLUMN content_type VARCHAR(100)",
+    ):
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"banners image migration warning: {e}")
+
     # Ko'p so'raladigan ustunlarga indeks — SQLite va PostgreSQL'da bir xil sintaksis
     try:
         with engine.connect() as conn:
