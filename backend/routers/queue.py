@@ -109,12 +109,12 @@ def get_live_queue(db: Session = Depends(get_db)):
             joinedload(Patient.service),
         )
         .filter(
+            # Faqat BUGUNGI bemorlar. Ilgari "kutmoqda"/"qabulda" holati sana
+            # cheklovisiz OR bilan tekshirilardi — natijada yakunlanmagan eski
+            # bemorlar TV taxtasida kunlar davomida osilib qolardi.
             Patient.is_cancelled == False,
-            or_(
-                Patient.queue_status.in_(["qabulda", "kutmoqda"]),
-                Patient.created_at >= start,
-                Patient.updated_at >= start,
-            )
+            Patient.created_at >= start,
+            Patient.created_at <= end,
         )
         .all()
     )
