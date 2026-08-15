@@ -58,3 +58,6 @@ shablonlar/
 
 # Chop etish agenti — haqiqiy sozlama (agent_token bor), .example versiyasi qoladi
 print-agent/config.ini
+
+# Vaqtinchalik hisobot ma'lumotlari (bemor ismlari bor)
+kunlik.json
