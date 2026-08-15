@@ -115,30 +115,48 @@ def get_report(db: Session, start: date, end: date) -> dict:
             seen_keys.add(key)
             new_count += 1
 
+    cash = 0
+    card = 0
+    click = 0
+    qr = 0
     if txs:
         total_income = sum(t.total_amount for t in txs)
-        from services.finance import CARD_TYPES, CASH_TYPES
-        cash = sum(
-            (t.cash_amount if t.cash_amount else (t.total_amount if t.payment_type in CASH_TYPES else 0))
-            for t in txs
-        )
-        card = sum(
-            (t.card_amount if t.card_amount else (t.total_amount if t.payment_type in CARD_TYPES else 0))
-            for t in txs
-        )
+        for t in txs:
+            ptype = (t.payment_type or "").lower()
+            if ptype in ("cash", "naqd"):
+                cash += (t.cash_amount if t.cash_amount else t.total_amount)
+            elif ptype in ("card", "karta", "terminal"):
+                card += (t.card_amount if t.card_amount else t.total_amount)
+            elif ptype in ("click", "payme"):
+                click += t.total_amount
+            elif ptype == "qr":
+                qr += t.total_amount
+            elif ptype in ("split", "aralash"):
+                cash += (t.cash_amount or 0)
+                card += (t.card_amount or 0)
+            else:
+                card += t.total_amount
         referrer_share = sum(t.referrer_amount for t in txs)
         provider_share = sum(t.provider_amount for t in txs)
         center_share = sum(t.center_amount for t in txs)
     else:
         total_income = sum((p.payment_amount or 0) for p in all_patients)
-        cash = sum(
-            (p.payment_amount or 0) if (p.payment_type or "").lower() in ("cash", "naqd") else 0
-            for p in all_patients
-        )
-        card = sum(
-            (p.payment_amount or 0) if (p.payment_type or "").lower() in ("card", "karta", "click", "qr") else 0
-            for p in all_patients
-        )
+        for p in all_patients:
+            ptype = (p.payment_type or "").lower()
+            amt = int(p.payment_amount or 0)
+            if ptype in ("cash", "naqd"):
+                cash += (p.cash_amount if p.cash_amount else amt)
+            elif ptype in ("card", "karta", "terminal"):
+                card += (p.card_amount if p.card_amount else amt)
+            elif ptype in ("click", "payme"):
+                click += amt
+            elif ptype == "qr":
+                qr += amt
+            elif ptype in ("split", "aralash"):
+                cash += (p.cash_amount or 0)
+                card += (p.card_amount or 0)
+            else:
+                card += amt
         referrer_share = sum((getattr(p, "referrer_amount", 0) or 0) for p in all_patients)
         provider_share = sum((getattr(p, "provider_amount", 0) or 0) for p in all_patients)
         center_share = total_income - referrer_share - provider_share
@@ -149,6 +167,18 @@ def get_report(db: Session, start: date, end: date) -> dict:
         .all()
     )
     expense_total = sum(x.amount for x in expenses)
+    cash_expenses = 0
+    card_expenses = 0
+    for x in expenses:
+        desc = x.description or ""
+        if "[MANBA: Karta kassa]" in desc or "[MANBA: Bank hisob]" in desc or "[MANBA: Click]" in desc:
+            card_expenses += x.amount
+        else:
+            cash_expenses += x.amount
+
+    net_cash = max(0, cash - cash_expenses)
+    net_card = max(0, (card + click + qr) - card_expenses)
+    net_total = max(0, total_income - expense_total)
 
     # Bitta so'rovda ikkalasi (advance + salary) — masofaviy bazaga har bir
     # alohida so'rov ~200ms ketadi, shuning uchun kombinatsiyalash muhim
@@ -457,7 +487,14 @@ def get_report(db: Session, start: date, end: date) -> dict:
         "total_income": int(total_income),
         "cash": int(cash),
         "card": int(card),
-        "referrer_share": int(referrer_share),
+        "click": int(click),
+        "qr": int(qr),
+        "expenses": int(expense_total),
+        "cash_expenses": int(cash_expenses),
+        "card_expenses": int(card_expenses),
+        "net_cash": int(net_cash),
+        "net_card": int(net_card),
+        "net_total": int(net_total),
         "provider_share": int(provider_share),
         "center_share": int(center_share),
         "expenses": int(expense_total),
@@ -516,7 +553,14 @@ def admin_daily_report(db: Session, d: date) -> dict:
         "total_income": full["total_income"],
         "cash": full["cash"],
         "card": full["card"],
+        "click": full.get("click", 0),
+        "qr": full.get("qr", 0),
         "expenses": full["expenses"],
+        "cash_expenses": full.get("cash_expenses", 0),
+        "card_expenses": full.get("card_expenses", 0),
+        "net_cash": full.get("net_cash", 0),
+        "net_card": full.get("net_card", 0),
+        "net_total": full.get("net_total", 0),
         "services_breakdown": full["services_breakdown"],
         "payment_chart": full["payment_chart"],
         "paper_entry_patients": full["paper_entry_patients"],
