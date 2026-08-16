@@ -68,7 +68,7 @@ export default function IncassationModal({ open, onClose }) {
   const variance = actual - expected
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto overscroll-contain">
       {/* ── PRINT-ONLY STYLES FOR POS THERMAL PRINTERS ── */}
       <style>{`
         @media print {

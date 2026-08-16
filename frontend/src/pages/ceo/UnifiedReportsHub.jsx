@@ -20,6 +20,7 @@ import Modal from '../../components/Modal'
 import { Btn, Icons, THead } from '../../components/UIKit'
 import CeoSavedReports from './SavedReports'
 import IncassationModal from '../../components/IncassationModal'
+import { BRAND } from '../../config/brand'
 
 const MONTH_NAMES = [
   'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
@@ -149,12 +150,24 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       setPayrollData(payRes)
       setInventoryData(invRes || [])
       setExpensesData(expRes || [])
-    } catch (e) {
-      toast(e.message || "Hisobotlar yuklanishida xatolik", 'error')
+    } catch (err) {
+      toast("Hisobot ma'lumotlarini yuklashda xatolik", 'error')
     } finally {
       setLoading(false)
     }
   }, [year, month, toast])
+
+  const handleDeleteExpense = async (ex) => {
+    if (!ex || !ex.id) return
+    if (!window.confirm(`"${ex.description || ex.note || 'Harajat'}" (${formatMoney(ex.amount)}) o'chirilsinmi?\nSumma balansga qaytariladi.`)) return
+    try {
+      await api(`/expenses/${ex.id}`, { method: 'DELETE' })
+      toast("Harajat o'chirildi va summa balansga qaytarildi ✓")
+      fetchWithDates(dateFrom, dateTo)
+    } catch (err) {
+      toast(err.message || "O'chirishda xatolik", 'error')
+    }
+  }
 
   useEffect(() => {
     fetchWithDates(dateFrom, dateTo)
@@ -388,7 +401,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       </tr>`
     }
 
-    const fullHtml = `<!DOCTYPE html><html><head><title>Hisobot — Marjona Med Service</title>
+    const fullHtml = `<!DOCTYPE html><html><head><title>Hisobot — ${BRAND.name}</title>
       <style>
         body { font-family: Segoe UI, Arial, sans-serif; padding: 25px; color: #0f172a; background: #fff; line-height: 1.5; font-size: 15px; }
         .header { text-align: center; border-bottom: 3px double #000; padding-bottom: 14px; margin-bottom: 22px; }
@@ -812,17 +825,27 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
         {!isCollapsed && (
           <div className="overflow-x-auto animate-fadeIn">
             <table className="w-full text-xs">
-              <THead cols={['#', 'Kategoriya', 'Izoh / Sabab', 'Summa', 'Sana']} />
+              <THead cols={['#', 'Kategoriya', 'Izoh / Sabab', 'Summa', 'Sana', 'Harakatlar']} />
               <tbody className="divide-y divide-border">
                 {expensesData.length === 0 ? (
-                  <tr><td colSpan={5} className="py-6 text-center text-muted italic">Ushbu davrda harajat kiritilmagan</td></tr>
+                  <tr><td colSpan={6} className="py-6 text-center text-muted italic">Ushbu davrda harajat kiritilmagan</td></tr>
                 ) : expensesData.map((ex, i) => (
                   <tr key={ex.id || i} className="hover:bg-surface-hover font-semibold">
                     <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
-                    <td className="p-2.5"><span className="badge badge-gold font-bold">{ex.category}</span></td>
-                    <td className="p-2.5 text-body font-bold">{ex.note || '—'}</td>
+                    <td className="p-2.5"><span className="badge badge-gold font-bold">{ex.category || 'Boshqa'}</span></td>
+                    <td className="p-2.5 text-body font-bold">{ex.description || ex.note || '—'}</td>
                     <td className="p-2.5 font-mono font-black text-rose-400">{formatMoney(ex.amount)}</td>
                     <td className="p-2.5 text-muted font-mono">{formatDate(ex.created_at)}</td>
+                    <td className="p-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteExpense(ex)}
+                        className="px-2 py-1 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1"
+                        title="O'chirish (balansga qaytarish)"
+                      >
+                        🗑️ O'chirish
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1007,7 +1030,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       })
     }
 
-    const fullHtml = `<!DOCTYPE html><html><head><title>Yo'naltiruvchilar Hisoboti — Marjona Med Service</title>
+    const fullHtml = `<!DOCTYPE html><html><head><title>Yo'naltiruvchilar Hisoboti — ${BRAND.name}</title>
       <style>
         body { font-family: Arial, Helvetica, sans-serif; padding: 15px; color: #0f172a; background: #fff; line-height: 1.35; font-size: 11.5px; }
         .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 14px; }
@@ -1163,34 +1186,36 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                                 <span>📋 {r.name} yuborgan bemorlar ro'yxati</span>
                                 <span>Jami ulush: {formatMoney(r.earned_commission)}</span>
                               </h4>
-                              <table className="w-full text-[11px] border border-border">
-                                <thead className="bg-surface-2 text-muted uppercase font-mono">
-                                  <tr>
-                                    <th className="p-1.5 border border-border text-center">#</th>
-                                    <th className="p-1.5 border border-border text-center">Sana va vaqt</th>
-                                    <th className="p-1.5 border border-border">Bemor F.I.Sh</th>
-                                    <th className="p-1.5 border border-border">Xizmat nomi</th>
-                                    <th className="p-1.5 border border-border text-right">Xizmat Narxi</th>
-                                    <th className="p-1.5 border border-border text-center">Belgilangan Ulush</th>
-                                    <th className="p-1.5 border border-border text-right">Hisoblangan Ulush</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                  {(!r.patients || r.patients.length === 0) ? (
-                                    <tr><td colSpan={7} className="p-2 text-center text-muted">Bemorlar topilmadi</td></tr>
-                                  ) : r.patients.map((p, pIdx) => (
-                                    <tr key={pIdx} className="hover:bg-white/5">
-                                      <td className="p-1.5 text-center font-mono text-muted">{pIdx + 1}</td>
-                                      <td className="p-1.5 text-center font-mono">{p.date || '—'}</td>
-                                      <td className="p-1.5 font-bold text-body">{p.patient_name}</td>
-                                      <td className="p-1.5 text-muted">{p.service_name}</td>
-                                      <td className="p-1.5 text-right font-mono font-bold">{formatMoney(p.payment_amount)}</td>
-                                      <td className="p-1.5 text-center font-mono font-bold text-gold">{p.rate_label || '10%'}</td>
-                                      <td className="p-1.5 text-right font-mono font-bold text-cyan">{formatMoney(p.referrer_fee)}</td>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-[11px] border border-border">
+                                  <thead className="bg-surface-2 text-muted uppercase font-mono">
+                                    <tr>
+                                      <th className="p-1.5 border border-border text-center">#</th>
+                                      <th className="p-1.5 border border-border text-center">Sana va vaqt</th>
+                                      <th className="p-1.5 border border-border">Bemor F.I.Sh</th>
+                                      <th className="p-1.5 border border-border">Xizmat nomi</th>
+                                      <th className="p-1.5 border border-border text-right">Xizmat Narxi</th>
+                                      <th className="p-1.5 border border-border text-center">Belgilangan Ulush</th>
+                                      <th className="p-1.5 border border-border text-right">Hisoblangan Ulush</th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody className="divide-y divide-border">
+                                    {(!r.patients || r.patients.length === 0) ? (
+                                      <tr><td colSpan={7} className="p-2 text-center text-muted">Bemorlar topilmadi</td></tr>
+                                    ) : r.patients.map((p, pIdx) => (
+                                      <tr key={pIdx} className="hover:bg-white/5">
+                                        <td className="p-1.5 text-center font-mono text-muted">{pIdx + 1}</td>
+                                        <td className="p-1.5 text-center font-mono">{p.date || '—'}</td>
+                                        <td className="p-1.5 font-bold text-body">{p.patient_name}</td>
+                                        <td className="p-1.5 text-muted">{p.service_name}</td>
+                                        <td className="p-1.5 text-right font-mono font-bold">{formatMoney(p.payment_amount)}</td>
+                                        <td className="p-1.5 text-center font-mono font-bold text-gold">{p.rate_label || '10%'}</td>
+                                        <td className="p-1.5 text-right font-mono font-bold text-cyan">{formatMoney(p.referrer_fee)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           </td>
                         </tr>

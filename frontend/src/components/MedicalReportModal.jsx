@@ -1,4 +1,5 @@
 import { Printer, X, FileText, Stethoscope } from 'lucide-react'
+import { BRAND } from '../config/brand'
 
 export default function MedicalReportModal({ patient, doctorName, specialization, onClose }) {
   if (!patient) return null
@@ -16,7 +17,7 @@ export default function MedicalReportModal({ patient, doctorName, specialization
   })
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto overscroll-contain">
       {/* ── PRINT-ONLY STYLES (A4 / Blank Print) ── */}
       <style>{`
         @media print {
@@ -50,7 +51,7 @@ export default function MedicalReportModal({ patient, doctorName, specialization
         {/* Modal Close Button */}
         <button
           onClick={onClose}
-          className="no-print absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+          className="no-print absolute top-4 right-4 p-2 rounded-xl text-slate-600 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
         >
           <X className="h-5 w-5" />
         </button>
@@ -73,7 +74,7 @@ export default function MedicalReportModal({ patient, doctorName, specialization
             <div>
               <h1 className="text-2xl font-black tracking-wide text-cyan-700 uppercase">MARJONA MED SERVICE</h1>
               <p className="text-xs text-slate-600 font-bold uppercase tracking-wider">Tibbiy Klinika va Diagnostika Markazi</p>
-              <p className="text-xs text-slate-500 mt-0.5">Manzil: Toshkent sh. | Tel: +998 90 123-45-67</p>
+              <p className="text-xs text-slate-700 mt-0.5">Manzil: Toshkent sh. | Tel: {BRAND.phone}</p>
             </div>
             <div className="text-right font-mono text-xs text-slate-500">
               <span className="block font-bold text-slate-800 text-sm">TIBBIY XULOSA № {patient.ticket_number || patient.id}</span>
@@ -84,14 +85,14 @@ export default function MedicalReportModal({ patient, doctorName, specialization
           {/* Patient & Doctor Banner */}
           <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
             <div>
-              <span className="text-slate-500 uppercase tracking-wider font-bold block text-[10px]">BEMOR MA'LUMOTLARI</span>
+              <span className="text-slate-700 uppercase tracking-wider font-bold block text-[10px]">BEMOR MA'LUMOTLARI</span>
               <p className="text-sm font-black text-slate-900 mt-0.5">{patient.first_name} {patient.last_name}</p>
               <p className="text-slate-600">📞 Tel: <strong>{patient.phone}</strong></p>
               {patient.birth_date && <p className="text-slate-600">📅 Tug'ilgan sana: <strong>{new Date(patient.birth_date).toLocaleDateString('uz-UZ')}</strong></p>}
             </div>
 
             <div>
-              <span className="text-slate-500 uppercase tracking-wider font-bold block text-[10px]">QABUL KILGAN SHIFOKOR</span>
+              <span className="text-slate-700 uppercase tracking-wider font-bold block text-[10px]">QABUL KILGAN SHIFOKOR</span>
               <p className="text-sm font-black text-cyan-800 mt-0.5">{doctorName || patient.provider_name || 'Shifokor'}</p>
               <p className="text-slate-600">🩺 Mutaxassislik: <strong>{specialization || 'Shifokor'}</strong></p>
               <p className="text-slate-600">📋 Xizmat turi: <strong>{patient.service_name || 'Umumiy ko\'rik'}</strong></p>
@@ -133,8 +134,8 @@ export default function MedicalReportModal({ patient, doctorName, specialization
           {/* Signatures & Stamp */}
           <div className="pt-8 flex justify-between items-end text-xs text-slate-700">
             <div>
-              <p className="font-bold">Marjona Med Servis Klinika Muhr O'rni:</p>
-              <div className="w-24 h-24 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400 mt-2">
+              <p className="font-bold">{BRAND.name} — Klinika Muhr O'rni:</p>
+              <div className="w-24 h-24 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-600 mt-2">
                 [ MUHR ]
               </div>
             </div>

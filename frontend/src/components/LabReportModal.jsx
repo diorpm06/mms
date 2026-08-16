@@ -15,7 +15,7 @@ export default function LabReportModal({ patientName, testName, category, result
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto overscroll-contain">
       {/* ── PRINT-ONLY STYLES ── */}
       <style>{`
         @media print {
@@ -49,7 +49,7 @@ export default function LabReportModal({ patientName, testName, category, result
         {/* Modal Close Button */}
         <button
           onClick={onClose}
-          className="no-print absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
+          className="no-print absolute top-4 right-4 p-2 rounded-xl text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
         >
           <X className="h-5 w-5" />
         </button>
@@ -71,11 +71,11 @@ export default function LabReportModal({ patientName, testName, category, result
           {/* Patient Banner */}
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs grid grid-cols-2 gap-3">
             <div>
-              <span className="text-slate-500 uppercase font-bold text-[10px]">BEMOR:</span>
+              <span className="text-slate-700 uppercase font-bold text-[10px]">BEMOR:</span>
               <p className="text-sm font-black text-slate-900 mt-0.5">{patientName || 'Bemor'}</p>
             </div>
             <div>
-              <span className="text-slate-500 uppercase font-bold text-[10px]">TAHLIL TURI:</span>
+              <span className="text-slate-700 uppercase font-bold text-[10px]">TAHLIL TURI:</span>
               <p className="text-sm font-bold text-cyan-800 mt-0.5">{testName} ({category})</p>
             </div>
           </div>
@@ -86,6 +86,7 @@ export default function LabReportModal({ patientName, testName, category, result
               🧪 TAHLIL NATIJALARI KO'RSATKICHLARI:
             </h3>
 
+            <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse border border-slate-300">
               <thead>
                 <tr className="bg-cyan-50 text-cyan-900 border-b border-slate-300 text-left">
@@ -102,13 +103,14 @@ export default function LabReportModal({ patientName, testName, category, result
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Signatures */}
           <div className="pt-8 flex justify-between items-end text-xs text-slate-700">
             <div>
               <p className="font-bold">Laborant / Vrash muhr o'rni:</p>
-              <div className="w-20 h-20 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400 mt-2">
+              <div className="w-20 h-20 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-600 mt-2">
                 [ MUHR ]
               </div>
             </div>

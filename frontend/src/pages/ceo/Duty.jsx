@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../utils/api'
 import { useToastStore } from '../../store/toastStore'
 import Modal from '../../components/Modal'
+import { PageHeader, Icons, Btn } from '../../components/UIKit'
 
 export default function Duty() {
   const [items, setItems] = useState([])
@@ -29,10 +30,13 @@ export default function Duty() {
 
   return (
     <div>
-      <div className="mb-6 flex justify-between">
-        <h1 className="text-2xl font-bold text-gold">Dejur jadvali</h1>
-        <button type="button" className="btn-gold" onClick={() => setModal(true)}>+ Dejur tayinlash</button>
-      </div>
+      <PageHeader
+        title="Dejur Jadvali"
+        subtitle="Navbatchilik jadvali va tayinlangan xodimlar"
+        icon={Icons.list}
+      >
+        <Btn variant="gold" icon={Icons.plus} onClick={() => setModal(true)}>Dejur tayinlash</Btn>
+      </PageHeader>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

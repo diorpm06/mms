@@ -1,5 +1,7 @@
 import { Printer, X, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { formatMoney } from '../utils/format'
+import { BRAND } from '../config/brand'
+import ReceiptHeader from './ReceiptHeader'
 
 export default function ReceiptModal({ patient, onClose }) {
   if (!patient) return null
@@ -162,7 +164,7 @@ export default function ReceiptModal({ patient, onClose }) {
         {/* Modal Close Button */}
         <button
           onClick={onClose}
-          className="no-print absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+          className="no-print absolute top-4 right-4 p-2 rounded-xl text-slate-600 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
         >
           <X className="h-5 w-5" />
         </button>
@@ -192,15 +194,11 @@ export default function ReceiptModal({ patient, onClose }) {
           className="bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-100 font-mono text-xs shadow-inner"
         >
           {/* Header */}
-          <div className="text-center pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
-            <img src="/logo.png" alt="Marjona Med Servis Logo" className="logo-img h-16 max-h-16 mx-auto mb-1 object-contain" />
-            <h2 className="text-base font-black tracking-wider uppercase text-slate-900 dark:text-slate-100">MARJONA MED SERVIS</h2>
-            <p className="text-[10px] text-slate-900 dark:text-slate-200 font-black mt-0.5">Tel: +998 (55) 604 44 24</p>
-          </div>
+          <ReceiptHeader />
 
           {/* GIANT QUEUE TICKET NUMBER */}
           <div className="ticket-number-box my-4 py-3 bg-white dark:bg-slate-900 border-2 border-slate-900 rounded-xl text-center">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+            <span className="text-[10px] font-bold text-slate-700 uppercase tracking-widest block">
               SIZNING NAVBATINGIZ:
             </span>
             <div className="ticket-number-text text-4xl font-black text-slate-900 tracking-tight font-mono my-0.5 break-all leading-tight">
@@ -214,22 +212,22 @@ export default function ReceiptModal({ patient, onClose }) {
           {/* Patient Info */}
           <div className="space-y-1.5 py-3 border-b border-dashed border-slate-300 dark:border-slate-700">
             <div className="flex justify-between">
-              <span className="text-slate-500">Mijoz:</span>
+              <span className="text-slate-700">Mijoz:</span>
               <strong className="text-right">{patient.first_name} {patient.last_name}</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Telefon:</span>
+              <span className="text-slate-700">Telefon:</span>
               <span>{patient.phone}</span>
             </div>
             {patient.birth_date && (
               <div className="flex justify-between">
-                <span className="text-slate-500">Tug'ilgan sana:</span>
+                <span className="text-slate-700">Tug'ilgan sana:</span>
                 <span>{new Date(patient.birth_date).toLocaleDateString('uz-UZ')}</span>
               </div>
             )}
             {patient.address && (
               <div className="flex justify-between">
-                <span className="text-slate-500">Manzil:</span>
+                <span className="text-slate-700">Manzil:</span>
                 <span>{patient.address}</span>
               </div>
             )}
@@ -237,7 +235,7 @@ export default function ReceiptModal({ patient, onClose }) {
 
           {/* Service & Payment Info */}
           <div className="space-y-1.5 py-3 border-b border-dashed border-slate-300 dark:border-slate-700">
-            <span className="text-slate-500 font-bold text-[10px] block">
+            <span className="text-slate-700 font-bold text-[10px] block">
               Xizmatlar va Ishlatilgan Materiallar ({allPrintItems.length} ta):
             </span>
             {Object.entries(
@@ -265,12 +263,12 @@ export default function ReceiptModal({ patient, onClose }) {
               </div>
             ))}
             <div className="flex justify-between pt-1 text-[11px]">
-              <span className="text-slate-500">Shifokor:</span>
+              <span className="text-slate-700">Shifokor:</span>
               <span className="font-bold text-slate-900 dark:text-slate-100">{patient.provider_name || '—'}</span>
             </div>
             {patient.referrer_name && (
               <div className="flex justify-between text-[11px]">
-                <span className="text-slate-500">Yo'naltiruvchi:</span>
+                <span className="text-slate-700">Yo'naltiruvchi:</span>
                 <span>{patient.referrer_name}</span>
               </div>
             )}
@@ -290,7 +288,7 @@ export default function ReceiptModal({ patient, onClose }) {
                 {formatMoney(patient.payment_amount)}
               </span>
             </div>
-            <div className="flex justify-between text-[11px] text-slate-500 mt-1">
+            <div className="flex justify-between text-[11px] text-slate-700 mt-1">
               <span>To'lov turi / holati:</span>
               <span className={`uppercase font-bold ${isPayLater ? 'text-amber-700 dark:text-amber-300' : ''}`}>
                 {isPayLater

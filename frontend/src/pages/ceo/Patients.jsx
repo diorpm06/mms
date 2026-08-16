@@ -13,6 +13,7 @@ import PatientMedicalCardModal from '../../components/PatientMedicalCardModal'
 import ReRegisterPatientModal from '../../components/ReRegisterPatientModal'
 import PaymentTicketModal from '../../components/PaymentTicketModal'
 import { Btn, Icons, PageHeader, THead, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
+import ActionMenu from '../../components/ActionMenu'
 
 export default function CeoPatients() {
   const [activeViewTab, setActiveViewTab] = useState('unique') // 'unique' | 'all_transactions'
@@ -34,27 +35,50 @@ export default function CeoPatients() {
   useEffect(() => { load() }, [])
 
   const handleDeletePatient = async (p) => {
-    if (!p) return
-    if (!window.confirm(`Haqiqatan ham "${p.first_name} ${p.last_name}" bemorini va uning barcha to'lovlarini tizimdan to'liq o'chirmoqchimisiz?`)) {
-      return
-    }
+    const msg = `DIQQAT: "${p.first_name} ${p.last_name}" bemorining ushbu qabuldagi barcha bog'liq xizmatlari va ma'lumotlari bazadan TO'LIQ O'CHIRILSINMI?\n\n(Shifokor va yo'naltiruvchi ulushlari hamda kassa balansi avtomatik qaytariladi.)`
+    if (!window.confirm(msg)) return
     try {
-      await api(`/patients/${p.id}`, { method: 'DELETE' })
-      toast(`✓ "${p.first_name} ${p.last_name}" bemori muvaffaqiyatli o'chirildi`)
+      const res = await api(`/patients/${p.id}`, { method: 'DELETE' })
+      toast(res.message || "Bemor va uning barcha qabullari bazadan to'liq o'chirildi ✓")
       load()
     } catch (e) {
-      toast(e.message || "O'chirishda xatolik", 'error')
+      toast(e.message, 'error')
     }
+  }
+
+  const removeServiceFromEdit = (indexToRemove) => {
+    if (!edit || !edit.servicesList) return
+    if (edit.servicesList.length <= 1) {
+      toast("Kamida 1 ta xizmat qolishi kerak. Bemorni to'liq o'chirish uchun 'O'chirish' tugmasidan foydalaning.", 'error')
+      return
+    }
+    const updated = edit.servicesList.filter((_, i) => i !== indexToRemove)
+    const newTotal = updated.reduce((acc, s) => acc + (s.price || 0) * (s.quantity || 1), 0)
+    setEdit({
+      ...edit,
+      servicesList: updated,
+      payment_amount: newTotal,
+    })
+    toast("Xizmat ro'yxatdan olib tashlandi. Saqlash tugmasini bosing.", 'info')
   }
 
   const saveEdit = async () => {
     if (editReason.length < 3) { toast('Sabab kamida 3 harf', 'error'); return }
     try {
+      const payload = {
+        ...edit,
+        reason: editReason,
+        services: edit.servicesList ? edit.servicesList.map(s => ({
+          service_id: s.service_id,
+          quantity: s.quantity || 1,
+          price: s.price,
+        })) : undefined,
+      }
       await api(`/patients/${edit.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...edit, reason: editReason }),
+        body: JSON.stringify(payload),
       })
-      toast('✓ Bemor ma\'lumoti tahrirlandi')
+      toast('✓ Bemor ma\'lumoti va xizmatlari tahrirlandi')
       setEdit(null)
       load()
     } catch (e) { toast(e.message, 'error') }
@@ -109,7 +133,11 @@ export default function CeoPatients() {
         total_spent: 0,
         services: [],
         latestPatient: p,
+        referrer_name: p.referrer_name || null,
       }
+    }
+    if (!uniquePatientsMap[key].referrer_name && p.referrer_name) {
+      uniquePatientsMap[key].referrer_name = p.referrer_name
     }
     uniquePatientsMap[key].visit_count += 1
     uniquePatientsMap[key].total_spent += (p.payment_amount || 0)
@@ -374,6 +402,13 @@ export default function CeoPatients() {
                   </div>
                 )}
 
+                {(p.referrer_name || item.referrer_name) && (
+                  <div className="text-xs font-bold text-gold flex items-center gap-1.5 bg-gold/10 px-2.5 py-1.5 rounded-xl border border-gold/20">
+                    <span>📢 Yo'naltiruvchi:</span>
+                    <span className="font-extrabold text-body">{p.referrer_name || item.referrer_name}</span>
+                  </div>
+                )}
+
                 {/* Card Action Buttons */}
                 <div className="pt-3 border-t border-border flex items-center justify-between gap-1">
                   <button
@@ -418,10 +453,10 @@ export default function CeoPatients() {
         /* ── TAB 1: UNIQUE PATIENTS TABLE ── */
         <div className="card overflow-x-auto p-0 border-gold/20 shadow-lg">
           <table className="w-full text-xs">
-            <THead cols={['#', 'Bemor F.I.SH', 'Telefon', 'Olgan Xizmatlari', 'Tashriflar', 'Jami Sarflangan', 'So\'nggi Tashrif', 'Harakatlar']} />
+            <THead cols={['#', 'Bemor F.I.SH', 'Telefon', "Yo'naltiruvchi", 'Olgan Xizmatlari', 'Tashriflar', 'Jami Sarflangan', 'So\'nggi Tashrif', 'Harakatlar']} />
             <tbody className="divide-y divide-border font-semibold">
               {uniquePatientsList.length === 0 ? (
-                <tr><td colSpan={8} className="py-8"><EmptyState icon="👤" message="Bemorlar topilmadi" /></td></tr>
+                <tr><td colSpan={9} className="py-8"><EmptyState icon="👤" message="Bemorlar topilmadi" /></td></tr>
               ) : uniquePatientsList.map((u, idx) => {
                 const initials = `${(u.first_name || 'B')[0]}${(u.last_name || 'M')[0]}`.toUpperCase()
                 return (
@@ -442,6 +477,14 @@ export default function CeoPatients() {
 
                     <td className="p-3 font-mono text-muted text-xs">
                       {u.phone || '—'}
+                    </td>
+
+                    <td className="p-3">
+                      {u.referrer_name ? (
+                        <span className="badge badge-gold font-bold text-xs">📢 {u.referrer_name}</span>
+                      ) : (
+                        <span className="text-muted italic text-[11px]">—</span>
+                      )}
                     </td>
 
                     <td className="p-3">
@@ -523,10 +566,10 @@ export default function CeoPatients() {
         /* ── TAB 2: ALL INDIVIDUAL VISITS TABLE ── */
         <div className="card overflow-x-auto p-0 border-cyan-500/20 shadow-lg">
           <table className="w-full text-xs">
-            <THead cols={['Sana', 'Bemor F.I.SH', 'Telefon', 'Xizmat Nomi', 'Summa', 'Kiritdi', 'Harakatlar']} />
+            <THead cols={['Sana', 'Bemor F.I.SH', 'Telefon', "Yo'naltiruvchi", 'Xizmat Nomi', 'Summa', 'Kiritdi', 'Harakatlar']} />
             <tbody className="divide-y divide-border font-semibold">
               {filteredPatients.length === 0 ? (
-                <tr><td colSpan={7} className="py-8"><EmptyState icon="👤" message="Bemorlar topilmadi" /></td></tr>
+                <tr><td colSpan={8} className="py-8"><EmptyState icon="👤" message="Bemorlar topilmadi" /></td></tr>
               ) : filteredPatients.map((p) => (
                 <tr
                   key={p.id}
@@ -539,6 +582,14 @@ export default function CeoPatients() {
                   </td>
 
                   <td className="p-3 text-muted font-mono text-xs">{p.phone || '—'}</td>
+
+                  <td className="p-3">
+                    {p.referrer_name ? (
+                      <span className="badge badge-gold font-bold text-xs">📢 {p.referrer_name}</span>
+                    ) : (
+                      <span className="text-muted italic text-[11px]">—</span>
+                    )}
+                  </td>
 
                   <td className="p-3 text-cyan font-extrabold text-xs">
                     {(p.services || []).length > 1 ? (
@@ -567,7 +618,8 @@ export default function CeoPatients() {
                         ✗ Bekor: {p.cancel_reason}
                       </span>
                     ) : (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Eng ko'p ishlatiladigani ochiq, qolgani ⋮ menyusida */}
                         <Btn
                           variant="gold"
                           size="xs"
@@ -578,54 +630,51 @@ export default function CeoPatients() {
                           Karta
                         </Btn>
 
-                        <Btn
-                          variant="cyan"
-                          size="xs"
-                          onClick={() => setReRegisterPatient(p)}
-                          title="Bemorni yangi xizmatga qayta yozish"
-                        >
-                          ➕ Yozish
-                        </Btn>
-
-                        <Btn
-                          variant="ghost"
-                          size="xs"
-                          icon={Icons.history}
-                          onClick={() => openVisits(p)}
-                          title="Tashriflar tarixi"
-                        >
-                          Tarix
-                        </Btn>
-
-                        <Btn
-                          variant="outline"
-                          size="xs"
-                          icon={Icons.edit}
-                          onClick={() => { setEdit({ ...p }); setEditReason('') }}
-                          title="Tahrirlash"
-                        >
-                          Tahrir
-                        </Btn>
-
-                        <Btn
-                          variant="danger"
-                          size="xs"
-                          icon={Icons.trash}
-                          onClick={() => { setCancelId(p.id); setCancelReason('') }}
-                          title="To'lovni bekor qilish"
-                        >
-                          Bekor
-                        </Btn>
-
-                        <Btn
-                          variant="danger"
-                          size="xs"
-                          icon={Icons.trash}
-                          onClick={() => handleDeletePatient(p)}
-                          title="Bemorni bazadan to'liq o'chirish"
-                        >
-                          O'chirish
-                        </Btn>
+                        <ActionMenu
+                          items={[
+                            {
+                              label: 'Yangi xizmatga yozish',
+                              icon: Icons.plus,
+                              variant: 'gold',
+                              onClick: () => setReRegisterPatient(p),
+                            },
+                            {
+                              label: 'Tashriflar tarixi',
+                              icon: Icons.history,
+                              onClick: () => openVisits(p),
+                            },
+                            {
+                              label: 'Tahrirlash va xizmatlar',
+                              icon: Icons.edit,
+                              onClick: () => {
+                                setEdit({
+                                  ...p,
+                                  servicesList: (p.services && p.services.length)
+                                    ? p.services.map((s) => ({
+                                        service_id: s.service_id,
+                                        service_name: s.service_name || s.name,
+                                        price: s.total_price || s.price || 0,
+                                        quantity: s.quantity || 1,
+                                      }))
+                                    : [{ service_id: p.service_id, service_name: p.service_name, price: p.payment_amount || 0, quantity: 1 }],
+                                })
+                                setEditReason('')
+                              },
+                            },
+                            {
+                              label: "To'lovni bekor qilish",
+                              icon: Icons.cancel,
+                              variant: 'danger',
+                              onClick: () => { setCancelId(p.id); setCancelReason('') },
+                            },
+                            {
+                              label: "Bazadan to'liq o'chirish",
+                              icon: Icons.trash,
+                              variant: 'danger',
+                              onClick: () => handleDeletePatient(p),
+                            },
+                          ]}
+                        />
                       </div>
                     )}
                   </td>
@@ -637,7 +686,7 @@ export default function CeoPatients() {
       )}
 
       {/* Edit modal */}
-      <Modal open={!!edit} onClose={() => setEdit(null)} title="Bemor ma'lumotlarini tahrirlash" size="md">
+      <Modal open={!!edit} onClose={() => setEdit(null)} title="Bemor va Xizmatlarni Tahrirlash" size="md">
         {edit && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -662,6 +711,42 @@ export default function CeoPatients() {
               <input className="input-field text-xs font-bold" value={edit.address}
                 onChange={(e) => setEdit({ ...edit, address: e.target.value })} />
             </div>
+
+            {/* XIZMATLARNI BITTALAB O'CHIRISH BO'LIMI */}
+            <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-2">
+              <span className="text-xs font-bold text-gold uppercase tracking-wider block mb-1">
+                📋 Bemor Xizmatlari Ro'yxati ({edit.servicesList?.length || 0} ta xizmat)
+              </span>
+              <p className="text-[11px] text-muted mb-2">
+                Alohida bironta xizmatni bekor qilmoqchi bo'lsangiz, shu yerning o'zida olib tashlashingiz mumkin:
+              </p>
+              
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {edit.servicesList && edit.servicesList.map((svc, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border text-xs">
+                    <div className="min-w-0 pr-2">
+                      <span className="font-extrabold text-body block truncate">{svc.service_name || 'Xizmat'}</span>
+                      <span className="text-[10px] text-emerald font-mono font-bold">{formatMoney(svc.price)}</span>
+                    </div>
+                    <Btn
+                      variant="danger"
+                      size="xs"
+                      icon={Icons.trash}
+                      onClick={() => removeServiceFromEdit(i)}
+                      title="Ushbu xizmatni qabuldan olib tashlash"
+                    >
+                      O'chirish
+                    </Btn>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 border-t border-border flex justify-between items-center font-bold text-xs">
+                <span className="text-muted">Qayta hisoblangan umumiy to'lov:</span>
+                <span className="text-emerald font-mono font-black text-sm">{formatMoney(edit.payment_amount)}</span>
+              </div>
+            </div>
+
             <div>
               <label className="text-xs font-bold text-muted block mb-1">Tahrirlash sababi *</label>
               <input className="input-field text-xs" placeholder="Kamida 3 ta harf..."

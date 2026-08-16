@@ -1,10 +1,12 @@
-/** Naqt/karta pie uchun — nol qiymatlarni olib tashlaydi */
-export function paymentPieData(cash, card, paymentChart) {
+/** Naqt/karta/click/qr pie uchun — nol qiymatlarni olib tashlaydi */
+export function paymentPieData(cash, card, paymentChart, click, qr) {
   const fromApi = (paymentChart || []).filter((d) => (d.value || 0) > 0)
   if (fromApi.length) return fromApi
   return [
     { name: 'Naqt',  value: cash || 0 },
-    { name: 'QR / Terminal', value: card || 0 },
+    { name: 'Karta', value: card || 0 },
+    { name: 'Click', value: click || 0 },
+    { name: 'QR / Transfer', value: qr || 0 },
   ].filter((d) => d.value > 0)
 }
 

@@ -166,6 +166,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
         provider_share = sum((getattr(p, "provider_amount", 0) or 0) for p in all_patients)
         center_share = total_income - referrer_share - provider_share
 
+
     expenses = (
         db.query(Expense)
         .filter(Expense.created_at >= s, Expense.created_at <= e, Expense.is_cancelled == False)
@@ -314,6 +315,8 @@ def get_report(db: Session, start: date, end: date) -> dict:
     payment_chart = [
         {"name": "Naqt", "value": int(cash)},
         {"name": "Karta", "value": int(card)},
+        {"name": "Click", "value": int(click)},
+        {"name": "QR / Transfer", "value": int(qr)},
     ]
     finance_chart = [
         {"name": "Jami tushgan", "value": int(total_income)},
@@ -664,16 +667,29 @@ def top_referrers(db: Session, limit: int = 10):
 
 
 def top_services(db: Session, limit: int = 10):
+    """
+    Eng ko'p daromad keltirgan xizmatlar.
+
+    Ilgari bu so'rov Patient.service_id bo'yicha bog'lanardi — ya'ni bitta
+    tashrifdagi BIRINCHI xizmat olinib, tashrifning BUTUN summasi o'shanga
+    yozilardi. Bemor 3 ta tahlil topshirsa, ro'yxatda faqat bittasi ko'rinib,
+    uning summasi haqiqiydan katta chiqardi.
+
+    Endi har bir xizmat alohida sanaladi (patient_services jadvali).
+    """
+    from models.patient_service import PatientService
+
     return (
         db.query(
             Service.name,
-            func.count(Patient.id).label("count"),
-            func.sum(Patient.payment_amount).label("total"),
+            func.count(func.distinct(PatientService.patient_id)).label("count"),
+            func.sum(PatientService.total_price).label("total"),
         )
-        .join(Patient, Patient.service_id == Service.id)
+        .join(PatientService, PatientService.service_id == Service.id)
+        .join(Patient, Patient.id == PatientService.patient_id)
         .filter(Patient.is_cancelled == False)
         .group_by(Service.id, Service.name)
-        .order_by(func.sum(Patient.payment_amount).desc())
+        .order_by(func.sum(PatientService.total_price).desc())
         .limit(limit)
         .all()
     )
@@ -748,11 +764,13 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         svc_name = svc.name if svc else "Noma'lum"
         svc_id = svc.id if svc else 0
         paid = p.payment_amount or 0
-        if svc and getattr(svc, "referrer_commission_sum", 0) and svc.referrer_commission_sum > 0:
-            ref_comm = svc.referrer_commission_sum
+        from services.finance import get_referrer_rates_for_service
+        ref_comm_pct, ref_comm_sum = get_referrer_rates_for_service(p.referrer, svc, db)
+        if ref_comm_sum > 0:
+            ref_comm = ref_comm_sum
             ref_pct = 0
         else:
-            ref_pct = svc.referrer_commission_percent if (svc and svc.referrer_commission_percent) else 0
+            ref_pct = ref_comm_pct
             ref_comm = int((paid * ref_pct) / 100)
 
         # Configurable split in SO'M or PERCENT of referrer commission between doctor and clinic
@@ -817,18 +835,17 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             svc = p.service
             dept_name = _extract_department_name(svc.name if svc else "", svc.category if svc else "", svc.cabinet if svc else "") if svc else "Boshqa xizmatlar"
 
-            paid = p.payment_amount or 0
-            if svc and getattr(svc, "referrer_commission_sum", 0) and svc.referrer_commission_sum > 0:
-                ref_fee = svc.referrer_commission_sum
-                rate_label = f"{svc.referrer_commission_sum:,}".replace(",", " ") + " so'm"
-            elif svc and getattr(svc, "referrer_commission_percent", None) is not None:
-                pct = svc.referrer_commission_percent or 0
-                ref_fee = int((paid * pct) / 100)
-                rate_label = f"{pct}%"
+            from services.finance import get_referrer_rates_for_service
+            ref_pct, ref_sum = get_referrer_rates_for_service(r, svc, db)
+            if ref_sum > 0:
+                ref_fee = ref_sum
+                rate_label = f"{ref_sum:,}".replace(",", " ") + " so'm"
+            elif ref_pct > 0:
+                ref_fee = int((paid * ref_pct) / 100)
+                rate_label = f"{pct}%" if (pct := ref_pct) else "0%"
             else:
-                pct = r.percentage or 0
-                ref_fee = int((paid * pct) / 100)
-                rate_label = f"{pct}%"
+                ref_fee = 0
+                rate_label = "0%"
 
             total_comm += ref_fee
             patient_details.append({
@@ -859,17 +876,17 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             if any(ex in d_name for ex in ["Massaj", "Ineksiya"]):
                 continue
             paid = p.payment_amount or 0
-            if svc and getattr(svc, "referrer_commission_sum", 0) and svc.referrer_commission_sum > 0:
-                ref_fee = svc.referrer_commission_sum
-                rate_label = f"{svc.referrer_commission_sum:,}".replace(",", " ") + " so'm"
-            elif svc and getattr(svc, "referrer_commission_percent", None) is not None:
-                pct = svc.referrer_commission_percent or 0
-                ref_fee = int((paid * pct) / 100)
-                rate_label = f"{pct}%"
+            from services.finance import get_referrer_rates_for_service
+            ref_pct, ref_sum = get_referrer_rates_for_service(r, svc, db)
+            if ref_sum > 0:
+                ref_fee = ref_sum
+                rate_label = f"{ref_sum:,}".replace(",", " ") + " so'm"
+            elif ref_pct > 0:
+                ref_fee = int((paid * ref_pct) / 100)
+                rate_label = f"{ref_pct}%"
             else:
-                pct = r.percentage or 0
-                ref_fee = int((paid * pct) / 100)
-                rate_label = f"{pct}%"
+                ref_fee = 0
+                rate_label = "0%"
 
             s_key = (d_str, s_name)
             if s_key not in daily_svc_map:
@@ -976,15 +993,18 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             continue
         patient_count = len(pr_patients)
         gross_total = sum(p.payment_amount for p in pr_patients)
-        total_prov_share = 0
         from services.finance import calculate_financial_split
         for p in pr_patients:
-            paid = p.payment_amount or 0
             svc = p.service
-            ref_comm_sum = svc.referrer_commission_sum if svc else 0
-            ref_comm_pct = (svc.referrer_commission_percent if (svc and svc.referrer_commission_percent) else 0) if p.referrer_id else 0
+            paid = p.payment_amount or 0
+            from services.finance import get_referrer_rates_for_service
+            ref_comm_pct, ref_comm_sum = get_referrer_rates_for_service(p.referrer, svc, db) if p.referrer_id else (0, 0)
             ref_doc_split_pct = svc.referrer_doctor_split_percent if svc else None
             ref_doc_split_sum = svc.referrer_doctor_split_sum if svc else 0
+
+            c_name = f"{svc.category or ''} {svc.name or ''}".lower() if svc else ""
+            is_uzi = any(k in c_name for k in ["uzi", "ultratovush", "mashonka"]) if svc else False
+            original_price = svc.price if svc else paid
 
             _, prov_amt, _ = calculate_financial_split(
                 total=paid,
@@ -993,6 +1013,8 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 referrer_commission_sum=ref_comm_sum,
                 ref_doc_split_pct=ref_doc_split_pct if p.referrer_id else None,
                 ref_doc_split_sum=ref_doc_split_sum if p.referrer_id else 0,
+                is_uzi=is_uzi,
+                original_price=original_price,
             )
             total_prov_share += prov_amt
 
@@ -1047,12 +1069,9 @@ def referrer_patient_details(db: Session, referrer_id: int, start: date, end: da
     for p in patients:
         svc = p.service
         paid = p.payment_amount or 0
-        ref_comm = 0
-        if svc and getattr(svc, "referrer_commission_sum", 0) and svc.referrer_commission_sum > 0:
-            ref_comm = svc.referrer_commission_sum
-        else:
-            ref_pct = svc.referrer_commission_percent if (svc and svc.referrer_commission_percent) else 0
-            ref_comm = int((paid * ref_pct) / 100)
+        from services.finance import get_referrer_rates_for_service
+        ref_pct, ref_sum = get_referrer_rates_for_service(p.referrer, svc, db)
+        ref_comm = ref_sum if ref_sum > 0 else int((paid * ref_pct) / 100)
 
         result.append({
             "id": p.id,
@@ -1066,42 +1085,45 @@ def referrer_patient_details(db: Session, referrer_id: int, start: date, end: da
 
 
 def top_referrers_analytics(db: Session) -> list:
-    """Returns top referrers with patient count and total commission earned."""
-    from sqlalchemy.orm import joinedload
+    """
+    Har bir yo'naltiruvchi: nechta bemor, qancha tushum, qancha komissiya.
 
-    referrers = db.query(Referrer).filter(Referrer.is_active == True).all()
-    results = []
-    for r in referrers:
-        patients = (
-            db.query(Patient)
-            .options(joinedload(Patient.service))
-            .filter(Patient.referrer_id == r.id, Patient.is_cancelled == False)
-            .all()
+    Ilgari HAR BIR yo'naltiruvchi uchun alohida so'rov yuborilardi
+    (26 yo'naltiruvchi = 26 ta murojaat), so'ng komissiya har bir bemor uchun
+    qaytadan hisoblanardi — 58 ta bemorda 10 soniya ketardi.
+
+    Endi bitta so'rov. Komissiya qaytadan hisoblanmaydi: tranzaksiyaga haqiqatan
+    yozilgan summa olinadi, ya'ni hisobot to'langan pulga aniq mos keladi.
+    """
+    qatorlar = (
+        db.query(
+            Referrer.id,
+            Referrer.full_name,
+            Referrer.phone,
+            func.count(func.distinct(Transaction.patient_id)).label("patient_count"),
+            func.coalesce(func.sum(Transaction.total_amount), 0).label("total_paid"),
+            func.coalesce(func.sum(Transaction.referrer_amount), 0).label("total_commission"),
         )
-        p_count = len(patients)
-        total_comm = 0
-        total_paid = 0
-        for p in patients:
-            paid = p.payment_amount or 0
-            total_paid += paid
-            svc = p.service
-            if svc and getattr(svc, "referrer_commission_sum", 0) and svc.referrer_commission_sum > 0:
-                ref_comm = svc.referrer_commission_sum
-            else:
-                ref_pct = svc.referrer_commission_percent if (svc and svc.referrer_commission_percent) else 0
-                ref_comm = int((paid * ref_pct) / 100)
-            total_comm += ref_comm
+        .outerjoin(
+            Transaction,
+            (Transaction.referrer_id == Referrer.id) & (Transaction.is_cancelled == False),
+        )
+        .filter(Referrer.is_active == True)
+        .group_by(Referrer.id, Referrer.full_name, Referrer.phone)
+        .all()
+    )
 
-        results.append({
-            "id": r.id,
-            "full_name": r.full_name,
-            "organization": getattr(r, "organization", ""),
-            "phone": r.phone,
-            "patient_count": p_count,
-            "total_paid": total_paid,
-            "total_commission": total_comm,
-        })
-
-    results.sort(key=lambda x: x["patient_count"], reverse=True)
-    return results
-
+    natija = [
+        {
+            "id": x.id,
+            "full_name": x.full_name,
+            "organization": "",
+            "phone": x.phone,
+            "patient_count": int(x.patient_count or 0),
+            "total_paid": int(x.total_paid or 0),
+            "total_commission": int(x.total_commission or 0),
+        }
+        for x in qatorlar
+    ]
+    natija.sort(key=lambda z: z["patient_count"], reverse=True)
+    return natija

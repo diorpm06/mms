@@ -25,4 +25,7 @@ class Service(Base):
     allow_custom_price: Mapped[bool] = mapped_column(Boolean, default=False)  # Admin can enter custom price
     template_key: Mapped[str | None] = mapped_column(String(50), nullable=True)  # frontend reportTemplates.js key
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Bo'lim tarifidan qat'i nazar, shu xizmatga komissiya berilmaydi
+    # (masalan "Uzi (qo'shimcha)"). Ilgari bu xizmat nomidagi so'z bilan aniqlanardi.
+    no_referrer_commission: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -63,8 +63,59 @@ def _next_ticket(db: Session) -> str:
     today = date.today()
     start = datetime.combine(today, datetime.min.time())
     end = datetime.combine(today, datetime.max.time())
-    today_count = db.query(Patient).filter(Patient.created_at >= start, Patient.created_at <= end).count()
-    return f"A-{today_count + 1:03d}"
+    return _keyingi_raqam(db, "A", start, end)
+
+
+def _bemorni_qulflab_ol(db: Session, patient_id: int):
+    """
+    Bemor qatorini QULFLAB o'qiydi (SELECT ... FOR UPDATE).
+
+    Ikki qurilmadan bir vaqtda tahrirlash/bekor qilish sinovda ikkita xatoni
+    ko'rsatdi:
+      1) Ikkalasi ham xizmat ro'yxatini almashtirsa, o'chirish va qo'shish
+         aralashib ketib, bemorda 2 barobar xizmat qatori qolardi
+         (to'lov 100 000, xizmatlar jami 200 000).
+      2) Ikkalasi ham bekor qilsa, ikkalasi ham muvaffaqiyatli tugardi —
+         balanslar ikki marta orqaga qaytarilishi mumkin edi.
+
+    Qulf tufayli ikkinchi so'rov birinchisi tugagunicha kutadi va yangilangan
+    holatni ko'radi (masalan "allaqachon bekor qilingan" xatosini oladi).
+    """
+    q = db.query(Patient).filter(Patient.id == patient_id)
+    # SQLite FOR UPDATE ni qo'llab-quvvatlamaydi — faqat PostgreSQL'da
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        q = q.with_for_update()
+    return q.first()
+
+
+def _keyingi_raqam(db: Session, prefiks: str, start, end) -> str:
+    """
+    Shu kun uchun `PREFIKS-NNN` ko'rinishidagi keyingi bo'sh raqam.
+
+    Ilgari raqam COUNT(*) + 1 bilan olinardi. Bemor o'chirilsa sanoq kamayib,
+    keyingi bemorga ALLAQACHON BERILGAN raqam qayta berilardi — TV taxtasida
+    va chekda ikki bemorda bir xil navbat chiqardi.
+
+    Endi mavjud raqamlarning eng kattasidan keyingisi olinadi, ya'ni o'chirish
+    keyingi raqamlarga ta'sir qilmaydi.
+    """
+    qatorlar = (
+        db.query(Patient.ticket_number)
+        .filter(
+            Patient.created_at >= start,
+            Patient.created_at <= end,
+            Patient.ticket_number.like(f"{prefiks}-%"),
+        )
+        .all()
+    )
+    eng_katta = 0
+    for (raqam,) in qatorlar:
+        try:
+            n = int(str(raqam).rsplit("-", 1)[1])
+        except (IndexError, ValueError):
+            continue
+        eng_katta = max(eng_katta, n)
+    return f"{prefiks}-{eng_katta + 1:03d}"
 
 
 router = APIRouter(prefix="/api/patients", tags=["patients"])
@@ -72,8 +123,11 @@ router = APIRouter(prefix="/api/patients", tags=["patients"])
 
 class EditServiceItem(BaseModel):
     service_id: int
-    quantity: int = 1
-    price: int | None = None      # bo'sh bo'lsa katalog narxi olinadi
+    # Chegaralar ro'yxatga olishdagi bilan bir xil bo'lishi shart. Ilgari
+    # tahrirlashda ular yo'q edi: manfiy narx, 0 yoki manfiy son qabul
+    # qilinardi, 10^12 esa bazani "integer out of range" bilan yiqitardi.
+    quantity: int = Field(default=1, ge=1, le=100)
+    price: int | None = Field(default=None, ge=0, le=100_000_000)
 
 
 class PatientUpdate(BaseModel):
@@ -85,16 +139,31 @@ class PatientUpdate(BaseModel):
     referrer_id: int | None = None
     provider_id: int | None = None
     service_id: int | None = None
-    payment_amount: int | None = None
+    payment_amount: int | None = Field(default=None, ge=0, le=100_000_000)
     payment_type: str | None = None
-    cash_amount: int | None = None
-    card_amount: int | None = None
-    click_amount: int | None = None
-    qr_amount: int | None = None
+    cash_amount: int | None = Field(default=None, ge=0)
+    card_amount: int | None = Field(default=None, ge=0)
+    click_amount: int | None = Field(default=None, ge=0)
+    qr_amount: int | None = Field(default=None, ge=0)
     # Xizmatlar ro'yxati qayta yuborilsa — eskisi almashtiriladi va
     # to'lov summasi qaytadan hisoblanadi (chegirma saqlanib qoladi).
     services: list[EditServiceItem] | None = None
     reason: str = Field(min_length=3)
+
+    @field_validator("payment_type")
+    @classmethod
+    def validate_payment_type(cls, v):
+        """
+        Ro'yxatga olishda to'lov turi tekshirilardi, tahrirlashda esa yo'q —
+        "bitcoin" kabi har qanday matn saqlanib, hisobotda tanilmay qolardi.
+        """
+        if v is None:
+            return v
+        ruxsat = ("cash", "card", "click", "qr", "naqd", "karta", "payme",
+                  "split", "aralash", "later", "keyinroq", "nasiya", "qarz")
+        if v not in ruxsat:
+            raise ValueError("To'lov turi noto'g'ri (cash, card, click, qr, split, later)")
+        return v
 
 
 class CancelBody(BaseModel):
@@ -405,6 +474,34 @@ async def create_patient(
     else:
         raise HTTPException(status_code=400, detail="Kamida bitta xizmat tanlang")
 
+    # ── Bog'liq yozuvlar haqiqatan mavjudmi ────────────────────────────────
+    # Ilgari mavjud bo'lmagan yo'naltiruvchi/shifokor ID si bilan bemor
+    # yozib yuborilardi: yo'naltiruvchida baza "foreign key" xatosi bilan
+    # yiqilardi, shifokorda esa bemor mavjud bo'lmagan doktorga biriktirilib,
+    # hisobotlarda ko'rinmay qolardi.
+    if data.referrer_id:
+        if not db.query(Referrer).filter(Referrer.id == data.referrer_id).first():
+            raise HTTPException(status_code=400, detail="Yo'naltiruvchi topilmadi")
+    if data.provider_id:
+        if not db.query(Provider).filter(Provider.id == data.provider_id).first():
+            raise HTTPException(status_code=400, detail="Shifokor topilmadi")
+
+    # ── Chegirma umumiy narxdan oshmasin ───────────────────────────────────
+    # Ilgari narxdan katta chegirma qabul qilinardi va to'lov 0 ga tushardi.
+    _xizmat_jami = 0
+    for _it in service_items:
+        _sv = db.query(Service).filter(Service.id == _it["service_id"]).first()
+        _narx = _it.get("price")
+        if _narx is None:
+            _narx = _sv.price if _sv else 0
+        _xizmat_jami += int(_narx) * int(_it.get("quantity", 1) or 1)
+    if (data.discount_amount or 0) > _xizmat_jami:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"Chegirma ({data.discount_amount:,} so'm) umumiy narxdan "
+                    f"({_xizmat_jami:,} so'm) katta bo'lishi mumkin emas"),
+        )
+
     # Split F.I.Sh into first_name and last_name if single string provided
     first_name_clean = data.first_name.strip()
     last_name_clean = (data.last_name or "").strip()
@@ -506,13 +603,7 @@ async def create_patient(
         svc_prefix = dep_data["prefix"]
 
         if svc_requires_queue:
-            prefix_pattern = f"{svc_prefix}-%"
-            prefix_count = db.query(Patient).filter(
-                Patient.created_at >= start,
-                Patient.created_at <= end,
-                Patient.ticket_number.like(prefix_pattern),
-            ).count()
-            ticket_num = f"{svc_prefix}-{prefix_count + 1:03d}"
+            ticket_num = _keyingi_raqam(db, svc_prefix, start, end)
             initial_queue_status = "kutmoqda"
         else:
             ticket_num = None
@@ -723,11 +814,22 @@ def update_patient(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ceo),
 ):
-    p = db.query(Patient).filter(Patient.id == patient_id).first()
+    p = _bemorni_qulflab_ol(db, patient_id)
     if not p:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
     if p.is_cancelled:
         raise HTTPException(status_code=400, detail="Bekor qilingan yozuvni tahrirlab bo'lmaydi")
+    # Bog'liq yozuvlar mavjudligini tekshiramiz — ro'yxatga olishda bu bor edi,
+    # tahrirlashda esa yo'q edi: mavjud bo'lmagan yo'naltiruvchi bazani
+    # "foreign key" xatosi bilan yiqitardi, shifokor esa jimgina yozilib,
+    # bemor yo'q doktorga biriktirilardi.
+    if data.referrer_id:
+        if not db.query(Referrer).filter(Referrer.id == data.referrer_id).first():
+            raise HTTPException(status_code=400, detail="Yo'naltiruvchi topilmadi")
+    if data.provider_id:
+        if not db.query(Provider).filter(Provider.id == data.provider_id).first():
+            raise HTTPException(status_code=400, detail="Shifokor topilmadi")
+
     old = _patient_row(p)
     updates = data.model_dump(exclude_unset=True, exclude={"reason"})
     new_services = updates.pop("services", None)
@@ -802,7 +904,7 @@ def cancel_patient(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ceo),
 ):
-    p = db.query(Patient).filter(Patient.id == patient_id).first()
+    p = _bemorni_qulflab_ol(db, patient_id)
     if not p or p.is_cancelled:
         raise HTTPException(status_code=400, detail="Topilmadi yoki bekor qilingan")
     tx = db.query(Transaction).filter(Transaction.patient_id == p.id, Transaction.is_cancelled == False).first()
@@ -849,14 +951,7 @@ def reissue_ticket(
     start = datetime.combine(today, datetime.min.time())
     end = datetime.combine(today, datetime.max.time())
 
-    prefix_pattern = f"{svc_prefix}-%"
-    prefix_count = db.query(Patient).filter(
-        Patient.created_at >= start,
-        Patient.created_at <= end,
-        Patient.ticket_number.like(prefix_pattern),
-    ).count()
-
-    new_ticket_num = f"{svc_prefix}-{prefix_count + 1:03d}"
+    new_ticket_num = _keyingi_raqam(db, svc_prefix, start, end)
     p.ticket_number = new_ticket_num
     p.queue_status = "kutmoqda"
     p.updated_at = datetime.now()
@@ -946,18 +1041,17 @@ def patient_visits(patient_id: int, db: Session = Depends(get_db), _: User = Dep
     first_clean = (p.first_name or "").strip().lower()
     last_clean = (p.last_name or "").strip().lower()
 
-    if phone_clean and phone_clean not in ("-", "None", "", "null"):
+    digits_only = "".join(c for c in phone_clean if c.isdigit())
+    has_valid_phone = len(digits_only) >= 9
+
+    if has_valid_phone:
         filter_clause = or_(
             Patient.phone == phone_clean,
             (func.lower(Patient.first_name) == first_clean) & (func.lower(Patient.last_name) == last_clean)
         )
     else:
-        if p.birth_date:
-            filter_clause = (
-                (func.lower(Patient.first_name) == first_clean) &
-                (func.lower(Patient.last_name) == last_clean) &
-                (Patient.birth_date == p.birth_date)
-            )
+        if first_clean and last_clean:
+            filter_clause = (func.lower(Patient.first_name) == first_clean) & (func.lower(Patient.last_name) == last_clean)
         else:
             filter_clause = (Patient.id == p.id)
 
@@ -1034,25 +1128,54 @@ def delete_patient(
     db: Session = Depends(get_db),
     user: User = Depends(require_ceo),
 ):
+    from datetime import timedelta
     p = db.query(Patient).filter(Patient.id == patient_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Bemor topilmadi")
 
-    ip, ua = get_client_info(request)
-    log_audit(
-        db,
-        user_id=user.id,
-        user_role=user.role,
-        action_type="DELETE_PATIENT",
-        table_name="Patient",
-        record_id=p.id,
-        detail_message=f"Bemor o'chirildi: {p.first_name} {p.last_name} ({p.phone})",
-        ip_address=ip,
-        device_info=ua,
-    )
+    # Find related patient visits registered together at the exact same time/ticket/phone
+    related_patients = [p]
+    if p.created_at:
+        t_start = p.created_at - timedelta(seconds=120)
+        t_end = p.created_at + timedelta(seconds=120)
+        others = (
+            db.query(Patient)
+            .filter(
+                Patient.id != p.id,
+                Patient.first_name == p.first_name,
+                Patient.last_name == p.last_name,
+                Patient.created_at >= t_start,
+                Patient.created_at <= t_end,
+            )
+            .all()
+        )
+        related_patients.extend(others)
 
-    db.query(Transaction).filter(Transaction.patient_id == p.id).delete()
-    db.delete(p)
+    deleted_names = []
+    for rp in related_patients:
+        # Lower doctor/referrer/center balances if patient was active
+        if not rp.is_cancelled:
+            tx = db.query(Transaction).filter(Transaction.patient_id == rp.id, Transaction.is_cancelled == False).first()
+            if tx:
+                cancel_patient_payment(db, rp, tx)
+
+        ip, ua = get_client_info(request)
+        log_audit(
+            db,
+            user_id=user.id,
+            user_role=user.role,
+            action_type="DELETE_PATIENT",
+            table_name="Patient",
+            record_id=rp.id,
+            detail_message=f"Bemor o'chirildi: {rp.first_name} {rp.last_name} ({rp.phone})",
+            ip_address=ip,
+            device_info=ua,
+        )
+
+        deleted_names.append(f"#{rp.id} ({rp.service.name if rp.service else 'xizmat'})")
+        db.query(Transaction).filter(Transaction.patient_id == rp.id).delete()
+        db.delete(rp)
+
     db.commit()
-    return {"message": "Bemor muvaffaqiyatli o'chirildi"}
+    return {"message": f"Bemor {p.first_name} {p.last_name} va uning barcha bog'liq qabullari ({len(related_patients)} ta xizmat) bazadan to'liq o'chirildi"}
 

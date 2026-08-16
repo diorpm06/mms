@@ -4,6 +4,7 @@ import { api } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { exportToExcel, exportToPdf } from '../../utils/exportUtils'
 import { useToastStore } from '../../store/toastStore'
+import { BRAND } from '../../config/brand'
 
 export default function Payroll() {
   const [data, setData] = useState(null)
@@ -216,7 +217,7 @@ export default function Payroll() {
       {/* Header */}
       <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gold flex items-center gap-2">
+          <h1 className="page-title flex items-center gap-2">
             <DollarSign className="h-6 w-6" /> Oylik Maosh Kalkulyatori va Qaydnomasi
           </h1>
           <p className="text-xs text-muted mt-1">Shifokorlar (50/50 split) va xodimlarning oylik maoshini avanslar bilan hisoblash</p>
@@ -307,7 +308,7 @@ export default function Payroll() {
       <div id="payroll-print-container" className="card p-6 space-y-4">
         {/* Printable Header */}
         <div className="hidden print:block pb-4 border-b-2 border-border text-center">
-          <h1 className="text-2xl font-black uppercase text-slate-900">MARJONA MED SERVICE</h1>
+          <h1 className="text-2xl font-black uppercase text-slate-900">{BRAND.name}</h1>
           <h2 className="text-sm font-bold uppercase text-slate-600 mt-1">
             SHIFOKORLAR VA XODIMLAR OYLIK MAOSH QAYDNOMASI ({month}/{year})
           </h2>

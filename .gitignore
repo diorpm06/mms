@@ -61,3 +61,7 @@ print-agent/config.ini
 
 # Vaqtinchalik hisobot ma'lumotlari (bemor ismlari bor)
 kunlik.json
+
+# Zaxira nusxalar — bemor ismlari va to'lov ma'lumotlari bor, repoda saqlanmaydi
+backups/
+kunlik.json

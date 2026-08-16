@@ -37,25 +37,53 @@ def _expense_out(e: Expense) -> dict:
     }
 
 
-def sync_advances_and_salaries_to_expenses(db: Session):
+def sync_advances_and_salaries_to_expenses(_ignored=None):
+    """
+    Avans/oylik/chiqarimlarni harajatlar ro'yxatiga ko'chiradi.
+
+    DIQQAT: bu funksiya O'ZINING alohida sessiyasida ishlaydi va faqat o'zi
+    qo'shgan yozuvlarni commit qiladi. Ilgari u chaqiruvchining sessiyasini
+    olib, oxirida db.commit() qilardi — natijada hisobotni OCHISH o'sha
+    sessiyadagi boshqa har qanday yarim tugallangan o'zgarishni ham bazaga
+    yozib yuborardi.
+    """
+    from datetime import timedelta
+    from database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return _sync_ichki(db)
+    finally:
+        db.close()
+
+
+def _sync_ichki(db: Session):
     from datetime import timedelta
     from models.advance import Advance
     from models.provider_advance import ProviderAdvance
     from models.salary_log import SalaryLog
     from models.employee import Employee
     from models.provider import Provider
+    from models.referrer import Referrer
+    from models.payout import Payout
 
     changed = False
+
+    # 1. Employee Advances
     advances = db.query(Advance).filter(Advance.is_cancelled == False).all()
     for a in advances:
         emp = db.query(Employee).filter(Employee.id == a.employee_id).first()
         emp_name = emp.full_name if emp else f"Xodim #{a.employee_id}"
         desc_text = f"Avans: {emp_name}" + (f" — {a.note}" if a.note else "")
+        # Kalitga IZOH ham kiradi — aks holda 5 daqiqa ichida ikki xodimga
+        # bir xil summa berilsa, ikkinchisi takror deb hisoblanib
+        # harajatlar ro'yxatiga umuman tushmay qolardi.
         exists = db.query(Expense).filter(
             Expense.category == "Avans",
             Expense.amount == a.amount,
-            Expense.created_at >= a.created_at - timedelta(seconds=10),
-            Expense.created_at <= a.created_at + timedelta(seconds=10),
+            Expense.description.like(f"%{emp_name}%"),
+            Expense.created_at >= a.created_at - timedelta(minutes=5),
+            Expense.created_at <= a.created_at + timedelta(minutes=5),
         ).first()
         if not exists:
             db.add(Expense(
@@ -67,18 +95,23 @@ def sync_advances_and_salaries_to_expenses(db: Session):
             ))
             changed = True
 
+    # 2. Provider Advances
     prov_advances = db.query(ProviderAdvance).all()
     for pa in prov_advances:
         p_name = "Noma'lum"
         if pa.recipient_type == "provider":
             p = db.query(Provider).filter(Provider.id == pa.recipient_id).first()
             if p: p_name = p.full_name
+        elif pa.recipient_type == "referrer":
+            ref = db.query(Referrer).filter(Referrer.id == pa.recipient_id).first()
+            if ref: p_name = ref.full_name
         desc_text = f"Avans: {p_name}" + (f" — {pa.note}" if pa.note else "")
         exists = db.query(Expense).filter(
             Expense.category == "Avans",
             Expense.amount == pa.amount,
-            Expense.created_at >= pa.created_at - timedelta(seconds=10),
-            Expense.created_at <= pa.created_at + timedelta(seconds=10),
+            Expense.description.like(f"%{p_name}%"),
+            Expense.created_at >= pa.created_at - timedelta(minutes=5),
+            Expense.created_at <= pa.created_at + timedelta(minutes=5),
         ).first()
         if not exists:
             db.add(Expense(
@@ -90,6 +123,7 @@ def sync_advances_and_salaries_to_expenses(db: Session):
             ))
             changed = True
 
+    # 3. Employee Salary Logs
     salaries = db.query(SalaryLog).all()
     for s in salaries:
         emp = db.query(Employee).filter(Employee.id == s.employee_id).first()
@@ -97,8 +131,9 @@ def sync_advances_and_salaries_to_expenses(db: Session):
         exists = db.query(Expense).filter(
             Expense.category == "Oylik",
             Expense.amount == s.amount,
-            Expense.created_at >= s.paid_at - timedelta(seconds=10),
-            Expense.created_at <= s.paid_at + timedelta(seconds=10),
+            Expense.description.like(f"%{emp.full_name if emp else s.employee_id}%"),
+            Expense.created_at >= s.paid_at - timedelta(minutes=5),
+            Expense.created_at <= s.paid_at + timedelta(minutes=5),
         ).first()
         if not exists:
             db.add(Expense(
@@ -106,6 +141,36 @@ def sync_advances_and_salaries_to_expenses(db: Session):
                 amount=s.amount,
                 category="Oylik",
                 created_at=s.paid_at,
+                created_by=1,
+            ))
+            changed = True
+
+    # 4. Payouts (Referrer / Provider / Employee)
+    payouts = db.query(Payout).filter(Payout.amount > 0).all()
+    for po in payouts:
+        if po.recipient_type == "referrer":
+            ref = db.query(Referrer).filter(Referrer.id == po.recipient_id).first()
+            r_name = ref.full_name if ref else f"#{po.recipient_id}"
+            desc = f"[MANBA: Naqt kassa] Yo'naltiruvchi to'lovi: {r_name}"
+            cat = "Yo'naltiruvchi to'lovi"
+        else:
+            prov = db.query(Provider).filter(Provider.id == po.recipient_id).first()
+            p_name = prov.full_name if prov else f"#{po.recipient_id}"
+            desc = f"[MANBA: Naqt kassa] Shifokor maoshi: {p_name}"
+            cat = "Oylik"
+
+        exists = db.query(Expense).filter(
+            Expense.category == cat,
+            Expense.amount == po.amount,
+            Expense.created_at >= po.created_at - timedelta(minutes=5),
+            Expense.created_at <= po.created_at + timedelta(minutes=5),
+        ).first()
+        if not exists:
+            db.add(Expense(
+                description=desc,
+                amount=po.amount,
+                category=cat,
+                created_at=po.created_at,
                 created_by=1,
             ))
             changed = True
@@ -124,7 +189,7 @@ def list_expenses(
     _: User = Depends(require_admin_or_ceo),
 ):
     try:
-        sync_advances_and_salaries_to_expenses(db)
+        sync_advances_and_salaries_to_expenses()
     except Exception as err:
         print("Expense sync error:", err)
 
@@ -189,19 +254,10 @@ def create_expense(
 
 
 class CancelBody(_BaseModel):
-    reason: str = Field(min_length=3)
+    reason: str | None = "O'chirildi"
 
 
-@router.post("/{expense_id}/cancel")
-def cancel_expense(
-    expense_id: int,
-    body: CancelBody,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_ceo),
-):
-    e = db.query(Expense).filter(Expense.id == expense_id, Expense.is_cancelled == False).first()
-    if not e:
-        raise HTTPException(status_code=404, detail="Harajat topilmadi yoki bekor qilingan")
+def _perform_expense_cancel(e: Expense, reason: str, user: User, db: Session):
     from services.finance import get_or_create_balance, log_balance_change
     bal = get_or_create_balance(db)
     bal.current_balance += e.amount
@@ -210,17 +266,49 @@ def cancel_expense(
     e.is_cancelled = True
     e.cancelled_at = datetime.now()
     e.cancelled_by = user.id
-    e.cancel_reason = body.reason
+    e.cancel_reason = reason
     db.commit()
     import asyncio
     import threading
     threading.Thread(
         target=lambda: asyncio.run(
             send_telegram_message(
-                f"❌ Harajat bekor qilindi\n🧾 {e.description}\n📝 Sabab: {body.reason}",
+                f"❌ Harajat bekor qilindi\n🧾 {e.description}\n📝 Sabab: {reason}",
                 section="cancellations",
             )
         ),
         daemon=True,
     ).start()
+
+
+@router.post("/{expense_id}/cancel")
+def cancel_expense(
+    expense_id: int,
+    body: CancelBody | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    e = db.query(Expense).filter(Expense.id == expense_id, Expense.is_cancelled == False).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Harajat topilmadi yoki bekor qilingan")
+    reason = (body.reason if body and body.reason else "O'chirildi") or "O'chirildi"
+    _perform_expense_cancel(e, reason, user, db)
     return {"message": "Harajat bekor qilindi"}
+
+
+@router.delete("/{expense_id}")
+def delete_expense(
+    expense_id: int,
+    reason: str = Query("O'chirildi"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    e = db.query(Expense).filter(Expense.id == expense_id, Expense.is_cancelled == False).first()
+    if not e:
+        # Check if already cancelled
+        e_any = db.query(Expense).filter(Expense.id == expense_id).first()
+        if e_any and e_any.is_cancelled:
+            return {"message": "Harajat allaqachon bekor qilingan"}
+        raise HTTPException(status_code=404, detail="Harajat topilmadi")
+    _perform_expense_cancel(e, reason or "O'chirildi", user, db)
+    return {"message": "Harajat o'chirildi"}

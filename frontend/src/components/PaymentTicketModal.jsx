@@ -1,6 +1,8 @@
 import { Printer, X, AlertTriangle } from 'lucide-react'
 import { formatMoney, paymentLabel } from '../utils/format'
 import { Btn, Icons } from './UIKit'
+import { BRAND } from '../config/brand'
+import ReceiptHeader from './ReceiptHeader'
 
 export default function PaymentTicketModal({ open, patient, onClose }) {
   if (!open || !patient) return null
@@ -218,11 +220,7 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
         <div id="payment-ticket-container" className="bg-white text-slate-900 p-3 rounded-2xl font-mono text-xs space-y-2 border border-slate-300">
 
           {/* Header */}
-          <div className="text-center pb-1.5 border-b border-dashed border-slate-400">
-            <img src="/logo.png" alt="Marjona Med Servis Logo" className="logo-img h-16 max-h-16 mx-auto mb-1 object-contain" />
-            <h2 className="font-black text-xs uppercase tracking-wide text-slate-900">MARJONA MED SERVIS</h2>
-            <p className="text-[9px] text-slate-900 font-black mt-0.5">Tel: +998 (55) 604 44 24</p>
-          </div>
+          <ReceiptHeader compact />
 
           {/* QUEUE TICKET NUMBER BOX */}
           <div className="ticket-number-box bg-slate-100 p-3 rounded-xl border-2 border-slate-900 text-center my-1">
@@ -271,7 +269,12 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
               <span className="text-slate-600 font-bold">To'lov Turi:</span>
               <strong className="uppercase text-right text-slate-900">
                 {firstPatient.payment_type === 'split' || firstPatient.payment_type === 'aralash'
-                  ? `Aralash (${formatMoney(totalCash)} Naqd + ${formatMoney(totalCard)} Karta/2-Usul)`
+                  ? `Aralash (${[
+                      totalCash > 0 ? `${formatMoney(totalCash)} Naqd` : '',
+                      totalCard > 0 ? `${formatMoney(totalCard)} Karta` : '',
+                      (patient.click_amount || firstPatient.click_amount) > 0 ? `${formatMoney(patient.click_amount || firstPatient.click_amount)} Click` : '',
+                      (patient.qr_amount || firstPatient.qr_amount) > 0 ? `${formatMoney(patient.qr_amount || firstPatient.qr_amount)} QR` : '',
+                    ].filter(Boolean).join(' + ') || 'Aralash'})`
                   : paymentLabel(firstPatient.payment_type)}
               </strong>
             </div>

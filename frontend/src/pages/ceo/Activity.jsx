@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../utils/api'
 import { formatDate } from '../../utils/format'
+import { PageHeader, Icons } from '../../components/UIKit'
 
 const ACTIONS = ['', 'LOGIN', 'LOGOUT', 'CREATE', 'UPDATE', 'PAYMENT', 'CANCEL', 'EXPENSE', 'ADVANCE', 'SALARY']
 
@@ -28,7 +29,11 @@ export default function Activity() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-gold">Faoliyat tarixi</h1>
+      <PageHeader
+        title="Faoliyat Tarixi"
+        subtitle="Tizimda kim nima qilgani — kirish, tahrirlash va bekor qilishlar"
+        icon={Icons.history}
+      />
       <div className="card mb-4 flex flex-wrap gap-2">
         <select className="input-field max-w-[180px]" value={userId} onChange={(e) => setUserId(e.target.value)}>
           <option value="">Barcha foydalanuvchilar</option>

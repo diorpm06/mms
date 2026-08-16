@@ -5,6 +5,7 @@ import { formatMoney, formatDate } from '../utils/format'
 import ReRegisterPatientModal from './ReRegisterPatientModal'
 import PaymentTicketModal from './PaymentTicketModal'
 import LabResultsModal from './LabResultsModal'
+import { BRAND } from '../config/brand'
 
 export default function PatientMedicalCardModal({ patient, onClose }) {
   const [history, setHistory] = useState([])
@@ -291,16 +292,16 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    <tr className="hover:bg-surface-hover font-bold text-body">
+                    <tr className="hover:bg-surface-hover font-bold text-body bg-gold/5">
                       <td className="p-2.5 font-mono text-cyan">{new Date(patient.created_at).toLocaleDateString('uz-UZ')}</td>
-                      <td className="p-2.5">{patient.service_name}</td>
+                      <td className="p-2.5 font-bold">{patient.service_name}</td>
                       <td className="p-2.5 text-muted">{patient.provider_name || '—'}</td>
-                      <td className="p-2.5 text-right font-mono text-emerald">{formatMoney(patient.payment_amount)}</td>
+                      <td className="p-2.5 text-right font-mono text-emerald font-extrabold">{formatMoney(patient.payment_amount)}</td>
                       <td className="p-2.5 text-center">
                         <span className="badge badge-gold uppercase text-[10px]">{patient.payment_type || 'Naqd'}</span>
                       </td>
                     </tr>
-                    {history.map((h) => (
+                    {history.filter(h => h.id !== patient.id).map((h) => (
                       <tr key={h.id} className="hover:bg-surface-hover text-body">
                         <td className="p-2.5 font-mono text-muted">{new Date(h.created_at).toLocaleDateString('uz-UZ')}</td>
                         <td className="p-2.5 font-semibold">{h.service_name}</td>
@@ -328,7 +329,7 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
         {/* Modal Footer Controls */}
         <div className="no-print pt-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-xs text-muted">
-            Kartochka avtomatik saqlangan • <b>Marjona Med Service CRM</b>
+            Kartochka avtomatik saqlangan • <b>{BRAND.name}</b>
           </div>
 
           <div className="flex gap-2 w-full sm:w-auto">

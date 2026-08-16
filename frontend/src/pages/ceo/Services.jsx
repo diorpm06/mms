@@ -7,6 +7,7 @@ import Modal from '../../components/Modal'
 import { TableSkeleton } from '../../components/Skeleton'
 import { Btn, Icons, PageHeader, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
 import { REPORT_TEMPLATES } from '../../utils/reportTemplates'
+import ActionMenu from '../../components/ActionMenu'
 
 // Kategoriya "Asosiy bo'lim: Ichki bo'lim" ko'rinishida saqlanadi
 // (masalan "Laboratoriya: GORMONLAR"). Quyidagi ikki yordamchi shu
@@ -69,22 +70,16 @@ export default function CeoServices() {
     })
   }
 
-  // Extra Bo'limlar with no services yet (persisted in localStorage)
-  const [localBolimlar, setLocalBolimlar] = useState(() => {
-    try {
-      const saved = localStorage.getItem('crm_local_bolimlar')
-      return saved ? JSON.parse(saved) : []
-    } catch (e) { return [] }
-  })
+  // Hali xizmati yo'q bo'limlar. Ilgari bular brauzerning localStorage'ida
+  // saqlanardi — shuning uchun bir qurilmada qo'shilgan bo'lim boshqa
+  // qurilmada umuman ko'rinmasdi. Endi serverdan olinadi.
+  const [localBolimlar, setLocalBolimlar] = useState([])
   const toast = useToastStore((s) => s.add)
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('crm_local_bolimlar', JSON.stringify(localBolimlar))
-    } catch (e) {}
-  }, [localBolimlar])
-
-  const load = () => api('/services/all').then(setItems)
+  const load = () => {
+    api('/services/all').then(setItems)
+    api('/services/categories').then((c) => setLocalBolimlar(c || [])).catch(() => {})
+  }
   useEffect(() => { load() }, [])
 
   // Group active services by main category (e.g. 'Laboratoriya' for 'Laboratoriya: GORMONLAR')
@@ -182,7 +177,7 @@ export default function CeoServices() {
           prefix_letter: cleanPrefix,
         }),
       })
-      setLocalBolimlar((prev) => prev.map((b) => (b === targetBolimOldName ? newName : b)))
+      // ro'yxat load() da serverdan qaytadan olinadi
       toast(`✓ Bo'lim nomi "${newName}" va prefiks (${cleanPrefix}) saqlandi`)
       setEditBolimModal(false)
       load()
@@ -197,7 +192,7 @@ export default function CeoServices() {
         method: 'DELETE',
       })
       toast(`✓ "${catName}" bo'limi va undagi xizmatlar o'chirildi`)
-      setLocalBolimlar((prev) => prev.filter((b) => b !== catName))
+      await api(`/services/categories?name=${encodeURIComponent(catName)}`, { method: 'DELETE' }).catch(() => {})
       setDeleteBolimTarget(null)
       load()
     } catch (e) {
@@ -260,16 +255,22 @@ export default function CeoServices() {
     } catch (e) { toast(e.message, 'error') }
   }
 
-  const handleCreateBolim = () => {
+  const handleCreateBolim = async () => {
     const name = newBolimName.trim()
     if (!name) { toast("Bo'lim nomini kiriting", 'error'); return }
     if (allBolimlar.some((b) => b.toLowerCase() === name.toLowerCase())) {
       toast("Bu nomli bo'lim allaqachon mavjud", 'error'); return
     }
-    setLocalBolimlar((prev) => [...prev, name])
-    toast(`✓ "${name}" bo'limi yaratildi`)
-    setNewBolimName('')
-    setBolimModal(false)
+    try {
+      await api('/services/categories', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      })
+      toast(`✓ "${name}" bo'limi yaratildi — barcha qurilmalarda ko'rinadi`)
+      setNewBolimName('')
+      setBolimModal(false)
+      load()
+    } catch (e) { toast(e.message, 'error') }
   }
 
   const toggleActive = async (s) => {
@@ -390,24 +391,7 @@ export default function CeoServices() {
                   </div>
 
                   <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    <Btn
-                      variant="outline"
-                      size="2xs"
-                      icon={Icons.edit}
-                      onClick={() => openEditBolim(catName)}
-                      title="Bo'lim nomini tahrirlash"
-                    >
-                      Tahrirlash
-                    </Btn>
-                    <Btn
-                      variant="danger"
-                      size="2xs"
-                      icon={Icons.trash}
-                      onClick={() => setDeleteBolimTarget(catName)}
-                      title="Bo'limni va undagi xizmatlarni o'chirish"
-                    >
-                      O'chirish
-                    </Btn>
+                    {/* Eng ko'p ishlatiladigan amal ochiq, boshqarish ⋮ menyusida */}
                     <Btn
                       variant="gold"
                       size="xs"
@@ -416,6 +400,22 @@ export default function CeoServices() {
                     >
                       Xizmat qo'shish
                     </Btn>
+                    <ActionMenu
+                      title="Bo'lim amallari"
+                      items={[
+                        {
+                          label: "Bo'lim nomini tahrirlash",
+                          icon: Icons.edit,
+                          onClick: () => openEditBolim(catName),
+                        },
+                        {
+                          label: "Bo'limni o'chirish",
+                          icon: Icons.trash,
+                          variant: 'danger',
+                          onClick: () => setDeleteBolimTarget(catName),
+                        },
+                      ]}
+                    />
                   </div>
                 </div>
 
@@ -479,7 +479,6 @@ export default function CeoServices() {
                                 <div className="flex flex-wrap items-center gap-3 text-xs text-muted font-medium">
                                   <span>🚪 Kabinet: <strong className="text-foreground">{s.cabinet || '1-Xona'}</strong></span>
                                   <span>🎟️ Navbat: <strong className="text-foreground">{s.requires_queue ? `Barchaga (${s.queue_prefix || prefixLetter})` : 'Yo\'q'}</strong></span>
-                                  <span>🤝 Yo'naltiruvchi: <strong className="text-cyan">{s.referrer_commission_percent ? `${s.referrer_commission_percent}%` : s.referrer_commission_sum ? `${formatMoney(s.referrer_commission_sum)}` : 'Yo\'q'}</strong></span>
                                 </div>
                               </div>
 
@@ -586,31 +585,7 @@ export default function CeoServices() {
             </div>
           </div>
 
-          <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-3">
-            <h4 className="font-bold text-gold text-xs uppercase tracking-wider">🤝 Yo'naltiruvchi shifokor komissiyasi</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="form-label">Komissiya foizi (%)</label>
-                <input
-                  type="number"
-                  placeholder="Masalan: 10"
-                  value={form.referrer_commission_percent}
-                  onChange={(e) => setForm({ ...form, referrer_commission_percent: e.target.value })}
-                  className="input-field text-xs font-mono font-bold"
-                />
-              </div>
-              <div>
-                <label className="form-label">Komissiya belgilangan summa (so'm)</label>
-                <input
-                  type="text"
-                  placeholder="Masalan: 20 000"
-                  value={form.referrer_commission_sum ? formatWithCommas(form.referrer_commission_sum) : ''}
-                  onChange={(e) => setForm({ ...form, referrer_commission_sum: parseDigits(e.target.value) })}
-                  className="input-field text-xs font-mono font-bold"
-                />
-              </div>
-            </div>
-          </div>
+
 
           <div className="flex items-center gap-2 pt-1">
             <input

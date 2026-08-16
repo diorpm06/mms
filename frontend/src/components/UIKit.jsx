@@ -19,6 +19,12 @@ export const Icons = {
   printer:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>,
   download:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
   search:      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  // Sahifalarda ishlatilgan, lekin bu ro'yxatda yo'q edi — ikonka jimgina
+  // ko'rinmasdan qolardi (Icons.catalog, Icons.creditCard, Icons.fileText).
+  calendar:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  catalog:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>,
+  creditCard: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+  fileText:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
   history:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4H1"/><polyline points="1 2 1 8 7 8"/></svg>,
   money:       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
   arrowUp:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>,
@@ -36,23 +42,29 @@ export const Icons = {
 }
 
 // ─── Btn ─────────────────────────────────────────────────────────────────────
+// Hamma variant index.css dagi bitta asosdan foydalanadi — ilgari info/cyan/amber
+// o'z ranglarini shu yerda yozardi va qolganlaridan farq qilardi (kun rejimida
+// och rang oq fonda deyarli ko'rinmasdi).
 const variantMap = {
   gold:    'btn-gold',
   outline: 'btn-outline',
   danger:  'btn-danger',
+  rose:    'btn-rose',
   success: 'btn-success',
+  emerald: 'btn-emerald',
   ghost:   'btn-ghost',
-  info:    'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-all duration-200 border-blue-500/60 text-blue-400 bg-transparent hover:bg-blue-500/10',
-  cyan:    'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-all duration-200 border-cyan-500/60 text-cyan-300 bg-transparent hover:bg-cyan-500/10',
-  amber:   'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition-all duration-200 border-amber-500/60 text-amber-300 bg-transparent hover:bg-amber-500/10',
+  info:    'btn-info',
+  cyan:    'btn-cyan',
+  amber:   'btn-amber',
 }
 
+// O'lcham endi index.css dagi modifikatorlar orqali — asos bilan mos keladi
 const sizeMap = {
-  '2xs': 'px-1.5 py-0.5 text-[10px] gap-1 rounded-lg',
-  xs: 'px-2 py-0.5 text-[11px] rounded-xl',
-  sm: 'px-3 py-1 text-xs',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-5 py-2.5 text-sm',
+  '2xs': 'btn-xs',
+  xs: 'btn-xs',
+  sm: 'btn-sm',
+  md: '',
+  lg: 'px-5 py-2.5 text-base',
 }
 
 export function Btn({
@@ -67,8 +79,7 @@ export function Btn({
 }) {
   const base = variantMap[variant] || variantMap.gold
   const sz   = sizeMap[size] || ''
-  const isCustom = ['info', 'cyan', 'amber'].includes(variant)
-  const sizeClass = !isCustom ? sz : sz
+  const sizeClass = sz
 
   const renderIcon = () => {
     if (!IconProp) return null

@@ -210,23 +210,60 @@ html.light {
     border-radius: inherit;
   }
 
-  /* ── Buttons ── */
+  /* ── Buttons ──────────────────────────────────────────────
+     Barcha variant BITTA asosdan foydalanadi: o'lchami, radiusi,
+     shrifti va fokus halqasi bir xil — faqat rangi farq qiladi.
+     Ilgari btn-gold katta (px-4 py-2), btn-danger/success/ghost esa
+     kichik (px-3 py-1.5 text-xs) edi, shuning uchun yonma-yon turgan
+     tugmalar har xil balandlikda chiqardi.
+     Kichikroq kerak bo'lsa: btn-sm yoki btn-xs qo'shiladi. */
+  .btn-gold, .btn-outline, .btn-danger, .btn-success, .btn-ghost,
+  .btn-info, .btn-cyan, .btn-amber, .btn-emerald, .btn-rose {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl
+           px-3.5 py-2 text-sm font-bold whitespace-nowrap
+           transition-all duration-200;
+    border: 1px solid transparent;
+    line-height: 1.25rem;
+    min-height: 2.375rem;
+    cursor: pointer;
+  }
+  .btn-gold:focus-visible, .btn-outline:focus-visible, .btn-danger:focus-visible,
+  .btn-success:focus-visible, .btn-ghost:focus-visible, .btn-info:focus-visible,
+  .btn-cyan:focus-visible, .btn-amber:focus-visible, .btn-emerald:focus-visible,
+  .btn-rose:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+  }
+  .btn-gold:disabled, .btn-outline:disabled, .btn-danger:disabled,
+  .btn-success:disabled, .btn-ghost:disabled, .btn-info:disabled,
+  .btn-cyan:disabled, .btn-amber:disabled, .btn-emerald:disabled,
+  .btn-rose:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* O'lcham modifikatorlari */
+  .btn-sm { @apply px-3 py-1.5 text-xs; min-height: 2rem; }
+  .btn-xs { @apply px-2.5 py-1 text-[11px] gap-1; min-height: 1.75rem; }
+
+  /* Asosiy harakat — to'ldirilgan */
   .btn-gold {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 font-bold transition-all duration-200 shadow-md;
     background: linear-gradient(135deg, var(--gold) 0%, var(--gold-hover) 100%);
     color: #ffffff;
+    @apply shadow-md;
   }
   html.dark .btn-gold { color: #0f172a; }
   .btn-gold:hover:not(:disabled) {
-    filter: brightness(1.1);
+    filter: brightness(1.08);
     box-shadow: 0 4px 14px var(--gold-glow);
     transform: translateY(-1px);
   }
   .btn-gold:active:not(:disabled) { transform: translateY(0); }
-  .btn-gold:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* Ikkilamchi — chiziqli */
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border-2 px-4 py-2 font-bold transition-all duration-200;
     border-color: var(--gold);
     color: var(--gold);
     background: transparent;
@@ -235,36 +272,33 @@ html.light {
     background-color: var(--gold-dim);
     box-shadow: 0 0 0 1px var(--gold-glow);
   }
-  .btn-outline:disabled { opacity: 0.45; cursor: not-allowed; }
 
-  .btn-danger {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
-    border-color: var(--danger);
-    color: var(--danger);
-    background: transparent;
-  }
-  .btn-danger:hover {
-    background-color: rgba(239, 68, 68, 0.1);
-    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2);
-  }
-
-  .btn-success {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
-    border-color: var(--success);
-    color: var(--success);
-    background: transparent;
-  }
-  .btn-success:hover { background-color: rgba(16, 185, 129, 0.1); }
-
+  /* Uchinchi darajali — fonsiz */
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all duration-200;
     color: var(--text-muted);
     background: transparent;
   }
-  .btn-ghost:hover {
+  .btn-ghost:hover:not(:disabled) {
     background-color: var(--surface-hover);
     color: var(--text);
   }
+
+  /* Rangli variantlar — hammasi bir xil naqsh */
+  .btn-danger  { border-color: rgba(239,  68,  68, 0.45); color: var(--danger);         background: transparent; }
+  .btn-rose    { border-color: rgba(239,  68,  68, 0.45); color: var(--danger);         background: transparent; }
+  .btn-success { border-color: rgba( 16, 185, 129, 0.45); color: var(--success);        background: transparent; }
+  .btn-emerald { border-color: rgba( 16, 185, 129, 0.45); color: var(--color-emerald);  background: transparent; }
+  .btn-info    { border-color: rgba( 59, 130, 246, 0.45); color: var(--color-blue);     background: transparent; }
+  .btn-cyan    { border-color: rgba(  6, 182, 212, 0.45); color: var(--color-cyan);     background: transparent; }
+  .btn-amber   { border-color: rgba(245, 158,  11, 0.45); color: var(--color-amber);    background: transparent; }
+
+  .btn-danger:hover:not(:disabled),
+  .btn-rose:hover:not(:disabled)    { background-color: rgba(239,  68,  68, 0.10); box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2); }
+  .btn-success:hover:not(:disabled),
+  .btn-emerald:hover:not(:disabled) { background-color: rgba( 16, 185, 129, 0.10); }
+  .btn-info:hover:not(:disabled)    { background-color: rgba( 59, 130, 246, 0.10); }
+  .btn-cyan:hover:not(:disabled)    { background-color: rgba(  6, 182, 212, 0.10); }
+  .btn-amber:hover:not(:disabled)   { background-color: rgba(245, 158,  11, 0.10); }
 
   /* ── Input / Select ── */
   .input-field {
@@ -376,30 +410,41 @@ html.light {
     border-color: var(--border-strong);
   }
 
-  /* ── Extra button variants ── */
-  .btn-info {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
-    border-color: rgba(59, 130, 246, 0.5);
-    color: var(--color-blue);
-    background: transparent;
+  /* ── Jadval sarlavhasi ──────────────────────────────────────
+     Ilgari jadvallarning yarmi THead komponentini (oltin rang, katta
+     harf, fon) ishlatardi, yarmi esa qo'lda <th className="p-3"> deb
+     yozilgandi — hech qanday uslubsiz. Shuning uchun bir sahifada
+     jadval boshqacha, ikkinchisida boshqacha ko'rinardi.
+     Bu qoida .card ichidagi BARCHA jadvallarga bir xil ko'rinish beradi;
+     matn joylashuvi kerak bo'lsa text-right/text-center bilan o'zgaradi. */
+  .card table thead th {
+    @apply px-3.5 py-3 text-left text-xs font-extrabold uppercase tracking-wider whitespace-nowrap;
+    color: var(--gold);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
   }
-  .btn-info:hover { background-color: rgba(59, 130, 246, 0.1); }
+  .card table thead th:first-child { border-top-left-radius: 0.5rem; }
+  .card table thead th:last-child  { border-top-right-radius: 0.5rem; }
 
-  .btn-cyan {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
-    border-color: rgba(6, 182, 212, 0.5);
-    color: var(--color-cyan);
-    background: transparent;
+  /* Jadval katagidagi tugmalar ixcham bo'lsin.
+     Tor "Harakatlar" ustunida yozuvli tugmalar o'ralib ketib, qator
+     balandligini 3-4 barobar oshirib yuborardi. */
+  .card table td :is(.btn-gold, .btn-outline, .btn-danger, .btn-rose,
+                     .btn-success, .btn-emerald, .btn-ghost,
+                     .btn-info, .btn-cyan, .btn-amber) {
+    @apply px-2 py-1 text-[11px] gap-1;
+    min-height: 1.75rem;
   }
-  .btn-cyan:hover { background-color: rgba(6, 182, 212, 0.1); }
+  /* Jadval qatorlari bir xil balandlikda ko'rinsin */
+  .card table tbody td { vertical-align: middle; }
 
-  .btn-amber {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all duration-200;
-    border-color: rgba(245, 158, 11, 0.5);
-    color: var(--color-amber);
-    background: transparent;
+  /* Qatorlar orasidagi chiziq va ustiga borilganda yoritish — bir xil */
+  .card table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.15s ease;
   }
-  .btn-amber:hover { background-color: rgba(245, 158, 11, 0.1); }
+  .card table tbody tr:last-child { border-bottom: none; }
+  .card table tbody tr:hover { background-color: var(--surface-hover); }
 
   /* ── Table head cell style ── */
   .th-cell {

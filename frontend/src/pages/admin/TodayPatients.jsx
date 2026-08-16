@@ -7,6 +7,7 @@ import PaymentTicketModal from '../../components/PaymentTicketModal'
 import PatientMedicalCardModal from '../../components/PatientMedicalCardModal'
 import ReRegisterPatientModal from '../../components/ReRegisterPatientModal'
 import { Btn, Icons, PageHeader, THead, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
+import ActionMenu from '../../components/ActionMenu'
 
 export default function TodayPatients() {
   const [patients, setPatients] = useState([])
@@ -526,19 +527,9 @@ export default function TodayPatients() {
                         )}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-1 min-w-[250px] max-w-[280px] ml-auto">
-                        {/* Karta */}
-                        <Btn
-                          variant="gold"
-                          size="xs"
-                          icon={Icons.folder}
-                          onClick={() => setEhrPatient(p)}
-                          title="Bemor elektron kartochkasi va retseptlari"
-                        >
-                          Karta
-                        </Btn>
-
-                        {/* Chek */}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Eng ko'p ishlatiladigan ikkitasi ochiq turadi —
+                            qolgani ⋮ menyusida, joy tejash uchun */}
                         <Btn
                           variant="amber"
                           size="xs"
@@ -549,7 +540,6 @@ export default function TodayPatients() {
                           Chek
                         </Btn>
 
-                        {/* Chaqir / Tugatish */}
                         {p.queue_status !== 'qabulda' && p.queue_status !== 'yakunlandi' ? (
                           <Btn
                             variant="success"
@@ -562,7 +552,7 @@ export default function TodayPatients() {
                           </Btn>
                         ) : p.queue_status === 'qabulda' ? (
                           <Btn
-                            variant="info"
+                            variant="cyan"
                             size="xs"
                             icon={Icons.check}
                             onClick={() => handleUpdateStatus(p.id, 'yakunlandi')}
@@ -571,52 +561,40 @@ export default function TodayPatients() {
                             Tugatish
                           </Btn>
                         ) : (
-                          <div className="flex items-center justify-center text-[10px] font-bold text-muted border border-border/40 rounded-xl px-1">✓ Yakunlandi</div>
+                          <span className="text-[10px] font-bold text-muted px-1.5">✓ Yakunlandi</span>
                         )}
 
-                        {/* Qayta Yozish */}
-                        <Btn
-                          variant="cyan"
-                          size="xs"
-                          onClick={() => setReRegisterPatient(p)}
-                          title="Bemorni boshqa xizmatga qayta yozish"
-                        >
-                          ➕ Yozish
-                        </Btn>
-
-                        {/* Qayta Navbat */}
-                        <Btn
-                          variant="outline"
-                          size="xs"
-                          icon={Icons.refresh}
-                          loading={reissuingId === p.id}
-                          onClick={() => handleReissueTicket(p)}
-                          title="Navbati o'tib ketganda qayta navbat berish"
-                        >
-                          Navbat
-                        </Btn>
-
-                        {/* Xato kiritilgan yo'naltiruvchi / to'lov turini tuzatish */}
-                        <Btn
-                          variant="outline"
-                          size="xs"
-                          icon={Icons.edit}
-                          onClick={() => openEdit(p)}
-                          title="Yo'naltiruvchi yoki to'lov turini tuzatish"
-                        >
-                          Tahrir
-                        </Btn>
-
-                        {/* Bekor */}
-                        <Btn
-                          variant="danger"
-                          size="xs"
-                          icon={Icons.x}
-                          onClick={() => { setCancelPatient(p); setCancelReason('') }}
-                          title="To'lovni bekor qilish (yozuv saqlanadi)"
-                        >
-                          Bekor
-                        </Btn>
+                        <ActionMenu
+                          items={[
+                            {
+                              label: 'Bemor kartasi',
+                              icon: Icons.folder,
+                              variant: 'gold',
+                              onClick: () => setEhrPatient(p),
+                            },
+                            {
+                              label: 'Boshqa xizmatga yozish',
+                              icon: Icons.plus,
+                              onClick: () => setReRegisterPatient(p),
+                            },
+                            {
+                              label: 'Qayta navbat berish',
+                              icon: Icons.refresh,
+                              onClick: () => handleReissueTicket(p),
+                            },
+                            {
+                              label: 'Tahrirlash',
+                              icon: Icons.edit,
+                              onClick: () => openEdit(p),
+                            },
+                            {
+                              label: "To'lovni bekor qilish",
+                              icon: Icons.cancel,
+                              variant: 'danger',
+                              onClick: () => { setCancelPatient(p); setCancelReason('') },
+                            },
+                          ]}
+                        />
                       </div>
                     )}
                   </td>
@@ -630,7 +608,7 @@ export default function TodayPatients() {
       {/* Call modal */}
       {callingId && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="card max-w-sm w-full p-6 shadow-2xl" style={{ borderColor: 'rgba(6,182,212,0.4)' }}>
+          <div className="card max-w-sm w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto overscroll-contain" style={{ borderColor: 'rgba(6,182,212,0.4)' }}>
             <div className="flex items-center gap-3 mb-4">
               <div className="rounded-xl p-2" style={{ background: 'rgba(6,182,212,0.12)', color: '#67e8f9' }}>
                 {Icons.bell}
@@ -672,7 +650,7 @@ export default function TodayPatients() {
       {/* YOZUVNI TAHRIRLASH (yo'naltiruvchi / to'lov turi) */}
       {editPatient && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+          <div className="card max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto overscroll-contain">
             <div>
               <h3 className="text-lg font-black text-gold">Yozuvni tuzatish</h3>
               <p className="text-xs text-muted mt-1">
@@ -882,7 +860,7 @@ export default function TodayPatients() {
       {/* TO'LOVNI BEKOR QILISH */}
       {cancelPatient && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="card max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+          <div className="card max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto overscroll-contain">
             <div>
               <h3 className="text-lg font-black text-rose-400">To'lovni bekor qilish</h3>
               <p className="text-xs text-muted mt-1">

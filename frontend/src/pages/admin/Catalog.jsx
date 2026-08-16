@@ -77,47 +77,51 @@ export default function AdminCatalog() {
           )}
 
           {tab === 'referrers' && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="table-head border-b">
-                  <th className="p-2 text-left">Ism</th>
-                  <th className="p-2 text-left">Telefon</th>
-                </tr>
-              </thead>
-              <tbody>
-                {referrers.length === 0 ? (
-                  <tr><td colSpan={2} className="text-muted p-6 text-center">Yo'naltiruvchilar yo'q</td></tr>
-                ) : referrers.map((r) => (
-                  <tr key={r.id} className="table-row border-b">
-                    <td className="p-2">{r.full_name}</td>
-                    <td className="p-2">{r.phone}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="table-head border-b">
+                    <th className="p-2 text-left">Ism</th>
+                    <th className="p-2 text-left">Telefon</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {referrers.length === 0 ? (
+                    <tr><td colSpan={2} className="text-muted p-6 text-center">Yo'naltiruvchilar yo'q</td></tr>
+                  ) : referrers.map((r) => (
+                    <tr key={r.id} className="table-row border-b">
+                      <td className="p-2">{r.full_name}</td>
+                      <td className="p-2">{r.phone}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {tab === 'providers' && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="table-head border-b">
-                  <th className="p-2 text-left">Ism</th>
-                  <th className="p-2 text-left">Mutaxassislik</th>
-                  <th className="p-2 text-left">Telefon</th>
-                </tr>
-              </thead>
-              <tbody>
-                {providers.length === 0 ? (
-                  <tr><td colSpan={3} className="text-muted p-6 text-center">Xizmat ko'rsatuvchilar yo'q</td></tr>
-                ) : providers.map((p) => (
-                  <tr key={p.id} className="table-row border-b">
-                    <td className="p-2">{p.full_name}</td>
-                    <td className="p-2">{p.specialization}</td>
-                    <td className="p-2">{p.phone}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="table-head border-b">
+                    <th className="p-2 text-left">Ism</th>
+                    <th className="p-2 text-left">Mutaxassislik</th>
+                    <th className="p-2 text-left">Telefon</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {providers.length === 0 ? (
+                    <tr><td colSpan={3} className="text-muted p-6 text-center">Xizmat ko'rsatuvchilar yo'q</td></tr>
+                  ) : providers.map((p) => (
+                    <tr key={p.id} className="table-row border-b">
+                      <td className="p-2">{p.full_name}</td>
+                      <td className="p-2">{p.specialization}</td>
+                      <td className="p-2">{p.phone}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

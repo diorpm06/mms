@@ -10,6 +10,7 @@ import Modal from '../../components/Modal'
 import { TableSkeleton } from '../../components/Skeleton'
 import { Btn, Icons, PageHeader, THead, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
 import CeoProviders from './Providers'
+import ActionMenu from '../../components/ActionMenu'
 
 export default function CeoEmployees() {
   const [activeTab, setActiveTab] = useState('employees') // 'employees' | 'providers'
@@ -389,58 +390,45 @@ export default function CeoEmployees() {
                           )}
                         </td>
                         <td className="p-3">
-                          <ActionRow>
-                            {isAct && (
-                              <Btn
-                                variant="gold"
-                                size="xs"
-                                icon={Icons.money}
-                                title="Maosh berish"
-                                onClick={async () => {
+                          <ActionMenu
+                            items={[
+                              {
+                                label: 'Maosh berish',
+                                icon: Icons.money,
+                                variant: 'gold',
+                                hidden: !isAct,
+                                onClick: async () => {
                                   setConfirmPayId(e.id)
                                   try {
                                     const s = await api(`/employees/${e.id}/payroll-summary`)
                                     setPaySummary(s)
                                   } catch (_) { setPaySummary(null) }
-                                }}
-                              >
-                                Maosh Berish
-                              </Btn>
-                            )}
+                                },
+                              },
+                              { label: 'Maosh tarixi', icon: Icons.history, onClick: () => openHistory(e) },
+                              {
+                                label: 'Tahrirlash',
+                                icon: Icons.edit,
+                                onClick: () => {
+                                  setEdit(e)
+                                  setForm({ ...e, monthly_salary: String(e.monthly_salary) })
+                                  setModal(true)
+                                },
+                              },
+                              {
+                                label: isAct ? "Ishdan bo'shatish" : 'Qayta tiklash',
+                                icon: isAct ? Icons.cancel : Icons.check,
+                                onClick: () => toggleEmployeeActive(e),
+                              },
+                              {
+                                label: "Bazadan to'liq o'chirish",
+                                icon: Icons.trash,
+                                variant: 'danger',
+                                onClick: () => hardDeleteEmployee(e),
+                              },
+                            ]}
+                          />
 
-                            <Btn variant="ghost" size="xs" icon={Icons.history} onClick={() => openHistory(e)} title="Maosh tarixi">
-                              Tarix
-                            </Btn>
-
-                            <Btn
-                              variant="outline"
-                              size="xs"
-                              icon={Icons.edit}
-                              title="Tahrirlash"
-                              onClick={() => { setEdit(e); setForm({ ...e, monthly_salary: String(e.monthly_salary) }); setModal(true) }}
-                            >
-                              Tahrir
-                            </Btn>
-
-                            <Btn
-                              variant={isAct ? "amber" : "success"}
-                              size="xs"
-                              onClick={() => toggleEmployeeActive(e)}
-                              title={isAct ? "Ishdan bo'shatish" : "Qayta tiklash"}
-                            >
-                              {isAct ? "Ishdan ketgan" : "Tiklash"}
-                            </Btn>
-
-                            <Btn
-                              variant="danger"
-                              size="xs"
-                              icon={Icons.trash}
-                              onClick={() => hardDeleteEmployee(e)}
-                              title="Bazadan to'liq o'chirish"
-                            >
-                              O'chirish
-                            </Btn>
-                          </ActionRow>
                         </td>
                       </tr>
                     )

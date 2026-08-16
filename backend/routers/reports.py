@@ -33,12 +33,12 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 def ceo_dashboard(db: Session = Depends(get_db), _: User = Depends(require_ceo)):
     from sqlalchemy import func
     from models.expense import Expense
-
     today = date.today()
     daily = dashboard_summary(db, today)
     chart = income_last_n_days(db, 7)
-    tops = top_services(db, 3)
-    refs = top_referrers(db, 3)
+    # Rahbar panelidagi kartalar — 5 tadan ko'rsatiladi
+    tops = top_services(db, 5)
+    refs = top_referrers(db, 5)
     month_start = today.replace(day=1)
     month_start_dt, month_end_dt = (
         datetime.combine(month_start, datetime.min.time()),
@@ -189,9 +189,6 @@ def report_payouts(period: str = "10day", db: Session = Depends(get_db), _: User
     ]
 
 
-@router.get("/top-referrers")
-def report_top_referrers(db: Session = Depends(get_db), _: User = Depends(require_ceo)):
-    return [{"id": r[0], "name": r[1], "count": int(r[2] or 0), "total": int(r[3] or 0)} for r in top_referrers(db)]
 
 
 @router.get("/referrer-details/{referrer_id}")

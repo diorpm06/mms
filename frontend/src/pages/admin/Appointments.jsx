@@ -106,7 +106,7 @@ export default function Appointments() {
     <div className="space-y-6 max-w-6xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gold flex items-center gap-2">
+          <h1 className="page-title flex items-center gap-2">
             <CalendarIcon className="h-6 w-6" /> Qabulga Yozilish Kalendari
           </h1>
           <p className="text-xs text-muted mt-1">Bemorlarni oldindan soatiga qarab navbatga yozish va kelganda navbatga kiritish (Check-in)</p>

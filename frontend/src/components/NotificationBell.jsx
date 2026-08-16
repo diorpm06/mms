@@ -4,6 +4,7 @@ import { Bell } from 'lucide-react'
 import { api } from '../utils/api'
 import { useNotificationStore } from '../store/notificationStore'
 import { useAuthStore } from '../store/authStore'
+import { BRAND } from '../config/brand'
 
 function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -78,7 +79,7 @@ export default function NotificationBell() {
 
     if (document.visibilityState === 'hidden') {
       try {
-        new Notification('Marjona Med Service', {
+        new Notification(BRAND.name, {
           body: newestItem?.message || "Yangi bildirishnoma",
         })
       } catch (_) {}

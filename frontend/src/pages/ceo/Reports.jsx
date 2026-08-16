@@ -8,6 +8,7 @@ import { api, downloadBlob } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { hasPositiveValues, paymentPieData, formatYAxis, moneyFormatter, truncateLabel } from '../../utils/charts'
 import { exportToExcel, exportToPdf } from '../../utils/exportUtils'
+import { BRAND } from '../../config/brand'
 
 const TABS = [
   { id: 'daily',   label: 'Kunlik' },
@@ -114,7 +115,7 @@ export default function CeoReports() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="page-title mb-1">Hisobotlar</h1>
-          <p className="text-muted text-sm">Marjona Med Service — moliyaviy hisobot</p>
+          <p className="text-muted text-sm">{BRAND.name} — moliyaviy hisobot</p>
         </div>
         <div className="flex gap-2">
           <button type="button" className="btn-outline py-2 text-sm" onClick={() => exportFile('excel')}>
@@ -169,11 +170,12 @@ export default function CeoReports() {
       ) : (
         <>
           {/* Stat summary */}
-          <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {[
               { label: 'Jami daromad',   value: formatMoney(report.total_income),  color: 'var(--success)' },
               { label: 'Naqt',           value: formatMoney(report.cash),           color: 'var(--gold)' },
               { label: 'Karta',          value: formatMoney(report.card),           color: 'var(--info)' },
+              { label: 'Click',          value: formatMoney(report.click || 0),     color: '#06b6d4' },
               { label: 'Sof foyda',      value: formatMoney(report.net_profit),     color: report.net_profit >= 0 ? 'var(--success)' : 'var(--danger)' },
             ].map((c) => (
               <div key={c.label} className="stat-card">
@@ -210,15 +212,15 @@ export default function CeoReports() {
               ) : <NoData />}
             </div>
 
-            {/* Cash / Card pie */}
+            {/* Cash / Card / Click / QR pie */}
             <div className="card">
-              <h3 className="text-body mb-4 font-semibold">Naqt / Karta</h3>
-              {hasPositiveValues(paymentPieData(report.cash, report.card, report.payment_chart)) ? (
+              <h3 className="text-body mb-4 font-semibold">To'lov Turlari Taqsimoti (Naqt, Karta, Click, QR)</h3>
+              {hasPositiveValues(paymentPieData(report.cash, report.card, report.payment_chart, report.click, report.qr)) ? (
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart margin={{ top: 16, right: 24, bottom: 16, left: 24 }}>
                       <Pie
-                        data={paymentPieData(report.cash, report.card, report.payment_chart)}
+                        data={paymentPieData(report.cash, report.card, report.payment_chart, report.click, report.qr)}
                         dataKey="value"
                         nameKey="name"
                         cx="50%"
@@ -229,7 +231,7 @@ export default function CeoReports() {
                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
-                        {paymentPieData(report.cash, report.card, report.payment_chart).map((_, i) => (
+                        {paymentPieData(report.cash, report.card, report.payment_chart, report.click, report.qr).map((_, i) => (
                           <Cell key={i} fill={chartColors[i % chartColors.length]} />
                         ))}
                       </Pie>

@@ -135,7 +135,7 @@ export default function CeoInpatients() {
 
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gold">Statsionar Yotgan Bemorlar</h1>
+          <h1 className="page-title">Statsionar Yotgan Bemorlar</h1>
           <p className="text-xs text-muted mt-1">Klinika palatalarida yotib davolanayotgan bemorlarni boshqarish va выписка chekini chop etish</p>
         </div>
         {isCeo && <button type="button" className="btn-gold" onClick={() => setModal(true)}>+ Qabul qilish</button>}

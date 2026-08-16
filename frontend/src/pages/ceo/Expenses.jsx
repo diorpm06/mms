@@ -141,14 +141,27 @@ export default function CeoExpenses() {
   }
 
   const doCancel = async () => {
-    if (cancelReason.length < 3) { toast('Sabab kamida 3 harf', 'error'); return }
+    const reasonText = cancelReason.trim() || "CEO tomonidan o'chirildi"
     try {
-      await api(`/expenses/${cancelId}/cancel`, { method: 'POST', body: JSON.stringify({ reason: cancelReason }) })
-      toast('Harajat bekor qilindi')
+      await api(`/expenses/${cancelId}`, { method: 'DELETE', body: JSON.stringify({ reason: reasonText }) })
+      toast('Harajat o\'chirildi va balans qaytarildi ✓')
       setCancelId(null)
       setCancelReason('')
       load()
-    } catch (e) { toast(e.message, 'error') }
+    } catch (e) {
+      toast(e.message || "O'chirishda xatolik", 'error')
+    }
+  }
+
+  const handleDeleteDirectly = async (eItem) => {
+    if (!window.confirm(`"${eItem.description || 'Harajat'}" (${formatMoney(eItem.amount)}) o'chirilsinmi?\nSumma balansga qaytariladi.`)) return
+    try {
+      await api(`/expenses/${eItem.id}`, { method: 'DELETE' })
+      toast('Harajat o\'chirildi ✓')
+      load()
+    } catch (err) {
+      toast(err.message || "O'chirishda xatolik", 'error')
+    }
   }
 
   return (
@@ -209,11 +222,11 @@ export default function CeoExpenses() {
                       <Btn
                         variant="danger"
                         size="xs"
-                        icon={Icons.cancel}
-                        onClick={() => { setCancelId(e.id); setCancelReason('') }}
-                        title="Bekor qilish"
+                        icon={Icons.trash}
+                        onClick={() => handleDeleteDirectly(e)}
+                        title="O'chirish (balansga qaytarish)"
                       >
-                        Bekor
+                        O'chirish
                       </Btn>
                     )}
                     {e.is_cancelled && (

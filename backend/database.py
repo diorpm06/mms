@@ -102,6 +102,22 @@ def run_migrations():
                 except Exception as e:
                     logger.warning(f"queue_tickets migration warning: {e}")
 
+                # Referrers
+                try:
+                    result = conn.execute(text("PRAGMA table_info(referrers)")).fetchall()
+                    existing_cols = [r[1] for r in result]
+                    if "lab_percent" not in existing_cols:
+                        conn.execute(text("ALTER TABLE referrers ADD COLUMN lab_percent INTEGER DEFAULT 22"))
+                    if "fizio_percent" not in existing_cols:
+                        conn.execute(text("ALTER TABLE referrers ADD COLUMN fizio_percent INTEGER DEFAULT 20"))
+                    if "uzi_sum" not in existing_cols:
+                        conn.execute(text("ALTER TABLE referrers ADD COLUMN uzi_sum INTEGER DEFAULT 15000"))
+                    if "other_sum" not in existing_cols:
+                        conn.execute(text("ALTER TABLE referrers ADD COLUMN other_sum INTEGER DEFAULT 10000"))
+                    conn.commit()
+                except Exception as e:
+                    logger.warning(f"referrers migration warning: {e}")
+
     except Exception as e:
         logger.warning(f"Migration warning: {e}")
 
@@ -116,6 +132,35 @@ def run_migrations():
                 conn.rollback()
     except Exception as e:
         logger.warning(f"template_key migration warning: {e}")
+
+    # Komissiya qoidalari endi bazada (ilgari kodda yozilgan edi).
+    for stmt in (
+        "ALTER TABLE service_categories ADD COLUMN commission_mode VARCHAR(10) DEFAULT 'none'",
+        "ALTER TABLE service_categories ADD COLUMN commission_value INTEGER DEFAULT 0",
+        "ALTER TABLE services ADD COLUMN no_referrer_commission BOOLEAN DEFAULT FALSE",
+    ):
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"commission columns migration warning: {e}")
+
+    seed_commission_rules()
+
+    # referrers.ozon_sum — Ozonaterapiya alohida bo'lim, o'z tarifi bilan
+    try:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE referrers ADD COLUMN ozon_sum INTEGER DEFAULT 10000"))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+    except Exception as e:
+        logger.warning(f"ozon_sum migration warning: {e}")
 
     # patients/transactions: click_amount, qr_amount — aralash to'lovda Click va QR
     # qismlarini kartadan ajratib yozish uchun
@@ -147,12 +192,13 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"is_paper_entry migration warning: {e}")
 
-    # users.plain_password / failed_login_attempts / locked_until — CEO uchun
-    # joriy login/parolni ko'rsatish va login sahifasida ko'p urinishni bloklash uchun
+    # referrers: lab_percent, fizio_percent, uzi_sum, other_sum, is_confirmed
     for stmt in (
-        "ALTER TABLE users ADD COLUMN plain_password VARCHAR(255)",
-        "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0",
-        "ALTER TABLE users ADD COLUMN locked_until TIMESTAMP",
+        "ALTER TABLE referrers ADD COLUMN lab_percent INTEGER DEFAULT 22",
+        "ALTER TABLE referrers ADD COLUMN fizio_percent INTEGER DEFAULT 20",
+        "ALTER TABLE referrers ADD COLUMN uzi_sum INTEGER DEFAULT 15000",
+        "ALTER TABLE referrers ADD COLUMN other_sum INTEGER DEFAULT 10000",
+        "ALTER TABLE referrers ADD COLUMN is_confirmed BOOLEAN DEFAULT TRUE",
     ):
         try:
             with engine.connect() as conn:
@@ -162,6 +208,7 @@ def run_migrations():
                 except Exception:
                     conn.rollback()
         except Exception as e:
+            logger.warning(f"referrers migration warning: {e}")
             logger.warning(f"users auth-security migration warning: {e}")
 
     # banners.image_data / content_type — rasm baza ichida saqlanadi
@@ -209,5 +256,79 @@ def get_db():
         logger.error(f"DB Session error: {e}")
         db.rollback()
         raise e
+    finally:
+        db.close()
+
+
+# Ilgari kodda qat'iy yozilgan komissiya qoidalari. Bular FAQAT bir marta,
+# jadval bo'sh bo'lganda ko'chiriladi — keyin rahbar panelidan boshqariladi.
+_ESKI_QOIDALAR = {
+    "laboratoriya": ("percent", 22),
+    "fizioterapiya": ("percent", 20),
+    "uzi": ("sum", 15000),
+    "ozonaterapiya": ("sum", 10000),
+}
+
+
+def seed_commission_rules():
+    """Mavjud xizmat bo'limlarini va eski komissiya qoidalarini bazaga ko'chiradi."""
+    from sqlalchemy.orm import Session as _S
+
+    try:
+        from models.service import Service
+        from models.service_category import ServiceCategory
+        from models.referrer import Referrer
+        from models.referrer_commission import ReferrerCommission
+    except Exception as e:
+        logger.warning(f"commission seed import warning: {e}")
+        return
+
+    db = _S(bind=engine)
+    try:
+        # 1) Har bir mavjud bo'lim uchun qator
+        bor = {c.name for c in db.query(ServiceCategory).all()}
+        kats = set()
+        for sv in db.query(Service).all():
+            raw = (sv.category or "Umumiy").strip()
+            kats.add(raw.split(":")[0].strip() if ":" in raw else raw)
+
+        qoshildi = 0
+        for nom in kats:
+            if nom in bor:
+                continue
+            rejim, qiymat = _ESKI_QOIDALAR.get(nom.strip().lower(), ("none", 0))
+            db.add(ServiceCategory(name=nom, commission_mode=rejim, commission_value=qiymat))
+            qoshildi += 1
+
+        # 2) Yo'naltiruvchilarning eski ustunlaridagi istisnolar
+        if db.query(ReferrerCommission).count() == 0:
+            maydon = {
+                "Laboratoriya": ("lab_percent", "percent", 22),
+                "Fizioterapiya": ("fizio_percent", "percent", 20),
+                "Uzi": ("uzi_sum", "sum", 15000),
+                "Ozonaterapiya": ("ozon_sum", "sum", 10000),
+            }
+            for r in db.query(Referrer).all():
+                for kat, (ustun, rejim, standart) in maydon.items():
+                    qiymat = getattr(r, ustun, None)
+                    if qiymat is not None and qiymat != standart:
+                        db.add(ReferrerCommission(
+                            referrer_id=r.id, category=kat, mode=rejim, value=int(qiymat)
+                        ))
+                        qoshildi += 1
+
+        # 3) "Uzi (qo'shimcha)" — komissiyadan chiqarilgan xizmat
+        for sv in db.query(Service).all():
+            nom = (sv.name or "").lower()
+            if ("qo'shimcha" in nom or "qoshimcha" in nom) and not sv.no_referrer_commission:
+                sv.no_referrer_commission = True
+                qoshildi += 1
+
+        if qoshildi:
+            db.commit()
+            logger.info(f"Komissiya qoidalari ko'chirildi: {qoshildi} ta yozuv")
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"commission seed warning: {e}")
     finally:
         db.close()

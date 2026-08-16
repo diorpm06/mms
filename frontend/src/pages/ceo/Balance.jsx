@@ -3,6 +3,7 @@ import { api } from '../../utils/api'
 import { formatMoney, formatDate } from '../../utils/format'
 import { Skeleton, TableSkeleton } from '../../components/Skeleton'
 import { Wallet } from 'lucide-react'
+import { PageHeader, Icons } from '../../components/UIKit'
 
 const TYPE_LABELS = {
   income:         { label: 'Kirim',          color: 'var(--success)' },
@@ -37,7 +38,11 @@ export default function CeoBalance() {
 
   return (
     <div>
-      <h1 className="page-title mb-6">Balans</h1>
+      <PageHeader
+        title="Balans"
+        subtitle="Kassa qoldig'i va pul harakati tarixi"
+        icon={Icons.money}
+      />
 
       {!balance ? (
         <Skeleton className="mb-6 h-36 rounded-2xl" />

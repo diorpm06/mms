@@ -4,12 +4,13 @@ import { api } from '../utils/api'
 import { useToastStore } from '../store/toastStore'
 import BannersManager from '../components/BannersManager'
 import { PageHeader, Btn } from '../components/UIKit'
+import { BRAND } from '../config/brand'
 
 const MARQUEE_PRESETS = [
-  "🏥 Marjona Med Service klinikasi xush kelibsiz! Ish vaqti 08:00 dan 18:00 gacha.",
+  `🏥 ${BRAND.name} klinikasiga xush kelibsiz! Ish vaqti ${BRAND.workHours}.`,
   "✨ Diqqat Aksiya! Eko-profil va UZI tahlillari uchun 20% chegirma e'lon qilindi!",
   "⚠️ Iltimos, navbatingiz kelganda elektron ekrandagi xona raqamiga rioya qiling.",
-  "📞 Murojaat va ma'lumotlar uchun telefon: +998 90 123 45 67",
+  `📞 Murojaat uchun telefon: ${BRAND.phone}`,
 ]
 
 export default function TvManagerDashboard({ defaultTab = 'live' }) {
@@ -253,7 +254,7 @@ export default function TvManagerDashboard({ defaultTab = 'live' }) {
                     <span className="text-4xl font-black text-gold font-mono block mt-1">
                       {queueLive.waiting_count || 0} nafar
                     </span>
-                    <span className="text-[10px] text-slate-400 font-bold block mt-1">Kassa & Navbat kutish zali</span>
+                    <span className="text-[10px] text-muted font-bold block mt-1">Kassa & Navbat kutish zali</span>
                   </div>
                 </div>
 

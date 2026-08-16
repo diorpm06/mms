@@ -1,5 +1,7 @@
 import { Printer, X, Building2, CheckCircle2 } from 'lucide-react'
 import { formatMoney } from '../utils/format'
+import { BRAND } from '../config/brand'
+import ReceiptHeader from './ReceiptHeader'
 
 export default function InpatientReceiptModal({ inpatient, onClose }) {
   if (!inpatient) return null
@@ -34,7 +36,7 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
   const totalPaid = inpatient.total_paid || (daysCount * dailyPrice)
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto overscroll-contain">
       {/* ── PRINT-ONLY STYLES FOR POS THERMAL PRINTERS ── */}
       <style>{`
         @media print {
@@ -77,7 +79,7 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
         {/* Modal Close Button */}
         <button
           onClick={onClose}
-          className="no-print absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+          className="no-print absolute top-4 right-4 p-2 rounded-xl text-slate-600 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
         >
           <X className="h-5 w-5" />
         </button>
@@ -97,15 +99,11 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
           className="bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-100 font-mono text-xs shadow-inner"
         >
           {/* Header */}
-          <div className="text-center pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
-            <h2 className="text-lg font-black tracking-wider uppercase">MARJONA MED SERVICE</h2>
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">Statsionar Bemor Kvitansiyasi</p>
-            <p className="text-[10px] text-slate-400 mt-1">Tel: +998 90 123-45-67</p>
-          </div>
+          <ReceiptHeader subtitle="Statsionar Bemor Kvitansiyasi" />
 
           {/* PALATA & KOYKA BADGE */}
           <div className="my-4 py-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-center">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
+            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest block">
               PALATA / KOYKA
             </span>
             <div className="text-3xl font-black text-cyan-600 dark:text-cyan-400 tracking-tight font-mono my-0.5">
@@ -119,16 +117,16 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
           {/* Patient Info */}
           <div className="space-y-1.5 py-3 border-b border-dashed border-slate-300 dark:border-slate-700">
             <div className="flex justify-between">
-              <span className="text-slate-500">Mijoz:</span>
+              <span className="text-slate-700">Mijoz:</span>
               <strong className="text-right">{inpatient.first_name} {inpatient.last_name}</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Telefon:</span>
+              <span className="text-slate-700">Telefon:</span>
               <span>{inpatient.phone}</span>
             </div>
             {inpatient.diagnosis && (
               <div className="flex justify-between">
-                <span className="text-slate-500">Tashxis:</span>
+                <span className="text-slate-700">Tashxis:</span>
                 <span className="font-bold text-right">{inpatient.diagnosis}</span>
               </div>
             )}
@@ -137,19 +135,19 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
           {/* Stay Details */}
           <div className="space-y-1.5 py-3 border-b border-dashed border-slate-300 dark:border-slate-700">
             <div className="flex justify-between">
-              <span className="text-slate-500">Yotqizilgan sana:</span>
+              <span className="text-slate-700">Yotqizilgan sana:</span>
               <span>{admitDate}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Chiqarilgan sana:</span>
+              <span className="text-slate-700">Chiqarilgan sana:</span>
               <span>{dischargeDate}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Jami kunlar:</span>
+              <span className="text-slate-700">Jami kunlar:</span>
               <strong className="text-cyan-700 dark:text-cyan-300">{daysCount} kun</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Kunlik stavka:</span>
+              <span className="text-slate-700">Kunlik stavka:</span>
               <span>{formatMoney(dailyPrice)}</span>
             </div>
           </div>
@@ -162,7 +160,7 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
                 {formatMoney(totalPaid)}
               </span>
             </div>
-            <div className="flex justify-between text-[11px] text-slate-500 mt-1">
+            <div className="flex justify-between text-[11px] text-slate-700 mt-1">
               <span>Holat:</span>
               <span className="uppercase font-bold text-emerald-600">{inpatient.status === 'chiqdi' ? 'ЧИКДИ (ВЫПИСКА)' : 'YOTMOQDA'}</span>
             </div>
@@ -173,7 +171,7 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
             <div className="inline-block font-mono tracking-widest text-[14px] font-black border-t-2 border-b-2 border-slate-900 dark:border-slate-100 px-4 py-0.5">
               ||| ||||| |||| || |||||| | |||
             </div>
-            <p className="text-[9px] text-slate-400 mt-2 italic">
+            <p className="text-[9px] text-slate-600 mt-2 italic">
               Klinikamizda davolanganingiz uchun rahmat! Tugal salomatlik tilaymiz!
             </p>
           </div>

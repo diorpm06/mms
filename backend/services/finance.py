@@ -45,22 +45,45 @@ def calculate_financial_split(
     referrer_commission_sum: int | None = 0,
     ref_doc_split_pct: int | None = None,
     ref_doc_split_sum: int | None = 0,
+    is_uzi: bool = False,
+    original_price: int | None = None,
 ):
     """
     Financial split logic:
-    - Provider (Doctor) base = total * provider_percentage / 100
-    - Referrer amount = referrer_commission_sum or (total * referrer_percentage / 100)
-    - Doctor deduction = ref_doc_split_sum or (referrer_amount * ref_doc_split_pct / 100)
-    - Provider final = max(0, provider_base - doctor_deduction)
-    - Center final = max(0, total - referrer_amount - provider_final)
-    """
-    provider_base = int(total * provider_percentage / 100)
+    - Normal services:
+      - Provider base = total * provider_percentage / 100
+      - Referrer amount = referrer_commission_sum or (total * referrer_percentage / 100)
+      - Doctor deduction = ref_doc_split_sum or (referrer_amount * ref_doc_split_pct / 100)
+      - Provider final = max(0, provider_base - doctor_deduction)
+      - Center final = max(0, total - referrer_amount - provider_final)
 
+    - UZI services (Special Rule):
+      - Clinic fixed fee = 0 if (original_price and total < original_price) else 10000
+      - Remaining = max(0, total - clinic_fixed_fee)
+      - Provider final = int(remaining * provider_percentage / 100)
+      - Referrer amount = referrer_commission_sum or (total * referrer_percentage / 100)
+      - Referrer is paid 100% from clinic share (0 deduction from doctor)
+      - Center final = max(0, total - referrer_amount - provider_final)
+    """
     referrer_amount = 0
     if referrer_commission_sum and referrer_commission_sum > 0:
         referrer_amount = int(referrer_commission_sum)
     elif referrer_percentage:
         referrer_amount = int(total * referrer_percentage / 100)
+
+    if is_uzi:
+        has_discount = original_price is not None and total < original_price
+        clinic_fixed_fee = 0 if has_discount else 10000
+        remaining = max(0, total - clinic_fixed_fee)
+        pct = provider_percentage if provider_percentage > 0 else 50
+        provider_amount = int(remaining * pct / 100)
+        # DIQQAT: max(0, ...) QO'YMANG. Komissiya to'lovdan oshib ketsa markaz
+        # ulushi minusga tushishi kerak — nolga qisilsa ulushlar yig'indisi
+        # to'lovdan katta bo'lib qoladi va tizim yo'qdan pul yaratadi.
+        center_amount = total - referrer_amount - provider_amount
+        return referrer_amount, provider_amount, center_amount
+
+    provider_base = int(total * provider_percentage / 100)
 
     ref_doc_deduction = 0
     if referrer_amount > 0:
@@ -70,9 +93,120 @@ def calculate_financial_split(
             ref_doc_deduction = int((referrer_amount * ref_doc_split_pct) / 100)
 
     provider_amount = max(0, provider_base - ref_doc_deduction)
-    center_amount = max(0, total - referrer_amount - provider_amount)
+    center_amount = total - referrer_amount - provider_amount
 
     return referrer_amount, provider_amount, center_amount
+
+
+# Komissiya qoidalari bazada saqlanadi, lekin hisobotlarda yuzlab bemor uchun
+# takror o'qilmasligi kerak — shuning uchun jarayon xotirasida saqlanadi va
+# sozlama o'zgarganda bekor qilinadi.
+_QOIDA_KESH: dict = {"bolim": None, "istisno": None}
+
+
+def invalidate_commission_cache() -> None:
+    """Komissiya sozlamasi o'zgarganda chaqiriladi."""
+    _QOIDA_KESH["bolim"] = None
+    _QOIDA_KESH["istisno"] = None
+
+
+def _load_commission_rules(db: Session):
+    if _QOIDA_KESH["bolim"] is None or _QOIDA_KESH["istisno"] is None:
+        from models.referrer_commission import ReferrerCommission
+        from models.service_category import ServiceCategory
+
+        _QOIDA_KESH["bolim"] = {
+            (c.name or "").strip().lower(): (c.commission_mode or "none", int(c.commission_value or 0))
+            for c in db.query(ServiceCategory).all()
+        }
+        _QOIDA_KESH["istisno"] = {
+            (rc.referrer_id, (rc.category or "").strip().lower()): (rc.mode or "none", int(rc.value or 0))
+            for rc in db.query(ReferrerCommission).all()
+        }
+    return _QOIDA_KESH["bolim"], _QOIDA_KESH["istisno"]
+
+
+def main_category(raw: str | None) -> str:
+    """'Laboratoriya: GORMONLAR' -> 'Laboratoriya'"""
+    v = (raw or "Umumiy").strip()
+    return v.split(":")[0].strip() if ":" in v else v
+
+
+def get_referrer_rates_for_service(referrer, service, db: Session | None = None):
+    """
+    Yo'naltiruvchiga shu xizmat uchun qancha berilishini qaytaradi: (foiz, summa).
+
+    Tartib:
+      1. Xizmat komissiyadan chiqarilgan bo'lsa -> 0
+      2. Shu yo'naltiruvchi uchun bo'limda istisno bor bo'lsa -> o'sha
+      3. Aks holda bo'limning umumiy tarifi
+      4. Bo'lim topilmasa yoki tarifi "yo'q" bo'lsa -> 0
+
+    Qoidalar bazadan o'qiladi (rahbar panelidan boshqariladi). Ilgari bu
+    yerda bo'lim nomlari va tariflar kodda yozib qo'yilgan edi.
+    """
+    if not referrer or not service:
+        return 0, 0
+
+    if getattr(service, "no_referrer_commission", False):
+        return 0, 0
+
+    if db is None:
+        db = _sessiya_ol()
+        oz_sessiyam = True
+    else:
+        oz_sessiyam = False
+
+    try:
+        bolimlar, istisnolar = _load_commission_rules(db)
+    finally:
+        if oz_sessiyam:
+            db.close()
+
+    kalit = main_category(getattr(service, "category", None)).lower()
+    rejim, qiymat = istisnolar.get((referrer.id, kalit)) or bolimlar.get(kalit) or ("none", 0)
+
+    if rejim == "percent":
+        return int(qiymat), 0
+    if rejim == "sum":
+        return 0, int(qiymat)
+    
+    c_name = kalit
+    # 1. Laboratoriya
+    if any(k in c_name for k in [
+        "labora", "tahlil", "gormon", "infeksiya", "biokimyo", "klinik",
+        "koagul", "gepatit", "torch", "elektrolit", "allergiya", "revmatoid",
+        "siydik", "mazok", "surtma", "oak", "vsk", "crb"
+    ]):
+        pct = getattr(referrer, "lab_percent", 22)
+        return (pct if pct is not None and pct > 0 else 22), 0
+
+    # 2. Fizioterapiya
+    if any(k in c_name for k in [
+        "fizio", "terapiya", "aktivator", "lazer", "magnit", "elektro",
+        "parafin", "xijoma", "ultrazvuk", "uvch", "darsanval", "tubus",
+        "limfo", "traksion", "gidro", "cho'zish", "iglo", "bochka"
+    ]):
+        pct = getattr(referrer, "fizio_percent", 20)
+        return (pct if pct is not None and pct > 0 else 20), 0
+
+    # 3. UZI
+    if any(k in c_name for k in ["uzi", "ultratovush", "mashonka"]):
+        s_val = getattr(referrer, "uzi_sum", 15000)
+        return 0, (s_val if s_val is not None and s_val > 0 else 15000)
+
+    # 4. Ozonaterapiya
+    if any(k in c_name for k in ["ozon", "ozonoterap", "ozonaterap"]):
+        s_val = getattr(referrer, "ozon_sum", 10000)
+        return 0, (s_val if s_val is not None and s_val > 0 else 10000)
+
+    # Qolgan barcha xizmatlar (EKG, Konsultatsiya, Massaj va h.k.) -> 0 so'm
+    return 0, 0
+
+
+def _sessiya_ol():
+    from database import SessionLocal
+    return SessionLocal()
 
 
 def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None, db: Session, service_id: int | None = None):
@@ -84,27 +218,22 @@ def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None,
             provider_pct = provider.percentage
 
     referrer = None
-    referrer_pct = None
     if referrer_id:
         referrer = db.query(Referrer).filter(Referrer.id == referrer_id, Referrer.is_active == True).first()
-        if referrer:
-            referrer_pct = referrer.percentage
 
     from models.service import Service
     service = db.query(Service).filter(Service.id == service_id).first() if service_id else None
 
-    ref_comm_sum = service.referrer_commission_sum if service else 0
-    ref_comm_pct = service.referrer_commission_percent if (service and service.referrer_commission_percent) else 0
+    ref_comm_pct, ref_comm_sum = get_referrer_rates_for_service(referrer, service, db)
     ref_doc_split_pct = service.referrer_doctor_split_percent if service else None
     ref_doc_split_sum = service.referrer_doctor_split_sum if service else 0
 
-    # DIQQAT: yo'naltiruvchi ko'rsatilmagan bo'lsa komissiya umuman
-    # hisoblanmasligi kerak. Ilgari komissiya xizmat sozlamasidan olinib,
-    # yo'naltiruvchi yo'q bo'lsa ham klinika ulushidan ayirilardi va hech
-    # kimga berilmasdi — pul yo'qolib ketardi.
     if not referrer:
         ref_comm_pct = 0
         ref_comm_sum = 0
+
+    is_uzi = main_category(service.category).lower().startswith("uzi") if service else False
+    original_price = service.price if service else total
 
     referrer_amount, provider_amount, center_amount = calculate_financial_split(
         total=total,
@@ -113,6 +242,8 @@ def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None,
         referrer_commission_sum=ref_comm_sum,
         ref_doc_split_pct=ref_doc_split_pct if referrer else None,
         ref_doc_split_sum=ref_doc_split_sum if referrer else 0,
+        is_uzi=is_uzi,
+        original_price=original_price,
     )
     return provider, referrer, referrer_amount, provider_amount, center_amount
 
@@ -439,22 +570,22 @@ def employee_payroll_summary(db: Session, employee_id: int, month: str | None = 
 
 
 def cancel_patient_payment(db: Session, patient: Patient, tx: Transaction) -> None:
-    if patient.is_cancelled:
-        raise HTTPException(status_code=400, detail="Allaqachon bekor qilingan")
-    provider = db.query(Provider).filter(Provider.id == tx.provider_id).first()
+    if patient.is_cancelled or (tx and tx.is_cancelled):
+        return
+    provider = db.query(Provider).filter(Provider.id == tx.provider_id).first() if tx.provider_id else None
     if tx.referrer_id:
         ref = db.query(Referrer).filter(Referrer.id == tx.referrer_id).first()
         if ref:
-            ref.balance = max(0, ref.balance - tx.referrer_amount)
+            ref.balance = max(0, ref.balance - (tx.referrer_amount or 0))
     if provider:
-        provider.balance = max(0, provider.balance - tx.provider_amount)
+        provider.balance = max(0, provider.balance - (tx.provider_amount or 0))
     bal = get_or_create_balance(db)
-    bal.current_balance = max(0, bal.current_balance - tx.center_amount)
+    bal.current_balance = max(0, bal.current_balance - (tx.center_amount or 0))
     bal.updated_at = datetime.now()
-    log_balance_change(db, -tx.center_amount, "cancel", f"Bekor: mijoz #{patient.id}")
+    log_balance_change(db, -(tx.center_amount or 0), "cancel", f"Bekor/O'chirish: mijoz #{patient.id}")
     tx.is_cancelled = True
     tx.cancelled_at = datetime.now()
-    tx.cancel_reason = patient.cancel_reason
+    tx.cancel_reason = patient.cancel_reason or "Bekor qilindi"
 
 
 def process_advance(db: Session, amount: int, description: str) -> Balance:

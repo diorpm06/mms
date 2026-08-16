@@ -28,17 +28,28 @@ def list_referrers(
     return q.order_by(Referrer.full_name).all()
 
 
+@router.get("/pending", response_model=list[ReferrerOut])
+def pending_referrers(db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)):
+    return db.query(Referrer).filter(Referrer.is_active == True, Referrer.is_confirmed == False).all()
+
+
 @router.post("", response_model=ReferrerOut)
-def create_referrer(data: ReferrerCreate, db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)):
-    r = Referrer(**data.model_dump())
+def create_referrer(data: ReferrerCreate, db: Session = Depends(get_db), user: User = Depends(require_admin_or_ceo)):
+    d = data.model_dump()
+    # If created by CEO directly in CEO page, consider it confirmed unless specified
+    if user.role == "ceo" and "is_confirmed" not in d:
+        d["is_confirmed"] = True
+    else:
+        d["is_confirmed"] = False
+    r = Referrer(**d)
     db.add(r)
     db.commit()
     db.refresh(r)
     return r
 
 
-@router.put("/{referrer_id}", response_model=ReferrerOut)
-def update_referrer(
+@router.post("/{referrer_id}/confirm", response_model=ReferrerOut)
+def confirm_referrer(
     referrer_id: int, data: ReferrerUpdate, db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)
 ):
     r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
@@ -46,6 +57,24 @@ def update_referrer(
         raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(r, k, v)
+    r.is_confirmed = True
+    db.commit()
+    db.refresh(r)
+    return r
+
+
+@router.put("/{referrer_id}", response_model=ReferrerOut)
+def update_referrer(
+    referrer_id: int, data: ReferrerUpdate, db: Session = Depends(get_db), user: User = Depends(require_admin_or_ceo)
+):
+    r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(r, k, v)
+    # If CEO edits rates, confirm automatically
+    if user.role == "ceo" and data.is_confirmed is not False:
+        r.is_confirmed = True
     db.commit()
     db.refresh(r)
     return r
@@ -66,7 +95,9 @@ def payout_referrer(
     referrer_id: int,
     body: PayoutBody,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin_or_ceo),
+    # Faqat rahbar: bu klinikadan pul chiqishi. Admin panelida bunday tugma
+    # yo'q edi, lekin API ochiq turgani uchun so'rov yuborib chiqarish mumkin edi.
+    _: User = Depends(require_ceo),
 ):
     payout = payout_recipient_balance(db, "referrer", referrer_id, source=body.source)
     qoplandi = getattr(payout, "settled_from_advance", 0) or 0

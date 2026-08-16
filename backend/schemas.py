@@ -33,8 +33,9 @@ class UserOut(BaseModel):
 
 
 class ServiceCreate(BaseModel):
-    name: str
-    price: int = Field(ge=0)
+    # Bo'sh nom qabul qilinardi — katalogda nomsiz xizmat paydo bo'lardi
+    name: str = Field(min_length=1, max_length=200)
+    price: int = Field(ge=0, le=100_000_000)
     category: Optional[str] = "Umumiy"
     cabinet: Optional[str] = "1-Xona"
     requires_queue: Optional[bool] = True
@@ -91,9 +92,15 @@ class ServiceOut(BaseModel):
 
 
 class ReferrerCreate(BaseModel):
-    full_name: str
+    full_name: str = Field(min_length=1, max_length=200)
     phone: Optional[str] = ""
     percentage: Optional[int] = Field(default=0, ge=0, le=100)
+    lab_percent: Optional[int] = Field(default=22, ge=0, le=100)
+    fizio_percent: Optional[int] = Field(default=20, ge=0, le=100)
+    uzi_sum: Optional[int] = Field(default=15000, ge=0)
+    ozon_sum: Optional[int] = Field(default=10000, ge=0)
+    other_sum: Optional[int] = Field(default=10000, ge=0)
+    is_confirmed: Optional[bool] = False
 
     @field_validator("phone")
     @classmethod
@@ -109,7 +116,13 @@ class ReferrerUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
     percentage: Optional[int] = Field(default=None, ge=0, le=100)
+    lab_percent: Optional[int] = Field(default=None, ge=0, le=100)
+    fizio_percent: Optional[int] = Field(default=None, ge=0, le=100)
+    uzi_sum: Optional[int] = Field(default=None, ge=0)
+    ozon_sum: Optional[int] = Field(default=None, ge=0)
+    other_sum: Optional[int] = Field(default=None, ge=0)
     is_active: Optional[bool] = None
+    is_confirmed: Optional[bool] = None
 
 
 class ReferrerOut(BaseModel):
@@ -117,8 +130,14 @@ class ReferrerOut(BaseModel):
     full_name: str
     phone: str
     percentage: int
+    lab_percent: int = 22
+    fizio_percent: int = 20
+    uzi_sum: int = 15000
+    ozon_sum: int = 10000
+    other_sum: int = 10000
     balance: int
     is_active: bool
+    is_confirmed: bool = True
 
     class Config:
         from_attributes = True
@@ -171,9 +190,9 @@ class ProviderOut(BaseModel):
 
 
 class EmployeeCreate(BaseModel):
-    full_name: str
-    position: str
-    monthly_salary: int = Field(gt=0)
+    full_name: str = Field(min_length=1, max_length=200)
+    position: str = Field(min_length=1, max_length=120)
+    monthly_salary: int = Field(gt=0, le=1_000_000_000)
 
 
 class EmployeeUpdate(BaseModel):
@@ -197,12 +216,14 @@ class EmployeeOut(BaseModel):
 class ServiceItem(BaseModel):
     service_id: int
     provider_id: Optional[int] = None
-    price: Optional[int] = None
-    quantity: Optional[int] = 1
+    # Manfiy narx to'lovni 0 ga tushirardi, 10^12 esa bazani "out of range"
+    # xatosi bilan yiqitardi. Soni 0 yoki manfiy ham qabul qilinardi.
+    price: Optional[int] = Field(default=None, ge=0, le=100_000_000)
+    quantity: Optional[int] = Field(default=1, ge=1, le=100)
 
 
 class PatientCreate(BaseModel):
-    first_name: str
+    first_name: str = Field(min_length=1, max_length=120)
     last_name: Optional[str] = ""
     birth_date: date
     phone: Optional[str] = ""
@@ -213,17 +234,37 @@ class PatientCreate(BaseModel):
     services: Optional[list[ServiceItem]] = None
     payment_amount: Optional[int] = None
     payment_type: str  # cash | card | click | qr | split
-    cash_amount: Optional[int] = 0
-    card_amount: Optional[int] = 0
+    # Manfiy summa kassani buzardi (to'lov musbat, naqd manfiy bo'lib qolardi)
+    cash_amount: Optional[int] = Field(default=0, ge=0)
+    card_amount: Optional[int] = Field(default=0, ge=0)
     # Aralash to'lovda Click/Payme va QR qismlari — kartadan alohida
-    click_amount: Optional[int] = 0
-    qr_amount: Optional[int] = 0
+    click_amount: Optional[int] = Field(default=0, ge=0)
+    qr_amount: Optional[int] = Field(default=0, ge=0)
     discount_amount: Optional[int] = Field(default=0, ge=0)
     discount_reason: Optional[str] = None
     discount_target_service_id: Optional[int] = None
     custom_date: Optional[date] = None
     is_paper_entry: Optional[bool] = False
     confirm_duplicate: Optional[bool] = False
+
+    @field_validator("birth_date")
+    @classmethod
+    def validate_birth_date(cls, v: date) -> date:
+        """2099-yil kabi kelajak sanasi qabul qilinardi."""
+        from datetime import date as _d
+        if v > _d.today():
+            raise ValueError("Tug'ilgan sana kelajakda bo'lishi mumkin emas")
+        if v.year < 1900:
+            raise ValueError("Tug'ilgan sana noto'g'ri")
+        return v
+
+    @field_validator("first_name")
+    @classmethod
+    def validate_first_name(cls, v: str) -> str:
+        """Bo'sh ism qabul qilinardi — ro'yxatda nomsiz bemor paydo bo'lardi."""
+        if not (v or "").strip():
+            raise ValueError("Bemor ismini kiriting")
+        return v.strip()
 
     @field_validator("phone")
     @classmethod
@@ -244,8 +285,9 @@ class PatientCreate(BaseModel):
 
 
 class ExpenseCreate(BaseModel):
-    description: str
-    amount: int = Field(gt=0)
+    # Bo'sh izoh qabul qilinardi, 10^12 esa bazani yiqitardi
+    description: str = Field(min_length=1, max_length=500)
+    amount: int = Field(gt=0, le=1_000_000_000)
     category: Optional[str] = None
     source: Optional[str] = None
 

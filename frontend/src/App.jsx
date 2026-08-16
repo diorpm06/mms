@@ -15,6 +15,7 @@ const CeoPatients = lazy(() => import('./pages/ceo/Patients'))
 const CeoServices = lazy(() => import('./pages/ceo/Services'))
 const AdminReportQueue = lazy(() => import('./pages/admin/ReportQueue'))
 const CeoReferrers = lazy(() => import('./pages/ceo/Referrers'))
+const CeoCommissions = lazy(() => import('./pages/ceo/Commissions'))
 const CeoProviders = lazy(() => import('./pages/ceo/Providers'))
 const CeoEmployees = lazy(() => import('./pages/ceo/Employees'))
 const CeoBalance = lazy(() => import('./pages/ceo/Balance'))
@@ -121,6 +122,9 @@ function AppRoutes() {
           <Route path="patients" element={<CeoPatients />} />
           <Route path="services" element={<CeoServices />} />
           <Route path="referrers" element={<CeoReferrers />} />
+          {/* Komissiya endi Yo'naltiruvchilar sahifasi ichida. Eski havola
+              saqlangan bo'lsa ham shu yerga olib boradi. */}
+          <Route path="commissions" element={<CeoReferrers />} />
           <Route path="providers" element={<CeoProviders />} />
           <Route path="employees" element={<CeoEmployees />} />
           <Route path="inpatients" element={<CeoInpatients />} />

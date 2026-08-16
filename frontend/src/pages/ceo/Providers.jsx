@@ -10,6 +10,7 @@ import { useToastStore } from '../../store/toastStore'
 import Modal from '../../components/Modal'
 import { TableSkeleton } from '../../components/Skeleton'
 import { Btn, Icons, PageHeader, THead, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
+import ActionMenu from '../../components/ActionMenu'
 
 const SOURCES = ['Naqt kassa', 'Karta kassa', 'Bank hisob', 'Boshqa']
 const emptyForm = { full_name: '', specialization: '', phone: '+998', percentage: '', fixed_salary: '', username: '', password: '', service_ids: [] }
@@ -475,50 +476,41 @@ export default function CeoProviders() {
                         : formatMoney(advances[p.id] ? advances[p.id].remaining : (p.balance || 0))}
                     </td>
                     <td className="p-3">
-                      <ActionRow>
-                        {p.balance > 0 && isAct && (
-                          <Btn variant="success" size="xs" icon={Icons.arrowDown} onClick={() => payout(p.id)} title="Balansni chiqarish">
-                            Chiqarish
-                          </Btn>
-                        )}
-                        {isAct && (
-                          <Btn
-                            variant="gold"
-                            size="xs"
-                            icon={Icons.creditCard}
-                            onClick={() => {
+                      <ActionMenu
+                        items={[
+                          {
+                            label: 'Balansni chiqarish',
+                            icon: Icons.arrowDown,
+                            variant: 'success',
+                            hidden: !(p.balance > 0 && isAct),
+                            onClick: () => payout(p.id),
+                          },
+                          {
+                            label: 'Avans berish',
+                            icon: Icons.creditCard,
+                            variant: 'gold',
+                            hidden: !isAct,
+                            onClick: () => {
                               setSelectedProviderForAdvance(p)
                               setAdvanceAmount('1000000')
                               setAdvanceModal(true)
-                            }}
-                            title="Avans berish"
-                          >
-                            Avans
-                          </Btn>
-                        )}
-                        <Btn variant="outline" size="xs" icon={Icons.edit} onClick={() => handleOpenEdit(p)} title="Tahrirlash">
-                          Tahrir
-                        </Btn>
+                            },
+                          },
+                          { label: 'Tahrirlash', icon: Icons.edit, onClick: () => handleOpenEdit(p) },
+                          {
+                            label: isAct ? "Ishdan ketgan deb belgilash" : 'Qayta tiklash',
+                            icon: isAct ? Icons.cancel : Icons.check,
+                            onClick: () => toggleProviderActive(p),
+                          },
+                          {
+                            label: "Bazadan to'liq o'chirish",
+                            icon: Icons.trash,
+                            variant: 'danger',
+                            onClick: () => hardDeleteProvider(p),
+                          },
+                        ]}
+                      />
 
-                        <Btn
-                          variant={isAct ? "amber" : "success"}
-                          size="xs"
-                          onClick={() => toggleProviderActive(p)}
-                          title={isAct ? "Ishdan ketgan deb belgilash" : "Qayta tiklash"}
-                        >
-                          {isAct ? "Ishdan ketgan" : "Tiklash"}
-                        </Btn>
-
-                        <Btn
-                          variant="danger"
-                          size="xs"
-                          icon={Icons.trash}
-                          onClick={() => hardDeleteProvider(p)}
-                          title="Bazadan to'liq o'chirish"
-                        >
-                          O'chirish
-                        </Btn>
-                      </ActionRow>
                     </td>
                   </tr>
                 )

@@ -14,7 +14,8 @@ router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
 
 class InventoryCreate(BaseModel):
-    name: str
+    # Bo'sh nom qabul qilinardi — omborda nomsiz material paydo bo'lardi
+    name: str = Field(min_length=1, max_length=200)
     category: str = "Sarflash materiali"
     quantity: int = Field(default=0, ge=0)
     unit: str = "dona"

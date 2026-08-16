@@ -110,7 +110,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="card max-w-lg w-full p-6 relative animate-in fade-in zoom-in-95 space-y-4">
+      <div className="card max-w-lg w-full p-6 relative animate-in fade-in zoom-in-95 space-y-4 max-h-[90vh] overflow-y-auto overscroll-contain">
         
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-border">

@@ -227,7 +227,7 @@ export default function CeoDashboard() {
       {/* Top cards */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="card">
-          <h2 className="accent-value mb-4 font-semibold">Top 3 xizmat</h2>
+          <h2 className="accent-value mb-4 font-semibold">Top 5 xizmat</h2>
           {d.top_services.length === 0 ? (
             <p className="text-muted text-sm">Ma'lumot yo'q</p>
           ) : (
@@ -251,7 +251,7 @@ export default function CeoDashboard() {
         </div>
 
         <div className="card">
-          <h2 className="accent-value mb-4 font-semibold">Top 3 yo'naltiruvchi</h2>
+          <h2 className="accent-value mb-4 font-semibold">Top 5 yo'naltiruvchi</h2>
           {d.top_referrers.length === 0 ? (
             <p className="text-muted text-sm">Ma'lumot yo'q</p>
           ) : (

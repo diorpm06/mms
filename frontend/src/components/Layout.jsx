@@ -8,6 +8,7 @@ import NotificationBell from './NotificationBell'
 import InternalChatModal from './InternalChatModal'
 import PaymentReminderWidget from './PaymentReminderWidget'
 import logo from '@assets/logo.png'
+import { BRAND } from '../config/brand'
 
 const CEO_LINKS = [
   { to: '/ceo',                 label: 'Dashboard',             icon: '📌', end: true },
@@ -96,7 +97,7 @@ export default function Layout({ role }) {
         {!logoError ? (
           <img
             src={logo}
-            alt="Marjona Med Service"
+            alt={BRAND.name}
             className="logo-img"
             onError={() => setLogoError(true)}
           />
@@ -109,7 +110,7 @@ export default function Layout({ role }) {
           </div>
         )}
         <p className="text-center text-sm font-black tracking-wide" style={{ color: 'var(--gold)' }}>
-          Marjona Med Service
+          {BRAND.name}
         </p>
         <p className="text-muted text-xs font-semibold">
           {effectiveRole === 'doctor' ? '🩺 Shifokor' : effectiveRole === 'admin' ? '👤 Administrator (Admin)' : '👑 Rahbar (Boshqaruv)'}
@@ -206,7 +207,7 @@ export default function Layout({ role }) {
           >
             {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
-          <span className="font-extrabold text-sm text-gold">Marjona Med Service</span>
+          <span className="font-extrabold text-sm text-gold">{BRAND.name}</span>
           <div className="flex items-center gap-2">
             <NotificationBell />
             <button type="button" onClick={handleLogout} className="text-rose-400 p-1">
@@ -218,7 +219,7 @@ export default function Layout({ role }) {
         {/* Desktop Top Header Bar for Notifications */}
         <header className="hidden md:flex h-12 items-center justify-between px-6 border-b border-border/40 bg-surface-1/40 backdrop-blur-sm flex-shrink-0">
           <div className="flex items-center gap-2 text-xs font-bold text-muted">
-            <span>🏥 Marjona Med Service CRM</span>
+            <span>🏥 {BRAND.system}</span>
             <span>•</span>
             <span className="text-gold font-mono uppercase tracking-wider">{effectiveRole === 'ceo' ? 'Rahbar' : effectiveRole} Paneli</span>
           </div>
@@ -229,8 +230,15 @@ export default function Layout({ role }) {
         </header>
 
         {/* Dynamic Route Page Body (INDEPENDENT RIGHT SCROLL) */}
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto min-h-0">
-          <Outlet />
+        {/* min-w-0 shart: usti overflow-hidden bo'lgani uchun, kengroq jadval
+            bu bo'lmasa kesilib qolardi va unga yetib ham bo'lmasdi. */}
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto min-h-0 min-w-0">
+          {/* Keng ekranda kontent cheksiz cho'zilmasin — o'qish uchun qulay
+              kenglikda markazda tursin. Ilgari har sahifa o'zicha max-w
+              qo'yardi (biri 3xl, biri 4xl, ko'pchiligi umuman yo'q). */}
+          <div className="mx-auto w-full max-w-[1400px]">
+            <Outlet />
+          </div>
         </main>
       </div>
 

@@ -3,6 +3,7 @@ import { api } from '../../utils/api'
 import { formatMoney, formatDate } from '../../utils/format'
 import { Skeleton } from '../../components/Skeleton'
 import IncassationModal from '../../components/IncassationModal'
+import { PageHeader, Icons } from '../../components/UIKit'
 
 export default function Cash() {
   const [data, setData] = useState(null)
@@ -19,7 +20,11 @@ export default function Cash() {
 
   if (!data) return (
     <div>
-      <h1 className="page-title mb-6">Kassa</h1>
+      <PageHeader
+        title="Kassa"
+        subtitle="Naqd va karta tushumlari holati"
+        icon={Icons.money}
+      />
       <div className="grid gap-4 md:grid-cols-2">
         <Skeleton className="h-64 rounded-2xl" />
         <Skeleton className="h-64 rounded-2xl" />
@@ -123,35 +128,37 @@ export default function Cash() {
           <div className="p-4 pb-0">
             <h3 className="accent-value font-semibold">So'nggi tranzaksiyalar</h3>
           </div>
-          <table className="w-full text-sm mt-3">
-            <thead>
-              <tr className="border-b text-left" style={{ borderColor: 'var(--border)' }}>
-                {['#', 'Summa', "To'lov turi", 'Vaqt'].map((h) => (
-                  <th key={h} className="p-3 font-semibold" style={{ color: 'var(--gold)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.transactions.map((t) => (
-                <tr
-                  key={t.id}
-                  className="border-b table-row"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <td className="p-3 text-muted">#{t.id}</td>
-                  <td className="p-3 font-semibold" style={{ color: 'var(--success)' }}>
-                    {formatMoney(t.amount)}
-                  </td>
-                  <td className="p-3">
-                    <span className={`badge ${t.payment_type === 'cash' ? 'badge-success' : 'badge-info'}`}>
-                      {t.payment_type === 'cash' ? 'Naqt' : 'Karta'}
-                    </span>
-                  </td>
-                  <td className="p-3 text-muted text-xs">{formatDate(t.created_at)}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm mt-3">
+              <thead>
+                <tr className="border-b text-left" style={{ borderColor: 'var(--border)' }}>
+                  {['#', 'Summa', "To'lov turi", 'Vaqt'].map((h) => (
+                    <th key={h} className="p-3 font-semibold" style={{ color: 'var(--gold)' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.transactions.map((t) => (
+                  <tr
+                    key={t.id}
+                    className="border-b table-row"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <td className="p-3 text-muted">#{t.id}</td>
+                    <td className="p-3 font-semibold" style={{ color: 'var(--success)' }}>
+                      {formatMoney(t.amount)}
+                    </td>
+                    <td className="p-3">
+                      <span className={`badge ${t.payment_type === 'cash' ? 'badge-success' : 'badge-info'}`}>
+                        {t.payment_type === 'cash' ? 'Naqt' : 'Karta'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-muted text-xs">{formatDate(t.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

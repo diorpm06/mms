@@ -42,7 +42,7 @@ import os
 from config import settings
 from database import Base, engine, run_migrations
 from routers import (
-    advances, appointments, audit, auth, balance, banners, cash, chat, duty, employees, expenses,
+    advances, appointments, audit, auth, balance, banners, cash, chat, commissions, duty, employees, expenses,
     incassation, inpatients, inventory, lab_results, notifications, patients, payroll, print_jobs, providers, queue,
     referrers, report_submissions, reports, services, sheets_backup, webhook,
 )
@@ -142,6 +142,7 @@ async def security_headers(request: Request, call_next):
 # ── Routerlar ─────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(services.router)
+app.include_router(commissions.router)
 app.include_router(referrers.router)
 app.include_router(providers.router)
 app.include_router(employees.router)

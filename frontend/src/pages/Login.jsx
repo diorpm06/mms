@@ -5,6 +5,7 @@ import { useToastStore } from '../store/toastStore'
 import { useTheme } from '../hooks/useTheme'
 import { Moon, Sun, Eye, EyeOff } from 'lucide-react'
 import logo from '@assets/logo.png'
+import { BRAND } from '../config/brand'
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -85,7 +86,7 @@ export default function Login() {
               <span className="text-sm font-bold" style={{ color: 'var(--gold)' }}>MMS</span>
             )}
           </div>
-          <h1 className="page-title text-2xl">Marjona Med Servis</h1>
+          <h1 className="page-title text-2xl">{BRAND.name}</h1>
           <p className="text-muted mt-1 text-sm">Tibbiy klinika boshqaruv tizimi</p>
         </div>
 
@@ -146,7 +147,7 @@ export default function Login() {
         </div>
 
         <p className="text-muted mt-6 text-center text-xs">
-          © 2025 Marjona Med Servis
+          © {new Date().getFullYear()} {BRAND.name}
         </p>
       </div>
     </div>

@@ -206,7 +206,7 @@ export default function Inventory() {
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gold flex items-center gap-2">
+          <h1 className="page-title flex items-center gap-2">
             <Package className="h-6 w-6" /> Omborxona va Tibbiy Materiallar Hisobi
           </h1>
           <p className="text-xs text-muted mt-1">Dori-darmonlar, shpritslar va bemorga biriktiriluvchi sarflash materiallari boshqaruvi</p>
@@ -407,42 +407,44 @@ export default function Inventory() {
             <span className="text-xs text-muted">Jami {logs.length} ta yozuv</span>
           </div>
 
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-surface-sunken text-muted border-b border-border text-left">
-                <th className="p-3">Sana & Vaqt</th>
-                <th className="p-3">Kiritgan Xodim</th>
-                <th className="p-3">Tafsilot & Bemor Chiptasi</th>
-                <th className="p-3 text-right">Tushum / Holat</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.length === 0 ? (
-                <tr><td colSpan={4} className="p-6 text-center text-muted">Hali ishlatilgan materiallar tarixi yo'q</td></tr>
-              ) : (
-                logs.map((l) => (
-                  <tr key={l.id} className="border-b border-border hover:bg-surface">
-                    <td className="p-3 font-mono text-muted">{l.created_at}</td>
-                    <td className="p-3 font-bold text-body">
-                      {l.user_name} <span className="text-[10px] text-muted uppercase">({l.user_role})</span>
-                    </td>
-                    <td className="p-3 text-body">
-                      <p className="font-semibold">{l.detail_message}</p>
-                    </td>
-                    <td className="p-3 text-right font-mono font-bold">
-                      {l.new_data?.charged > 0 ? (
-                        <span className="text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/30">
-                          + {formatMoney(l.new_data.charged)} (Kassaga o'tdi)
-                        </span>
-                      ) : (
-                        <span className="text-muted">Bepul sarf</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-surface-sunken text-muted border-b border-border text-left">
+                  <th className="p-3">Sana & Vaqt</th>
+                  <th className="p-3">Kiritgan Xodim</th>
+                  <th className="p-3">Tafsilot & Bemor Chiptasi</th>
+                  <th className="p-3 text-right">Tushum / Holat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.length === 0 ? (
+                  <tr><td colSpan={4} className="p-6 text-center text-muted">Hali ishlatilgan materiallar tarixi yo'q</td></tr>
+                ) : (
+                  logs.map((l) => (
+                    <tr key={l.id} className="border-b border-border hover:bg-surface">
+                      <td className="p-3 font-mono text-muted">{l.created_at}</td>
+                      <td className="p-3 font-bold text-body">
+                        {l.user_name} <span className="text-[10px] text-muted uppercase">({l.user_role})</span>
+                      </td>
+                      <td className="p-3 text-body">
+                        <p className="font-semibold">{l.detail_message}</p>
+                      </td>
+                      <td className="p-3 text-right font-mono font-bold">
+                        {l.new_data?.charged > 0 ? (
+                          <span className="text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/30">
+                            + {formatMoney(l.new_data.charged)} (Kassaga o'tdi)
+                          </span>
+                        ) : (
+                          <span className="text-muted">Bepul sarf</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

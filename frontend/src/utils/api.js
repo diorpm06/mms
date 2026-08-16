@@ -30,11 +30,18 @@ async function refreshTokens() {
     logout()
     return null
   }
-  const res = await fetch(`${API_BASE}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  })
+  let res
+  try {
+    res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+  } catch (_) {
+    // Tarmoq uzilgan bo'lsa tizimdan chiqarib yubormaymiz — foydalanuvchi
+    // aloqa tiklangach ishini davom ettira olsin
+    return null
+  }
   if (!res.ok) {
     logout()
     return null
@@ -42,6 +49,25 @@ async function refreshTokens() {
   const data = await res.json()
   setAuth(data)
   return data.access_token
+}
+
+// Tarmoq uzilganda beriladigan yagona xabar
+function networkError() {
+  const e = new Error("Serverga ulanib bo'lmadi. Internet aloqangizni tekshiring.")
+  e.status = 0
+  e.offline = true
+  return e
+}
+
+// Server JSON emas, HTML yoki bo'sh javob qaytarsa (masalan 502) — holatga qarab xabar
+function statusMessage(status) {
+  if (status === 401 || status === 403) return "Bu amal uchun ruxsatingiz yo'q."
+  if (status === 404) return "So'ralgan ma'lumot topilmadi."
+  if (status === 409) return 'Bu yozuv allaqachon mavjud.'
+  if (status === 413) return 'Yuborilgan fayl juda katta.'
+  if (status === 429) return "Juda ko'p urinish. Bir oz kuting."
+  if (status >= 500) return 'Serverda xatolik yuz berdi. Birozdan keyin qayta urining.'
+  return 'Xato yuz berdi.'
 }
 
 export async function api(path, options = {}) {
@@ -52,19 +78,30 @@ export async function api(path, options = {}) {
   }
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
 
-  let res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  let res
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  } catch (_) {
+    // Internet uzilsa yoki server javob bermasa fetch o'zi yiqiladi. Ilgari
+    // foydalanuvchi inglizcha "Failed to fetch" degan yozuvni ko'rardi.
+    throw networkError()
+  }
 
   if (res.status === 401 && accessToken) {
     const newToken = await refreshTokens()
     if (newToken) {
       headers.Authorization = `Bearer ${newToken}`
-      res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+      try {
+        res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+      } catch (_) {
+        throw networkError()
+      }
     }
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Xato yuz berdi' }))
-    const apiError = new Error(extractErrorMessage(err))
+    const err = await res.json().catch(() => null)
+    const apiError = new Error(err ? extractErrorMessage(err) : statusMessage(res.status))
     apiError.status = res.status
     throw apiError
   }

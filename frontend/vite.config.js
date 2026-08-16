@@ -68,12 +68,18 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 5173,
       proxy: {
+        // VITE_DEV_API_TARGET — faqat ishlab chiqish serveri uchun.
+        // VITE_API_URL dan farqi: u brauzerga ham ta'sir qiladi va brauzer
+        // backendga TO'G'RIDAN-TO'G'RI murojaat qiladi — natijada sahifa
+        // 127.0.0.1:5173 orqali ochilsa CORS bloklab qo'yadi. Bu o'zgaruvchi
+        // esa faqat proksi manzilini o'zgartiradi, brauzer baribir /api ga
+        // murojaat qiladi va CORS umuman ishtirok etmaydi.
         '/api': {
-          target: env.VITE_API_URL || 'http://localhost:8000',
+          target: env.VITE_DEV_API_TARGET || env.VITE_API_URL || 'http://localhost:8000',
           changeOrigin: true,
         },
         '/uploads': {
-          target: env.VITE_API_URL || 'http://localhost:8000',
+          target: env.VITE_DEV_API_TARGET || env.VITE_API_URL || 'http://localhost:8000',
           changeOrigin: true,
         },
       },

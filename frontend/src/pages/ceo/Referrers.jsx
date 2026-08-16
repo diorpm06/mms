@@ -5,16 +5,27 @@ import { useToastStore } from '../../store/toastStore'
 import Modal from '../../components/Modal'
 import { TableSkeleton } from '../../components/Skeleton'
 import { Btn, Icons, PageHeader, THead, ActionRow, EmptyState } from '../../components/UIKit'
+import { BRAND } from '../../config/brand'
+import CommissionSettings from './Commissions'
+import ActionMenu from '../../components/ActionMenu'
 
 const SOURCES = ['Naqt kassa', 'Karta kassa', 'Bank hisob', 'Boshqa']
 
 export default function CeoReferrers() {
-  const [activeTab, setActiveTab] = useState('catalog') // 'catalog' | '10day'
+  const [activeTab, setActiveTab] = useState('catalog') // 'catalog' | '10day' | 'commission'
   const [items, setItems] = useState(null)
   const [topAnalytics, setTopAnalytics] = useState([])
   const [modal, setModal] = useState(false)
   const [edit, setEdit] = useState(null)
-  const [form, setForm] = useState({ full_name: '', phone: '+998' })
+  const [form, setForm] = useState({
+    full_name: '',
+    phone: '+998',
+    lab_percent: 22,
+    fizio_percent: 20,
+    uzi_sum: 15000,
+    ozon_sum: 10000,
+    other_sum: 10000,
+  })
   const [payoutSource, setPayoutSource] = useState('Naqt kassa')
   
   // Advance Modal
@@ -22,6 +33,31 @@ export default function CeoReferrers() {
   const [selectedRefForAdvance, setSelectedRefForAdvance] = useState(null)
   const [advanceAmount, setAdvanceAmount] = useState('1000000')
   const [savingAdvance, setSavingAdvance] = useState(false)
+
+  // Confirm Pending Referrer Modal State
+  const [confirmModalItem, setConfirmModalItem] = useState(null)
+  const [confirmForm, setConfirmForm] = useState({
+    lab_percent: 22,
+    fizio_percent: 20,
+    uzi_sum: 15000,
+    ozon_sum: 10000,
+    other_sum: 10000,
+  })
+
+  const handleConfirmReferrer = async () => {
+    if (!confirmModalItem) return
+    try {
+      await api(`/referrers/${confirmModalItem.id}/confirm`, {
+        method: 'POST',
+        body: JSON.stringify(confirmForm),
+      })
+      toast(`"${confirmModalItem.full_name}" ulush foizlari tasdiqlandi va ro'yxatga olindi ✓`)
+      setConfirmModalItem(null)
+      load()
+    } catch (e) {
+      toast(e.message, 'error')
+    }
+  }
 
   // 10-Day Report State
   const now = new Date()
@@ -425,7 +461,7 @@ export default function CeoReferrers() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Yo'naltiruvchilar Hisoboti — Marjona Med Service</title>
+          <title>Yo'naltiruvchilar Hisoboti — ${BRAND.name}</title>
           <style>
             body { font-family: Arial, Helvetica, sans-serif; padding: 15px; color: #0f172a; background: #fff; line-height: 1.35; font-size: 11.5px; }
             .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 14px; }
@@ -506,19 +542,24 @@ export default function CeoReferrers() {
   }
 
   const totalBalance = items ? items.reduce((acc, r) => acc + (r.balance || 0), 0) : 0
+  const pendingItems = items ? items.filter((r) => r.is_confirmed === false) : []
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Yo'naltiruvchilar va 10-Kunlik Hisobotlar"
-        subtitle="Yo'naltiruvchi shifokorlar va 10 kunlik foiz to'lovlari boshqaruvi"
+        title="Yo'naltiruvchilar"
+        subtitle="Katalog va balanslar, 10-kunlik hisobot, komissiya tariflari"
         icon={Icons.user}
       >
         <div className="flex gap-2 items-center">
           <select className="input-field text-xs py-2" value={payoutSource} onChange={(e) => setPayoutSource(e.target.value)}>
             {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <Btn variant="gold" icon={Icons.plus} onClick={() => { setEdit(null); setForm({ full_name: '', phone: '+998' }); setModal(true) }}>
+          <Btn variant="gold" icon={Icons.plus} onClick={() => {
+            setEdit(null);
+            setForm({ full_name: '', phone: '+998', lab_percent: 22, fizio_percent: 20, uzi_sum: 15000, ozon_sum: 10000, other_sum: 10000 });
+            setModal(true);
+          }}>
             Yo'naltiruvchi Qo'shish
           </Btn>
         </div>
@@ -536,6 +577,11 @@ export default function CeoReferrers() {
           }`}
         >
           <span>🤝 Yo'naltiruvchilar Katalogi va Balanslar</span>
+          {pendingItems.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] animate-pulse">
+              {pendingItems.length} YANGI
+            </span>
+          )}
         </button>
 
         <button
@@ -549,11 +595,75 @@ export default function CeoReferrers() {
         >
           <span>📊 10-Kunlik Hisobot va To'lovlar (Statistika)</span>
         </button>
+
+        {/* Komissiya sozlamasi ilgari alohida sahifa edi — bu ham
+            yo'naltiruvchilarga tegishli bo'lgani uchun shu yerga ko'chirildi */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('commission')}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all ${
+            activeTab === 'commission'
+              ? 'bg-emerald-500 text-slate-950 shadow-md'
+              : 'bg-surface text-body hover:bg-white/5 border border-border'
+          }`}
+        >
+          <span>💠 Komissiya Sozlamasi</span>
+        </button>
       </div>
+
+      {activeTab === 'commission' && <CommissionSettings embedded />}
 
       {/* ── TAB 1: CATALOG & GENERAL BALANCES ───────────────────────── */}
       {activeTab === 'catalog' && (
         <div className="space-y-6">
+
+          {/* YANGI YO'NALTIRUVCHILAR TASDIQLASH BANNERI */}
+          {pendingItems.length > 0 && (
+            <div className="card p-4 bg-amber-500/10 border-2 border-amber-500/40 rounded-2xl shadow-xl space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center text-xl shrink-0">
+                  🔔
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black text-amber-300 uppercase tracking-wide flex items-center gap-2">
+                    Yangi Yo'naltiruvchi Qo'shilgan ({pendingItems.length} nafar tasdiqlash kutilmoqda)
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping inline-block" />
+                  </h3>
+                  <p className="text-xs text-muted">
+                    Bemor qabulida yangi yo'naltiruvchi kiritildi. Ularning ulush foizlari va summasini belgilab tasdiqlang.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
+                {pendingItems.map((r) => (
+                  <div key={r.id} className="p-3 bg-surface-2 rounded-xl border border-amber-500/40 flex items-center justify-between gap-2 shadow-sm">
+                    <div className="min-w-0">
+                      <span className="font-extrabold text-body text-xs block truncate">{r.full_name}</span>
+                      <span className="text-[10px] text-amber-400 font-bold block font-mono">Tasdiqlash kutilmoqda</span>
+                    </div>
+                    <Btn
+                      variant="gold"
+                      size="xs"
+                      icon={Icons.edit}
+                      onClick={() => {
+                        setConfirmModalItem(r);
+                        setConfirmForm({
+                          lab_percent: r.lab_percent ?? 22,
+                          fizio_percent: r.fizio_percent ?? 20,
+                          uzi_sum: r.uzi_sum ?? 15000,
+                          ozon_sum: r.ozon_sum ?? 10000,
+                          other_sum: r.other_sum ?? 10000,
+                        });
+                      }}
+                    >
+                      Foiz belgilash
+                    </Btn>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="card p-5 flex items-center justify-between">
               <div>
@@ -587,49 +697,100 @@ export default function CeoReferrers() {
           </div>
 
           {!items ? <TableSkeleton /> : (
-            <div className="card overflow-x-auto p-0">
-              <table className="w-full text-sm">
-                <THead cols={['#', 'Ism-Sharifi', 'Telefon', "To'lanadigan Balans", 'Harakatlar']} />
-                <tbody>
+            <div className="card overflow-x-auto p-0 border border-gold/20 shadow-lg">
+              <table className="w-full text-xs border-collapse">
+                <thead className="bg-surface-2 border-b border-border text-[11px] font-extrabold uppercase tracking-wider text-muted">
+                  <tr>
+                    <th className="p-2.5 text-center w-12">#</th>
+                    <th className="p-2.5 text-left min-w-[180px]">Yo'naltiruvchi Ismi</th>
+                    <th className="p-2.5 text-left w-28">Telefon</th>
+                    <th className="p-2.5 text-center w-24">🧪 Lab (%)</th>
+                    <th className="p-2.5 text-center w-24">⚡ Fizio (%)</th>
+                    <th className="p-2.5 text-center w-24">🖥️ UZI</th>
+                    <th className="p-2.5 text-center w-28">🧪 Ozonaterapiya</th>
+                    <th className="p-2.5 text-right w-32">To'lanadigan Balans</th>
+                    <th className="p-2.5 text-center w-16">Amallar</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border font-semibold">
                   {items.map((r, idx) => (
-                    <tr key={r.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="td-muted font-mono font-bold">#{idx + 1}</td>
-                      <td className="td-cell font-bold">{r.full_name}</td>
-                      <td className="td-muted font-mono text-xs">{r.phone}</td>
-                      <td className="td-cell font-bold accent-value">{formatMoney(r.balance)}</td>
-                      <td className="td-cell">
-                        <ActionRow>
-                          {r.balance > 0 && (
-                            <Btn variant="success" size="xs" icon={Icons.arrowDown} onClick={() => payout(r.id)} title="Balansni chiqarish">
-                              Chiqarish
-                            </Btn>
-                          )}
-                          <Btn
-                            variant="gold"
-                            size="xs"
-                            icon={Icons.creditCard}
-                            onClick={() => {
-                              setSelectedRefForAdvance(r)
-                              setAdvanceAmount('1000000')
-                              setAdvanceModal(true)
-                            }}
-                            title="Avans berish"
-                          >
-                            Avans
-                          </Btn>
-                          <Btn variant="outline" size="xs" icon={Icons.edit} onClick={() => { setEdit(r); setForm(r); setModal(true) }} title="Tahrirlash">
-                            Tahrir
-                          </Btn>
-                          <Btn
-                            variant="danger"
-                            size="xs"
-                            icon={Icons.trash}
-                            onClick={() => handleDelete(r)}
-                            title="O'chirish (ro'yxatdan olib tashlash)"
-                          >
-                            O'chirish
-                          </Btn>
-                        </ActionRow>
+                    <tr key={r.id} className="hover:bg-surface-hover transition-colors whitespace-nowrap">
+                      <td className="p-2.5 text-center text-muted font-mono font-bold">#{idx + 1}</td>
+                      <td className="p-2.5 text-left font-extrabold text-body text-sm">{r.full_name}</td>
+                      <td className="p-2.5 text-left text-muted font-mono text-xs">{r.phone || '—'}</td>
+                      
+                      <td className="p-2.5 text-center">
+                        <span className="inline-block px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-mono font-extrabold border border-amber-500/30 text-xs">
+                          {r.lab_percent ?? 22}%
+                        </span>
+                      </td>
+
+                      <td className="p-2.5 text-center">
+                        <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-mono font-extrabold border border-emerald-500/30 text-xs">
+                          {r.fizio_percent ?? 20}%
+                        </span>
+                      </td>
+
+                      <td className="p-2.5 text-center">
+                        <span className="inline-block px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 font-mono font-extrabold border border-cyan-500/30 text-xs">
+                          {formatMoney(r.uzi_sum ?? 15000)}
+                        </span>
+                      </td>
+
+                      <td className="p-2.5 text-center">
+                        <span className="inline-block px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-300 font-mono font-extrabold border border-violet-500/30 text-xs">
+                          {formatMoney(r.ozon_sum ?? 10000)}
+                        </span>
+                      </td>
+
+                      <td className="p-2.5 text-right font-mono font-black accent-value text-sm">
+                        {formatMoney(r.balance)}
+                      </td>
+
+                      <td className="p-2.5 text-center">
+                        <ActionMenu
+                          items={[
+                            {
+                              label: 'Balansni chiqarish',
+                              icon: Icons.arrowDown,
+                              variant: 'success',
+                              hidden: !(r.balance > 0),
+                              onClick: () => payout(r.id),
+                            },
+                            {
+                              label: 'Avans berish',
+                              icon: Icons.creditCard,
+                              variant: 'gold',
+                              onClick: () => {
+                                setSelectedRefForAdvance(r)
+                                setAdvanceAmount('1000000')
+                                setAdvanceModal(true)
+                              },
+                            },
+                            {
+                              label: 'Tahrirlash',
+                              icon: Icons.edit,
+                              onClick: () => {
+                                setEdit(r)
+                                setForm({
+                                  full_name: r.full_name || '',
+                                  phone: r.phone || '+998',
+                                  lab_percent: r.lab_percent ?? 22,
+                                  fizio_percent: r.fizio_percent ?? 20,
+                                  uzi_sum: r.uzi_sum ?? 15000,
+                                  ozon_sum: r.ozon_sum ?? 10000,
+                                })
+                                setModal(true)
+                              },
+                            },
+                            {
+                              label: "Ro'yxatdan o'chirish",
+                              icon: Icons.trash,
+                              variant: 'danger',
+                              onClick: () => handleDelete(r),
+                            },
+                          ]}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -784,83 +945,85 @@ export default function CeoReferrers() {
                   </div>
                 </div>
 
-                <table className="w-full text-sm">
-                  <THead cols={['#', 'Yo\'naltiruvchi', 'Bemorlar', 'Jami Tushum', 'Ishlangan Ulush', 'Avans Ushlanma', 'Sof To\'lanadigan', 'Holati', 'Harakatlar']} />
-                  <tbody>
-                    {(!tenDayReport.referrers_payout || tenDayReport.referrers_payout.length === 0) ? (
-                      <tr><td colSpan={9} className="py-8 text-center text-muted text-xs">Ushbu davrda yo'naltiruvchilar orqali bemor kelmagan</td></tr>
-                    ) : tenDayReport.referrers_payout.map((r, idx) => {
-                      const { from, to } = getTenDayDates()
-                      const key = `${r.referrer_id}_${from}_${to}`
-                      const isDeferred = !!deferredMap[key]
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <THead cols={['#', 'Yo\'naltiruvchi', 'Bemorlar', 'Jami Tushum', 'Ishlangan Ulush', 'Avans Ushlanma', 'Sof To\'lanadigan', 'Holati', 'Harakatlar']} />
+                    <tbody>
+                      {(!tenDayReport.referrers_payout || tenDayReport.referrers_payout.length === 0) ? (
+                        <tr><td colSpan={9} className="py-8 text-center text-muted text-xs">Ushbu davrda yo'naltiruvchilar orqali bemor kelmagan</td></tr>
+                      ) : tenDayReport.referrers_payout.map((r, idx) => {
+                        const { from, to } = getTenDayDates()
+                        const key = `${r.referrer_id}_${from}_${to}`
+                        const isDeferred = !!deferredMap[key]
 
-                      return (
-                        <tr key={r.referrer_id} className="hover:bg-white/[0.02] transition-colors text-xs whitespace-nowrap">
-                          <td className="td-muted font-mono font-bold whitespace-nowrap">#{idx + 1}</td>
-                          <td className="td-cell font-bold whitespace-nowrap">
-                            <div className="whitespace-nowrap">
-                              <span className="text-body font-bold">{r.name}</span>
-                              {r.phone && <span className="text-[10px] text-muted block font-mono">{r.phone}</span>}
-                            </div>
-                          </td>
-                          <td className="td-cell font-mono font-bold text-center whitespace-nowrap">{r.patient_count} nafar</td>
-                          <td className="td-cell font-mono text-muted whitespace-nowrap">{formatMoney(r.gross_total)}</td>
-                          <td className="td-cell font-mono font-bold text-gold whitespace-nowrap">{formatMoney(r.earned_commission)}</td>
-                          <td className="td-cell font-mono text-rose-400 whitespace-nowrap">
-                            {r.advance_deducted > 0 ? `-${formatMoney(r.advance_deducted)}` : '0'}
-                          </td>
-                          <td className="td-cell font-mono font-black text-cyan-300 text-base whitespace-nowrap">{formatMoney(r.net_payable)}</td>
-                          
-                          {/* Holati (Status) */}
-                          <td className="td-cell whitespace-nowrap">
-                            {isDeferred ? (
-                              <span className="badge badge-amber text-[10px] font-bold whitespace-nowrap">⏳ Keyinroqqa surilgan</span>
-                            ) : r.net_payable > 0 ? (
-                              <span className="badge badge-info text-[10px] font-bold whitespace-nowrap">🟡 10-Kunda To'lash Tayyor</span>
-                            ) : (
-                              <span className="badge badge-success text-[10px] font-bold whitespace-nowrap">🟢 Yopilgan</span>
-                            )}
-                          </td>
-
-                          {/* Harakatlar (Actions) */}
-                          <td className="td-cell whitespace-nowrap">
-                            <ActionRow>
-                              {r.net_payable > 0 && (
-                                <Btn
-                                  variant="success"
-                                  size="xs"
-                                  icon={Icons.arrowDown}
-                                  onClick={() => payout(r.referrer_id)}
-                                  title="10-kunlik hisobni to'lash (Balansni chiqarish)"
-                                >
-                                  Chiqarish
-                                </Btn>
+                        return (
+                          <tr key={r.referrer_id} className="hover:bg-white/[0.02] transition-colors text-xs whitespace-nowrap">
+                            <td className="td-muted font-mono font-bold whitespace-nowrap">#{idx + 1}</td>
+                            <td className="td-cell font-bold whitespace-nowrap">
+                              <div className="whitespace-nowrap">
+                                <span className="text-body font-bold">{r.name}</span>
+                                {r.phone && <span className="text-[10px] text-muted block font-mono">{r.phone}</span>}
+                              </div>
+                            </td>
+                            <td className="td-cell font-mono font-bold text-center whitespace-nowrap">{r.patient_count} nafar</td>
+                            <td className="td-cell font-mono text-muted whitespace-nowrap">{formatMoney(r.gross_total)}</td>
+                            <td className="td-cell font-mono font-bold text-gold whitespace-nowrap">{formatMoney(r.earned_commission)}</td>
+                            <td className="td-cell font-mono text-rose-400 whitespace-nowrap">
+                              {r.advance_deducted > 0 ? `-${formatMoney(r.advance_deducted)}` : '0'}
+                            </td>
+                            <td className="td-cell font-mono font-black text-cyan-300 text-base whitespace-nowrap">{formatMoney(r.net_payable)}</td>
+                            
+                            {/* Holati (Status) */}
+                            <td className="td-cell whitespace-nowrap">
+                              {isDeferred ? (
+                                <span className="badge badge-amber text-[10px] font-bold whitespace-nowrap">⏳ Keyinroqqa surilgan</span>
+                              ) : r.net_payable > 0 ? (
+                                <span className="badge badge-info text-[10px] font-bold whitespace-nowrap">🟡 10-Kunda To'lash Tayyor</span>
+                              ) : (
+                                <span className="badge badge-success text-[10px] font-bold whitespace-nowrap">🟢 Yopilgan</span>
                               )}
+                            </td>
 
-                              <Btn
-                                variant={isDeferred ? "cyan" : "amber"}
-                                size="xs"
-                                onClick={() => toggleDefer(r.referrer_id)}
-                                title={isDeferred ? "Kechiktirishni bekor qilish" : "To'lovni keyinroqqa surish"}
-                              >
-                                {isDeferred ? "Hozir to'lash" : "Keyinroq"}
-                              </Btn>
+                            {/* Harakatlar (Actions) */}
+                            <td className="td-cell whitespace-nowrap">
+                              <ActionRow>
+                                {r.net_payable > 0 && (
+                                  <Btn
+                                    variant="success"
+                                    size="xs"
+                                    icon={Icons.arrowDown}
+                                    onClick={() => payout(r.referrer_id)}
+                                    title="10-kunlik hisobni to'lash (Balansni chiqarish)"
+                                  >
+                                    Chiqarish
+                                  </Btn>
+                                )}
 
-                              <Btn
-                                variant="outline"
-                                size="xs"
-                                onClick={() => openPrintVoucher(r)}
-                                title="10-kunlik hujjatingizni chop etish"
-                              >
-                                🖨️ Chop etish
-                              </Btn>
-                            </ActionRow>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                                <Btn
+                                  variant={isDeferred ? "cyan" : "amber"}
+                                  size="xs"
+                                  onClick={() => toggleDefer(r.referrer_id)}
+                                  title={isDeferred ? "Kechiktirishni bekor qilish" : "To'lovni keyinroqqa surish"}
+                                >
+                                  {isDeferred ? "Hozir to'lash" : "Keyinroq"}
+                                </Btn>
+
+                                <Btn
+                                  variant="outline"
+                                  size="xs"
+                                  onClick={() => openPrintVoucher(r)}
+                                  title="10-kunlik hujjatingizni chop etish"
+                                >
+                                  🖨️ Chop etish
+                                </Btn>
+                              </ActionRow>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           )}
@@ -881,6 +1044,60 @@ export default function CeoReferrers() {
             <input className="input-field" placeholder="+998901234567"
               value={form.phone || ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </div>
+
+          <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-3">
+            <h4 className="font-bold text-gold text-xs uppercase tracking-wider">🏢 Bo'limlar bo'yicha ulush foizlari va summalari</h4>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label text-amber-400 font-bold">🧪 Laboratoriya (%)</label>
+                <input
+                  type="number"
+                  placeholder="22"
+                  value={form.lab_percent ?? 22}
+                  onChange={(e) => setForm({ ...form, lab_percent: +e.target.value })}
+                  className="input-field text-xs font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="form-label text-emerald-400 font-bold">⚡ Fizioterapiya (%)</label>
+                <input
+                  type="number"
+                  placeholder="20"
+                  value={form.fizio_percent ?? 20}
+                  onChange={(e) => setForm({ ...form, fizio_percent: +e.target.value })}
+                  className="input-field text-xs font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="form-label text-cyan-300 font-bold">🖥️ UZI (1 ta soxa - so'm)</label>
+                <input
+                  type="number"
+                  placeholder="15000"
+                  value={form.uzi_sum ?? 15000}
+                  onChange={(e) => setForm({ ...form, uzi_sum: +e.target.value })}
+                  className="input-field text-xs font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="form-label text-violet-300 font-bold">🧪 Ozonaterapiya (so'm)</label>
+                <input
+                  type="number"
+                  placeholder="10000"
+                  value={form.ozon_sum ?? 10000}
+                  onChange={(e) => setForm({ ...form, ozon_sum: +e.target.value })}
+                  className="input-field text-xs font-mono font-bold"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-muted">
+              ℹ️ Komissiya faqat shu 4 bo'limga beriladi. Maslaxat, Massaj, Ineksiya va boshqa barcha bo'limlarga — 0 so'm. "Uzi (qo'shimcha)" tarifiga ham komissiya ajratilmaydi.
+            </p>
+          </div>
+
           <div className="flex gap-2 pt-2">
             <Btn variant="ghost" full icon={Icons.x} onClick={() => setModal(false)}>Bekor</Btn>
             <Btn variant="gold" full icon={Icons.save} onClick={save}>Saqlash</Btn>
@@ -1026,6 +1243,77 @@ export default function CeoReferrers() {
           </div>
         </Modal>
       )}
+
+      {/* ── MODAL 4: CONFIRM NEW REFERRER & SET RATES ───────────────── */}
+      <Modal open={!!confirmModalItem} onClose={() => setConfirmModalItem(null)} title="Yangi Yo'naltiruvchi Foizlarini Belgilash va Tasdiqlash">
+        {confirmModalItem && (
+          <div className="space-y-4 pt-1">
+            <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/30 space-y-1">
+              <span className="text-xs font-bold text-amber-300 block uppercase tracking-wider">Yo'naltiruvchi Ma'lumoti:</span>
+              <span className="text-base font-extrabold text-body block">{confirmModalItem.full_name}</span>
+              {confirmModalItem.phone && <span className="text-xs text-muted font-mono block">{confirmModalItem.phone}</span>}
+            </div>
+
+            <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-3">
+              <h4 className="font-bold text-gold text-xs uppercase tracking-wider">🏢 Bo'limlar bo'yicha ulush foizlari va summalari</h4>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label text-amber-400 font-bold">🧪 Laboratoriya (%)</label>
+                  <input
+                    type="number"
+                    placeholder="22"
+                    value={confirmForm.lab_percent}
+                    onChange={(e) => setConfirmForm({ ...confirmForm, lab_percent: +e.target.value })}
+                    className="input-field text-xs font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label text-emerald-400 font-bold">⚡ Fizioterapiya (%)</label>
+                  <input
+                    type="number"
+                    placeholder="20"
+                    value={confirmForm.fizio_percent}
+                    onChange={(e) => setConfirmForm({ ...confirmForm, fizio_percent: +e.target.value })}
+                    className="input-field text-xs font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label text-cyan-300 font-bold">🖥️ UZI (1 ta soxa - so'm)</label>
+                  <input
+                    type="number"
+                    placeholder="15000"
+                    value={confirmForm.uzi_sum}
+                    onChange={(e) => setConfirmForm({ ...confirmForm, uzi_sum: +e.target.value })}
+                    className="input-field text-xs font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label text-violet-300 font-bold">🧪 Ozonaterapiya (so'm)</label>
+                  <input
+                    type="number"
+                    placeholder="10000"
+                    value={confirmForm.ozon_sum ?? 10000}
+                    onChange={(e) => setConfirmForm({ ...confirmForm, ozon_sum: +e.target.value })}
+                    className="input-field text-xs font-mono font-bold"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-muted">
+                ℹ️ Komissiya faqat shu 4 bo'limga beriladi. Maslaxat, Massaj, Ineksiya va boshqa barcha bo'limlarga — 0 so'm. "Uzi (qo'shimcha)" tarifiga ham komissiya ajratilmaydi. Saqlash tugmasi bosilgach, ushbu bildirishnoma olib tashlanadi.
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Btn variant="ghost" full icon={Icons.x} onClick={() => setConfirmModalItem(null)}>Bekor</Btn>
+              <Btn variant="gold" full icon={Icons.check} onClick={handleConfirmReferrer}>✓ Saqlash va Tasdiqlash</Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

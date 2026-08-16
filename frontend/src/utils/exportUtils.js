@@ -1,3 +1,4 @@
+import { BRAND } from '../config/brand'
 // Export data to Excel CSV format with UTF-8 BOM for perfect Excel compatibility
 export function exportToExcel(data, filename = 'Hisobot') {
   if (!data || !data.length) {
@@ -75,7 +76,7 @@ export function exportToPdf(title, data, columns) {
     </head>
     <body>
       <h1>MARJONA MED SERVICE — ${title}</h1>
-      <p>Sana: ${dateStr} | Tayyorlandi: Marjona Med Servis Tizimi</p>
+      <p>Sana: ${dateStr} | Tayyorlandi: ${BRAND.name}</p>
       <table>
         <thead><tr>${headersHtml}</tr></thead>
         <tbody>${rowsHtml}</tbody>
