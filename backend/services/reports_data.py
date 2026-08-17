@@ -1020,6 +1020,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             continue
         patient_count = len(pr_patients)
         gross_total = sum(p.payment_amount for p in pr_patients)
+        total_prov_share = 0
         from services.finance import calculate_financial_split
         for p in pr_patients:
             svc = p.service
