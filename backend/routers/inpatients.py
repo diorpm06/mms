@@ -634,61 +634,45 @@ def admit(
                        "Shifokorlar bo'limidan uni statsionar uchun belgilang.",
             )
 
+    # p — bazadagi mavjud bemor yozuvi. Yangi ism qo'lda kiritilsa, ambulator
+    # "patients" jadvaliga yozuv OCHILMAYDI: u yerda xizmat, to'lov summasi va
+    # to'lov turi majburiy, statsionarda esa bularning ma'nosi yo'q. Ilgari shu
+    # sababli yangi bemor yotqizishda 500 xato chiqardi. Ism-familiya
+    # to'g'ridan-to'g'ri statsionar yozuviga saqlanadi.
+    p = None
+    f_name = (data.first_name or "").strip()
+    l_name = (data.last_name or "").strip()
+
     if data.patient_id:
         p = db.query(Patient).filter(Patient.id == data.patient_id, Patient.is_cancelled == False).first()
         if not p:
             raise HTTPException(status_code=404, detail="Bazada bemor topilmadi")
+        f_name, l_name = p.first_name, p.last_name
     elif data.full_name or (data.first_name and data.last_name):
-        f_name = (data.first_name or "").strip()
-        l_name = (data.last_name or "").strip()
         if data.full_name and data.full_name.strip():
             parts = data.full_name.strip().split(maxsplit=1)
             f_name = parts[0]
             l_name = parts[1] if len(parts) > 1 else "."
-
-        b_date = None
-        if data.birth_date:
-            try:
-                raw_b = data.birth_date.strip()
-                if len(raw_b) == 4 and raw_b.isdigit():
-                    b_date = date(int(raw_b), 1, 1)
-                else:
-                    b_date = datetime.strptime(raw_b, "%Y-%m-%d").date()
-            except Exception:
-                b_date = date(1990, 1, 1)
-        else:
-            b_date = date(1990, 1, 1)
-
-        p = Patient(
-            first_name=f_name,
-            last_name=l_name,
-            phone=(data.phone or "").strip() or "mavjud emas",
-            address=(data.address or "").strip() or "Ko'rsatilmagan",
-            birth_date=b_date,
-            provider_id=data.doctor_id,
-            referrer_id=data.referrer_id,
-            created_by=user.id,
-        )
-        db.add(p)
-        db.flush()
     else:
         raise HTTPException(status_code=400, detail="Bazada bemor tanlanishi yoki yangi bemor ismi-familiyasi kiritilishi shart")
-    
+
+    telefon = (p.phone if p else (data.phone or "").strip()) or "mavjud emas"
+
     diagnosis = (data.diagnosis or "").strip()
     if data.planned_days:
         diagnosis = f"{diagnosis} #plan_days={data.planned_days}".strip()
-    
+
     inp = Inpatient(
-        first_name=p.first_name,
-        last_name=p.last_name,
-        phone=p.phone,
+        first_name=f_name,
+        last_name=l_name,
+        phone=telefon,
         room_number=data.room_number,
         bed_number=data.bed_number,
         tariff_id=data.tariff_id,
         # Ambulator shifokorga qaytmaydi: statsionar haqi faqat shu yerda
         # ataylab tanlangan xizmat ko'rsatuvchiga yoziladi.
         doctor_id=data.doctor_id,
-        referrer_id=data.referrer_id if data.referrer_id is not None else p.referrer_id,
+        referrer_id=data.referrer_id if data.referrer_id is not None else (p.referrer_id if p else None),
         diagnosis=diagnosis or None,
         daily_rate=data.daily_rate,
         created_by=user.id,
@@ -719,7 +703,8 @@ def admit(
     log_audit(
         db, user_id=user.id, user_role=user.role, action_type="CREATE",
         table_name="inpatients", record_id=inp.id,
-        new_data={"name": f"{inp.first_name} {inp.last_name}", "room": inp.room_number, "patient_id": p.id},
+        new_data={"name": f"{inp.first_name} {inp.last_name}", "room": inp.room_number,
+                  "patient_id": p.id if p else None},
         ip_address=ip, device_info=device,
     )
     db.commit()

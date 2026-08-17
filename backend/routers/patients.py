@@ -1015,6 +1015,11 @@ def mark_patient_paid(
 
     main_patient = next((p for p in patients_to_pay if p.id == patient_id), patients_to_pay[0])
 
+    # Guruh bo'lib to'langanda naqd/karta qismini har bir bemorga ulushiga qarab
+    # taqsimlash uchun kerak. Ilgari bu qator yozilmay qolgan edi va aralash yoki
+    # guruh to'lovi NameError bilan 500 xato berardi.
+    total_all_amount = sum(int(p.payment_amount or 0) for p in patients_to_pay)
+
     for p in patients_to_pay:
         p.payment_type = pay_type
         amount = p.payment_amount or 0

@@ -139,9 +139,9 @@ def get_report(db: Session, start: date, end: date) -> dict:
                 qr += (t.qr_amount or 0)
             else:
                 card += t.total_amount
-        referrer_share = sum(t.referrer_amount for t in txs)
-        provider_share = sum(t.provider_amount for t in txs)
-        center_share = sum(t.center_amount for t in txs)
+        referrer_share = sum((t.referrer_amount or 0) for t in txs)
+        provider_share = sum((t.provider_amount or 0) for t in txs)
+        center_share = sum((t.center_amount or 0) for t in txs)
     else:
         total_income = sum((p.payment_amount or 0) for p in all_patients)
         for p in all_patients:
@@ -572,6 +572,7 @@ def admin_daily_report(db: Session, d: date) -> dict:
         "net_cash": full.get("net_cash", 0),
         "net_card": full.get("net_card", 0),
         "net_total": full.get("net_total", 0),
+        "referrer_share": full.get("referrer_share", 0),
         "services_breakdown": full["services_breakdown"],
         "payment_chart": full["payment_chart"],
         "paper_entry_patients": full["paper_entry_patients"],
@@ -694,7 +695,33 @@ def top_departments(db: Session, limit: int = 5):
 
 
 def top_services(db: Session, limit: int = 10):
-    return top_departments(db, limit)
+    """
+    Eng ko'p daromad keltirgan XIZMATLAR (bo'lim emas — buning uchun
+    top_departments bor).
+
+    Ilgari bu so'rov Patient.service_id bo'yicha bog'lanardi — ya'ni bitta
+    tashrifdagi BIRINCHI xizmat olinib, tashrifning BUTUN summasi o'shanga
+    yozilardi. Bemor 3 ta tahlil topshirsa, ro'yxatda faqat bittasi ko'rinib,
+    uning summasi haqiqiydan katta chiqardi.
+
+    Endi har bir xizmat alohida sanaladi (patient_services jadvali).
+    """
+    from models.patient_service import PatientService
+
+    return (
+        db.query(
+            Service.name,
+            func.count(func.distinct(PatientService.patient_id)).label("count"),
+            func.sum(PatientService.total_price).label("total"),
+        )
+        .join(PatientService, PatientService.service_id == Service.id)
+        .join(Patient, Patient.id == PatientService.patient_id)
+        .filter(Patient.is_cancelled == False)
+        .group_by(Service.id, Service.name)
+        .order_by(func.sum(PatientService.total_price).desc())
+        .limit(limit)
+        .all()
+    )
 
 
 def income_by_period(db: Session, period: str = "7days"):
@@ -1072,6 +1099,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     base_report["providers_payout"] = providers_payout
     base_report["total_ref_payout"] = sum(r["net_payable"] for r in referrers_payout)
     base_report["total_prov_payout"] = sum(p["net_payable"] for p in providers_payout)
+    base_report["referrer_share"] = base_report["total_ref_payout"]
 
     return base_report
 

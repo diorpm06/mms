@@ -636,7 +636,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
               </div>
               <div className="stat-card">
                 <span className="text-xs font-bold text-muted uppercase">Yo'naltiruvchilar Hissi</span>
-                <p className="text-2xl font-black text-cyan font-mono mt-1">{formatMoney(reportsData?.referrer_share || 0)}</p>
+                <p className="text-2xl font-black text-cyan font-mono mt-1">{formatMoney(reportsData?.referrer_share || reportsData?.total_ref_payout || 0)}</p>
               </div>
               <div className="stat-card border-gold/40 bg-gold/5">
                 <span className="text-xs font-bold text-gold uppercase">Klinika Sof Foydasi</span>
