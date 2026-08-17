@@ -63,7 +63,10 @@ export default function NewPatient({ homePath = '/admin' }) {
   const [createdPatient, setCreatedPatient] = useState(null)
   const [expandedCat, setExpandedCat] = useState(null) // accordion
   const [splitSecond, setSplitSecond] = useState('card') // 'card' | 'qr'
-  const [discountTargetServiceId, setDiscountTargetServiceId] = useState('auto')
+  // Chegirma qaysi xizmatdan olinishi — MAJBURIY tanlanadi.
+  // Ilgari standarti 'auto' edi va jimgina 1-xizmatga qo'llanardi;
+  // natijada chegirma noto'g'ri bo'limga tushib qolardi.
+  const [discountTargetServiceId, setDiscountTargetServiceId] = useState('')
   const [newRefModal, setNewRefModal] = useState(false)
   const [newRefForm, setNewRefForm] = useState({ full_name: '', phone: '' })
   const [savingRef, setSavingRef] = useState(false)
@@ -364,6 +367,14 @@ export default function NewPatient({ homePath = '/admin' }) {
     // Katta chegirmadan ogohlantirish. Ilgari tizim jim qabul qilardi va
     // xizmat narxi chegirma maydoniga xato kiritilsa bemor 0 so'm to'lab
     // ketardi (hisobotlarda "to'lov miqdori g'alati" bo'lib ko'rinardi).
+    // Chegirma bir nechta xizmat bo'lganda qaysi biriga tegishli ekani
+    // aniq ko'rsatilishi shart — aks holda noto'g'ri bo'limga tushadi.
+    const tanlanganXizmatlar = selectedServices.filter((x) => x.service_id)
+    if (computedDiscount > 0 && tanlanganXizmatlar.length > 1 && !discountTargetServiceId) {
+      toast("Chegirma qaysi xizmatdan olinishini tanlang", 'error')
+      return
+    }
+
     if (computedDiscount > 0 && totalBasePrice > 0) {
       const pct = Math.round((computedDiscount / totalBasePrice) * 100)
       if (finalPrice <= 0) {
@@ -428,7 +439,7 @@ export default function NewPatient({ homePath = '/admin' }) {
       qr_amount: qrAmt,
       discount_amount: computedDiscount,
       discount_reason: computedDiscount > 0 ? form.discount_reason || 'Chegirma' : null,
-      discount_target_service_id: discountTargetServiceId !== 'auto' ? Number(discountTargetServiceId) : null,
+      discount_target_service_id: discountTargetServiceId ? Number(discountTargetServiceId) : null,
       services: validServices.map((s) => ({
         service_id: +s.service_id,
         provider_id: s.provider_id ? +s.provider_id : null,
@@ -1144,14 +1155,14 @@ export default function NewPatient({ homePath = '/admin' }) {
               {selectedServices.filter((s) => s.service_id).length > 1 && (
                 <div className="p-3 rounded-xl bg-cyan-950/50 border border-cyan-500/40 space-y-1.5">
                   <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                    🎯 Chegirma aynan qaysi xizmatdan ayirilsin?
+                    🎯 Chegirma qaysi xizmatdan ayirilsin? <span className="text-rose-400">*</span>
                   </label>
                   <select
                     value={discountTargetServiceId}
                     onChange={(e) => setDiscountTargetServiceId(e.target.value)}
                     className="w-full input-field text-xs font-bold text-cyan-200 bg-surface border-cyan-500/50 cursor-pointer"
                   >
-                    <option value="auto">⭐ Tanlangan 1-xizmatga to'liq qo'llansin (Tavsiya etiladi — butun summa bo'ladi)</option>
+                    <option value="">— Tanlang (majburiy) —</option>
                     {selectedServices.filter((s) => s.service_id).map((s) => {
                       const svcObj = services.find((x) => String(x.id) === String(s.service_id))
                       if (!svcObj) return null
@@ -1164,7 +1175,8 @@ export default function NewPatient({ homePath = '/admin' }) {
                     })}
                   </select>
                   <p className="text-[10px] text-cyan-400 font-medium">
-                    💡 Chegirma muayyan xizmatga biriktirilsa, boshqa xizmatlar narxi butunligicha saqlanib, qoldiqli raqamlar hosil bo'lmaydi.
+                    💡 Tanlash majburiy. Har bir xizmat o'z bo'limi bo'yicha alohida yozuv bo'ladi —
+                    chegirma qaysi biriga tegishli ekani aniq bo'lishi kerak.
                   </p>
                 </div>
               )}

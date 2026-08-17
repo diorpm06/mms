@@ -148,6 +148,10 @@ class PatientUpdate(BaseModel):
     # Xizmatlar ro'yxati qayta yuborilsa — eskisi almashtiriladi va
     # to'lov summasi qaytadan hisoblanadi (chegirma saqlanib qoladi).
     services: list[EditServiceItem] | None = None
+    # Chegirmani tahrirlab bo'lmasdi — noto'g'ri kiritilgan chegirmani
+    # tuzatishning yagona yo'li bemorni o'chirib qayta yozish edi.
+    discount_amount: int | None = Field(default=None, ge=0, le=100_000_000)
+    discount_reason: str | None = None
     reason: str = Field(min_length=3)
 
     @field_validator("payment_type")
@@ -861,10 +865,32 @@ def update_patient(
             ))
 
         p.service_id = first_sid
+        # Chegirma xizmatlar jamidan oshmasin
+        if (p.discount_amount or 0) > raw_total:
+            raise HTTPException(
+                status_code=400,
+                detail=(f"Chegirma ({p.discount_amount:,} so'm) xizmatlar jamidan "
+                        f"({raw_total:,} so'm) katta bo'lishi mumkin emas"),
+            )
         p.payment_amount = max(0, raw_total - (p.discount_amount or 0))
         # Naqd/karta taqsimotini yangi summaga moslaymiz
         _apply_payment_split(p, data)
         db.flush()
+    elif data.discount_amount is not None:
+        # Faqat chegirma o'zgartirilgan bo'lsa — to'lovni mavjud xizmatlardan
+        # qaytadan hisoblaymiz
+        mavjud = db.query(PatientService).filter(PatientService.patient_id == p.id).all()
+        raw_total = sum(int(x.total_price or 0) for x in mavjud) if mavjud else (
+            (p.payment_amount or 0) + (old.get("discount_amount") or 0)
+        )
+        if (p.discount_amount or 0) > raw_total:
+            raise HTTPException(
+                status_code=400,
+                detail=(f"Chegirma ({p.discount_amount:,} so'm) xizmatlar jamidan "
+                        f"({raw_total:,} so'm) katta bo'lishi mumkin emas"),
+            )
+        p.payment_amount = max(0, raw_total - (p.discount_amount or 0))
+        _apply_payment_split(p, data)
     else:
         # Xizmatlar ro'yxati alohida yangilanmagan bo'lsa ham payment_type / cash_amount o'zgargan bo'lishi mumkin
         _apply_payment_split(p, data)
@@ -875,7 +901,8 @@ def update_patient(
     # hisoblaymiz. Aks holda (masalan yo'naltiruvchi keyin qo'shilsa) uning
     # ulushi hech qachon hisoblanmay qolardi.
     money_fields = {"referrer_id", "provider_id", "service_id", "payment_amount", "payment_type",
-                    "cash_amount", "card_amount", "click_amount", "qr_amount"}
+                    "cash_amount", "card_amount", "click_amount", "qr_amount",
+                    "discount_amount"}
     if new_services is not None or (money_fields & set(updates.keys())):
         tx = (
             db.query(Transaction)
