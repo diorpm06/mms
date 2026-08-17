@@ -693,6 +693,10 @@ def top_departments(db: Session, limit: int = 5):
     return [(d["name"], d["count"], d["total"]) for d in res[:limit]]
 
 
+def top_services(db: Session, limit: int = 10):
+    return top_departments(db, limit)
+
+
 def income_by_period(db: Session, period: str = "7days"):
     """
     Rasm 2 bo'yicha: 1-10, 11-20, 21-30 kunlik dekada yoki 7 kunlik daromad charti.
