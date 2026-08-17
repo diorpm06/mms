@@ -239,11 +239,24 @@ export default function TodayPatients() {
 
   const [entryFilter, setEntryFilter] = useState('all') // 'all' | 'live' | 'paper'
   const [paymentTypeFilter, setPaymentTypeFilter] = useState('all') // 'all' | 'split' | 'click' | 'cash' | 'card' | 'later'
+  const [bolimFilter, setBolimFilter] = useState('all')
+
+  // Bo'lim nomi "Laboratoriya: GORMONLAR" ko'rinishida bo'lishi mumkin —
+  // filtr uchun faqat asosiy qismini olamiz
+  const asosiyBolim = (p) => {
+    const raw = (p.service_category || p.category || '').trim()
+    if (!raw) return 'Boshqa'
+    return raw.includes(':') ? raw.split(':')[0].trim() : raw
+  }
+
+  // Bugungi bemorlarda uchragan bo'limlar — bo'sh tugma chiqmasligi uchun
+  const bolimlar = [...new Set(patients.map(asosiyBolim))].sort((a, b) => a.localeCompare(b))
 
   const filteredPatients = patients.filter((p) => {
     if (entryFilter === 'live' && p.is_paper_entry) return false
     if (entryFilter === 'paper' && !p.is_paper_entry) return false
     if (paymentTypeFilter !== 'all' && (p.payment_type || '').toLowerCase() !== paymentTypeFilter) return false
+    if (bolimFilter !== 'all' && asosiyBolim(p) !== bolimFilter) return false
 
     if (!searchQuery) return true
     const q = searchQuery.toLowerCase()
@@ -375,6 +388,33 @@ export default function TodayPatients() {
           </div>
         ))}
       </div>
+
+      {/* Bo'lim bo'yicha filtr — faqat bugun uchragan bo'limlar chiqadi */}
+      {bolimlar.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-surface-2/80 rounded-2xl border border-border">
+          <span className="text-xs font-bold text-muted px-2">Bo'lim bo'yicha:</span>
+          {['all', ...bolimlar].map((b) => {
+            const count = b === 'all' ? patients.length : patients.filter((p) => asosiyBolim(p) === b).length
+            return (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setBolimFilter(b)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  bolimFilter === b
+                    ? 'bg-cyan-500 text-slate-950 shadow-md font-black scale-105'
+                    : 'bg-surface-1 text-muted hover:text-body hover:bg-surface-2'
+                }`}
+              >
+                {b === 'all' ? 'Barchasi' : b}{' '}
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-black/20 font-mono">
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* To'lov turi bo'yicha tezkor filtrlar */}
       <div className="flex flex-wrap items-center gap-1.5 p-2 bg-surface-2/80 rounded-2xl border border-border">

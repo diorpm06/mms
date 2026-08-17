@@ -30,13 +30,46 @@ O'zgarishlar ishchi papkada qoldiriladi.
 Localda ishlaganda ham har bir yozuv haqiqiy bazaga tushadi va Telegramga
 xabar ketadi. Sinov ma'lumoti yaratsangiz — **albatta o'chiring**.
 
-Sinov uchun ism prefiksi: `ZZ...` (masalan `ZZSINOV`). Tozalash:
+Sinov uchun ism prefiksi: `ZZ...` (masalan `ZZSINOV`). Faqat O'ZING yaratgan
+qatorlarni o'chir:
 ```sql
 DELETE FROM patient_services WHERE patient_id IN (SELECT id FROM patients WHERE first_name LIKE 'ZZ%');
 DELETE FROM transactions     WHERE patient_id IN (SELECT id FROM patients WHERE first_name LIKE 'ZZ%');
 DELETE FROM patients WHERE first_name LIKE 'ZZ%';
-UPDATE providers SET balance=0; UPDATE referrers SET balance=0;
 ```
+
+### ⛔ 1.3.1. HECH QACHON QILMANG
+
+Quyidagilar **butun klinikaning ma'lumotini** o'chiradi, sizning sinovingizni emas:
+
+```sql
+UPDATE balance SET current_balance = 0      -- kassani yo'q qiladi
+UPDATE providers SET balance = 0            -- shifokorlar puli yo'q bo'ladi
+UPDATE referrers SET balance = 0
+DELETE FROM expenses                        -- QAYTARIB BO'LMAYDI
+DELETE FROM balance_history
+DELETE FROM audit_logs
+```
+
+**Nima bo'lgani (2026-08-17):** bo'lim filtrini sinash uchun yozilgan skriptning
+tozalash qismi oldingi kundan nusxa olingan edi. O'sha kuni baza bo'sh edi va
+bu buyruqlar zararsiz edi. Bugun esa klinika soat 08:41 dan ishlayotgan,
+45 ta haqiqiy bemor bor edi. Skript kassani, shifokor va yo'naltiruvchi
+balanslarini nolga tushirdi, harajatlarni o'chirdi.
+
+Balanslar tranzaksiyalardan qayta hisoblab tiklandi (ular hosila ma'lumot).
+**Harajatlar tiklanmadi** — ular manba ma'lumot, boshqa nusxasi yo'q. 255 000
+so'mlik harajat yo'qoldi.
+
+**Qoida: bazaga yozadigan skript ishga tushirishdan oldin bazada jonli
+ma'lumot bor-yo'qligini TEKSHIR.** Bor bo'lsa — yozma, egasidan so'ra.
+Tozalashda faqat o'zing yaratgan qatorlarni `id` bo'yicha o'chir.
+
+### 1.3.2. Zaxira ishlamayapti
+`sheets_backup_config.json` da `enabled: true`, lekin `last_sync_at` =
+**2026-05-31** va Apps Script URL `HTTP 411` qaytaradi. Ya'ni tizim
+"zaxira yoqilgan" deb ko'rsatadi, aslida 2,5 oydan beri ishlamaydi.
+Bu tuzatilmaguncha bazaga yozadigan har qanday amal xavfli.
 
 ### 1.4. Hisobot funksiyalari bazaga yozmasin
 `daily_report()` va rahbar paneli **hech narsa yozmaydi**. Ilgari ular

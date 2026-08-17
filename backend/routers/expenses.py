@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +13,8 @@ from models.user import User
 from schemas import ExpenseCreate, ExpenseOut
 from services.finance import process_expense
 from services.telegram_notify import send_telegram_message
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/expenses", tags=["expenses"])
 
@@ -239,17 +242,19 @@ def create_expense(
     db.add(expense)
     db.commit()
     db.refresh(expense)
+    # DIQQAT: bu yerda fon oqimi (daemon thread) ishlatilgandi. So'rov tugashi
+    # bilan oqim o'ldirilardi va xabar yuborilmay qolardi — harajat
+    # bildirishnomalari Telegramga umuman bormagani shundan. Ustiga, ichidagi
+    # har qanday xato ham jimgina yutilardi.
+    # Endi ro'yxatga olishdagi kabi kutamiz va xatoni log qilamiz.
     import asyncio
-    import threading
-    threading.Thread(
-        target=lambda: asyncio.run(
-            send_telegram_message(
-                f"💸 Harajat: {data.amount:,} so'm\n📁 {data.category or 'Boshqa'}\n🧾 {data.description}".replace(",", " "),
-                section="finance",
-            )
-        ),
-        daemon=True,
-    ).start()
+    try:
+        asyncio.run(send_telegram_message(
+            f"💸 Harajat: {data.amount:,} so'm\n📁 {data.category or 'Boshqa'}\n🧾 {data.description}".replace(",", " "),
+            section="finance",
+        ))
+    except Exception as err:
+        logger.warning(f"Telegram xabari yuborilmadi (harajat): {err}")
     return _expense_out(expense)
 
 
@@ -269,16 +274,13 @@ def _perform_expense_cancel(e: Expense, reason: str, user: User, db: Session):
     e.cancel_reason = reason
     db.commit()
     import asyncio
-    import threading
-    threading.Thread(
-        target=lambda: asyncio.run(
-            send_telegram_message(
-                f"❌ Harajat bekor qilindi\n🧾 {e.description}\n📝 Sabab: {reason}",
-                section="cancellations",
-            )
-        ),
-        daemon=True,
-    ).start()
+    try:
+        asyncio.run(send_telegram_message(
+            f"❌ Harajat bekor qilindi\n🧾 {e.description}\n📝 Sabab: {reason}",
+            section="cancellations",
+        ))
+    except Exception as err:
+        logger.warning(f"Telegram xabari yuborilmadi (harajat bekor): {err}")
 
 
 @router.post("/{expense_id}/cancel")
