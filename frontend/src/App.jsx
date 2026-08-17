@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { useTheme } from './hooks/useTheme'
+import { api } from './utils/api'
 import Toast from './components/Toast'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -24,6 +25,7 @@ const CeoSavedReports = lazy(() => import('./pages/ceo/SavedReports'))
 const CeoActivity = lazy(() => import('./pages/ceo/Activity'))
 const CeoDuty = lazy(() => import('./pages/ceo/Duty'))
 const CeoInpatients = lazy(() => import('./pages/ceo/Inpatients'))
+const CeoInpatientSettings = lazy(() => import('./pages/ceo/InpatientSettings'))
 const CeoCash = lazy(() => import('./pages/ceo/Cash'))
 const ChangePassword = lazy(() => import('./pages/ceo/ChangePassword'))
 const CeoBackup = lazy(() => import('./pages/ceo/Backup'))
@@ -86,12 +88,10 @@ function useStartupAuth() {
   const { refreshToken, setAuth, logout } = useAuthStore()
   useEffect(() => {
     if (!refreshToken) return
-    fetch('/api/auth/refresh', {
+    api('/auth/refresh', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
-      .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data) setAuth(data); else logout() })
       .catch(() => {})
   }, [])
@@ -128,6 +128,7 @@ function AppRoutes() {
           <Route path="providers" element={<CeoProviders />} />
           <Route path="employees" element={<CeoEmployees />} />
           <Route path="inpatients" element={<CeoInpatients />} />
+          <Route path="inpatients-settings" element={<CeoInpatientSettings />} />
           <Route path="duty" element={<CeoDuty />} />
           <Route path="cash" element={<CeoCash />} />
           <Route path="balance" element={<CeoBalance />} />

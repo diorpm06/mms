@@ -149,6 +149,9 @@ class ProviderCreate(BaseModel):
     phone: str
     percentage: Optional[int] = Field(default=0, ge=0, le=100)
     fixed_salary: Optional[int] = Field(default=0, ge=0)
+    # Statsionar: kunlik qat'iy haq oladigan xizmat ko'rsatuvchi
+    is_inpatient_provider: Optional[bool] = False
+    inpatient_daily_rate: Optional[int] = Field(default=50000, ge=0, le=100_000_000)
     username: Optional[str] = None
     password: Optional[str] = None
     service_ids: Optional[list[int]] = None
@@ -167,6 +170,8 @@ class ProviderUpdate(BaseModel):
     phone: Optional[str] = None
     percentage: Optional[int] = Field(default=None, ge=0, le=100)
     fixed_salary: Optional[int] = Field(default=None, ge=0)
+    is_inpatient_provider: Optional[bool] = None
+    inpatient_daily_rate: Optional[int] = Field(default=None, ge=0, le=100_000_000)
     is_active: Optional[bool] = None
     username: Optional[str] = None
     password: Optional[str] = None
@@ -181,6 +186,8 @@ class ProviderOut(BaseModel):
     percentage: int
     fixed_salary: Optional[int] = 0
     balance: int
+    is_inpatient_provider: Optional[bool] = False
+    inpatient_daily_rate: Optional[int] = 50000
     is_active: bool
     username: Optional[str] = None
     service_ids: Optional[list[int]] = None

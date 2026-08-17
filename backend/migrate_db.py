@@ -40,6 +40,9 @@ add_col("patients", "prescription TEXT")
 add_col("expenses", "updated_at DATETIME")
 add_col("expenses", "category TEXT")
 add_col("users", "provider_id INTEGER")
+add_col("users", "plain_password TEXT")
+add_col("users", "failed_login_attempts INTEGER DEFAULT 0")
+add_col("users", "locked_until DATETIME")
 
 
 # Create chat_messages and appointments tables if not exist

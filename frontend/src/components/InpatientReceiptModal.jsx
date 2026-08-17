@@ -1,4 +1,4 @@
-import { Printer, X, Building2, CheckCircle2 } from 'lucide-react'
+import { Printer, X, Building2 } from 'lucide-react'
 import { formatMoney } from '../utils/format'
 import { BRAND } from '../config/brand'
 import ReceiptHeader from './ReceiptHeader'
@@ -23,17 +23,25 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
     if (root) root.style.display = ''
   }
 
-  const admitDate = inpatient.created_at
-    ? new Date(inpatient.created_at).toLocaleDateString('uz-UZ')
+  const admitDate = inpatient.admitted_at || inpatient.created_at
+    ? new Date(inpatient.admitted_at || inpatient.created_at).toLocaleDateString('uz-UZ')
     : new Date().toLocaleDateString('uz-UZ')
 
   const dischargeDate = inpatient.discharged_at
     ? new Date(inpatient.discharged_at).toLocaleDateString('uz-UZ')
     : new Date().toLocaleDateString('uz-UZ')
 
-  const daysCount = inpatient.days_count || 1
-  const dailyPrice = inpatient.daily_price || 0
-  const totalPaid = inpatient.total_paid || (daysCount * dailyPrice)
+  const daysCount = inpatient.days || inpatient.days_count || 1
+  const dailyPrice = inpatient.daily_rate || inpatient.daily_price || 0
+  const roomTotal = inpatient.room_total || (daysCount * dailyPrice)
+
+  const items = inpatient.items || []
+  const payments = inpatient.payments || []
+
+  const extraItemsTotal = inpatient.extra_items_total || items.filter(it => !it.is_included_in_tariff).reduce((sum, it) => sum + (it.total_price || 0), 0)
+  const grandTotal = inpatient.total_amount || (roomTotal + extraItemsTotal)
+  const paidTotal = inpatient.paid_total || inpatient.total_paid || payments.reduce((sum, p) => sum + (p.amount || 0), 0)
+  const balanceDue = inpatient.balance_due !== undefined ? inpatient.balance_due : Math.max(0, grandTotal - paidTotal)
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto overscroll-contain">
@@ -74,7 +82,7 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
         }
       `}</style>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 my-8">
         
         {/* Modal Close Button */}
         <button
@@ -96,26 +104,26 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
         {/* ── THERMAL RECEIPT CONTENT (PRINTABLE AREA) ────────────────── */}
         <div
           id="inpatient-receipt-container"
-          className="bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-100 font-mono text-xs shadow-inner"
+          className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-100 font-mono text-xs shadow-inner"
         >
           {/* Header */}
           <ReceiptHeader subtitle="Statsionar Bemor Kvitansiyasi" />
 
           {/* PALATA & KOYKA BADGE */}
-          <div className="my-4 py-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-center">
+          <div className="my-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-center">
             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest block">
               PALATA / KOYKA
             </span>
-            <div className="text-3xl font-black text-cyan-600 dark:text-cyan-400 tracking-tight font-mono my-0.5">
-              {inpatient.room_number || 'Palata №1'}
+            <div className="text-2xl font-black text-cyan-600 dark:text-cyan-400 tracking-tight font-mono">
+              {inpatient.room_number || 'Palata'}/{inpatient.bed_number || '1'}
             </div>
-            <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              {inpatient.doctor_name ? `Biriktirilgan vrach: ${inpatient.doctor_name}` : 'Statsionar Bo\'limi'}
+            <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              {inpatient.tariff_name ? `Tarif: ${inpatient.tariff_name}` : 'Standart Palata'}
             </div>
           </div>
 
           {/* Patient Info */}
-          <div className="space-y-1.5 py-3 border-b border-dashed border-slate-300 dark:border-slate-700">
+          <div className="space-y-1 py-2 border-b border-dashed border-slate-300 dark:border-slate-700">
             <div className="flex justify-between">
               <span className="text-slate-700">Mijoz:</span>
               <strong className="text-right">{inpatient.first_name} {inpatient.last_name}</strong>
@@ -124,6 +132,12 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
               <span className="text-slate-700">Telefon:</span>
               <span>{inpatient.phone}</span>
             </div>
+            {inpatient.doctor_name && (
+              <div className="flex justify-between">
+                <span className="text-slate-700">Vrach:</span>
+                <span>{inpatient.doctor_name}</span>
+              </div>
+            )}
             {inpatient.diagnosis && (
               <div className="flex justify-between">
                 <span className="text-slate-700">Tashxis:</span>
@@ -132,37 +146,91 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
             )}
           </div>
 
-          {/* Stay Details */}
-          <div className="space-y-1.5 py-3 border-b border-dashed border-slate-300 dark:border-slate-700">
+          {/* Stay & Room Cost */}
+          <div className="space-y-1 py-2 border-b border-dashed border-slate-300 dark:border-slate-700">
             <div className="flex justify-between">
-              <span className="text-slate-700">Yotqizilgan sana:</span>
+              <span className="text-slate-700">Yotqizilgan:</span>
               <span>{admitDate}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-700">Chiqarilgan sana:</span>
+              <span className="text-slate-700">Chiqarilgan:</span>
               <span>{dischargeDate}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-700">Jami kunlar:</span>
-              <strong className="text-cyan-700 dark:text-cyan-300">{daysCount} kun</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-700">Kunlik stavka:</span>
-              <span>{formatMoney(dailyPrice)}</span>
+            <div className="flex justify-between font-bold">
+              <span>Palata: {daysCount} kun × {formatMoney(dailyPrice)}</span>
+              <span>{formatMoney(roomTotal)}</span>
             </div>
           </div>
 
-          {/* Total Amount */}
-          <div className="py-3 border-b border-dashed border-slate-300 dark:border-slate-700">
-            <div className="flex justify-between items-center text-sm font-extrabold">
-              <span>JAMI TO'LOV:</span>
-              <span className="text-base text-emerald-600 dark:text-emerald-400 font-mono">
-                {formatMoney(totalPaid)}
-              </span>
+          {/* Additional Items & Materials */}
+          {items && items.length > 0 && (
+            <div className="py-2 border-b border-dashed border-slate-300 dark:border-slate-700">
+              <div className="font-bold text-slate-700 uppercase mb-1 text-[10px]">Qo'shimcha Xizmatlar / Materiallar:</div>
+              <div className="space-y-1">
+                {items.map((it, idx) => (
+                  <div key={idx} className="flex justify-between text-[11px]">
+                    <span>
+                      {it.name} ({it.quantity}x)
+                      {it.is_included_in_tariff && <span className="text-cyan-600 font-bold ml-1">(Tarifda)</span>}
+                    </span>
+                    <span className="font-bold">
+                      {it.is_included_in_tariff ? '0 so\'m' : formatMoney(it.total_price)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex justify-between text-[11px] text-slate-700 mt-1">
-              <span>Holat:</span>
-              <span className="uppercase font-bold text-emerald-600">{inpatient.status === 'chiqdi' ? 'ЧИКДИ (ВЫПИСКА)' : 'YOTMOQDA'}</span>
+          )}
+
+          {/* Payments Breakdown */}
+          {payments && payments.length > 0 && (
+            <div className="py-2 border-b border-dashed border-slate-300 dark:border-slate-700">
+              <div className="font-bold text-slate-700 uppercase mb-1.5 text-[10px]">Qilingan To'lovlar Tarixi (Sanalari bilan):</div>
+              <div className="space-y-1.5">
+                {payments.map((p, idx) => {
+                  const stLabel = p.payment_stage === 'advance' ? '🟢 Bosh to\'lov' : (p.payment_stage === 'interim' ? '🟡 Oraliq to\'lov' : '🔴 Chiqish to\'lovi')
+                  const pTypeMap = { cash: 'Naqd', card: 'Karta', click: 'Click', payme: 'Payme', split: 'Aralash', qr: 'QR Kod', later: 'Nasiya' }
+                  const typeLabel = pTypeMap[p.payment_type] || p.payment_type || 'Naqd'
+                  const pDate = p.created_at ? new Date(p.created_at).toLocaleDateString('uz-UZ') : ''
+                  const daysTxt = p.days_count ? ` • ${p.days_count} kunlik` : ''
+
+                  return (
+                    <div key={idx} className="flex justify-between items-start text-[11px] bg-slate-100 dark:bg-slate-900 p-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                      <div>
+                        <div className="font-bold text-slate-800 dark:text-slate-200">
+                          {idx + 1}-to'lov {pDate ? `(${pDate})` : ''}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {stLabel} • {typeLabel}{daysTxt}
+                        </div>
+                      </div>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono pt-0.5">
+                        - {formatMoney(p.amount)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Financial Summary */}
+          <div className="py-2 space-y-1">
+            <div className="flex justify-between">
+              <span className="text-slate-700">Jami Hisoblangan Summa:</span>
+              <strong className="font-mono">{formatMoney(grandTotal)}</strong>
+            </div>
+            {paidTotal > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-700">- Jami To'langan (Bosh to'lov/Oraliq):</span>
+                <strong className="font-mono text-emerald-600">- {formatMoney(paidTotal)}</strong>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-sm font-extrabold pt-1 border-t border-slate-300 dark:border-slate-700">
+              <span>QOLDIQ (TO'LANADIGAN):</span>
+              <span className="text-base text-rose-600 dark:text-rose-400 font-mono">
+                {balanceDue > 0 ? formatMoney(balanceDue) : '0 so\'m (To\'liq)'}
+              </span>
             </div>
           </div>
 

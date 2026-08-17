@@ -13,7 +13,12 @@ import { Btn, Icons, PageHeader, THead, StatusBadge, ActionRow, EmptyState } fro
 import ActionMenu from '../../components/ActionMenu'
 
 const SOURCES = ['Naqt kassa', 'Karta kassa', 'Bank hisob', 'Boshqa']
-const emptyForm = { full_name: '', specialization: '', phone: '+998', percentage: '', fixed_salary: '', username: '', password: '', service_ids: [] }
+const STATSIONAR_STANDART = 50000
+const emptyForm = {
+  full_name: '', specialization: '', phone: '+998', percentage: '', fixed_salary: '',
+  username: '', password: '', service_ids: [],
+  is_inpatient_provider: false, inpatient_daily_rate: String(STATSIONAR_STANDART),
+}
 
 const formatDoctorServicesSummary = (serviceIds, allServices) => {
   if (!serviceIds || serviceIds.length === 0) {
@@ -64,9 +69,124 @@ const formatDoctorServicesSummary = (serviceIds, allServices) => {
   )
 }
 
+/* ── Statsionar xizmat ko'rsatuvchilar bo'limi ───────────────────────────
+   Bu yerda foiz emas, yotgan kun soni ko'rsatiladi: shifokor bemor yotgan
+   har bir kun uchun qat'iy summa oladi. */
+function InpatientProvidersPanel({ rows, onEdit, onDetail, onPayout, onAdd }) {
+  if (!rows) return <TableSkeleton />
+
+  if (rows.length === 0) {
+    return (
+      <div className="card p-8 text-center space-y-3 border-violet-500/30">
+        <div className="text-4xl">🛏</div>
+        <h3 className="font-black text-base text-body">Statsionar xizmat ko'rsatuvchi belgilanmagan</h3>
+        <p className="text-xs text-muted max-w-md mx-auto font-semibold">
+          Shifokorni statsionar uchun belgilash uchun "Shifokorlar" bo'limiga o'ting,
+          uni tahrirlang va <span className="text-violet-300 font-bold">"Statsionar xizmat ko'rsatuvchi"</span>{' '}
+          katagiga belgi qo'yib, bir kunlik haqini kiriting. Shundan keyin u statsionarga
+          bemor yotqizishda tanlanadigan bo'ladi.
+        </p>
+        <div className="pt-1">
+          <Btn variant="cyan" icon={Icons.plus} onClick={onAdd}>Yangi shifokor qo'shish</Btn>
+        </div>
+      </div>
+    )
+  }
+
+  const jamiBugun = rows.reduce((s, r) => s + (r.today_accrued || 0), 0)
+  const jamiOy = rows.reduce((s, r) => s + (r.month_accrued || 0), 0)
+  const jamiBemor = rows.reduce((s, r) => s + (r.current_patients || 0), 0)
+
+  return (
+    <div className="space-y-5">
+      <div className="border-b border-border pb-3">
+        <h3 className="text-sm font-black text-violet-300 uppercase tracking-wider flex items-center gap-2">
+          🛏 Statsionar Xizmat Ko'rsatuvchilar ({rows.length} nafar)
+        </h3>
+        <p className="text-xs text-muted">
+          Bemor yotgan har bir kun uchun qat'iy haq. Hisob har kuni avtomat yoziladi.
+        </p>
+      </div>
+
+      {/* Yig'ma ko'rsatkichlar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="card p-4 border-violet-500/30">
+          <span className="text-[10px] font-extrabold text-muted uppercase block">Hozir yotgan bemorlar</span>
+          <span className="font-black text-violet-300 font-mono text-xl">{jamiBemor} ta</span>
+        </div>
+        <div className="card p-4 border-border">
+          <span className="text-[10px] font-extrabold text-muted uppercase block">Bugun yozilgan haq</span>
+          <span className="font-black text-gold font-mono text-xl">{formatMoney(jamiBugun)}</span>
+        </div>
+        <div className="card p-4 border-border">
+          <span className="text-[10px] font-extrabold text-muted uppercase block">Shu oyda jami</span>
+          <span className="font-black text-emerald font-mono text-xl">{formatMoney(jamiOy)}</span>
+        </div>
+      </div>
+
+      <div className="card overflow-x-auto p-0 border-violet-500/20 shadow-lg">
+        <table className="w-full text-xs">
+          <THead cols={[
+            'Xizmat ko\'rsatuvchi', 'Kunlik haqi', 'Hozir yotgan', 'Jami kun',
+            'Bugun', 'Shu oy', 'Jami yozilgan', 'Balans', 'Harakatlar',
+          ]} />
+          <tbody className="divide-y divide-border font-semibold">
+            {rows.map((p) => (
+              <tr key={p.id} className={p.is_active === false ? 'bg-rose-500/5 opacity-60' : 'hover:bg-surface-hover transition-colors whitespace-nowrap'}>
+                <td className="p-3">
+                  <div className="font-extrabold text-body">{p.full_name}</div>
+                  <div className="text-[11px] text-violet-300 font-bold">{p.specialization || 'Shifokor'}</div>
+                </td>
+                <td className="p-3">
+                  <span className="badge badge-gold font-mono text-[11px] font-extrabold">
+                    {formatMoney(p.daily_rate)} / kun
+                  </span>
+                </td>
+                <td className="p-3">
+                  {p.current_patients > 0 ? (
+                    <span className="badge badge-info text-[11px] font-extrabold">{p.current_patients} ta bemor</span>
+                  ) : (
+                    <span className="text-muted italic text-[11px]">yo'q</span>
+                  )}
+                </td>
+                <td className="p-3 font-mono font-bold text-body">{p.total_days} kun</td>
+                <td className="p-3 font-mono font-bold text-gold">
+                  {p.today_accrued > 0 ? `+${formatMoney(p.today_accrued)}` : '—'}
+                </td>
+                <td className="p-3 font-mono font-bold text-cyan">{formatMoney(p.month_accrued)}</td>
+                <td className="p-3 font-mono font-black text-body">{formatMoney(p.total_accrued)}</td>
+                <td className="p-3 font-mono font-black text-emerald text-sm">{formatMoney(p.balance)}</td>
+                <td className="p-3">
+                  <ActionMenu
+                    items={[
+                      { label: 'Kunma-kun hisobi', icon: Icons.list, onClick: () => onDetail(p) },
+                      {
+                        label: 'Balansni chiqarish',
+                        icon: Icons.arrowDown,
+                        variant: 'success',
+                        hidden: !(p.balance > 0 && p.is_active !== false),
+                        onClick: () => onPayout(p.id),
+                      },
+                      { label: 'Kunlik haqni o\'zgartirish', icon: Icons.edit, onClick: () => onEdit(p) },
+                    ]}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export default function CeoProviders() {
+  const [tab, setTab] = useState('doctors') // doctors | inpatient
   const [layoutMode, setLayoutMode] = useState('cards') // Default to PRO Cards View!
   const [items, setItems] = useState(null)
+  const [inpEarnings, setInpEarnings] = useState(null)
+  const [inpDetail, setInpDetail] = useState(null)   // {provider, rows}
+  const [inpDetailOpen, setInpDetailOpen] = useState(false)
   const [allServices, setAllServices] = useState([])
   const [modal, setModal] = useState(false)
   const [edit, setEdit] = useState(null)
@@ -107,8 +227,21 @@ export default function CeoProviders() {
     api('/services/all').then((s) => setAllServices(s || [])).catch(() => {})
     // Berilgan avanslar — avval bu ma'lumot bu bo'limda umuman ko'rinmasdi
     api('/providers/advance-summaries').then((a) => setAdvances(a || {})).catch(() => setAdvances({}))
+    api('/inpatients/provider-earnings').then((r) => setInpEarnings(r || [])).catch(() => setInpEarnings([]))
   }
   useEffect(() => { load() }, [])
+
+  const openInpDetail = async (p) => {
+    setInpDetail({ provider: p, rows: null })
+    setInpDetailOpen(true)
+    try {
+      const rows = await api(`/inpatients/provider-earnings/${p.id}`)
+      setInpDetail({ provider: p, rows: rows || [] })
+    } catch (e) {
+      setInpDetail({ provider: p, rows: [] })
+      toast(e.message, 'error')
+    }
+  }
 
   const toggleProviderActive = async (p) => {
     const isAct = p.is_active !== false
@@ -155,6 +288,8 @@ export default function CeoProviders() {
       username: p.username || '',
       password: '',
       service_ids: p.service_ids || [],
+      is_inpatient_provider: !!p.is_inpatient_provider,
+      inpatient_daily_rate: String(p.inpatient_daily_rate ?? STATSIONAR_STANDART),
     })
     setModal(true)
   }
@@ -168,6 +303,13 @@ export default function CeoProviders() {
         percentage: form.percentage !== '' && form.percentage !== null ? parseInt(form.percentage, 10) : 0,
         fixed_salary: form.fixed_salary !== '' && form.fixed_salary !== null ? parseInt(form.fixed_salary, 10) : 0,
         service_ids: form.service_ids || [],
+        is_inpatient_provider: !!form.is_inpatient_provider,
+        inpatient_daily_rate: form.inpatient_daily_rate !== '' && form.inpatient_daily_rate !== null
+          ? parseInt(form.inpatient_daily_rate, 10) : STATSIONAR_STANDART,
+      }
+      if (body.is_inpatient_provider && !(body.inpatient_daily_rate > 0)) {
+        toast("Statsionar kunlik haqi 0 dan katta bo'lishi kerak", 'error')
+        return
       }
       if (form.username) body.username = form.username
       if (form.password) body.password = form.password
@@ -218,8 +360,44 @@ export default function CeoProviders() {
     }
   }
 
+  const inpCount = (inpEarnings || []).length
+
   return (
     <div className="space-y-5">
+      {/* Bo'lim tanlash */}
+      <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border w-fit">
+        <button
+          type="button"
+          onClick={() => setTab('doctors')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            tab === 'doctors' ? 'bg-cyan text-slate-950 shadow' : 'text-muted hover:text-body'
+          }`}
+        >
+          👨‍⚕️ Shifokorlar {items ? `(${items.length})` : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('inpatient')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            tab === 'inpatient' ? 'bg-violet-500 text-white shadow' : 'text-muted hover:text-body'
+          }`}
+        >
+          🛏 Statsionar xizmat ko'rsatuvchi{inpCount > 0 ? ` (${inpCount})` : ''}
+        </button>
+      </div>
+
+      {tab === 'inpatient' ? (
+        <InpatientProvidersPanel
+          rows={inpEarnings}
+          // Hisobot qatorida shifokorning barcha maydonlari yo'q —
+          // tahrirlashga to'liq yozuvni uzatamiz
+          onEdit={(p) => handleOpenEdit((items || []).find((x) => x.id === p.id) || p)}
+          onDetail={openInpDetail}
+          onPayout={payout}
+          onAdd={handleOpenAdd}
+        />
+      ) : (
+      <>
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-3">
         <div>
           <h3 className="text-sm font-black text-cyan uppercase tracking-wider flex items-center gap-2">
@@ -519,6 +697,8 @@ export default function CeoProviders() {
           </table>
         </div>
       )}
+      </>
+      )}
 
       {/* Edit / Add Modal */}
       <Modal open={modal} onClose={() => setModal(false)}
@@ -553,6 +733,48 @@ export default function CeoProviders() {
               <input className="input-field text-xs font-mono font-bold" type="number" placeholder="0"
                 value={form.percentage || ''} onChange={(e) => setForm({ ...form, percentage: e.target.value })} />
             </div>
+          </div>
+
+          {/* Statsionar xizmat ko'rsatuvchi */}
+          <div className={`p-3 rounded-xl border space-y-3 transition-colors ${
+            form.is_inpatient_provider ? 'bg-violet-500/10 border-violet-500/40' : 'bg-surface-2 border-border'
+          }`}>
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                className="rounded accent-violet-500 mt-0.5 shrink-0"
+                checked={!!form.is_inpatient_provider}
+                onChange={(e) => setForm({ ...form, is_inpatient_provider: e.target.checked })}
+              />
+              <span>
+                <span className="font-bold text-violet-300 text-xs uppercase tracking-wider block">
+                  🛏 Statsionar xizmat ko'rsatuvchi
+                </span>
+                <span className="text-[11px] text-muted font-semibold">
+                  Belgilansa, statsionarga bemor yotqizishda tanlash mumkin bo'ladi va
+                  bemor yotgan har bir kun uchun quyidagi summa hisobiga yoziladi.
+                  Bu foizdan alohida — statsionar to'lovlaridan foiz olinmaydi.
+                </span>
+              </span>
+            </label>
+
+            {form.is_inpatient_provider && (
+              <div className="pl-6">
+                <label className="form-label font-bold">Bir kun uchun haq (so'm) *</label>
+                <input
+                  className="input-field text-sm font-mono font-bold text-gold max-w-[220px]"
+                  type="number"
+                  min={0}
+                  placeholder={String(STATSIONAR_STANDART)}
+                  value={form.inpatient_daily_rate}
+                  onChange={(e) => setForm({ ...form, inpatient_daily_rate: e.target.value })}
+                />
+                <p className="text-[11px] text-muted font-semibold mt-1">
+                  Bu yerda o'zgartirilsa, faqat bundan keyingi kunlarga ta'sir qiladi —
+                  allaqachon yozilgan kunlar qayta hisoblanmaydi.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-3">
@@ -639,6 +861,71 @@ export default function CeoProviders() {
             <Btn variant="ghost" full icon={Icons.x} onClick={() => setModal(false)}>Bekor Qilish</Btn>
             <Btn variant="cyan" full icon={Icons.save} onClick={save}>✓ Saqlash</Btn>
           </div>
+        </div>
+      </Modal>
+
+      {/* Statsionar kunma-kun hisobi */}
+      <Modal
+        open={inpDetailOpen}
+        onClose={() => setInpDetailOpen(false)}
+        title={`Statsionar kunlik hisobi — ${inpDetail?.provider?.full_name || ''}`}
+        size="lg"
+      >
+        <div className="space-y-3 text-xs">
+          {!inpDetail?.rows ? (
+            <TableSkeleton />
+          ) : inpDetail.rows.length === 0 ? (
+            <EmptyState icon="🛏" message="Hali kunlik haq yozilmagan" />
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-surface-2 rounded-xl border border-border">
+                <div>
+                  <span className="text-[10px] font-extrabold text-muted uppercase block">Jami</span>
+                  <span className="font-black text-emerald font-mono text-base">
+                    {formatMoney(inpDetail.rows.reduce((s, r) => s + (r.amount || 0), 0))}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-muted uppercase block">Kunlar</span>
+                  <span className="font-black text-body font-mono text-base">{inpDetail.rows.length} kun</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold text-muted uppercase block">Kunlik stavka</span>
+                  <span className="font-black text-gold font-mono text-base">
+                    {formatMoney(inpDetail.provider?.daily_rate || 0)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="max-h-[420px] overflow-y-auto rounded-xl border border-border">
+                <table className="w-full text-xs">
+                  <THead cols={['Sana', 'Bemor', 'Palata', 'Holati', 'Summa']} />
+                  <tbody className="divide-y divide-border font-semibold">
+                    {inpDetail.rows.map((r) => (
+                      <tr key={r.id} className="hover:bg-surface-hover transition-colors">
+                        <td className="p-2.5 font-mono font-bold text-body">{r.date}</td>
+                        <td className="p-2.5 font-bold text-body">{r.patient_name}</td>
+                        <td className="p-2.5 text-muted font-bold">{r.room_number}</td>
+                        <td className="p-2.5">
+                          {r.status === 'yotmoqda' ? (
+                            <span className="badge badge-info text-[10px] font-bold">Yotibdi</span>
+                          ) : (
+                            <span className="badge badge-muted text-[10px] font-bold">Chiqgan</span>
+                          )}
+                        </td>
+                        <td className="p-2.5 font-mono font-black text-gold text-right">
+                          +{formatMoney(r.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-muted font-semibold">
+                Oxirgi {inpDetail.rows.length} ta yozuv ko'rsatilmoqda.
+              </p>
+            </>
+          )}
         </div>
       </Modal>
 

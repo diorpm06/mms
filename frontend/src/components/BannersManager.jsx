@@ -63,7 +63,9 @@ export default function BannersManager() {
     setUploading(true)
     try {
       const { accessToken } = useAuthStore.getState()
-      const res = await fetch('/api/banners/upload', {
+      const rawApi = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const apiBase = !rawApi ? '/api' : (rawApi.endsWith('/api') ? rawApi : `${rawApi}/api`)
+      const res = await fetch(`${apiBase}/banners/upload`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,

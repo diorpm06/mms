@@ -337,25 +337,25 @@ export default function PaymentReminderWidget() {
               <label className="text-xs font-black text-body uppercase tracking-wider block">
                 To'lov Turini Tanlang:
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-5 gap-1.5">
                 {[
-                  { id: 'naqd', label: '💵 Naqd pul' },
-                  { id: 'karta', label: '💳 Karta / Terminal' },
-                  { id: 'payme', label: '📱 QR-kod / Payme' },
-                  { id: 'aralash', label: '🔀 Aralash (Naqd+Karta)' },
+                  { id: 'naqd', label: '💵 Naqd' },
+                  { id: 'karta', label: '💳 Karta' },
+                  { id: 'click', label: '📱 Click/Payme' },
+                  { id: 'aralash', label: '🔀 Aralash' },
+                  { id: 'qr', label: '🔳 QR Kod' },
                 ].map((t) => (
                   <button
                     key={t.id}
                     type="button"
                     onClick={() => setSelectedPayType(t.id)}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-extrabold transition-all text-left flex items-center justify-between ${
+                    className={`py-2 px-1 rounded-xl border text-[11px] font-bold transition-all text-center flex flex-col items-center justify-center gap-0.5 ${
                       selectedPayType === t.id
                         ? 'border-amber-400 bg-amber-500/25 text-amber-300 shadow-md scale-[1.02]'
                         : 'border-border bg-surface-2 text-body hover:bg-surface-2 hover:border-border-strong'
                     }`}
                   >
                     <span>{t.label}</span>
-                    {selectedPayType === t.id && <span className="text-amber-400 font-black">✓</span>}
                   </button>
                 ))}
               </div>

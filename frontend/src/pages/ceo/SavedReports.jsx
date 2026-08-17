@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../utils/api'
+import { api, downloadBlob } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import PageHeader from '../../components/PageHeader'
@@ -49,19 +49,8 @@ export default function CeoSavedReports() {
 
   const handleDownloadPdf = async (id, title) => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`/api/reports/saved/${id}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) throw new Error("PDF yuklanmadi")
-      const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${title}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
+      const blob = await api(`/reports/saved/${id}/pdf`)
+      downloadBlob(blob, `${title}.pdf`)
     } catch (e) {
       toast(e.message, 'error')
     }

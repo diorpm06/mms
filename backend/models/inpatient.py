@@ -16,7 +16,8 @@ class Inpatient(CancelMixin, Base):
     phone: Mapped[str] = mapped_column(String(20))
     room_number: Mapped[str] = mapped_column(String(20))
     bed_number: Mapped[str] = mapped_column(String(20))
-    doctor_id: Mapped[int] = mapped_column(ForeignKey("providers.id"))
+    tariff_id: Mapped[int | None] = mapped_column(ForeignKey("inpatient_tariffs.id"), nullable=True)
+    doctor_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id"), nullable=True)
     referrer_id: Mapped[int | None] = mapped_column(ForeignKey("referrers.id"), nullable=True)
     diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
     admitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -26,9 +27,11 @@ class Inpatient(CancelMixin, Base):
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
+    tariff = relationship("InpatientTariff")
     doctor = relationship("Provider", foreign_keys=[doctor_id])
     referrer = relationship("Referrer")
     payments = relationship("InpatientPayment", back_populates="inpatient")
+    items = relationship("InpatientItem", back_populates="inpatient", cascade="all, delete-orphan")
 
 
 class InpatientPayment(CancelMixin, Base):
@@ -38,6 +41,7 @@ class InpatientPayment(CancelMixin, Base):
     inpatient_id: Mapped[int] = mapped_column(ForeignKey("inpatients.id"))
     amount: Mapped[int] = mapped_column(Integer)
     payment_type: Mapped[str] = mapped_column(String(10))
+    payment_stage: Mapped[str] = mapped_column(String(20), default="interim")  # advance | interim | discharge
     days_count: Mapped[int] = mapped_column(Integer)
     period_start: Mapped[date] = mapped_column(Date)
     period_end: Mapped[date] = mapped_column(Date)

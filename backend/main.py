@@ -78,13 +78,16 @@ limiter = Limiter(key_func=get_remote_address)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Jadval/ustun/indeks migratsiyalari — Vercel serverless'da ham ishga tushishi shart,
-    # aks holda yangi ustun/indekslar productionda hech qachon yaratilmaydi.
-    try:
-        Base.metadata.create_all(bind=engine)
-        run_migrations()
-    except Exception as e:
-        logger.warning(f"DB init/migration warning: {e}")
+    import threading
+
+    def _init_db():
+        try:
+            Base.metadata.create_all(bind=engine)
+            run_migrations()
+        except Exception as e:
+            logger.warning(f"DB init/migration warning: {e}")
+
+    threading.Thread(target=_init_db, daemon=True).start()
 
     if not os.environ.get("VERCEL"):
         try:

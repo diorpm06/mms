@@ -612,13 +612,19 @@ def process_inpatient_payment(
     amount: int,
     payment_type: str,
     days_count: int,
+    cash_amount: int | None = None,
+    card_amount: int | None = None,
+    click_amount: int | None = None,
+    qr_amount: int | None = None,
 ) -> Transaction:
-    provider, referrer, referrer_amount, provider_amount, center_amount = _split_amounts(
-        amount, inpatient.referrer_id, inpatient.doctor_id, db
-    )
-    if referrer:
-        referrer.balance += referrer_amount
-    provider.balance += provider_amount
+    # Statsionarda yo'naltiruvchi komissiyasi yo'q, shifokor esa foiz emas —
+    # bemor yotgan har bir kun uchun qat'iy haq oladi. U haq alohida jadvalda
+    # (inpatient_provider_accruals) kunma-kun yoziladi, shu sababli to'lovning
+    # o'zi to'liq klinika hisobiga tushadi. Ilgari bu yerda shifokorga umumiy
+    # foiz ham berilib, bir ish uchun ikki marta to'lanish xavfi bor edi.
+    referrer_amount = 0
+    provider_amount = 0
+    center_amount = amount
     bal = get_or_create_balance(db)
     bal.current_balance += center_amount
     bal.updated_at = datetime.now()
@@ -626,15 +632,42 @@ def process_inpatient_payment(
         db, center_amount, "income",
         f"Yotgan #{inpatient.id}: {inpatient.first_name} {inpatient.last_name}",
     )
+
+    c_amt = cash_amount or 0
+    cd_amt = card_amount or 0
+    cl_amt = click_amount or 0
+    q_amt = qr_amount or 0
+
+    if (payment_type or "").lower() in ("split", "aralash") and (c_amt + cd_amt + cl_amt + q_amt > 0):
+        pass
+    else:
+        ptype = (payment_type or "").lower()
+        if ptype in ("cash", "naqd"):
+            c_amt = amount
+        elif ptype in ("click", "payme"):
+            cl_amt = amount
+        elif ptype == "qr":
+            q_amt = amount
+        elif ptype in ("later", "keyinroq", "nasiya", "qarz"):
+            c_amt = cd_amt = cl_amt = q_amt = 0
+        else:
+            cd_amt = amount
+
     tx = Transaction(
         patient_id=None,
         total_amount=amount,
-        referrer_id=inpatient.referrer_id,
+        referrer_id=None,
         referrer_amount=referrer_amount,
-        provider_id=provider.id,
+        # Shifokor kim ekani hisobotda ko'rinib tursin, lekin ulushi 0 —
+        # uning haqi kunlik hisobda alohida yuritiladi.
+        provider_id=inpatient.doctor_id,
         provider_amount=provider_amount,
         center_amount=center_amount,
         payment_type=payment_type,
+        cash_amount=c_amt,
+        card_amount=cd_amt,
+        click_amount=cl_amt,
+        qr_amount=q_amt,
     )
     db.add(tx)
     return tx

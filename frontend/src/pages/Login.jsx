@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useToastStore } from '../store/toastStore'
 import { useTheme } from '../hooks/useTheme'
+import { api } from '../utils/api'
 import { Moon, Sun, Eye, EyeOff } from 'lucide-react'
 import logo from '@assets/logo.png'
 import { BRAND } from '../config/brand'
@@ -19,14 +20,6 @@ export default function Login() {
   const toast = useToastStore((s) => s.add)
   const navigate = useNavigate()
 
-  const parseResponseJson = async (res) => {
-    const ct = res.headers.get('content-type') || ''
-    if (!ct.includes('application/json')) {
-      throw new Error("Backend bilan ulanishda xato yuz berdi. Iltimos qayta urinib ko'ring.")
-    }
-    return res.json()
-  }
-
   const getRedirectPath = (role) => {
     if (role === 'ceo') return '/ceo'
     if (role === 'doctor') return '/doctor'
@@ -41,22 +34,20 @@ export default function Login() {
     }
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/login', {
+      const data = await api('/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       })
-      const data = await parseResponseJson(res)
-      if (!res.ok) throw new Error(data.detail || 'Login xato')
       setAuth(data)
       toast('Muvaffaqiyatli kirdingiz')
       navigate(getRedirectPath(data.role))
     } catch (err) {
-      toast(err.message, 'error')
+      toast(err.message || 'Login xato', 'error')
     } finally {
       setLoading(false)
     }
   }
+
 
   return (
     <div

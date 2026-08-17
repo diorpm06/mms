@@ -13,12 +13,34 @@ function extractErrorMessage(err) {
   if (!err) return 'Xato yuz berdi'
   if (typeof err.detail === 'string') return err.detail
   if (Array.isArray(err.detail) && err.detail.length) {
-    const first = err.detail[0]
-    if (typeof first === 'string') return first
-    if (first && typeof first === 'object') {
-      if (first.msg) return String(first.msg)
-      return JSON.stringify(first)
+    const fieldMap = {
+      full_name: "Bemor F.I.O (Ismi va Familiyasi)",
+      first_name: "Ismi",
+      last_name: "Familiyasi",
+      birth_date: "Tug'ilgan yili",
+      address: "Manzil",
+      phone: "Telefon raqami",
+      daily_rate: "Kunlik yotish narxi",
+      tariff_id: "Tarif paketi",
+      room_number: "Palata raqami",
+      bed_number: "Koyka raqami",
+      doctor_id: "Shifokor",
+      patient_id: "Bazada bor bemor",
     }
+    const msgs = err.detail.map((item) => {
+      if (typeof item === 'string') return item
+      if (item && typeof item === 'object') {
+        const fieldName = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : ''
+        const label = fieldMap[fieldName] || fieldName
+        const msg = item.msg || "Maydon to'ldirilishi shart"
+        if (label && (msg === 'Field required' || msg === 'field required')) {
+          return `${label} to'ldirilishi shart (*)`
+        }
+        return label ? `${label}: ${msg}` : String(msg)
+      }
+      return JSON.stringify(item)
+    })
+    return msgs.join(', ')
   }
   if (typeof err.message === 'string') return err.message
   return JSON.stringify(err)

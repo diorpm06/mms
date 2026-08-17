@@ -39,13 +39,27 @@ def run_migrations():
     try:
         with engine.connect() as conn:
             if settings.DATABASE_URL.startswith("sqlite"):
+                # Users
+                try:
+                    result = conn.execute(text("PRAGMA table_info(users)")).fetchall()
+                    existing_cols = [r[1] for r in result]
+                    if "plain_password" not in existing_cols:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN plain_password VARCHAR(255)"))
+                    if "failed_login_attempts" not in existing_cols:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0"))
+                    if "locked_until" not in existing_cols:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN locked_until DATETIME"))
+                    conn.commit()
+                except Exception as e:
+                    logger.warning(f"users migration warning: {e}")
+
                 # Inventory items
                 try:
                     result = conn.execute(text("PRAGMA table_info(inventory_items)")).fetchall()
                     existing_cols = [r[1] for r in result]
                     if "cost_price" not in existing_cols:
                         conn.execute(text("ALTER TABLE inventory_items ADD COLUMN cost_price INTEGER DEFAULT 0"))
-                        conn.commit()
+                    conn.commit()
                 except Exception as e:
                     logger.warning(f"inventory_items migration warning: {e}")
 
@@ -121,23 +135,115 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"Migration warning: {e}")
 
-    # services.template_key — SQLite va PostgreSQL ikkalasida ham (mavjud bo'lsa xato
-    # jim yutiladi, ADD COLUMN IF NOT EXISTS SQLite'da yo'q)
-    try:
-        with engine.connect() as conn:
-            try:
-                conn.execute(text("ALTER TABLE services ADD COLUMN template_key VARCHAR(50)"))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-    except Exception as e:
-        logger.warning(f"template_key migration warning: {e}")
+    if settings.DATABASE_URL.startswith("sqlite"):
+        # services.template_key
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text("ALTER TABLE services ADD COLUMN template_key VARCHAR(50)"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"template_key migration warning: {e}")
 
-    # Komissiya qoidalari endi bazada (ilgari kodda yozilgan edi).
+        # Komissiya qoidalari endi bazada (ilgari kodda yozilgan edi).
+        for stmt in (
+            "ALTER TABLE service_categories ADD COLUMN commission_mode VARCHAR(10) DEFAULT 'none'",
+            "ALTER TABLE service_categories ADD COLUMN commission_value INTEGER DEFAULT 0",
+            "ALTER TABLE services ADD COLUMN no_referrer_commission BOOLEAN DEFAULT FALSE",
+        ):
+            try:
+                with engine.connect() as conn:
+                    try:
+                        conn.execute(text(stmt))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+            except Exception as e:
+                logger.warning(f"commission columns migration warning: {e}")
+
+        # referrers.ozon_sum — Ozonaterapiya alohida bo'lim, o'z tarifi bilan
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text("ALTER TABLE referrers ADD COLUMN ozon_sum INTEGER DEFAULT 10000"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"ozon_sum migration warning: {e}")
+
+        # patients/transactions: click_amount, qr_amount — aralash to'lovda Click va QR
+        for stmt in (
+            "ALTER TABLE patients ADD COLUMN click_amount INTEGER DEFAULT 0",
+            "ALTER TABLE patients ADD COLUMN qr_amount INTEGER DEFAULT 0",
+            "ALTER TABLE transactions ADD COLUMN click_amount INTEGER DEFAULT 0",
+            "ALTER TABLE transactions ADD COLUMN qr_amount INTEGER DEFAULT 0",
+        ):
+            try:
+                with engine.connect() as conn:
+                    try:
+                        conn.execute(text(stmt))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+            except Exception as e:
+                logger.warning(f"click/qr amount migration warning: {e}")
+
+        # patients.is_paper_entry
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text("ALTER TABLE patients ADD COLUMN is_paper_entry BOOLEAN DEFAULT FALSE"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"is_paper_entry migration warning: {e}")
+
+        # referrers: lab_percent, fizio_percent, uzi_sum, other_sum, is_confirmed
+        for stmt in (
+            "ALTER TABLE referrers ADD COLUMN lab_percent INTEGER DEFAULT 22",
+            "ALTER TABLE referrers ADD COLUMN fizio_percent INTEGER DEFAULT 20",
+            "ALTER TABLE referrers ADD COLUMN uzi_sum INTEGER DEFAULT 15000",
+            "ALTER TABLE referrers ADD COLUMN other_sum INTEGER DEFAULT 10000",
+            "ALTER TABLE referrers ADD COLUMN is_confirmed BOOLEAN DEFAULT TRUE",
+        ):
+            try:
+                with engine.connect() as conn:
+                    try:
+                        conn.execute(text(stmt))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+            except Exception as e:
+                logger.warning(f"referrers migration warning: {e}")
+
+        # banners.image_data / content_type
+        for stmt in (
+            "ALTER TABLE banners ADD COLUMN image_data BYTEA",
+            "ALTER TABLE banners ADD COLUMN content_type VARCHAR(100)",
+        ):
+            try:
+                with engine.connect() as conn:
+                    try:
+                        conn.execute(text(stmt))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+            except Exception as e:
+                logger.warning(f"banners image migration warning: {e}")
+
+    # Inpatients table column migrations (SQLite & PostgreSQL)
     for stmt in (
-        "ALTER TABLE service_categories ADD COLUMN commission_mode VARCHAR(10) DEFAULT 'none'",
-        "ALTER TABLE service_categories ADD COLUMN commission_value INTEGER DEFAULT 0",
-        "ALTER TABLE services ADD COLUMN no_referrer_commission BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE inpatients ADD COLUMN tariff_id INTEGER",
+        "ALTER TABLE inpatients ADD COLUMN doctor_id INTEGER",
+        "ALTER TABLE inpatients ADD COLUMN referrer_id INTEGER",
+        "ALTER TABLE inpatients ADD COLUMN diagnosis TEXT",
+        "ALTER TABLE inpatients ADD COLUMN cancel_reason TEXT",
+        "ALTER TABLE inpatients ADD COLUMN cancelled_at TIMESTAMP",
+        "ALTER TABLE inpatients ADD COLUMN cancelled_by INTEGER",
     ):
         try:
             with engine.connect() as conn:
@@ -147,84 +253,78 @@ def run_migrations():
                 except Exception:
                     conn.rollback()
         except Exception as e:
-            logger.warning(f"commission columns migration warning: {e}")
+            logger.warning(f"inpatients migration warning: {e}")
+
+    # inpatient_payments table migrations (SQLite & PostgreSQL)
+    for stmt in (
+        "ALTER TABLE inpatient_payments ADD COLUMN payment_stage VARCHAR(20) DEFAULT 'interim'",
+        "ALTER TABLE inpatient_payments ADD COLUMN days_count INTEGER DEFAULT 1",
+        "ALTER TABLE inpatient_payments ADD COLUMN period_start DATE",
+        "ALTER TABLE inpatient_payments ADD COLUMN period_end DATE",
+        "ALTER TABLE inpatient_payments ADD COLUMN is_cancelled BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE inpatient_payments ADD COLUMN cancelled_at TIMESTAMP",
+        "ALTER TABLE inpatient_payments ADD COLUMN cancelled_by INTEGER",
+        "ALTER TABLE inpatient_payments ADD COLUMN cancel_reason TEXT",
+    ):
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"inpatient_payments migration warning: {e}")
+
+    # inpatient_items table migrations (SQLite & PostgreSQL)
+    for stmt in (
+        "ALTER TABLE inpatient_items ADD COLUMN is_included_in_tariff BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE inpatient_items ADD COLUMN is_cancelled BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE inpatient_items ADD COLUMN cancelled_at TIMESTAMP",
+        "ALTER TABLE inpatient_items ADD COLUMN cancelled_by INTEGER",
+        "ALTER TABLE inpatient_items ADD COLUMN cancel_reason TEXT",
+    ):
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"inpatient_items migration warning: {e}")
+
+    # Statsionar xizmat ko'rsatuvchi belgisi va kunlik stavkasi (SQLite & PostgreSQL)
+    for stmt in (
+        "ALTER TABLE providers ADD COLUMN is_inpatient_provider BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE providers ADD COLUMN inpatient_daily_rate INTEGER DEFAULT 50000",
+    ):
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"providers inpatient migration warning: {e}")
+
+    # Eski qatorlarda NULL qolib ketmasin — hisob-kitobda 0 bo'lib chiqmasligi uchun
+    for stmt in (
+        "UPDATE providers SET is_inpatient_provider = FALSE WHERE is_inpatient_provider IS NULL",
+        "UPDATE providers SET inpatient_daily_rate = 50000 WHERE inpatient_daily_rate IS NULL",
+    ):
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"providers inpatient backfill warning: {e}")
 
     seed_commission_rules()
-
-    # referrers.ozon_sum — Ozonaterapiya alohida bo'lim, o'z tarifi bilan
-    try:
-        with engine.connect() as conn:
-            try:
-                conn.execute(text("ALTER TABLE referrers ADD COLUMN ozon_sum INTEGER DEFAULT 10000"))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-    except Exception as e:
-        logger.warning(f"ozon_sum migration warning: {e}")
-
-    # patients/transactions: click_amount, qr_amount — aralash to'lovda Click va QR
-    # qismlarini kartadan ajratib yozish uchun
-    for stmt in (
-        "ALTER TABLE patients ADD COLUMN click_amount INTEGER DEFAULT 0",
-        "ALTER TABLE patients ADD COLUMN qr_amount INTEGER DEFAULT 0",
-        "ALTER TABLE transactions ADD COLUMN click_amount INTEGER DEFAULT 0",
-        "ALTER TABLE transactions ADD COLUMN qr_amount INTEGER DEFAULT 0",
-    ):
-        try:
-            with engine.connect() as conn:
-                try:
-                    conn.execute(text(stmt))
-                    conn.commit()
-                except Exception:
-                    conn.rollback()
-        except Exception as e:
-            logger.warning(f"click/qr amount migration warning: {e}")
-
-    # patients.is_paper_entry — qog'oz jurnalidan (navbatchilikda) kiritilgan
-    # bemorlarni hisobotlarda alohida ko'rsatish uchun
-    try:
-        with engine.connect() as conn:
-            try:
-                conn.execute(text("ALTER TABLE patients ADD COLUMN is_paper_entry BOOLEAN DEFAULT FALSE"))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-    except Exception as e:
-        logger.warning(f"is_paper_entry migration warning: {e}")
-
-    # referrers: lab_percent, fizio_percent, uzi_sum, other_sum, is_confirmed
-    for stmt in (
-        "ALTER TABLE referrers ADD COLUMN lab_percent INTEGER DEFAULT 22",
-        "ALTER TABLE referrers ADD COLUMN fizio_percent INTEGER DEFAULT 20",
-        "ALTER TABLE referrers ADD COLUMN uzi_sum INTEGER DEFAULT 15000",
-        "ALTER TABLE referrers ADD COLUMN other_sum INTEGER DEFAULT 10000",
-        "ALTER TABLE referrers ADD COLUMN is_confirmed BOOLEAN DEFAULT TRUE",
-    ):
-        try:
-            with engine.connect() as conn:
-                try:
-                    conn.execute(text(stmt))
-                    conn.commit()
-                except Exception:
-                    conn.rollback()
-        except Exception as e:
-            logger.warning(f"referrers migration warning: {e}")
-            logger.warning(f"users auth-security migration warning: {e}")
-
-    # banners.image_data / content_type — rasm baza ichida saqlanadi
-    for stmt in (
-        "ALTER TABLE banners ADD COLUMN image_data BYTEA",
-        "ALTER TABLE banners ADD COLUMN content_type VARCHAR(100)",
-    ):
-        try:
-            with engine.connect() as conn:
-                try:
-                    conn.execute(text(stmt))
-                    conn.commit()
-                except Exception:
-                    conn.rollback()
-        except Exception as e:
-            logger.warning(f"banners image migration warning: {e}")
 
     # Ko'p so'raladigan ustunlarga indeks — SQLite va PostgreSQL'da bir xil sintaksis
     try:

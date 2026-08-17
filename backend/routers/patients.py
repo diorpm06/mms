@@ -216,6 +216,7 @@ def _patient_row(p: Patient) -> dict:
         "id": p.id,
         "first_name": p.first_name,
         "last_name": p.last_name,
+        "full_name": f"{p.first_name or ''} {p.last_name or ''}".strip(),
         "birth_date": p.birth_date.isoformat(),
         "phone": p.phone,
         "address": p.address,
@@ -1010,8 +1011,7 @@ def mark_patient_paid(
     if not patients_to_pay:
         raise HTTPException(status_code=404, detail="Bemor topilmadi")
 
-    total_all_amount = sum(p.payment_amount or 0 for p in patients_to_pay)
-    pay_type = body.payment_type if body.payment_type in ("naqd", "karta", "card", "cash", "split", "aralash", "payme") else "naqd"
+    pay_type = body.payment_type if body.payment_type in ("naqd", "karta", "card", "cash", "split", "aralash", "click", "payme", "qr") else "naqd"
 
     main_patient = next((p for p in patients_to_pay if p.id == patient_id), patients_to_pay[0])
 
@@ -1028,6 +1028,16 @@ def mark_patient_paid(
                 p.card_amount = 0
         elif pay_type in ("cash", "naqd"):
             p.cash_amount = amount
+            p.card_amount = 0
+        elif pay_type in ("click", "payme"):
+            if hasattr(p, "click_amount"):
+                p.click_amount = amount
+            p.cash_amount = 0
+            p.card_amount = 0
+        elif pay_type == "qr":
+            if hasattr(p, "qr_amount"):
+                p.qr_amount = amount
+            p.cash_amount = 0
             p.card_amount = 0
         else:
             p.cash_amount = 0

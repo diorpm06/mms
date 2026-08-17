@@ -23,6 +23,10 @@ class Provider(Base):
     percentage: Mapped[int] = mapped_column(Integer)
     fixed_salary: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
     balance: Mapped[int] = mapped_column(Integer, default=0)
+    # Statsionar xizmat ko'rsatuvchi — bemor yotgan har bir kun uchun qat'iy haq
+    # oladi (foiz emas). Faqat shu belgi qo'yilganlar statsionarda tanlanadi.
+    is_inpatient_provider: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    inpatient_daily_rate: Mapped[int] = mapped_column(Integer, default=50000, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
