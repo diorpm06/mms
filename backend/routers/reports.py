@@ -33,11 +33,12 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 def ceo_dashboard(db: Session = Depends(get_db), _: User = Depends(require_ceo)):
     from sqlalchemy import func
     from models.expense import Expense
+    from services.reports_data import top_departments
     today = date.today()
     daily = dashboard_summary(db, today)
     chart = income_last_n_days(db, 7)
-    # Rahbar panelidagi kartalar — 5 tadan ko'rsatiladi
-    tops = top_services(db, 5)
+    # Rahbar panelidagi kartalar — Rasm 3 bo'yicha Top 5 Bo'lim (UZI, Laboratoriya, Massaj, etc.)
+    tops = top_departments(db, 5)
     refs = top_referrers(db, 5)
     month_start = today.replace(day=1)
     month_start_dt, month_end_dt = (
@@ -85,6 +86,16 @@ def report_admin_daily(
     _: User = Depends(require_admin_or_ceo),
 ):
     return admin_daily_report(db, date_param)
+
+
+@router.get("/period-chart")
+def report_period_chart(
+    period: str = Query("7days"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    from services.reports_data import income_by_period
+    return income_by_period(db, period)
 
 
 @router.get("/daily")

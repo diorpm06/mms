@@ -26,6 +26,8 @@ export default function CeoEmployees() {
   // Har bir xodimning shu oydagi avans holati (id -> {base_salary, advances_total, payable_salary})
   const [payroll,      setPayroll]      = useState({})
   const [reminder,     setReminder]     = useState({ enabled: false, time: '09:00', day_of_month: 1, month: 0 })
+  const [advanceEmp,   setAdvanceEmp]   = useState(null)
+  const [advanceForm,  setAdvanceForm]  = useState({ amount: '', note: '' })
   const toast = useToastStore((s) => s.add)
 
   const load = async () => {
@@ -106,6 +108,22 @@ export default function CeoEmployees() {
         body: JSON.stringify(reminder),
       })
       toast('Maosh eslatma vaqti saqlandi ✓')
+    } catch (e) { toast(e.message, 'error') }
+  }
+
+  const submitAdvance = async () => {
+    if (!advanceEmp || !advanceForm.amount) {
+      toast("Avans summasini kiriting", 'error'); return
+    }
+    try {
+      const amt = parseInt(advanceForm.amount, 10)
+      const res = await api(`/employees/${advanceEmp.id}/advance`, {
+        method: 'POST',
+        body: JSON.stringify({ amount: amt, note: advanceForm.note || '' }),
+      })
+      toast(`✓ ${advanceEmp.full_name} ga ${formatMoney(amt)} avans berildi`)
+      setAdvanceEmp(null)
+      load()
     } catch (e) { toast(e.message, 'error') }
   }
 
@@ -301,62 +319,69 @@ export default function CeoEmployees() {
                       )}
                     </div>
 
-                    <div className="pt-2 flex items-center justify-between gap-1.5 flex-wrap">
-                      {isAct && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setConfirmPayId(e.id)
-                            try {
-                              const s = await api(`/employees/${e.id}/payroll-summary`)
-                              setPaySummary(s)
-                            } catch (_) { setPaySummary(null) }
-                          }}
-                          className="btn-gold py-1.5 px-3 text-xs font-extrabold flex-1 flex items-center justify-center gap-1 shadow-md"
-                        >
-                          💵 Maosh Berish
-                        </button>
+                    <div className="pt-2 flex items-center justify-between gap-2">
+                      {isAct ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setConfirmPayId(e.id)
+                              try {
+                                const s = await api(`/employees/${e.id}/payroll-summary`)
+                                setPaySummary(s)
+                              } catch (_) { setPaySummary(null) }
+                            }}
+                            className="btn-gold py-1.5 px-3 text-xs font-black flex-1 flex items-center justify-center gap-1 shadow-md"
+                          >
+                            💵 Maosh Berish
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAdvanceEmp(e)
+                              setAdvanceForm({ amount: '', note: '' })
+                            }}
+                            className="btn-outline border-amber-500/40 text-amber-400 hover:bg-amber-500/10 py-1.5 px-3 text-xs font-black flex-1 flex items-center justify-center gap-1"
+                          >
+                            💳 Avans Berish
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-rose-400 font-bold">Ishdan bo'shatilgan</span>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={() => openHistory(e)}
-                        className="btn-outline py-1.5 px-2 text-xs text-muted hover:text-gold"
-                        title="Maosh berish tarixi"
-                      >
-                        <History className="h-3.5 w-3.5" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => { setEdit(e); setForm({ ...e, monthly_salary: String(e.monthly_salary) }); setModal(true) }}
-                        className="btn-outline py-1.5 px-2 text-xs text-muted hover:text-gold"
-                        title="Tahrirlash"
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                      </button>
-
-                      {/* Toggle Fired / Dismissed Status */}
-                      <button
-                        type="button"
-                        onClick={() => toggleEmployeeActive(e)}
-                        className={`btn-outline py-1.5 px-2 text-xs ${
-                          isAct ? 'text-amber-400 hover:bg-amber-500/20 border-amber-500/40' : 'text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/40'
-                        }`}
-                        title={isAct ? "Xodimni ishdan ketgan deb belgilash" : "Xodimni qayta tiklash"}
-                      >
-                        {isAct ? <UserX className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
-                      </button>
-
-                      {/* Permanent Hard Delete */}
-                      <button
-                        type="button"
-                        onClick={() => hardDeleteEmployee(e)}
-                        className="btn-outline py-1.5 px-2 text-xs text-rose-400 hover:bg-rose-500/20 border-rose-500/40"
-                        title="Bazadan to'liq o'chirish"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {/* 3-dots ActionMenu for all secondary operations */}
+                      <ActionMenu
+                        title="Xodim amallari"
+                        items={[
+                          {
+                            label: 'Maosh tarixi',
+                            icon: <History className="h-4 w-4 text-gold" />,
+                            onClick: () => openHistory(e),
+                          },
+                          {
+                            label: 'Tahrirlash',
+                            icon: <Edit className="h-4 w-4 text-cyan-400" />,
+                            onClick: () => {
+                              setEdit(e)
+                              setForm({ ...e, monthly_salary: String(e.monthly_salary) })
+                              setModal(true)
+                            },
+                          },
+                          {
+                            label: isAct ? "Ishdan bo'shatish" : 'Qayta tiklash',
+                            icon: isAct ? <UserX className="h-4 w-4 text-amber-400" /> : <UserPlus className="h-4 w-4 text-emerald-400" />,
+                            onClick: () => toggleEmployeeActive(e),
+                          },
+                          {
+                            label: "Bazadan to'liq o'chirish",
+                            icon: <Trash2 className="h-4 w-4 text-rose-400" />,
+                            variant: 'danger',
+                            onClick: () => hardDeleteEmployee(e),
+                          },
+                        ]}
+                      />
                     </div>
                   </div>
                 )
@@ -525,6 +550,45 @@ export default function CeoEmployees() {
               </table>
             </div>
           )}
+        </div>
+      </Modal>
+      {/* Advance Modal */}
+      <Modal open={!!advanceEmp} onClose={() => setAdvanceEmp(null)} title={`Avans Berish — ${advanceEmp?.full_name}`} size="sm">
+        <div className="space-y-4 pt-1 text-xs">
+          <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-1">
+            <p className="font-bold text-body text-sm">{advanceEmp?.full_name}</p>
+            <p className="text-muted font-mono">Lavozimi: <span className="font-bold text-body">{advanceEmp?.position}</span></p>
+            <p className="text-muted font-mono">Oylik maosh: <span className="font-bold text-emerald">{formatMoney(advanceEmp?.monthly_salary || 0)}</span></p>
+            {payroll[advanceEmp?.id]?.advances_total > 0 && (
+              <p className="text-amber-400 font-mono font-bold">Olingan avans: −{formatMoney(payroll[advanceEmp?.id].advances_total)}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="form-label font-bold">Avans Summasi (so'm) *</label>
+            <input
+              className="input-field text-xs font-mono font-bold"
+              type="number"
+              placeholder="Masalan: 500000"
+              value={advanceForm.amount}
+              onChange={(e) => setAdvanceForm({ ...advanceForm, amount: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="form-label font-bold">Izoh / Sababi (ixtiyoriy)</label>
+            <input
+              className="input-field text-xs font-semibold"
+              placeholder="Ehtiyoj uchun..."
+              value={advanceForm.note}
+              onChange={(e) => setAdvanceForm({ ...advanceForm, note: e.target.value })}
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2 border-t border-border">
+            <Btn variant="ghost" full icon={Icons.x} onClick={() => setAdvanceEmp(null)}>Bekor</Btn>
+            <Btn variant="gold" full icon={Icons.money} onClick={submitAdvance}>✓ Avans Berish</Btn>
+          </div>
         </div>
       </Modal>
     </div>

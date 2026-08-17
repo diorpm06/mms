@@ -49,6 +49,20 @@ export default function CeoDashboard() {
     }
   }
 
+  const [chartPeriod, setChartPeriod] = useState('7days') // '7days' | '1-10' | '11-20' | '21-30'
+  const [chartData, setChartData]     = useState([])
+
+  const loadChart = useCallback(async (period) => {
+    try {
+      const data = await api(`/reports/period-chart?period=${period}`)
+      setChartData(data || [])
+    } catch (_) {}
+  }, [])
+
+  useEffect(() => {
+    loadChart(chartPeriod)
+  }, [chartPeriod, loadChart])
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
@@ -63,6 +77,9 @@ export default function CeoDashboard() {
         top_referrers: res.top_referrers || [],
         last_activity: res.last_activity || null,
       })
+      if (chartPeriod === '7days' && res.income_chart) {
+        setChartData(res.income_chart)
+      }
       if (forecastData) setAnalytics(forecastData)
       setLastUpdate(new Date())
     } catch (e) {
@@ -71,7 +88,7 @@ export default function CeoDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, chartPeriod])
 
   useEffect(() => { load() }, [location.pathname, load])
   useEffect(() => {
@@ -172,12 +189,42 @@ export default function CeoDashboard() {
         })}
       </div>
 
-      {/* Income chart */}
-      <div className="card mb-6">
-        <h2 className="text-body mb-4 font-semibold">So'nggi 7 kunlik daromad</h2>
+      {/* Income chart with Dekada Periods (Rasm 2) */}
+      <div className="card mb-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-body font-bold text-base">
+            {chartPeriod === '7days' && "So'nggi 7 kunlik daromad charti"}
+            {chartPeriod === '1-10'  && "1–10 Avgust Daromad Hisoboti (1-Dekada)"}
+            {chartPeriod === '11-20' && "11–20 Avgust Daromad Hisoboti (2-Dekada)"}
+            {chartPeriod === '21-30' && "21–30 Avgust Daromad Hisoboti (3-Dekada)"}
+          </h2>
+
+          <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border">
+            {[
+              { id: '7days', label: '7 kunlik' },
+              { id: '1-10',  label: '1–10 kun' },
+              { id: '11-20', label: '11–20 kun' },
+              { id: '21-30', label: '21–30 kun' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setChartPeriod(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                  chartPeriod === tab.id
+                    ? 'bg-gold text-slate-950 shadow'
+                    : 'text-muted hover:text-body'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={d.income_chart} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+            <BarChart data={chartData.length > 0 ? chartData : d.income_chart} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} vertical={false} />
               <XAxis
                 dataKey="date"
@@ -200,10 +247,10 @@ export default function CeoDashboard() {
                 cursor={{ fill: 'var(--gold-dim)' }}
               />
               <Bar dataKey="income" fill={chartGold} radius={[6, 6, 0, 0]}>
-                {d.income_chart.map((_, i) => (
+                {(chartData.length > 0 ? chartData : d.income_chart).map((_, i, arr) => (
                   <Cell
                     key={i}
-                    fill={i === d.income_chart.length - 1 ? chartGold : `${chartGold}99`}
+                    fill={i === arr.length - 1 ? chartGold : `${chartGold}99`}
                   />
                 ))}
               </Bar>
@@ -227,7 +274,7 @@ export default function CeoDashboard() {
       {/* Top cards */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="card">
-          <h2 className="accent-value mb-4 font-semibold">Top 5 xizmat</h2>
+          <h2 className="accent-value mb-4 font-bold text-base">Top 5 bo'lim (Tushum bo'yicha)</h2>
           {d.top_services.length === 0 ? (
             <p className="text-muted text-sm">Ma'lumot yo'q</p>
           ) : (
@@ -241,9 +288,10 @@ export default function CeoDashboard() {
                     >
                       {i + 1}
                     </span>
-                    <span className="text-body">{s.name}</span>
+                    <span className="text-body font-bold">{s.name}</span>
+                    <span className="text-xs text-muted font-mono">({s.count} ta qabul)</span>
                   </div>
-                  <span className="accent-value">{formatMoney(s.total)}</span>
+                  <span className="accent-value font-mono font-black">{formatMoney(s.total)}</span>
                 </li>
               ))}
             </ul>

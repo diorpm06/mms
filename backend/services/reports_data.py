@@ -666,65 +666,88 @@ def top_referrers(db: Session, limit: int = 10):
     )
 
 
-def top_services(db: Session, limit: int = 10):
+def top_departments(db: Session, limit: int = 5):
     """
-    Eng ko'p daromad keltirgan xizmatlar.
-
-    Ilgari bu so'rov Patient.service_id bo'yicha bog'lanardi — ya'ni bitta
-    tashrifdagi BIRINCHI xizmat olinib, tashrifning BUTUN summasi o'shanga
-    yozilardi. Bemor 3 ta tahlil topshirsa, ro'yxatda faqat bittasi ko'rinib,
-    uning summasi haqiqiydan katta chiqardi.
-
-    Endi har bir xizmat alohida sanaladi (patient_services jadvali).
+    Rasm 3 bo'yicha: Xizmat nomlari o'rniga eng ko'p daromad keltirgan Bo'limlar
+    (UZI, Laboratoriya, Massaj, Fizioterapiya, Ineksiya, va h.k.) guruhi.
     """
-    from models.patient_service import PatientService
-
-    return (
-        db.query(
-            Service.name,
-            func.count(func.distinct(PatientService.patient_id)).label("count"),
-            func.sum(PatientService.total_price).label("total"),
-        )
-        .join(PatientService, PatientService.service_id == Service.id)
-        .join(Patient, Patient.id == PatientService.patient_id)
+    patients = (
+        db.query(Patient)
         .filter(Patient.is_cancelled == False)
-        .group_by(Service.id, Service.name)
-        .order_by(func.sum(PatientService.total_price).desc())
-        .limit(limit)
         .all()
     )
+    dept_map = {}
+    for p in patients:
+        svc = p.service
+        s_name = svc.name if svc else ""
+        s_cat = svc.category if svc else ""
+        s_cab = svc.cabinet if svc else ""
+        dept = _extract_department_name(s_name, s_cat, s_cab)
+        if dept not in dept_map:
+            dept_map[dept] = {"name": dept, "count": 0, "total": 0}
+        dept_map[dept]["count"] += 1
+        dept_map[dept]["total"] += int(p.payment_amount or 0)
+
+    res = list(dept_map.values())
+    res.sort(key=lambda x: x["total"], reverse=True)
+    return [(d["name"], d["count"], d["total"]) for d in res[:limit]]
+
+
+def income_by_period(db: Session, period: str = "7days"):
+    """
+    Rasm 2 bo'yicha: 1-10, 11-20, 21-30 kunlik dekada yoki 7 kunlik daromad charti.
+    """
+    today = date.today()
+    if period == "1-10":
+        start_d = date(today.year, today.month, 1)
+        end_d = date(today.year, today.month, 10)
+    elif period == "11-20":
+        start_d = date(today.year, today.month, 11)
+        end_d = date(today.year, today.month, 20)
+    elif period == "21-30":
+        start_d = date(today.year, today.month, 21)
+        if today.month == 12:
+            end_d = date(today.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end_d = date(today.year, today.month + 1, 1) - timedelta(days=1)
+    else:
+        start_d = today - timedelta(days=6)
+        end_d = today
+
+    s, e = _period_range(start_d, end_d)
+
+    txs = db.query(Transaction).filter(
+        Transaction.created_at >= s,
+        Transaction.created_at <= e,
+        Transaction.is_cancelled == False
+    ).all()
+
+    totals_map = {}
+    if txs:
+        for t in txs:
+            d_val = t.created_at.date()
+            totals_map[d_val] = totals_map.get(d_val, 0) + int(t.total_amount or 0)
+    else:
+        pats = db.query(Patient).filter(
+            Patient.created_at >= s,
+            Patient.created_at <= e,
+            Patient.is_cancelled == False
+        ).all()
+        for p in pats:
+            d_val = p.created_at.date()
+            totals_map[d_val] = totals_map.get(d_val, 0) + int(p.payment_amount or 0)
+
+    result = []
+    curr = start_d
+    while curr <= end_d:
+        result.append({"date": curr.strftime("%d.%m"), "income": totals_map.get(curr, 0)})
+        curr += timedelta(days=1)
+
+    return result
 
 
 def income_last_n_days(db: Session, days: int = 7):
-    today = date.today()
-    start = today - timedelta(days=days - 1)
-    s, e = _period_range(start, today)
-
-    rows = (
-        db.query(
-            func.date(Transaction.created_at).label("day"),
-            func.sum(Transaction.total_amount).label("total"),
-        )
-        .filter(
-            Transaction.created_at >= s,
-            Transaction.created_at <= e,
-            Transaction.is_cancelled == False,
-        )
-        .group_by(func.date(Transaction.created_at))
-        .all()
-    )
-    totals_map = {}
-    for row in rows:
-        day_val = row.day
-        if isinstance(day_val, str):
-            day_val = datetime.fromisoformat(day_val).date()
-        totals_map[day_val] = int(row.total or 0)
-
-    result = []
-    for i in range(days - 1, -1, -1):
-        d = today - timedelta(days=i)
-        result.append({"date": d.strftime("%d.%m"), "income": totals_map.get(d, 0)})
-    return result
+    return income_by_period(db, "7days")
 
 
 def ten_day_report(db: Session, start: date, end: date) -> dict:
