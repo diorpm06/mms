@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Plus, Check, Stethoscope, User, Calendar, CreditCard, DollarSign, Search } from 'lucide-react'
+import { X, Plus, Trash2, Search, Check, Stethoscope, CreditCard } from 'lucide-react'
 import { api } from '../utils/api'
 import { formatMoney } from '../utils/format'
 import { useToastStore } from '../store/toastStore'
@@ -7,9 +7,9 @@ import { Btn, Icons } from './UIKit'
 
 const PAYMENT_TYPES = [
   { id: 'naqd', label: '💵 Naqd pul' },
-  { id: 'karta', label: '💳 Karta / QR (Terminal & Bank)' },
+  { id: 'karta', label: '💳 Karta / QR (Terminal)' },
   { id: 'click', label: '📱 Click / Payme' },
-  { id: 'aralash', label: '⚖️ Aralash (Naqd + Karta/QR)' },
+  { id: 'aralash', label: '⚖️ Aralash (Naqd + Karta)' },
   { id: 'later', label: '⏳ Keyinroq to\'lash (Nasiya)' },
 ]
 
@@ -19,12 +19,10 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
   const [providers, setProviders] = useState([])
   const [referrers, setReferrers] = useState([])
   
-  const [selectedServiceId, setSelectedServiceId] = useState('')
-  const [selectedProviderId, setSelectedProviderId] = useState('')
+  const [selectedServices, setSelectedServices] = useState([])
   const [selectedReferrerId, setSelectedReferrerId] = useState('')
   const [paymentType, setPaymentType] = useState('naqd')
   
-  const [price, setPrice] = useState(0)
   const [discountAmount, setDiscountAmount] = useState(0)
   const [discountReason, setDiscountReason] = useState('')
   const [cashAmount, setCashAmount] = useState(0)
@@ -44,67 +42,104 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
       setProviders(provs || [])
       setReferrers(refs || [])
       if (svcs && svcs.length > 0) {
-        setSelectedServiceId(svcs[0].id)
-        setPrice(svcs[0].price || 0)
+        setSelectedServices([
+          { service_id: svcs[0].id, price: svcs[0].price || 0, quantity: 1, provider_id: null }
+        ])
       }
     })
   }, [open])
 
-  // Qidiruv kiritilganda birinchi mos kelgan xizmatni va narxni avtomatik tanlash
-  useEffect(() => {
-    if (!serviceSearch.trim() || !services.length) return
-    const q = serviceSearch.toLowerCase().trim()
-    const filtered = services.filter((s) =>
-      (s.name || '').toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q)
-    )
-    if (filtered.length > 0) {
-      const match = filtered[0]
-      setSelectedServiceId(match.id)
-      setPrice(match.price || 0)
-    }
-  }, [serviceSearch, services])
-
   if (!open || !patient) return null
 
-  const handleServiceChange = (svcId) => {
-    const sId = Number(svcId)
-    setSelectedServiceId(sId)
-    const found = services.find((s) => s.id === sId)
-    if (found) {
-      setPrice(found.price || 0)
-    }
+  const findMatchingDoctor = (serviceId) => {
+    const sid = Number(serviceId)
+    if (!providers || providers.length === 0) return null
+    const matched = providers.find((p) => Array.isArray(p.service_ids) && p.service_ids.map(Number).includes(sid))
+    if (matched) return matched.id
+    const svc = services.find((s) => s.id === sid)
+    if (svc && svc.provider_id) return svc.provider_id
+    if (providers.length === 1) return providers[0].id
+    return null
   }
 
-  const finalAmount = Math.max(0, price - discountAmount)
+  const addServiceRow = (svcObj = null) => {
+    const found = svcObj || services[0]
+    if (!found) return
+    const autoDoctorId = findMatchingDoctor(found.id)
+    setSelectedServices((prev) => [
+      ...prev,
+      {
+        service_id: found.id,
+        price: found.price || 0,
+        quantity: 1,
+        provider_id: autoDoctorId || null
+      }
+    ])
+  }
+
+  const removeServiceRow = (index) => {
+    if (selectedServices.length <= 1) {
+      toast("Kamida 1 ta xizmat bo'lishi kerak", "warning")
+      return
+    }
+    setSelectedServices((prev) => prev.filter((_, idx) => idx !== index))
+  }
+
+  const updateServiceRow = (index, field, value) => {
+    setSelectedServices((prev) => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], [field]: value }
+      if (field === 'service_id') {
+        const found = services.find((s) => String(s.id) === String(value))
+        if (found) {
+          copy[index].price = found.price || 0
+          const autoDoc = findMatchingDoctor(found.id)
+          if (autoDoc) copy[index].provider_id = autoDoc
+        }
+      }
+      return copy
+    })
+  }
+
+  // Calculate Total Base Price across all selected services with quantities
+  const totalBasePrice = selectedServices.reduce(
+    (acc, row) => acc + (Number(row.price) || 0) * Math.max(1, Number(row.quantity) || 1),
+    0
+  )
+
+  const finalAmount = Math.max(0, totalBasePrice - (Number(discountAmount) || 0))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!selectedServiceId) {
-      toast("Xizmat turini tanlang", "error")
+    const validServices = selectedServices.filter((s) => s.service_id)
+    if (validServices.length === 0) {
+      toast("Kamida bitta xizmat turini tanlang", "error")
       return
     }
 
     setLoading(true)
     try {
       const payload = {
-        first_name: patient.first_name || patient.first_name,
-        last_name: patient.last_name || patient.last_name || '',
+        first_name: patient.first_name,
+        last_name: patient.last_name || '',
         birth_date: patient.birth_date ? String(patient.birth_date).slice(0, 10) : '2000-01-01',
         phone: patient.phone || '+998',
         address: patient.address || '',
-        service_id: Number(selectedServiceId),
-        provider_id: selectedProviderId ? Number(selectedProviderId) : null,
         referrer_id: selectedReferrerId ? Number(selectedReferrerId) : null,
         payment_type: paymentType,
         payment_amount: finalAmount,
         discount_amount: Number(discountAmount) || 0,
         discount_reason: discountReason || null,
         cash_amount: paymentType === 'aralash' ? Number(cashAmount) : (paymentType === 'naqd' ? finalAmount : 0),
-        // Click/Payme ham naqd bo'lmagan to'lov — 'karta' bilan bir qatorda
-        // hisoblanmasa, summa na naqdga na kartaga tushmay yo'qolib ketardi.
         card_amount: paymentType === 'aralash'
           ? Number(cardAmount)
           : (['karta', 'click'].includes(paymentType) ? finalAmount : 0),
+        services: validServices.map((s) => ({
+          service_id: Number(s.service_id),
+          provider_id: s.provider_id ? Number(s.provider_id) : null,
+          price: Number(s.price) || 0,
+          quantity: Math.max(1, Number(s.quantity) || 1),
+        })),
       }
 
       const res = await api('/patients', {
@@ -112,7 +147,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
         body: JSON.stringify(payload),
       })
 
-      toast(`✓ ${patient.first_name} yangi xizmatga muvaffaqiyatli yozildi! (Talon: ${res.ticket_number || `A-${res.id}`})`)
+      toast(`✓ ${patient.first_name} yangi xizmat(lar)ga muvaffaqiyatli yozildi! (Talon: ${res.ticket_number || `A-${res.id}`})`)
       if (onSuccess) onSuccess(res)
       onClose()
     } catch (err) {
@@ -122,9 +157,15 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
     }
   }
 
+  const filteredCatalogServices = services.filter((s) => {
+    if (!serviceSearch.trim()) return true
+    const q = serviceSearch.toLowerCase().trim()
+    return (s.name || '').toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q)
+  })
+
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="card max-w-lg w-full p-6 relative animate-in fade-in zoom-in-95 space-y-4 max-h-[90vh] overflow-y-auto overscroll-contain">
+      <div className="card max-w-2xl w-full p-6 relative animate-in fade-in zoom-in-95 space-y-4 max-h-[90vh] overflow-y-auto overscroll-contain">
         
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-border">
@@ -134,10 +175,10 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
             </div>
             <div>
               <h3 className="text-lg font-black text-gold uppercase tracking-wide">
-                Qayta Xizmatga Yozish
+                Qayta Xizmatga Yozish (Bir nechta xizmat va Soni)
               </h3>
               <p className="text-xs text-muted font-bold">
-                Bemor: <strong className="text-cyan">{patient.first_name} {patient.last_name}</strong> ({patient.phone})
+                Bemor: <strong className="text-cyan">{patient.first_name} {patient.last_name}</strong> ({patient.phone || 'Telefon yo\'q'})
               </p>
             </div>
           </div>
@@ -148,67 +189,148 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4 pt-1">
-          {/* Select Service */}
-          <div className="space-y-1.5">
-            <label className="form-label text-xs font-bold text-cyan mb-0">🏢 Xizmat turini tanlang *</label>
+          
+          {/* Quick Search & Add Service */}
+          <div className="space-y-2 card p-3 border-cyan-500/30 bg-surface-2">
+            <label className="form-label text-xs font-black text-cyan uppercase tracking-wider mb-0">
+              🔍 Xizmat qidirish va Ro'yxatga qo'shish
+            </label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="🔍 Xizmat qidirish (masalan: UZI)..."
+                placeholder="Xizmat nomini yozing (masalan: UZI, Massaj, Elektrofarez)..."
                 value={serviceSearch}
                 onChange={(e) => setServiceSearch(e.target.value)}
-                className="w-full pl-8 pr-8 py-1.5 rounded-lg bg-surface border border-cyan-500/40 text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-cyan-400 font-medium"
+                className="w-full pl-8 pr-8 py-2 rounded-xl bg-surface border border-cyan-500/40 text-xs font-medium focus:outline-none focus:border-cyan-400"
               />
-              <Search className="h-3.5 w-3.5 text-cyan-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Search className="h-4 w-4 text-cyan-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
               {serviceSearch && (
                 <button
                   type="button"
                   onClick={() => setServiceSearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-rose-400 text-xs"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-rose-400 text-xs font-bold"
                 >
                   ✕
                 </button>
               )}
             </div>
-            <select
-              className="input-field font-bold text-xs text-cyan py-2"
-              value={selectedServiceId}
-              onChange={(e) => handleServiceChange(e.target.value)}
-            >
-              {services
-                .filter((s) => {
-                  if (!serviceSearch.trim()) return true
-                  const q = serviceSearch.toLowerCase().trim()
-                  return (s.name || '').toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q)
-                })
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.category ? `[${s.category}] ` : ''}{s.name} — {formatMoney(s.price)}
-                  </option>
+
+            {/* Quick Click Badges if searching */}
+            {serviceSearch.trim() && (
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pt-1 border-t border-border/40">
+                {filteredCatalogServices.slice(0, 10).map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      addServiceRow(s)
+                      setServiceSearch('')
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan border border-cyan-500/30 text-xs font-bold flex items-center gap-1 transition-all"
+                  >
+                    <span>+ {s.name} ({formatMoney(s.price)})</span>
+                  </button>
                 ))}
-            </select>
+              </div>
+            )}
           </div>
 
-          {/* Select Provider / Doctor */}
-          <div>
-            <label className="form-label text-xs font-bold">🩺 Qabul qiluvchi Shifokor (Ixtiyoriy)</label>
-            <select
-              className="input-field text-xs py-2"
-              value={selectedProviderId}
-              onChange={(e) => setSelectedProviderId(e.target.value)}
-            >
-              <option value="">— Navbatdagi Bo'sh Shifokor —</option>
-              {providers.map((pr) => (
-                <option key={pr.id} value={pr.id}>
-                  Dr. {pr.full_name} ({pr.specialization || 'Shifokor'})
-                </option>
-              ))}
-            </select>
+          {/* Selected Services List */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="form-label text-xs font-black text-gold uppercase tracking-wider mb-0">
+                📋 Tanlangan Xizmatlar Ro'yxati ({selectedServices.length} ta)
+              </label>
+              <Btn type="button" variant="cyan" size="xs" icon={Plus} onClick={() => addServiceRow()}>
+                Xizmat Qo'shish
+              </Btn>
+            </div>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {selectedServices.map((row, idx) => {
+                const curSvc = services.find((s) => String(s.id) === String(row.service_id))
+                return (
+                  <div key={idx} className="p-3 rounded-xl bg-surface-2 border border-border flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 shadow-sm">
+                    {/* Service Dropdown */}
+                    <div className="min-w-[180px] flex-1">
+                      <select
+                        className="input-field text-xs font-bold text-body py-1.5"
+                        value={row.service_id}
+                        onChange={(e) => updateServiceRow(idx, 'service_id', e.target.value)}
+                      >
+                        {services.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.category ? `[${s.category}] ` : ''}{s.name} — {formatMoney(s.price)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Doctor Dropdown */}
+                    <div className="w-40 shrink-0">
+                      <select
+                        className="input-field text-xs text-muted py-1.5"
+                        value={row.provider_id || ''}
+                        onChange={(e) => updateServiceRow(idx, 'provider_id', e.target.value)}
+                      >
+                        <option value="">— Shifokor —</option>
+                        {providers.map((pr) => (
+                          <option key={pr.id} value={pr.id}>
+                            Dr. {pr.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Quantity (Soni) input with - / + buttons */}
+                    <div className="flex items-center gap-1 border border-border rounded-lg bg-surface px-1 py-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => updateServiceRow(idx, 'quantity', Math.max(1, (Number(row.quantity) || 1) - 1))}
+                        className="w-6 h-6 rounded-md bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        className="w-10 text-center font-mono font-bold text-xs bg-transparent focus:outline-none text-gold"
+                        value={row.quantity || 1}
+                        onChange={(e) => updateServiceRow(idx, 'quantity', Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateServiceRow(idx, 'quantity', (Number(row.quantity) || 1) + 1)}
+                        className="w-6 h-6 rounded-md bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
+                      >
+                        +
+                      </button>
+                      <span className="text-[10px] text-muted font-bold pr-1">ta</span>
+                    </div>
+
+                    {/* Price Subtotal */}
+                    <div className="w-24 text-right font-mono font-extrabold text-xs text-emerald shrink-0">
+                      {formatMoney((Number(row.price) || 0) * (Number(row.quantity) || 1))}
+                    </div>
+
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={() => removeServiceRow(idx)}
+                      className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition-all shrink-0"
+                      title="O'chirish"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           {/* Select Referrer */}
           <div>
-            <label className="form-label text-xs font-bold text-muted">🤝 Yo'naltiruvchi Shifokor / Muassasa</label>
+            <label className="form-label text-xs font-bold text-muted">🤝 Yo'naltiruvchi Shifokor / Muassasa (Ixtiyoriy)</label>
             <select
               className="input-field text-xs text-muted py-2"
               value={selectedReferrerId}
@@ -226,7 +348,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
           {/* Payment Type */}
           <div>
             <label className="form-label text-xs font-bold">💳 To'lov Usuli</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {PAYMENT_TYPES.map((pt) => (
                 <button
                   key={pt.id}
@@ -245,17 +367,17 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
           </div>
 
           {/* Pricing & Discount Calculation */}
-          <div className="p-3.5 rounded-2xl card-2 space-y-2">
+          <div className="p-3.5 rounded-2xl card-2 space-y-2 border border-gold/30">
             <div className="flex justify-between items-center text-xs text-muted">
-              <span>Xizmat Narxi:</span>
-              <span className="font-mono font-bold text-body">{formatMoney(price)}</span>
+              <span>Xizmatlar Jami Narxi:</span>
+              <span className="font-mono font-bold text-body">{formatMoney(totalBasePrice)}</span>
             </div>
 
             <div className="flex justify-between items-center text-xs">
               <span className="text-amber font-bold">Chegirma (so'm):</span>
               <input
                 type="number"
-                className="input-field max-w-[120px] text-right font-mono font-bold py-1 text-amber text-xs"
+                className="input-field max-w-[140px] text-right font-mono font-bold py-1 text-amber text-xs"
                 placeholder="0"
                 value={discountAmount || ''}
                 onChange={(e) => setDiscountAmount(Number(e.target.value) || 0)}
@@ -263,7 +385,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
             </div>
 
             <div className="flex justify-between items-center text-sm font-black pt-2 border-t border-border">
-              <span className="text-cyan">TO'LANADIGAN SUMMA:</span>
+              <span className="text-cyan">TO'LANADIGAN UMUMIY SUMMA:</span>
               <span className="text-emerald font-mono text-base">{formatMoney(finalAmount)}</span>
             </div>
           </div>
@@ -274,7 +396,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
               Bekor
             </Btn>
             <Btn variant="gold" full icon={Icons.check} type="submit" loading={loading}>
-              Yangi Xizmatga Yozish
+              Yangi Xizmat(lar)ga Yozish
             </Btn>
           </div>
         </form>
