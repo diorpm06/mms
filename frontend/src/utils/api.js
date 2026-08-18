@@ -135,10 +135,18 @@ export async function api(path, options = {}) {
 }
 
 export function downloadBlob(blob, filename) {
+  if (!blob) return
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
+  a.style.display = 'none'
   a.href = url
-  a.download = filename
+  a.download = filename || 'hisobot.pdf'
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => {
+    if (document.body.contains(a)) {
+      document.body.removeChild(a)
+    }
+    URL.revokeObjectURL(url)
+  }, 1000)
 }

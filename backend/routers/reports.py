@@ -310,6 +310,8 @@ def export_referrers_pdf_route(
 
 def _resolve_report(db, type, date_param, year, month, from_date, to_date):
     today = date.today()
+    if from_date and to_date and not date_param and type in ("daily", "custom"):
+        return ten_day_report(db, from_date, to_date)
     if type == "daily":
         return daily_report(db, date_param or today)
     if type == "ten_day" or type == "10day":

@@ -43,9 +43,6 @@ export function exportToPdf(title, data, columns) {
     return
   }
 
-  const printWindow = window.open('', '_blank', 'width=900,height=700')
-  if (!printWindow) return
-
   const dateStr = new Date().toLocaleDateString('uz-UZ')
 
   const headersHtml = columns.map((c) => `<th style="padding: 8px; border: 1px solid #cbd5e1; background: #f1f5f9; text-align: left;">${c.header}</th>`).join('')
@@ -88,6 +85,32 @@ export function exportToPdf(title, data, columns) {
     </html>
   `
 
-  printWindow.document.write(html)
-  printWindow.document.close()
+  const printWindow = window.open('', '_blank', 'width=900,height=700')
+  if (printWindow) {
+    printWindow.document.write(html)
+    printWindow.document.close()
+  } else {
+    // Browser Popup Blocker fallback: Print smoothly via invisible iframe
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    document.body.appendChild(iframe)
+    const doc = iframe.contentWindow.document
+    doc.open()
+    doc.write(html)
+    doc.close()
+    setTimeout(() => {
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe)
+        }
+      }, 1000)
+    }, 500)
+  }
 }

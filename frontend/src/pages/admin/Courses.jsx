@@ -34,9 +34,13 @@ export default function Courses() {
   useEffect(() => { yukla() }, [])
 
   const keldi = async (r) => {
+    // Bemorning shu kunlik BARCHA xizmatlari birdan belgilanadi
+    const qatorlar = (r.services || [])
+      .filter((x) => x.remaining > 0)
+      .map((x) => `  • ${x.service_name} — ${x.quantity} kunlik kursning ${x.used_count + 1}-kuni`)
+      .join('\n')
     const savol =
-      `${r.patient_name} — ${r.service_name}\n\n` +
-      `Bu ${r.quantity} kunlik kursning ${r.used_count + 1}-kuni.\n` +
+      `${r.patient_name}\n\n${qatorlar}\n\n` +
       `Qayta to'lov OLINMAYDI, bemor navbatga qo'yiladi.\n\nDavom etamizmi?`
     if (!window.confirm(savol)) return
     setIshlanmoqda(r.key)
@@ -79,11 +83,11 @@ export default function Courses() {
     return (
       (r.patient_name || '').toLowerCase().includes(q) ||
       (r.phone || '').toLowerCase().includes(q) ||
-      (r.service_name || '').toLowerCase().includes(q)
+      (r.services || []).some((x) => (x.service_name || '').toLowerCase().includes(q))
     )
   })
 
-  const jamiQolgan = (rows || []).reduce((s, r) => s + r.remaining, 0)
+  const jamiQolgan = (rows || []).reduce((s, r) => s + (r.total_remaining || 0), 0)
 
   return (
     <div className="space-y-5 max-w-6xl mx-auto pb-10">
@@ -141,13 +145,11 @@ export default function Courses() {
             return (
               <div key={r.key} className="card p-3.5 flex flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="font-extrabold text-sm text-body truncate">{r.patient_name}</h4>
-                    <span className="badge badge-cyan text-[10px] font-bold">{r.service_name}</span>
-                  </div>
+                  <h4 className="font-extrabold text-sm text-body truncate">{r.patient_name}</h4>
                   <p className="text-[11px] text-muted font-semibold mt-0.5">
                     {r.phone ? `${r.phone} · ` : ''}
-                    Boshlangan: {sana(r.started_at)} · {formatMoney(r.total_price)} to'langan
+                    Boshlangan: {sana(r.started_at)} ·{' '}
+                    {formatMoney((r.services || []).reduce((s, x) => s + (x.total_price || 0), 0))} to'langan
                     {r.tickets && r.tickets.length > 1
                       ? ` · ${r.tickets.length} ta chekdan yig'ilgan (${r.tickets.join(', ')})`
                       : r.tickets && r.tickets.length === 1
@@ -155,19 +157,24 @@ export default function Courses() {
                         : ''}
                   </p>
 
-                  {/* Kunlar chizig'i */}
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {Array.from({ length: r.quantity }).map((_, n) => (
-                      <span
-                        key={n}
-                        className={`text-[10px] font-mono font-bold rounded px-1.5 py-0.5 border ${
-                          n < r.used_count
-                            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                            : 'bg-surface-2 border-border text-muted'
-                        }`}
-                      >
-                        {n + 1}-kun{n < r.used_count ? ' ✓' : ''}
-                      </span>
+                  {/* Bemorning har bir xizmati o'z qatorida, kunlari bilan */}
+                  <div className="space-y-1.5 mt-2">
+                    {(r.services || []).map((x) => (
+                      <div key={x.service_id} className="flex flex-wrap items-center gap-1.5">
+                        <span className="badge badge-cyan text-[10px] font-bold">{x.service_name}</span>
+                        {Array.from({ length: x.quantity }).map((_, n) => (
+                          <span
+                            key={n}
+                            className={`text-[10px] font-mono font-bold rounded px-1.5 py-0.5 border ${
+                              n < x.used_count
+                                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                                : 'bg-surface-2 border-border text-muted'
+                            }`}
+                          >
+                            {n + 1}-kun{n < x.used_count ? ' ✓' : ''}
+                          </span>
+                        ))}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -175,7 +182,7 @@ export default function Courses() {
                 <div className="flex items-center gap-2 shrink-0">
                   <div className="text-right">
                     <span className="text-[10px] font-extrabold text-muted uppercase block">Qoldi</span>
-                    <span className="font-black text-gold font-mono text-lg">{r.remaining} kun</span>
+                    <span className="font-black text-gold font-mono text-lg">{r.total_remaining} kun</span>
                   </div>
 
                   <Btn

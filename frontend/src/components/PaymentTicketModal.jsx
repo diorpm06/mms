@@ -130,10 +130,12 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
     })
   })
   // Faqat bir kundan ko'p bo'lganlari kurs hisoblanadi.
-  // Ro'yxatga olingan kun — 1-kun, qolgani keyingi kunlarga.
+  // Bu chek TO'LOV cheki — kun hali sanalmaydi. Birinchi kun ham
+  // "Davolanishdagilar" da "Keldi" bosilganda belgilanadi va o'sha payt
+  // alohida navbat taloni chiqadi.
   const kurslar = Object.values(kursMap)
     .filter((k) => k.soni > 1)
-    .map((k) => ({ ...k, ishlatilgan: 1 }))
+    .map((k) => ({ ...k, ishlatilgan: 0 }))
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
@@ -331,12 +333,14 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
                 <div className="font-black text-[11px] tracking-wide text-slate-900">
                   OLDINDAN TO'LANGAN TASHRIF
                 </div>
-                {firstPatient.prepaid_total ? (
-                  <div className="text-[10px] font-bold text-slate-900">
-                    {firstPatient.prepaid_total} kunlik kursning{' '}
-                    {firstPatient.prepaid_day}-kuni
+                {/* Bemor bir kelishda bir necha muolaja olishi mumkin —
+                    har biri o'z qatorida, nechanchi kuni ekani bilan. */}
+                {(firstPatient.prepaid_lines || []).map((q, i) => (
+                  <div key={i} className="flex justify-between text-[10px] font-bold text-slate-900">
+                    <span>{cleanServiceName(q.service_name)}</span>
+                    <span className="font-mono">{q.day}-kun / {q.total} kun</span>
                   </div>
-                ) : null}
+                ))}
                 <div className="text-[9px] font-bold text-slate-900">
                   Bugun to'lov olinmaydi.
                 </div>
