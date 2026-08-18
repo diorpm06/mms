@@ -999,6 +999,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         total_comm = 0
         patient_details = []
         for p in sorted(ref_patients, key=lambda x: x.created_at, reverse=True):
+            paid = p.payment_amount or 0
             svc = p.service
             dept_name = _extract_department_name(svc.name if svc else "", svc.category if svc else "", svc.cabinet if svc else "") if svc else "Boshqa xizmatlar"
 
