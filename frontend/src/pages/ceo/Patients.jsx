@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Search, User, Phone, Calendar, DollarSign, Activity, FileText,
-  PlusCircle, History, Edit, Trash2, CheckCircle, ShieldAlert,
+  PlusCircle, Edit, CheckCircle, ShieldAlert,
   UserCheck, HeartPulse, Filter, Grid, List, Sparkles, MapPin
 } from 'lucide-react'
 import { api } from '../../utils/api'
@@ -409,41 +409,45 @@ export default function CeoPatients() {
                   </div>
                 )}
 
-                {/* Card Action Buttons */}
-                <div className="pt-3 border-t border-border flex items-center justify-between gap-1">
+                {/* Card Action Buttons — ikkita asosiy tugma + qolgani ⋮ ichida.
+                    Ilgari bu yerda 4 ta tugma bir qatorda turardi va tor
+                    kartochkada oxirgisi tashqariga chiqib ketardi. */}
+                <div className="pt-3 border-t border-border flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setEhrPatient(p)}
-                    className="btn-gold py-1.5 px-3 text-xs font-bold flex-1 flex items-center justify-center gap-1"
+                    className="btn-gold py-1.5 px-2 text-xs font-bold flex-1 min-w-0 flex items-center justify-center gap-1"
                   >
-                    <FileText className="h-3.5 w-3.5" /> Tibbiy Karta
+                    <FileText className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">Tibbiy Karta</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setReRegisterPatient(p)}
-                    className="btn-cyan py-1.5 px-3 text-xs font-bold flex-1 flex items-center justify-center gap-1"
+                    className="btn-cyan py-1.5 px-2 text-xs font-bold flex-1 min-w-0 flex items-center justify-center gap-1"
                   >
-                    <PlusCircle className="h-3.5 w-3.5" /> Qayta Yozish
+                    <PlusCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">Qayta Yozish</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => openVisits(p)}
-                    className="btn-outline py-1.5 px-2.5 text-xs text-muted hover:text-gold"
-                    title="Tashriflar Tarixi"
-                  >
-                    <History className="h-3.5 w-3.5" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePatient(p)}
-                    className="btn-outline py-1.5 px-2.5 text-xs text-rose-400 hover:bg-rose-500/20 border-rose-500/40"
-                    title="Bemorni bazadan to'liq o'chirish"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="shrink-0">
+                    <ActionMenu
+                      items={[
+                        {
+                          label: 'Tashriflar tarixi',
+                          icon: Icons.history,
+                          onClick: () => openVisits(p),
+                        },
+                        {
+                          label: "Bazadan to'liq o'chirish",
+                          icon: Icons.trash,
+                          variant: 'danger',
+                          onClick: () => handleDeletePatient(p),
+                        },
+                      ]}
+                    />
+                  </div>
                 </div>
               </div>
             )

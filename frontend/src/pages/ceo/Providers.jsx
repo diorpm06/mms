@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   User, Phone, Stethoscope, DollarSign, CreditCard, Edit, CheckCircle,
-  Award, Activity, List, Grid, ShieldAlert, ArrowDownRight, Layers,
-  Trash2, UserX, UserPlus
+  Award, Activity, List, Grid, ShieldAlert, ArrowDownRight, Layers
 } from 'lucide-react'
 import { api } from '../../utils/api'
 import { formatMoney, formatWithCommas, parseDigits } from '../../utils/format'
@@ -551,8 +550,10 @@ export default function CeoProviders() {
                  )}
                 </div>
 
-                {/* Bottom Action Row */}
-                <div className="pt-2 flex items-center justify-between gap-1.5 flex-wrap">
+                {/* Bottom Action Row — asosiy tugmalar ko'rinib turadi, qolgani
+                    ⋮ ichida. Ilgari 4 ta tugma bir qatorda edi va tor
+                    kartochkada oxirgisi tashqariga chiqib ketardi. */}
+                <div className="pt-2 flex items-center gap-1.5">
                   {isAct && (
                     <button
                       type="button"
@@ -561,41 +562,39 @@ export default function CeoProviders() {
                         setAdvanceAmount('1000000')
                         setAdvanceModal(true)
                       }}
-                      className="btn-gold py-1.5 px-2.5 text-xs font-bold flex-1 flex items-center justify-center gap-1"
+                      className="btn-gold py-1.5 px-2 text-xs font-bold flex-1 min-w-0 flex items-center justify-center gap-1"
                     >
-                      <CreditCard className="h-3.5 w-3.5" /> Avans
+                      <CreditCard className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Avans</span>
                     </button>
                   )}
 
                   <button
                     type="button"
                     onClick={() => handleOpenEdit(p)}
-                    className="btn-outline py-1.5 px-2.5 text-xs font-bold text-body flex-1 flex items-center justify-center gap-1"
+                    className="btn-outline py-1.5 px-2 text-xs font-bold text-body flex-1 min-w-0 flex items-center justify-center gap-1"
                   >
-                    <Edit className="h-3.5 w-3.5" /> Tahrir
+                    <Edit className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">Tahrir</span>
                   </button>
 
-                  {/* Dismiss / Restore toggle */}
-                  <button
-                    type="button"
-                    onClick={() => toggleProviderActive(p)}
-                    className={`btn-outline py-1.5 px-2 text-xs ${
-                      isAct ? 'text-amber-400 hover:bg-amber-500/20 border-amber-500/40' : 'text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/40'
-                    }`}
-                    title={isAct ? "Shifokorni ishdan ketgan deb belgilash" : "Shifokorni qayta faollashtirish"}
-                  >
-                    {isAct ? <UserX className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
-                  </button>
-
-                  {/* Permanent Hard Delete */}
-                  <button
-                    type="button"
-                    onClick={() => hardDeleteProvider(p)}
-                    className="btn-outline py-1.5 px-2 text-xs text-rose-400 hover:bg-rose-500/20 border-rose-500/40"
-                    title="Bazadan to'liq o'chirish"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="shrink-0">
+                    <ActionMenu
+                      items={[
+                        {
+                          label: isAct ? "Ishdan ketgan deb belgilash" : 'Qayta faollashtirish',
+                          icon: isAct ? Icons.cancel : Icons.check,
+                          onClick: () => toggleProviderActive(p),
+                        },
+                        {
+                          label: "Bazadan to'liq o'chirish",
+                          icon: Icons.trash,
+                          variant: 'danger',
+                          onClick: () => hardDeleteProvider(p),
+                        },
+                      ]}
+                    />
+                  </div>
                 </div>
               </div>
             )

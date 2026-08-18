@@ -13,7 +13,11 @@ from models.patient import Patient
 from models.service import Service
 from models.user import User
 from services.audit import get_client_info, log_audit
-from services.finance import cancel_patient_payment, process_inpatient_payment
+from services.finance import (
+    cancel_inpatient_payments,
+    cancel_patient_payment,
+    process_inpatient_payment,
+)
 from services.inpatient_accrual import (
     provider_accrual_detail,
     provider_inpatient_summary,
@@ -60,15 +64,15 @@ class InpatientCreate(BaseModel):
     phone: str | None = None
     birth_date: str | None = None
     address: str | None = None
-    room_number: str
-    bed_number: str
+    room_number: str = Field(min_length=1, max_length=50)
+    bed_number: str = Field(min_length=1, max_length=50)
     tariff_id: int | None = None
     doctor_id: int | None = None
     referrer_id: int | None = None
-    diagnosis: str | None = None
-    daily_rate: int = Field(gt=0)
+    diagnosis: str | None = Field(default=None, max_length=2000)
+    daily_rate: int = Field(gt=0, le=50_000_000)
     planned_days: int | None = Field(default=None, ge=1, le=180)
-    initial_payment_amount: int | None = Field(default=None, ge=0)
+    initial_payment_amount: int | None = Field(default=None, ge=0, le=500_000_000)
     initial_payment_type: str | None = "cash"
     cash_amount: int | None = Field(default=None, ge=0)
     card_amount: int | None = Field(default=None, ge=0)
@@ -81,22 +85,25 @@ class InpatientItemCreate(BaseModel):
     service_id: int | None = None
     material_id: int | None = None
     name: str | None = None
-    quantity: int = Field(default=1, ge=1)
-    unit_price: int | None = Field(default=None, ge=0)
+    # Adashib nol ortiqcha bosilsa ushlansin — ilgari chegara umuman yo'q edi
+    quantity: int = Field(default=1, ge=1, le=1000)
+    unit_price: int | None = Field(default=None, ge=0, le=50_000_000)
     is_included_in_tariff: bool = False
 
 
 class PaymentCreate(BaseModel):
-    amount: int = Field(gt=0)
+    amount: int = Field(gt=0, le=500_000_000)
     payment_type: str = "cash"
     payment_stage: str = Field(default="interim", pattern="^(advance|interim|discharge)$")
-    days_count: int = Field(default=1, ge=0)
+    days_count: int = Field(default=1, ge=0, le=365)
     period_start: date | None = None
     period_end: date | None = None
     cash_amount: int | None = Field(default=None, ge=0)
     card_amount: int | None = Field(default=None, ge=0)
     click_amount: int | None = Field(default=None, ge=0)
     qr_amount: int | None = Field(default=None, ge=0)
+    # Hisobdan ortiq to'lov qabul qilinishi uchun ataylab tasdiqlanadi
+    allow_overpay: bool = False
 
 
 class DischargeBody(BaseModel):
@@ -114,7 +121,8 @@ class DailyPaymentBody(BaseModel):
     payment_date: date | None = None
     payment_type: str = "cash"
     days_count: int = Field(default=1, ge=1, le=60)
-    amount: int | None = Field(default=None, gt=0)
+    amount: int | None = Field(default=None, gt=0, le=500_000_000)
+    allow_overpay: bool = False
     cash_amount: int | None = Field(default=None, ge=0)
     card_amount: int | None = Field(default=None, ge=0)
     click_amount: int | None = Field(default=None, ge=0)
@@ -128,6 +136,67 @@ class CancelBody(BaseModel):
 # -------------------------------------------------------------------------
 # SERIALIZATION & HELPERS
 # -------------------------------------------------------------------------
+def _telegram_yubor(matn: str) -> None:
+    """Telegram xabarini yuboradi va tugashini kutadi.
+
+    Ilgari bu alohida fon oqimida (daemon) yuborilardi — Vercel'da
+    so'rov tugashi bilan oqim o'ldirilar va xabar hech qachon yetib bormasdi.
+    Harajatlar bo'limida bu allaqachon tuzatilgan, endi statsionarda ham.
+    """
+    import asyncio
+    import logging
+
+    try:
+        asyncio.run(send_telegram_message(matn, section="inpatients"))
+    except Exception as e:
+        logging.getLogger(__name__).warning("Statsionar telegram xabari yuborilmadi: %s", e)
+
+
+def _qulflab_ol(db: Session, inpatient_id: int) -> Inpatient | None:
+    """Yotgan bemor yozuvini qulflab o'qiydi.
+
+    Ikki qurilmadan bir vaqtda to'lov kiritilsa ikkalasi ham eski qoldiqni
+    ko'rib, hisobni buzardi. PostgreSQL'da qator qulflanadi; SQLite qulflashni
+    qo'llab-quvvatlamaydi, u yerda oddiy o'qish bo'ladi.
+    """
+    q = db.query(Inpatient).filter(Inpatient.id == inpatient_id, Inpatient.is_cancelled == False)  # noqa: E712
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        q = q.with_for_update()
+    return q.first()
+
+
+def _koyka_bandmi(db: Session, xona: str, koyka: str, bundan_tashqari: int | None = None) -> Inpatient | None:
+    """Shu koykada hozir yotgan bemorni qaytaradi (bo'sh bo'lsa None)."""
+    q = db.query(Inpatient).filter(
+        Inpatient.room_number == (xona or "").strip(),
+        Inpatient.bed_number == (koyka or "").strip(),
+        Inpatient.status == "yotmoqda",
+        Inpatient.is_cancelled == False,  # noqa: E712
+    )
+    if bundan_tashqari:
+        q = q.filter(Inpatient.id != bundan_tashqari)
+    return q.first()
+
+
+def _tolov_holatini_tekshir(inp: Inpatient, qoshiladigan: int, ruxsat: bool) -> None:
+    """Hisobdan ortiq to'lov kiritilayotgan bo'lsa to'xtatadi."""
+    if ruxsat:
+        return
+    hisob = _serialize_inp(inp)
+    qoldiq = int(hisob["balance_due"])
+    if qoshiladigan > qoldiq:
+        ortiqcha = qoshiladigan - qoldiq
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"To'lov hisobdan {ortiqcha:,} so'm ortiq. "
+                f"Umumiy hisob {hisob['total_amount']:,}, to'langan {hisob['paid_total']:,}, "
+                f"qolgan qarz {qoldiq:,} so'm. "
+                "Oldindan ko'proq to'lanayotgan bo'lsa, tasdiqlang."
+            ).replace(",", " "),
+        )
+
+
 def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
     elapsed_days = days or _calc_days(i)
     planned_days = _extract_planned_days(i.diagnosis)
@@ -618,6 +687,16 @@ def admit(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ceo),
 ):
+    # Bir koykaga ikki bemor yotqizilmasin — ilgari umuman tekshirilmasdi va
+    # palata xaritasida ikki odam bitta koykada ko'rinardi.
+    band = _koyka_bandmi(db, data.room_number, data.bed_number)
+    if band:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{data.room_number}-palata {data.bed_number}-koykada "
+                   f"{band.first_name} {band.last_name} yotibdi. Bo'sh koyka tanlang.",
+        )
+
     # Statsionarda faqat "statsionar xizmat ko'rsatuvchi" deb belgilangan
     # shifokorlar tanlanadi — ular kunlik qat'iy haq oladi.
     if data.doctor_id:
@@ -792,9 +871,15 @@ def record_payment(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ceo),
 ):
-    inp = db.query(Inpatient).filter(Inpatient.id == inpatient_id, Inpatient.is_cancelled == False).first()
+    inp = _qulflab_ol(db, inpatient_id)
     if not inp:
         raise HTTPException(status_code=404, detail="Bemor topilmadi")
+    if inp.status != "yotmoqda":
+        raise HTTPException(
+            status_code=400,
+            detail="Bu bemor allaqachon chiqarilgan — unga yangi to'lov yozib bo'lmaydi.",
+        )
+    _tolov_holatini_tekshir(inp, body.amount, body.allow_overpay)
 
     period_start = body.period_start or date.today()
     period_end = body.period_end or date.today()
@@ -830,12 +915,7 @@ def record_payment(
         f"👤 {inp.first_name} {inp.last_name}\n"
         f"💰 {body.amount:,} so'm ({body.payment_type})"
     ).replace(",", " ")
-    import asyncio
-    import threading
-    threading.Thread(
-        target=lambda: asyncio.run(send_telegram_message(msg, section="inpatients")),
-        daemon=True,
-    ).start()
+    _telegram_yubor(msg)
 
     return {"message": "To'lov saqlandi", "amount": body.amount}
 
@@ -848,13 +928,21 @@ def discharge(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ceo),
 ):
-    inp = db.query(Inpatient).options(
-        joinedload(Inpatient.items),
-        joinedload(Inpatient.payments)
-    ).filter(Inpatient.id == inpatient_id, Inpatient.is_cancelled == False).first()
-
+    inp = _qulflab_ol(db, inpatient_id)
     if not inp or inp.status != "yotmoqda":
         raise HTTPException(status_code=400, detail="Bemor topilmadi yoki allaqachon chiqgan")
+
+    # Chiqish sanasi tekshiruvi — ilgari umuman tekshirilmasdi va yotgan
+    # sanadan oldingi sana kiritilsa kun soni manfiy chiqib hisob buzilardi.
+    yotgan_kun = inp.admitted_at.date()
+    if body.discharged_at < yotgan_kun:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Chiqish sanasi yotgan sanadan ({yotgan_kun.strftime('%d.%m.%Y')}) "
+                   "oldin bo'lishi mumkin emas.",
+        )
+    if body.discharged_at > date.today():
+        raise HTTPException(status_code=400, detail="Chiqish sanasi kelajakda bo'lishi mumkin emas.")
 
     inp.discharged_at = datetime.combine(body.discharged_at, datetime.min.time())
     days = body.days_count or _calc_days(inp)
@@ -908,12 +996,7 @@ def discharge(
         f"📅 Kun: {days}\n"
         f"💰 Yakuniy to'lov: {amount:,} so'm"
     ).replace(",", " ")
-    import asyncio
-    import threading
-    threading.Thread(
-        target=lambda: asyncio.run(send_telegram_message(msg, section="inpatients")),
-        daemon=True,
-    ).start()
+    _telegram_yubor(msg)
 
     return {
         "amount": amount,
@@ -932,11 +1015,12 @@ def daily_payment(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ceo),
 ):
-    inp = db.query(Inpatient).filter(Inpatient.id == inpatient_id, Inpatient.is_cancelled == False).first()
+    inp = _qulflab_ol(db, inpatient_id)
     if not inp or inp.status != "yotmoqda":
         raise HTTPException(status_code=400, detail="Bemor topilmadi yoki aktiv emas")
 
     amount = body.amount or (inp.daily_rate * body.days_count)
+    _tolov_holatini_tekshir(inp, amount, body.allow_overpay)
     period_day = body.payment_date or date.today()
     process_inpatient_payment(db, inp, amount, body.payment_type, body.days_count)
     pay = InpatientPayment(
@@ -962,24 +1046,33 @@ def cancel_inpatient(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ceo),
 ):
-    inp = db.query(Inpatient).filter(Inpatient.id == inpatient_id).first()
-    if not inp or inp.is_cancelled:
+    inp = _qulflab_ol(db, inpatient_id)
+    if not inp:
         raise HTTPException(status_code=400, detail="Topilmadi")
+
+    # Olingan to'lovlar kassadan qaytariladi. Ilgari bu qilinmasdi: bemor bekor
+    # qilinsa ham puli kassada va kunlik tushum hisobotida qolib ketardi.
+    pul_qaytdi = cancel_inpatient_payments(db, inp, body.reason)
+
+    # Shifokorga yozilgan kunlik haqlar ham qaytariladi
+    haq_qaytdi = reverse_inpatient_accruals(db, inp.id)
+
     inp.is_cancelled = True
     inp.cancelled_at = datetime.now()
     inp.cancelled_by = user.id
     inp.cancel_reason = body.reason
 
-    # Yozilgan kunlik haqlar shifokor balansidan qaytariladi — aks holda
-    # bekor qilingan bemor uchun ham pul hisoblanib qolardi.
-    qaytarildi = reverse_inpatient_accruals(db, inp.id)
-
     ip, device = get_client_info(request)
     log_audit(
         db, user_id=user.id, user_role=user.role, action_type="CANCEL",
         table_name="inpatients", record_id=inp.id,
-        new_data={"reason": body.reason, "accruals_reversed": qaytarildi},
+        new_data={"reason": body.reason, "payments_reversed": pul_qaytdi,
+                  "accruals_reversed": haq_qaytdi},
         ip_address=ip, device_info=device,
     )
     db.commit()
-    return {"message": "Bekor qilindi", "accruals_reversed": qaytarildi}
+    return {
+        "message": "Bekor qilindi",
+        "payments_reversed": pul_qaytdi,
+        "accruals_reversed": haq_qaytdi,
+    }

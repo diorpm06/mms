@@ -329,28 +329,47 @@ export default function CeoInpatients() {
   const handlePayment = async () => {
     if (!payModal || !payForm.amount) return
     const targetId = payModal.id
-    try {
-      await api(`/inpatients/${targetId}/payment`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amount: +payForm.amount,
-          payment_type: payForm.payment_type,
-          payment_stage: payForm.payment_stage,
-          days_count: +payForm.days_count || 1,
-          cash_amount: payForm.payment_type === 'split' && payForm.cash_amount ? +payForm.cash_amount : undefined,
-          card_amount: payForm.payment_type === 'split' && payForm.card_amount ? +payForm.card_amount : undefined,
-          click_amount: payForm.payment_type === 'split' && payForm.click_amount ? +payForm.click_amount : undefined,
-          qr_amount: payForm.payment_type === 'split' && payForm.qr_amount ? +payForm.qr_amount : undefined,
-        }),
-      })
+
+    const yubor = (allowOverpay) => api(`/inpatients/${targetId}/payment`, {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: +payForm.amount,
+        payment_type: payForm.payment_type,
+        payment_stage: payForm.payment_stage,
+        days_count: +payForm.days_count || 1,
+        cash_amount: payForm.payment_type === 'split' && payForm.cash_amount ? +payForm.cash_amount : undefined,
+        card_amount: payForm.payment_type === 'split' && payForm.card_amount ? +payForm.card_amount : undefined,
+        click_amount: payForm.payment_type === 'split' && payForm.click_amount ? +payForm.click_amount : undefined,
+        qr_amount: payForm.payment_type === 'split' && payForm.qr_amount ? +payForm.qr_amount : undefined,
+        ...(allowOverpay ? { allow_overpay: true } : {}),
+      }),
+    })
+
+    const yakunla = async () => {
       toast('To\'lov kiritildi')
       setPayModal(null)
       loadData()
-
       // Fetch full inpatient details for printable receipt
       const fullInpatient = await api(`/inpatients/${targetId}`)
       setSelectedReceipt(fullInpatient)
+    }
+
+    try {
+      await yubor(false)
+      await yakunla()
     } catch (e) {
+      // Server hisobdan ortiq to'lovni to'xtatadi. Bu ataylab (oldindan
+      // ko'proq to'lash) bo'lishi mumkin — shuning uchun tasdiqlash so'raymiz.
+      if (e.status === 400 && /ortiq/i.test(e.message || '')) {
+        if (!window.confirm(`${e.message}\n\nBaribir qabul qilinsinmi?`)) return
+        try {
+          await yubor(true)
+          await yakunla()
+        } catch (e2) {
+          toast(e2.message, 'error')
+        }
+        return
+      }
       toast(e.message, 'error')
     }
   }

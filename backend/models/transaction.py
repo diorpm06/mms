@@ -12,6 +12,10 @@ class Transaction(CancelMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"), nullable=True, index=True)
+    # Statsionar to'lovlarida patient_id bo'sh bo'ladi. Ilgari yotgan bemor bilan
+    # bog'lanish umuman yo'q edi — shu sababli bemor bekor qilinganda qaysi
+    # to'lovni qaytarishni topib bo'lmasdi va pul kassada qolib ketardi.
+    inpatient_id: Mapped[int | None] = mapped_column(ForeignKey("inpatients.id"), nullable=True, index=True)
     total_amount: Mapped[int] = mapped_column(Integer)
     referrer_id: Mapped[int | None] = mapped_column(ForeignKey("referrers.id"), nullable=True, index=True)
     referrer_amount: Mapped[int] = mapped_column(Integer, default=0)

@@ -298,6 +298,9 @@ def run_migrations():
     for stmt in (
         "ALTER TABLE providers ADD COLUMN is_inpatient_provider BOOLEAN DEFAULT FALSE",
         "ALTER TABLE providers ADD COLUMN inpatient_daily_rate INTEGER DEFAULT 50000",
+        # To'lovni yotgan bemorga bog'laydi — bekor qilinganda pulni qaytarish uchun
+        "ALTER TABLE transactions ADD COLUMN inpatient_id INTEGER",
+        "CREATE INDEX IF NOT EXISTS ix_transactions_inpatient_id ON transactions (inpatient_id)",
     ):
         try:
             with engine.connect() as conn:

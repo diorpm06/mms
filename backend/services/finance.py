@@ -655,6 +655,7 @@ def process_inpatient_payment(
 
     tx = Transaction(
         patient_id=None,
+        inpatient_id=inpatient.id,
         total_amount=amount,
         referrer_id=None,
         referrer_amount=referrer_amount,
@@ -671,3 +672,58 @@ def process_inpatient_payment(
     )
     db.add(tx)
     return tx
+
+
+def cancel_inpatient_payments(db: Session, inpatient: Inpatient, sabab: str | None = None) -> int:
+    """Yotgan bemor bekor qilinganda olingan pullarni kassadan qaytaradi.
+
+    Ilgari bunday funksiya umuman yo'q edi: bemor bekor qilinsa ham olingan
+    to'lov kassada va kunlik tushum hisobotida qolib ketardi.
+    Qaytarilgan umumiy summani qaytaradi.
+    """
+    from models.inpatient import InpatientPayment
+
+    tranzaksiyalar = (
+        db.query(Transaction)
+        .filter(Transaction.inpatient_id == inpatient.id, Transaction.is_cancelled == False)  # noqa: E712
+        .all()
+    )
+    if not tranzaksiyalar:
+        return 0
+
+    bal = get_or_create_balance(db)
+    jami = 0
+    for tx in tranzaksiyalar:
+        if tx.referrer_id:
+            ref = db.query(Referrer).filter(Referrer.id == tx.referrer_id).first()
+            if ref:
+                ref.balance = max(0, int(ref.balance or 0) - int(tx.referrer_amount or 0))
+        if tx.provider_id and (tx.provider_amount or 0):
+            prov = db.query(Provider).filter(Provider.id == tx.provider_id).first()
+            if prov:
+                prov.balance = max(0, int(prov.balance or 0) - int(tx.provider_amount or 0))
+
+        bal.current_balance = max(0, int(bal.current_balance or 0) - int(tx.center_amount or 0))
+        jami += int(tx.total_amount or 0)
+
+        tx.is_cancelled = True
+        tx.cancelled_at = datetime.now()
+        tx.cancel_reason = sabab or "Yotgan bemor bekor qilindi"
+
+    bal.updated_at = datetime.now()
+    log_balance_change(
+        db, -jami, "cancel",
+        f"Statsionar bekor: #{inpatient.id} {inpatient.first_name} {inpatient.last_name}",
+    )
+
+    # To'lov yozuvlari ham bekor qilinadi — aks holda bemor kartasida
+    # "to'langan" bo'lib turaveradi
+    for pay in db.query(InpatientPayment).filter(
+        InpatientPayment.inpatient_id == inpatient.id,
+        InpatientPayment.is_cancelled == False,  # noqa: E712
+    ).all():
+        pay.is_cancelled = True
+        pay.cancelled_at = datetime.now()
+        pay.cancel_reason = sabab or "Yotgan bemor bekor qilindi"
+
+    return jami
