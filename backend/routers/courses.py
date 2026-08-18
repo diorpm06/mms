@@ -174,9 +174,20 @@ def use_session(
     if not asl:
         raise HTTPException(status_code=404, detail="Bemor topilmadi")
 
+    idlar = [ps.id for ps in g["_rows"]]
+
+    # To'lov qatorlarini QULFLAYMIZ. "Keldi" ikki qurilmadan bir vaqtda
+    # bosilsa, ikkala so'rov ham "bugun kelmagan" degan xulosaga kelib,
+    # bemorga ikkita navbat berilishi va bir kun ortiqcha yechilishi mumkin
+    # edi. Qulf ikkinchi so'rovni birinchisi tugagunicha kuttiradi.
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        (db.query(PatientService)
+           .filter(PatientService.id.in_(idlar))
+           .with_for_update()
+           .all())
+
     # Shu odam bugun shu xizmat bo'yicha allaqachon kelganmi
     bugun_boshi = datetime.combine(date.today(), datetime.min.time())
-    idlar = [ps.id for ps in g["_rows"]]
     bor = (
         db.query(Patient)
         .filter(
@@ -189,7 +200,8 @@ def use_session(
     if bor:
         raise HTTPException(
             status_code=400,
-            detail=f"Bu bemor bugun shu xizmat bo'yicha allaqachon qabul qilingan ({bor.ticket_number}).",
+            detail=f"Bu bemor bugun shu xizmat bo'yicha allaqachon qabul qilingan "
+                   f"({bor.ticket_number}). Bir kunda bir marta belgilanadi.",
         )
 
     # Bo'sh o'rni qolgan birinchi yozuvni ishlatamiz
@@ -245,6 +257,34 @@ def use_session(
         "ticket_number": ticket,
         "patient_id": yangi.id,
         "remaining": qolgan,
+        # Navbat talonini darrov chop etish uchun — bemor raqamini
+        # qo'lida olishi kerak, xuddi oddiy ro'yxatga olishdagidek.
+        "patient": {
+            "id": yangi.id,
+            "first_name": yangi.first_name,
+            "last_name": yangi.last_name,
+            "phone": yangi.phone,
+            "birth_date": yangi.birth_date.isoformat() if yangi.birth_date else None,
+            "ticket_number": ticket,
+            "cabinet": yangi.cabinet,
+            "queue_status": yangi.queue_status,
+            "payment_amount": 0,
+            "payment_type": "prepaid",
+            "cash_amount": 0, "card_amount": 0, "click_amount": 0, "qr_amount": 0,
+            "discount_amount": 0,
+            "created_at": yangi.created_at.isoformat() if yangi.created_at else None,
+            "service_name": g["service_name"],
+            "service_category": g["category"],
+            "is_prepaid_visit": True,
+            "prepaid_day": g["used_count"] + 1,
+            "prepaid_total": g["quantity"],
+            "services": [{
+                "service_name": g["service_name"],
+                "category": g["category"],
+                "quantity": 1,
+                "total_price": 0,
+            }],
+        },
     }
 
 

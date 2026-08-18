@@ -324,6 +324,25 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
               </div>
             )}
 
+            {/* Oldindan to'langan kursning navbatdagi kuni — bu talonda
+                to'lov yo'q, chunki pul birinchi kuni olingan. */}
+            {firstPatient.is_prepaid_visit && (
+              <div className="border-2 border-slate-900 rounded p-1.5 my-1.5 text-center space-y-0.5">
+                <div className="font-black text-[11px] tracking-wide text-slate-900">
+                  OLDINDAN TO'LANGAN TASHRIF
+                </div>
+                {firstPatient.prepaid_total ? (
+                  <div className="text-[10px] font-bold text-slate-900">
+                    {firstPatient.prepaid_total} kunlik kursning{' '}
+                    {firstPatient.prepaid_day}-kuni
+                  </div>
+                ) : null}
+                <div className="text-[9px] font-bold text-slate-900">
+                  Bugun to'lov olinmaydi.
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between border-b border-slate-200 pb-1 pt-1">
               <span className="text-slate-600 font-bold">To'lov Turi:</span>
               <strong className="uppercase text-right text-slate-900">

@@ -5,6 +5,7 @@ import { formatMoney } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import { Btn, Icons, PageHeader, EmptyState } from '../../components/UIKit'
 import { TableSkeleton } from '../../components/Skeleton'
+import PaymentTicketModal from '../../components/PaymentTicketModal'
 
 function sana(iso) {
   if (!iso) return '—'
@@ -17,6 +18,8 @@ export default function Courses() {
   const [rows, setRows] = useState(null)
   const [qidiruv, setQidiruv] = useState('')
   const [ishlanmoqda, setIshlanmoqda] = useState(null)
+  // "Keldi" bosilgach bemorga navbat taloni chop etib beriladi
+  const [talon, setTalon] = useState(null)
   const toast = useToastStore((s) => s.add)
 
   const yukla = async () => {
@@ -43,6 +46,8 @@ export default function Courses() {
         body: JSON.stringify({ key: r.key }),
       })
       toast(res.message || 'Navbatga qo\'yildi')
+      // Bemor navbat raqamini qo'lida olishi kerak — talon darrov ochiladi
+      if (res.patient) setTalon(res.patient)
       yukla()
     } catch (e) {
       toast(e.message, 'error')
@@ -82,6 +87,9 @@ export default function Courses() {
 
   return (
     <div className="space-y-5 max-w-6xl mx-auto pb-10">
+      {talon && (
+        <PaymentTicketModal open={!!talon} patient={talon} onClose={() => setTalon(null)} />
+      )}
       <PageHeader
         title="🔁 Davolanishdagilar (oldindan to'langan kurslar)"
         subtitle="Bir necha kunga to'lab ketgan bemorlar. Kelganda «Keldi» bosing — qayta to'lov olinmaydi, navbat raqami beriladi."
