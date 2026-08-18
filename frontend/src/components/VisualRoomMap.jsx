@@ -113,33 +113,45 @@ export default function VisualRoomMap({ rooms: propRooms, activeInpatients, onAd
                         {b.bed?.toString().startsWith('Koyka') ? b.bed : `Koyka ${b.bed}`}
                       </span>
                       {b.patient ? (
-                        <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-extrabold border border-cyan-500/40">
-                          {b.patient.planned_days ? `${b.patient.days}/${b.patient.planned_days} kun` : `${b.patient.days} kun`}
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-extrabold border border-cyan-500/40">
+                          {b.patient.planned_days
+                            ? `${b.patient.days || b.patient.days_count || 1}/${b.patient.planned_days} kun`
+                            : `${b.patient.days || b.patient.days_count || 1} kun`}
                         </span>
                       ) : (
-                        <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-extrabold border border-emerald-500/40">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-extrabold border border-emerald-500/40">
                           BO'SH
                         </span>
                       )}
                     </div>
 
                     {b.patient ? (
-                      <div className="space-y-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => onViewPatient && onViewPatient(b.patient)}
-                          className="font-extrabold text-sm text-cyan-300 hover:underline hover:text-cyan-200 text-left block w-full truncate"
-                          title="Bemor kartasini ko'rish"
-                        >
-                          {b.patient.first_name} {b.patient.last_name}
-                        </button>
+                      <div className="space-y-1.5 pt-0.5">
+                        <div className="flex items-center justify-between gap-1">
+                          <button
+                            type="button"
+                            onClick={() => onViewPatient && onViewPatient(b.patient)}
+                            className="font-extrabold text-sm text-cyan-300 hover:underline hover:text-cyan-200 text-left truncate flex-1"
+                            title="Bemor tibbiy kartasini ko'rish"
+                          >
+                            {b.patient.first_name} {b.patient.last_name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onViewPatient && onViewPatient(b.patient)}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40 font-bold shrink-0"
+                            title="Tibbiy kartani ko'rish"
+                          >
+                            👁️ Kartochka
+                          </button>
+                        </div>
                         
-                        <div className="text-[11px] font-mono space-y-1 p-2 bg-surface-2/40 rounded-xl border border-border/50">
-                          <div className="flex justify-between text-muted text-[10px]">
+                        <div className="text-[10px] font-mono space-y-0.5 p-1.5 bg-surface-2/40 rounded-xl border border-border/50">
+                          <div className="flex justify-between text-muted">
                             <span>Jami: {formatMoney(b.patient.total_amount)}</span>
                             <span className="text-emerald-400 font-bold">To'langan: {formatMoney(b.patient.paid_total)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-[11px] font-bold">
+                          <div className="flex justify-between items-center font-bold">
                             <span className="text-muted">Qoldiq (Qarz):</span>
                             <span className={b.patient.balance_due > 0 ? 'text-rose-400 font-black' : 'text-emerald-400 font-black'}>
                               {b.patient.balance_due > 0 ? formatMoney(b.patient.balance_due) : '0 so\'m (To\'liq)'}
@@ -147,49 +159,38 @@ export default function VisualRoomMap({ rooms: propRooms, activeInpatients, onAd
                           </div>
                         </div>
                         
-                        <div className="pt-1.5 space-y-1.5">
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => onViewPatient && onViewPatient(b.patient)}
-                              className="btn-outline border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/50 py-1.5 px-2 text-[11px] font-bold flex items-center justify-center gap-1 rounded-xl"
-                              title="Bemor tibbiy kartasini ko'rish"
-                            >
-                              👁️ Ko'rish
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onPay && onPay(b.patient)}
-                              className="btn-outline border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/50 py-1.5 px-2 text-[11px] font-bold flex items-center justify-center gap-1 rounded-xl"
-                              title="To'lov qabul qilish (Bosh to'lov / Oraliq)"
-                            >
-                              💳 To'lov
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => onAddItem && onAddItem(b.patient)}
-                              className="btn-outline border-purple-500/40 text-purple-300 hover:bg-purple-950/50 py-1.5 px-2 text-[11px] font-bold flex items-center justify-center gap-1 rounded-xl"
-                              title="Qo'shimcha tahlil, xizmat yoki dori biriktirish"
-                            >
-                              🧪 +Xizmat
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onDischarge(b.patient)}
-                              className="btn-gold py-1.5 px-2 text-[11px] font-bold flex items-center justify-center gap-1 rounded-xl"
-                            >
-                              🚪 Chiqarish
-                            </button>
-                          </div>
+                        <div className="pt-1 grid grid-cols-2 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => onPay && onPay(b.patient)}
+                            className="btn-outline border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/50 py-1 px-1.5 text-[10px] font-bold flex items-center justify-center gap-1 rounded-lg"
+                            title="To'lov qabul qilish"
+                          >
+                            💳 To'lov
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onAddItem && onAddItem(b.patient)}
+                            className="btn-outline border-purple-500/40 text-purple-300 hover:bg-purple-950/50 py-1 px-1.5 text-[10px] font-bold flex items-center justify-center gap-1 rounded-lg"
+                            title="Qo'shimcha tahlil, xizmat yoki dori biriktirish"
+                          >
+                            🧪 +Xizmat
+                          </button>
                           <button
                             type="button"
                             onClick={() => onPrintReceipt(b.patient)}
-                            className="btn-outline border-gold/40 text-gold hover:bg-gold/10 w-full py-1.5 text-[11px] font-bold flex items-center justify-center gap-1 rounded-xl"
+                            className="btn-outline border-gold/40 text-gold hover:bg-gold/10 py-1 px-1.5 text-[10px] font-bold flex items-center justify-center gap-1 rounded-lg"
                             title="Kvitansiya chekini ko'rish va chop etish"
                           >
-                            🧾 Chek Chiqarish
+                            🧾 Chek
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDischarge(b.patient)}
+                            className="btn-gold py-1 px-1.5 text-[10px] font-bold flex items-center justify-center gap-1 rounded-lg"
+                            title="Bemor kasalxonadan chiqarish"
+                          >
+                            🚪 Chiqarish
                           </button>
                         </div>
                       </div>
