@@ -526,7 +526,7 @@ export default function CeoInpatients() {
 
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gold/20 text-left text-gold">
+            <tr className="border-b border-gold/20 text-left text-amber-700 dark:text-gold font-bold">
               <th className="p-3">Bemor Ismi</th>
               <th className="p-3">Palata / Koyka</th>
               <th className="p-3">Tarif / Kunlik Narx</th>
@@ -543,7 +543,7 @@ export default function CeoInpatients() {
                   <button
                     type="button"
                     onClick={() => setViewPatientModal(i)}
-                    className="hover:underline hover:text-cyan-400 text-left font-extrabold"
+                    className="hover:underline text-cyan-600 dark:text-cyan-400 text-left font-extrabold"
                     title="Bemor kartasini ko'rish"
                   >
                     {i.first_name} {i.last_name}
@@ -552,7 +552,7 @@ export default function CeoInpatients() {
                     {i.doctor_name ? (i.doctor_name.toLowerCase().startsWith('dr.') ? i.doctor_name : `Dr. ${i.doctor_name}`) : ''}
                   </div>
                 </td>
-                <td className="p-3 font-mono font-bold text-cyan-400">{i.room_number}/{i.bed_number}</td>
+                <td className="p-3 font-mono font-bold text-cyan-600 dark:text-cyan-400">{i.room_number}/{i.bed_number}</td>
                 <td className="p-3">
                   <div className="font-bold">{i.tariff_name || 'Standart'}</div>
                   <div className="text-xs text-muted font-mono">{formatMoney(i.daily_rate)}/kun</div>
@@ -561,21 +561,21 @@ export default function CeoInpatients() {
                 <td className="p-3 font-mono font-bold text-foreground">
                   {formatMoney(i.total_amount)}
                   {i.extra_items_total > 0 && (
-                    <div className="text-[10px] text-cyan-400 font-normal">+{formatMoney(i.extra_items_total)} qo'shimcha</div>
+                    <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-normal">+{formatMoney(i.extra_items_total)} qo'shimcha</div>
                   )}
                 </td>
                 <td className="p-3">
                   {i.paid_total === 0 ? (
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 inline-block">
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/40 inline-block">
                       ⏳ Chiqishda (Nasiya)
                     </span>
                   ) : i.balance_due > 0 ? (
                     <div>
-                      <span className="text-xs font-mono font-bold text-emerald-400 block">{formatMoney(i.paid_total)} (Bosh to'lov)</span>
-                      <span className="text-[10px] font-mono text-rose-400 block">Qoldiq: {formatMoney(i.balance_due)}</span>
+                      <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 block">{formatMoney(i.paid_total)} (Bosh to'lov)</span>
+                      <span className="text-[10px] font-mono text-rose-600 dark:text-rose-400 block">Qoldiq: {formatMoney(i.balance_due)}</span>
                     </div>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 inline-block">
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-500/40 inline-block">
                       ✅ To'liq to'langan
                     </span>
                   )}
