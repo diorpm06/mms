@@ -44,6 +44,8 @@ export default function TodayPatients() {
       card_amount: initialCard,
       click_amount: p.click_amount || 0,
       qr_amount: p.qr_amount || 0,
+      discount_amount: p.discount_amount || 0,
+      discount_reason: p.discount_reason || '',
       reason: '',
     })
     // Bemorning hozirgi xizmatlari (tahrirlash uchun nusxa)
@@ -94,7 +96,8 @@ export default function TodayPatients() {
       return
     }
 
-    const totalToPay = Math.max(0, editTotal - (editPatient?.discount_amount || 0))
+    const discAmt = Math.max(0, Number(editForm.discount_amount) || 0)
+    const totalToPay = Math.max(0, editTotal - discAmt)
     let cashAmt = Number(editForm.cash_amount) || 0
     let cardAmt = Number(editForm.card_amount) || 0
     let clickAmt = Number(editForm.click_amount) || 0
@@ -110,8 +113,6 @@ export default function TodayPatients() {
         toast(`Kiritilgan to'lovlar yig'indisi (${formatMoney(sumEntered)}) to'lanadigan summa (${formatMoney(totalToPay)})ga teng bo'lishi kerak!`, 'error')
         return
       }
-      // Ilgari shu yerda Click va QR kartaga qo'shib yuborilardi va hisobotda
-      // "Karta" bo'lib chiqardi — endi har biri o'z maydonida ketadi.
     } else if (editForm.payment_type === 'cash') {
       cashAmt = totalToPay
       cardAmt = 0; clickAmt = 0; qrAmt = 0
@@ -133,6 +134,8 @@ export default function TodayPatients() {
         body: JSON.stringify({
           referrer_id: editForm.referrer_id ? Number(editForm.referrer_id) : null,
           payment_type: editForm.payment_type,
+          discount_amount: discAmt,
+          discount_reason: editForm.discount_reason?.trim() || null,
           cash_amount: cashAmt,
           card_amount: cardAmt,
           click_amount: clickAmt,
@@ -746,23 +749,50 @@ export default function TodayPatients() {
               </select>
 
               <div className="flex justify-between mt-2 pt-2 border-t border-border text-xs font-bold">
-                <span className="text-muted">Xizmatlar summasi:</span>
+                <span className="text-muted">Xizmatlar jami summasi:</span>
                 <span className="font-mono text-body">{formatMoney(editTotal)}</span>
               </div>
-              {(editPatient.discount_amount || 0) > 0 && (
-                <>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted">Chegirma (o'zgarmaydi):</span>
-                    <span className="font-mono text-amber-400">-{formatMoney(editPatient.discount_amount)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-black">
-                    <span>To'lanadigan:</span>
-                    <span className="font-mono text-emerald">
-                      {formatMoney(Math.max(0, editTotal - editPatient.discount_amount))}
-                    </span>
-                  </div>
-                </>
-              )}
+
+              {/* Editable Discount Section */}
+              <div className="grid grid-cols-2 gap-2 mt-2 p-2 bg-surface-2 rounded-xl border border-amber-500/30">
+                <div>
+                  <label className="text-[11px] font-bold text-amber-400 block mb-1">🏷️ Chegirma Summasi (so'm)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editForm.discount_amount}
+                    onChange={(e) => {
+                      const dVal = Math.max(0, Number(e.target.value) || 0)
+                      const newToPay = Math.max(0, editTotal - dVal)
+                      setEditForm({
+                        ...editForm,
+                        discount_amount: dVal,
+                        cash_amount: editForm.payment_type === 'cash' ? newToPay : editForm.cash_amount,
+                        card_amount: editForm.payment_type === 'card' ? newToPay : editForm.card_amount,
+                      })
+                    }}
+                    placeholder="0"
+                    className="input-field text-xs font-mono font-bold text-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-muted block mb-1">Chegirma Sababi</label>
+                  <input
+                    type="text"
+                    value={editForm.discount_reason}
+                    onChange={(e) => setEditForm({ ...editForm, discount_reason: e.target.value })}
+                    placeholder="Masalan: avval to'lagan"
+                    className="input-field text-xs font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-between text-xs font-black pt-1">
+                <span>Yakuniy To'lanadigan Summa:</span>
+                <span className="font-mono text-emerald text-sm font-extrabold">
+                  {formatMoney(Math.max(0, editTotal - (Number(editForm.discount_amount) || 0)))}
+                </span>
+              </div>
             </div>
 
             <div>

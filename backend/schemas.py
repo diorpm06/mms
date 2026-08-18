@@ -101,6 +101,9 @@ class ReferrerCreate(BaseModel):
     ozon_sum: Optional[int] = Field(default=10000, ge=0)
     other_sum: Optional[int] = Field(default=10000, ge=0)
     is_confirmed: Optional[bool] = False
+    # Bir xil ismli yo'naltiruvchi bo'lsa server rad etadi. Foydalanuvchi
+    # "baribir qo'shish" desa, so'rov shu belgi bilan qayta yuboriladi.
+    force: Optional[bool] = False
 
     @field_validator("phone")
     @classmethod

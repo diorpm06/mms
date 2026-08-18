@@ -140,14 +140,33 @@ export default function CeoReferrers() {
   }, [activeTab, tenDayYear, tenDayMonth, tenDaySegment, customFrom, customTo])
 
   const save = async () => {
+    const body = { ...form, percentage: 0 }
     try {
-      const body = { ...form, percentage: 0 }
       if (edit) await api(`/referrers/${edit.id}`, { method: 'PUT', body: JSON.stringify(body) })
       else await api('/referrers', { method: 'POST', body: JSON.stringify(body) })
       toast(edit ? "Yo'naltiruvchi tahrirlandi" : "Yangi yo'naltiruvchi qo'shildi")
       setModal(false)
       load()
     } catch (e) {
+      // 409 — shu ismda allaqachon bor. Bir odam ikki qatorga bo'linib
+      // ketmasligi uchun avval ogohlantiramiz, lekin haqiqatan boshqa odam
+      // bo'lsa qo'shish imkoni qoladi.
+      if (e.status === 409 && !edit) {
+        const davom = window.confirm(
+          `${e.message}\n\nBu haqiqatan boshqa odam bo'lsa "OK" bosing — baribir qo'shiladi.\n` +
+          `Aks holda "Bekor" bosib, ro'yxatdan mavjudini tanlang.`
+        )
+        if (!davom) return
+        try {
+          await api('/referrers', { method: 'POST', body: JSON.stringify({ ...body, force: true }) })
+          toast("Yangi yo'naltiruvchi qo'shildi")
+          setModal(false)
+          load()
+        } catch (e2) {
+          toast(e2.message, 'error')
+        }
+        return
+      }
       toast(e.message, 'error')
     }
   }

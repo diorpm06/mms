@@ -16,6 +16,24 @@ class PayoutBody(BaseModel):
     source: str | None = None
 
 
+def _sodda_ism(nom: str | None) -> str:
+    """Ismni taqqoslash uchun soddalashtiradi: katta-kichik harf va ortiqcha
+    bo'shliqlar hisobga olinmaydi. "Qazbek travmatolog" va "Qazbek Travmatolog"
+    bir xil deb qaraladi."""
+    return " ".join((nom or "").split()).casefold()
+
+
+def _bir_xil_ismli(db: Session, nom: str, bundan_tashqari: int | None = None):
+    """Shu ismdagi faol yo'naltiruvchini qaytaradi (bo'lmasa None)."""
+    kalit = _sodda_ism(nom)
+    if not kalit:
+        return None
+    for r in db.query(Referrer).filter(Referrer.is_active == True).all():  # noqa: E712
+        if r.id != bundan_tashqari and _sodda_ism(r.full_name) == kalit:
+            return r
+    return None
+
+
 @router.get("", response_model=list[ReferrerOut])
 def list_referrers(
     active_only: bool = True,
@@ -36,6 +54,23 @@ def pending_referrers(db: Session = Depends(get_db), _: User = Depends(require_a
 @router.post("", response_model=ReferrerOut)
 def create_referrer(data: ReferrerCreate, db: Session = Depends(get_db), user: User = Depends(require_admin_or_ceo)):
     d = data.model_dump()
+    majburiy = bool(d.pop("force", False))
+
+    # Ilgari hech qanday tekshiruv yo'q edi: bemor qabul qilayotgan xodim
+    # ro'yxatdan yo'naltiruvchini topa olmay yangisini qo'shardi va bitta
+    # odam ikki qatorga bo'linib ketardi — ishlagan puli ham, hisoboti ham.
+    if not majburiy:
+        mavjud = _bir_xil_ismli(db, d.get("full_name"))
+        if mavjud:
+            raise HTTPException(
+                status_code=409,
+                detail=f"\"{mavjud.full_name}\" nomli yo'naltiruvchi allaqachon bor. "
+                       "Ro'yxatdan o'shani tanlang. Bu boshqa odam bo'lsa, "
+                       "ismini aniqroq yozing (masalan familiyasi bilan).",
+            )
+
+    d["full_name"] = " ".join((d.get("full_name") or "").split())
+
     # If created by CEO directly in CEO page, consider it confirmed unless specified
     if user.role == "ceo" and "is_confirmed" not in d:
         d["is_confirmed"] = True
@@ -70,7 +105,23 @@ def update_referrer(
     r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
     if not r:
         raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
-    for k, v in data.model_dump(exclude_unset=True).items():
+
+    yangilanish = data.model_dump(exclude_unset=True)
+
+    # Tahrirlashda ham boshqasining ismiga aylantirib yuborilmasin. Ism
+    # o'zgarmayotgan bo'lsa tekshirilmaydi — aks holda "baribir qo'shish" bilan
+    # kiritilgan yozuvning stavkasini ham tahrirlab bo'lmay qolardi.
+    if yangilanish.get("full_name") and _sodda_ism(yangilanish["full_name"]) != _sodda_ism(r.full_name):
+        mavjud = _bir_xil_ismli(db, yangilanish["full_name"], bundan_tashqari=r.id)
+        if mavjud:
+            raise HTTPException(
+                status_code=409,
+                detail=f"\"{mavjud.full_name}\" nomli boshqa yo'naltiruvchi allaqachon bor. "
+                       "Ismini boshqacharoq yozing.",
+            )
+        yangilanish["full_name"] = " ".join(yangilanish["full_name"].split())
+
+    for k, v in yangilanish.items():
         setattr(r, k, v)
     # If CEO edits rates, confirm automatically
     if user.role == "ceo" and data.is_confirmed is not False:
