@@ -289,7 +289,7 @@ def today_patients(db: Session = Depends(get_db), _: User = Depends(require_doct
     today = date.today()
     start = datetime.combine(today, datetime.min.time())
     end = datetime.combine(today, datetime.max.time())
-    paper_start = datetime.combine(today - timedelta(days=30), datetime.min.time())
+    paper_start = datetime.combine(today - timedelta(days=1), datetime.min.time())
 
     patients = (
         db.query(Patient)

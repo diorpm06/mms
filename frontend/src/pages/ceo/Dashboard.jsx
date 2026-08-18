@@ -112,7 +112,13 @@ export default function CeoDashboard() {
 
   const d = data || EMPTY
   const cards = [
-    { label: 'Kunlik daromad',      value: formatMoney(d.daily_income),    icon: CARD_ICONS[0], color: CARD_COLORS[0] },
+    {
+      label: 'Kunlik daromad',
+      value: formatMoney(d.daily_income),
+      subtitle: (d.paper_income || 0) > 0 ? `📄 Navbatchilik: ${formatMoney(d.paper_income)}` : null,
+      icon: CARD_ICONS[0],
+      color: CARD_COLORS[0],
+    },
     { label: 'Jami balans',         value: formatMoney(d.current_balance), icon: CARD_ICONS[1], color: CARD_COLORS[1] },
     { label: 'Bugungi mijozlar',    value: d.today_patients,               icon: CARD_ICONS[2], color: CARD_COLORS[2] },
     { label: 'Harajatlar (bu oy)',  value: formatMoney(d.month_expenses),  icon: CARD_ICONS[3], color: CARD_COLORS[3] },
@@ -176,6 +182,11 @@ export default function CeoDashboard() {
                 <div>
                   <p className="text-muted text-xs font-medium uppercase tracking-wide">{c.label}</p>
                   <p className="mt-2 text-xl font-bold" style={{ color: c.color }}>{c.value}</p>
+                  {c.subtitle && (
+                    <p className="text-[10px] text-amber-400 font-bold font-mono mt-1">
+                      {c.subtitle}
+                    </p>
+                  )}
                 </div>
                 <div
                   className="rounded-xl p-2.5"

@@ -301,6 +301,8 @@ def run_migrations():
         # To'lovni yotgan bemorga bog'laydi — bekor qilinganda pulni qaytarish uchun
         "ALTER TABLE transactions ADD COLUMN inpatient_id INTEGER",
         "CREATE INDEX IF NOT EXISTS ix_transactions_inpatient_id ON transactions (inpatient_id)",
+        # Shifokor shablonni saqlaydi (draft), keyin alohida adminga yuboradi
+        "ALTER TABLE report_submissions ADD COLUMN submitted_at TIMESTAMP",
     ):
         try:
             with engine.connect() as conn:

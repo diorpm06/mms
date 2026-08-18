@@ -22,7 +22,11 @@ class ReportSubmission(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     doctor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     doctor_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="submitted")  # submitted | printed
+    # draft     — shifokor to'ldirib saqladi, hali adminga yuborilmagan
+    # submitted — adminga yuborilgan, chop etishni kutmoqda
+    # printed   — admin chop etgan
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     printed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     printed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)

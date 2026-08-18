@@ -174,8 +174,8 @@ export default function CeoReports() {
             {[
               { label: 'Jami daromad',   value: formatMoney(report.total_income),  color: 'var(--success)' },
               { label: 'Naqt',           value: formatMoney(report.cash),           color: 'var(--gold)' },
-              { label: 'Karta',          value: formatMoney(report.card),           color: 'var(--info)' },
-              { label: 'Click',          value: formatMoney(report.click || 0),     color: '#06b6d4' },
+              { label: 'Karta / QR',     value: formatMoney((report.card || 0) + (report.qr || 0)), color: 'var(--info)' },
+              { label: 'Click / Payme',  value: formatMoney(report.click || 0),     color: '#06b6d4' },
               { label: 'Sof foyda',      value: formatMoney(report.net_profit),     color: report.net_profit >= 0 ? 'var(--success)' : 'var(--danger)' },
             ].map((c) => (
               <div key={c.label} className="stat-card">

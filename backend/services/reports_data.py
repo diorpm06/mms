@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import and_, case, func
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session
 
 from models.advance import Advance
@@ -86,13 +86,43 @@ def last_activity_date(db: Session) -> date | None:
 def get_report(db: Session, start: date, end: date) -> dict:
     s, e = _period_range(start, end)
 
-    txs = _active_tx_filter(
-        db.query(Transaction).filter(Transaction.created_at >= s, Transaction.created_at <= e)
-    ).all()
+    if start == end:
+        paper_shift_s = s - timedelta(hours=16)
+        txs = _active_tx_filter(
+            db.query(Transaction).filter(
+                or_(
+                    and_(Transaction.created_at >= s, Transaction.created_at <= e),
+                    and_(
+                        Transaction.created_at >= paper_shift_s,
+                        Transaction.created_at < s,
+                        Transaction.patient_id.in_(
+                            db.query(Patient.id).filter(Patient.is_paper_entry == True)
+                        ),
+                    ),
+                )
+            )
+        ).all()
 
-    patients_q = db.query(Patient).filter(
-        Patient.created_at >= s, Patient.created_at <= e, Patient.is_cancelled == False
-    )
+        patients_q = db.query(Patient).filter(
+            or_(
+                and_(Patient.created_at >= s, Patient.created_at <= e),
+                and_(
+                    Patient.created_at >= paper_shift_s,
+                    Patient.created_at < s,
+                    Patient.is_paper_entry == True,
+                ),
+            ),
+            Patient.is_cancelled == False,
+        )
+    else:
+        txs = _active_tx_filter(
+            db.query(Transaction).filter(Transaction.created_at >= s, Transaction.created_at <= e)
+        ).all()
+
+        patients_q = db.query(Patient).filter(
+            Patient.created_at >= s, Patient.created_at <= e, Patient.is_cancelled == False
+        )
+
     all_patients = patients_q.all()
     patients_count = len(all_patients)
 
@@ -125,18 +155,14 @@ def get_report(db: Session, start: date, end: date) -> dict:
             ptype = (t.payment_type or "").lower()
             if ptype in ("cash", "naqd"):
                 cash += (t.cash_amount if t.cash_amount else t.total_amount)
-            elif ptype in ("card", "karta", "terminal"):
-                card += (t.card_amount if t.card_amount else t.total_amount)
+            elif ptype in ("card", "karta", "terminal", "qr"):
+                card += (t.card_amount if t.card_amount else t.total_amount) + (t.qr_amount or 0)
             elif ptype in ("click", "payme"):
                 click += t.total_amount
-            elif ptype == "qr":
-                qr += t.total_amount
             elif ptype in ("split", "aralash"):
-                # Aralash to'lovda Click/QR qismi kartadan ajratiladi
                 cash += (t.cash_amount or 0)
-                card += (t.card_amount or 0)
+                card += (t.card_amount or 0) + (t.qr_amount or 0)
                 click += (t.click_amount or 0)
-                qr += (t.qr_amount or 0)
             else:
                 card += t.total_amount
         referrer_share = sum((t.referrer_amount or 0) for t in txs)
@@ -149,17 +175,14 @@ def get_report(db: Session, start: date, end: date) -> dict:
             amt = int(p.payment_amount or 0)
             if ptype in ("cash", "naqd"):
                 cash += (p.cash_amount if p.cash_amount else amt)
-            elif ptype in ("card", "karta", "terminal"):
-                card += (p.card_amount if p.card_amount else amt)
+            elif ptype in ("card", "karta", "terminal", "qr"):
+                card += (p.card_amount if p.card_amount else amt) + (getattr(p, "qr_amount", 0) or 0)
             elif ptype in ("click", "payme"):
                 click += amt
-            elif ptype == "qr":
-                qr += amt
             elif ptype in ("split", "aralash"):
                 cash += (p.cash_amount or 0)
-                card += (p.card_amount or 0)
+                card += (p.card_amount or 0) + (getattr(p, "qr_amount", 0) or 0)
                 click += (p.click_amount or 0)
-                qr += (p.qr_amount or 0)
             else:
                 card += amt
         referrer_share = sum((getattr(p, "referrer_amount", 0) or 0) for p in all_patients)
@@ -224,24 +247,51 @@ def get_report(db: Session, start: date, end: date) -> dict:
         .scalar()
     )
 
-    services_breakdown = (
-        db.query(
-            Service.name,
-            Service.category,
-            Service.cabinet,
-            func.count(Patient.id).label("cnt"),
-            func.sum(Patient.payment_amount).label("total"),
+    if start == end:
+        paper_shift_s = s - timedelta(hours=16)
+        services_breakdown = (
+            db.query(
+                Service.name,
+                Service.category,
+                Service.cabinet,
+                func.count(Patient.id).label("cnt"),
+                func.sum(Patient.payment_amount).label("total"),
+            )
+            .join(Patient, Patient.service_id == Service.id)
+            .filter(
+                or_(
+                    and_(Patient.created_at >= s, Patient.created_at <= e),
+                    and_(
+                        Patient.created_at >= paper_shift_s,
+                        Patient.created_at < s,
+                        Patient.is_paper_entry == True,
+                    ),
+                ),
+                Patient.is_cancelled == False,
+            )
+            .group_by(Service.id, Service.name, Service.category, Service.cabinet)
+            .order_by(func.sum(Patient.payment_amount).desc())
+            .all()
         )
-        .join(Patient, Patient.service_id == Service.id)
-        .filter(
-            Patient.created_at >= s,
-            Patient.created_at <= e,
-            Patient.is_cancelled == False,
+    else:
+        services_breakdown = (
+            db.query(
+                Service.name,
+                Service.category,
+                Service.cabinet,
+                func.count(Patient.id).label("cnt"),
+                func.sum(Patient.payment_amount).label("total"),
+            )
+            .join(Patient, Patient.service_id == Service.id)
+            .filter(
+                Patient.created_at >= s,
+                Patient.created_at <= e,
+                Patient.is_cancelled == False,
+            )
+            .group_by(Service.id, Service.name, Service.category, Service.cabinet)
+            .order_by(func.sum(Patient.payment_amount).desc())
+            .all()
         )
-        .group_by(Service.id, Service.name, Service.category, Service.cabinet)
-        .order_by(func.sum(Patient.payment_amount).desc())
-        .all()
-    )
 
     dept_map = {}
     for r in services_breakdown:
@@ -260,24 +310,51 @@ def get_report(db: Session, start: date, end: date) -> dict:
     formatted_services = list(dept_map.values())
     formatted_services.sort(key=lambda x: x["total"], reverse=True)
 
-
-    referrers_breakdown = (
-        db.query(
-            Referrer.full_name,
-            func.count(func.distinct(Transaction.patient_id)).label("cnt"),
-            func.sum(Transaction.referrer_amount).label("total"),
+    if start == end:
+        paper_shift_s = s - timedelta(hours=16)
+        referrers_breakdown = (
+            db.query(
+                Referrer.full_name,
+                func.count(func.distinct(Transaction.patient_id)).label("cnt"),
+                func.sum(Transaction.referrer_amount).label("total"),
+            )
+            .join(Transaction, Transaction.referrer_id == Referrer.id)
+            .filter(
+                or_(
+                    and_(Transaction.created_at >= s, Transaction.created_at <= e),
+                    and_(
+                        Transaction.created_at >= paper_shift_s,
+                        Transaction.created_at < s,
+                        Transaction.patient_id.in_(
+                            db.query(Patient.id).filter(Patient.is_paper_entry == True)
+                        ),
+                    ),
+                ),
+                Transaction.is_cancelled == False,
+            )
+            .group_by(Referrer.id, Referrer.full_name)
+            .order_by(func.sum(Transaction.referrer_amount).desc())
+            .limit(10)
+            .all()
         )
-        .join(Transaction, Transaction.referrer_id == Referrer.id)
-        .filter(
-            Transaction.created_at >= s,
-            Transaction.created_at <= e,
-            Transaction.is_cancelled == False,
+    else:
+        referrers_breakdown = (
+            db.query(
+                Referrer.full_name,
+                func.count(func.distinct(Transaction.patient_id)).label("cnt"),
+                func.sum(Transaction.referrer_amount).label("total"),
+            )
+            .join(Transaction, Transaction.referrer_id == Referrer.id)
+            .filter(
+                Transaction.created_at >= s,
+                Transaction.created_at <= e,
+                Transaction.is_cancelled == False,
+            )
+            .group_by(Referrer.id, Referrer.full_name)
+            .order_by(func.sum(Transaction.referrer_amount).desc())
+            .limit(10)
+            .all()
         )
-        .group_by(Referrer.id, Referrer.full_name)
-        .order_by(func.sum(Transaction.referrer_amount).desc())
-        .limit(10)
-        .all()
-    )
 
     duty_date = end if start == end else date.today()
 
@@ -313,10 +390,9 @@ def get_report(db: Session, start: date, end: date) -> dict:
         d += timedelta(days=1)
 
     payment_chart = [
-        {"name": "Naqt", "value": int(cash)},
-        {"name": "Karta", "value": int(card)},
-        {"name": "Click", "value": int(click)},
-        {"name": "QR / Transfer", "value": int(qr)},
+        {"name": "Naqd", "value": int(cash)},
+        {"name": "Karta / QR", "value": int(card + qr)},
+        {"name": "Click / Payme", "value": int(click)},
     ]
     finance_chart = [
         {"name": "Jami tushgan", "value": int(total_income)},
@@ -599,11 +675,33 @@ def daily_report(db: Session, d: date) -> dict:
 
 def dashboard_summary(db: Session, d: date) -> dict:
     """
-    Faqat CEO dashboard uchun yengil xulosa — to'liq get_report() o'rniga
-    (~15 so'rov o'rniga 3 ta). get_report() har doim daily/weekly/monthly/
-    ten-day hisobot sahifalari uchun to'liq holicha qoladi.
+    CEO/Admin dashboard uchun yengil xulosa, shu jumladan tungi navbatchilik jurnali tushumlari.
     """
     s, e = _day_range(d)
+    paper_shift_s = s - timedelta(hours=16)
+
+    paper_income = (
+        db.query(func.coalesce(func.sum(Patient.payment_amount), 0))
+        .filter(
+            Patient.is_paper_entry == True,
+            Patient.created_at >= paper_shift_s,
+            Patient.created_at <= e,
+            Patient.is_cancelled == False,
+        )
+        .scalar()
+    ) or 0
+
+    paper_count = (
+        db.query(func.count(Patient.id))
+        .filter(
+            Patient.is_paper_entry == True,
+            Patient.created_at >= paper_shift_s,
+            Patient.created_at <= e,
+            Patient.is_cancelled == False,
+        )
+        .scalar()
+    ) or 0
+
     total_income = (
         db.query(func.coalesce(func.sum(Transaction.total_amount), 0))
         .filter(
@@ -612,7 +710,9 @@ def dashboard_summary(db: Session, d: date) -> dict:
             Transaction.is_cancelled == False,
         )
         .scalar()
-    )
+    ) or 0
+    total_income += int(paper_income)
+
     patients_count = (
         db.query(func.count(Patient.id))
         .filter(
@@ -621,12 +721,16 @@ def dashboard_summary(db: Session, d: date) -> dict:
             Patient.is_cancelled == False,
         )
         .scalar()
-    )
+    ) or 0
+    patients_count += int(paper_count)
+
     bal = db.query(Balance).first()
     current_balance = bal.current_balance if bal else 0
     return {
         "total_income": int(total_income or 0),
         "patients_count": int(patients_count or 0),
+        "paper_income": int(paper_income or 0),
+        "paper_count": int(paper_count or 0),
         "current_balance": int(current_balance),
     }
 

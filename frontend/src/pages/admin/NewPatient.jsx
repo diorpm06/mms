@@ -1187,16 +1187,13 @@ export default function NewPatient({ homePath = '/admin' }) {
         {/* 4. TO'LOV USULI */}
         <div className="space-y-3">
           <label className="form-label">💳 To'lov Usulini Tanlang</label>
-          <div data-kbd-group="payment" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div data-kbd-group="payment" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {[
               { id: 'cash',  label: '💵 Naqd',        desc: 'Naqd Pul' },
-              // Ilgari "Karta" tugmasining qiymati 'click' edi — shuning uchun
-              // Karta tanlansa ham hamma joyda "Click" deb ko'rinardi.
-              { id: 'card',  label: '💳 Karta',       desc: 'Terminal / Bank kartasi' },
+              { id: 'card',  label: '💳 Karta / QR',   desc: 'Terminal / Bank QR (Bank)' },
               { id: 'click', label: '📱 Click/Payme', desc: 'Click, Payme' },
-              { id: 'split', label: '🔀 Aralash',     desc: 'Naqd + Karta' },
+              { id: 'split', label: '🔀 Aralash',     desc: 'Naqd + Karta/QR' },
               { id: 'later', label: '⏳ Keyinroq',    desc: 'Nasiya / Qarz' },
-              { id: 'qr',    label: '🔳 QR Kod',      desc: 'QR to\'lov' },
             ].map((pm) => (
               <button
                 key={pm.id}

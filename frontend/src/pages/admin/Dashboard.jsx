@@ -13,6 +13,7 @@ import {
   Wallet,
   ArrowDownRight,
   Landmark,
+  Smartphone,
 } from 'lucide-react'
 
 export default function AdminDashboard() {
@@ -61,14 +62,14 @@ export default function AdminDashboard() {
       {/* Stats Cards */}
       <div className="my-6">
         {!data ? (
-          <CardSkeleton count={6} />
+          <CardSkeleton count={7} />
         ) : (
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
             {/* Card 1: Mijozlar */}
-            <div className="stat-card border border-cyan-500/20 bg-cyan-500/5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide">
+            <div className="stat-card border border-cyan-500/20 bg-cyan-500/5 flex flex-col justify-between p-3.5 rounded-2xl shadow-sm">
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="min-w-0">
+                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide truncate">
                     Mijozlar
                   </p>
                   <p className="mt-2 text-2xl font-black text-body font-mono">
@@ -76,107 +77,133 @@ export default function AdminDashboard() {
                     <span className="text-xs text-muted font-normal">nafar</span>
                   </p>
                 </div>
-                <div className="rounded-xl p-2 bg-cyan-500/15 text-cyan">
+                <div className="rounded-xl p-2 bg-cyan-500/15 text-cyan shrink-0">
                   <Users className="h-5 w-5" />
                 </div>
               </div>
             </div>
 
             {/* Card 2: Bugungi Jami Daromad (Tushum) */}
-            <div className="stat-card border border-emerald/30 bg-emerald/5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide">
+            <div className="stat-card border border-emerald/30 bg-emerald/5 flex flex-col justify-between p-3.5 rounded-2xl shadow-sm">
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="min-w-0">
+                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide truncate" title="Jami Tushum">
                     📈 Jami Tushum
                   </p>
-                  <p className="mt-2 text-xl font-black font-mono text-emerald">
+                  <p className="mt-2 text-base xl:text-lg font-black font-mono text-emerald truncate" title={formatMoney(data.total_income)}>
                     {formatMoney(data.total_income)}
                   </p>
                 </div>
-                <div className="rounded-xl p-2 bg-emerald/15 text-emerald">
+                <div className="rounded-xl p-2 bg-emerald/15 text-emerald shrink-0">
                   <TrendingUp className="h-5 w-5" />
                 </div>
               </div>
+              {(data.paper_entry_total || data.paper_income || 0) > 0 && (
+                <div className="mt-3 pt-2 border-t border-emerald-500/20 flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-muted">Navbatchilik:</span>
+                  <span className="font-bold text-amber-400">{formatMoney(data.paper_entry_total || data.paper_income || 0)}</span>
+                </div>
+              )}
             </div>
 
             {/* Card 3: Naqd Tushum */}
-            <div className="stat-card border border-gold/30 bg-gold/5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide">
+            <div className="stat-card border border-gold/30 bg-gold/5 flex flex-col justify-between p-3.5 rounded-2xl shadow-sm">
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="min-w-0">
+                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide truncate" title="Naqd Tushum">
                     💵 Naqd Tushum
                   </p>
-                  <p className="mt-2 text-xl font-black font-mono text-gold">
+                  <p className="mt-2 text-base xl:text-lg font-black font-mono text-gold truncate" title={formatMoney(data.cash)}>
                     {formatMoney(data.cash)}
                   </p>
                 </div>
-                <div className="rounded-xl p-2 bg-gold/15 text-gold">
+                <div className="rounded-xl p-2 bg-gold/15 text-gold shrink-0">
                   <Wallet className="h-5 w-5" />
                 </div>
               </div>
             </div>
 
-            {/* Card 4: Karta & Click Tushum */}
-            <div className="stat-card border border-info/30 bg-info/5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide">
-                    💳 Karta / Click
+            {/* Card 4: Karta / QR Tushum */}
+            <div className="stat-card border border-info/30 bg-info/5 flex flex-col justify-between p-3.5 rounded-2xl shadow-sm">
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="min-w-0">
+                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide truncate" title="Karta / QR Tushum">
+                    💳 Karta / QR
                   </p>
-                  <p className="mt-2 text-xl font-black font-mono text-info">
-                    {formatMoney(
-                      (data.card || 0) + (data.click || 0) + (data.qr || 0)
-                    )}
-                  </p>
-                  <p className="text-[10px] text-muted font-mono mt-1">
-                    Karta: {formatMoney(data.card)} · Click: {formatMoney(data.click || 0)}
+                  <p className="mt-2 text-base xl:text-lg font-black font-mono text-info truncate" title={formatMoney((data.card || 0) + (data.qr || 0))}>
+                    {formatMoney((data.card || 0) + (data.qr || 0))}
                   </p>
                 </div>
-                <div className="rounded-xl p-2 bg-info/15 text-info">
+                <div className="rounded-xl p-2 bg-info/15 text-info shrink-0">
                   <CreditCard className="h-5 w-5" />
                 </div>
               </div>
             </div>
 
-            {/* Card 5: Jami Harajatlar */}
-            <div className="stat-card border border-rose-500/30 bg-rose-500/5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide">
-                    💸 Jami Harajatlar
+            {/* Card 5: Click / Payme Tushum */}
+            <div className="stat-card border border-cyan-500/30 bg-cyan-500/5 flex flex-col justify-between p-3.5 rounded-2xl shadow-sm">
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="min-w-0">
+                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide truncate" title="Click / Payme Tushum">
+                    📱 Click / Payme
                   </p>
-                  <p className="mt-2 text-xl font-black font-mono text-rose-400">
-                    -{formatMoney(data.expenses)}
-                  </p>
-                  <p className="text-[10px] text-muted font-mono mt-1">
-                    Naqd: {formatMoney(data.cash_expenses || 0)} · Karta: {formatMoney(data.card_expenses || 0)}
+                  <p className="mt-2 text-base xl:text-lg font-black font-mono text-cyan-400 truncate" title={formatMoney(data.click || 0)}>
+                    {formatMoney(data.click || 0)}
                   </p>
                 </div>
-                <div className="rounded-xl p-2 bg-rose-500/15 text-rose-400">
-                  <ArrowDownRight className="h-5 w-5" />
+                <div className="rounded-xl p-2 bg-cyan-500/15 text-cyan-400 shrink-0">
+                  <Smartphone className="h-5 w-5" />
                 </div>
               </div>
             </div>
 
-            {/* Card 6: Kassada Qolgan Pul (Net Balance) */}
-            <div className="stat-card border-2 border-emerald bg-emerald/10 shadow-xl">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-emerald text-[11px] font-black uppercase tracking-wide">
-                    🏦 Kassada Qolgan Pul
+            {/* Card 6: Jami Harajatlar */}
+            <div className="stat-card border border-rose-500/30 bg-rose-500/5 flex flex-col justify-between p-3.5 rounded-2xl shadow-sm">
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="min-w-0">
+                  <p className="text-muted text-[11px] font-extrabold uppercase tracking-wide truncate" title="Harajatlar">
+                    💸 Harajatlar
                   </p>
-                  <p className="mt-2 text-xl font-black font-mono text-emerald">
+                  <p className="mt-2 text-base xl:text-lg font-black font-mono text-rose-400 truncate" title={`-${formatMoney(data.expenses)}`}>
+                    -{formatMoney(data.expenses)}
+                  </p>
+                </div>
+                <div className="rounded-xl p-2 bg-rose-500/15 text-rose-400 shrink-0">
+                  <ArrowDownRight className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-3 pt-2 border-t border-rose-500/20 flex flex-col gap-0.5 text-[10px] font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted">Naqd:</span>
+                  <span className="font-bold text-rose-300">{formatMoney(data.cash_expenses || 0)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted">Karta:</span>
+                  <span className="font-bold text-rose-300">{formatMoney(data.card_expenses || 0)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 7: Kassada Qolgan Pul (Net Balance) */}
+            <div className="stat-card border-2 border-emerald bg-emerald/10 flex flex-col justify-between p-3.5 rounded-2xl shadow-lg">
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="min-w-0">
+                  <p className="text-emerald text-[11px] font-black uppercase tracking-wide truncate" title="Kassada Qolgan">
+                    🏦 Kassada Qolgan
+                  </p>
+                  <p className="mt-2 text-base xl:text-lg font-black font-mono text-emerald truncate" title={formatMoney(data.net_total ?? Math.max(0, data.total_income - data.expenses))}>
                     {formatMoney(
                       data.net_total ?? Math.max(0, data.total_income - data.expenses)
                     )}
                   </p>
-                  <p className="text-[10px] text-emerald/90 font-mono font-bold mt-1">
-                    Naqdda: {formatMoney(data.net_cash ?? Math.max(0, data.cash - (data.cash_expenses || 0)))}
-                  </p>
                 </div>
-                <div className="rounded-xl p-2 bg-emerald/20 text-emerald">
+                <div className="rounded-xl p-2 bg-emerald/20 text-emerald shrink-0">
                   <Landmark className="h-5 w-5" />
                 </div>
+              </div>
+              <div className="mt-3 pt-2 border-t border-emerald-500/30 flex justify-between items-center text-[10px] text-emerald font-mono font-bold">
+                <span className="text-emerald/80">Naqdda:</span>
+                <span>{formatMoney(data.net_cash ?? Math.max(0, data.cash - (data.cash_expenses || 0)))}</span>
               </div>
             </div>
           </div>

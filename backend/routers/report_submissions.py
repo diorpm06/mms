@@ -30,6 +30,7 @@ def _row(r: ReportSubmission) -> dict:
         "id": r.id,
         "patient_id": r.patient_id,
         "patient_name": f"{r.patient.first_name} {r.patient.last_name}" if r.patient else None,
+        "ticket_number": r.patient.ticket_number if r.patient else None,
         "service_id": r.service_id,
         "template_key": r.template_key,
         "template_label": r.template_label,
@@ -38,6 +39,7 @@ def _row(r: ReportSubmission) -> dict:
         "doctor_name": r.doctor_name,
         "status": r.status,
         "printed_at": r.printed_at.isoformat() if r.printed_at else None,
+        "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     }
 
@@ -62,7 +64,9 @@ def create_report_submission(
         filled_data=body.content,
         doctor_id=user.id,
         doctor_name=user.full_name,
-        status="submitted",
+        # Saqlash va yuborish ajratilgan: shifokor avval to'ldirib saqlaydi
+        # (qoralama), keyin bir necha natijani birdaniga adminga yuboradi.
+        status="draft",
     )
     db.add(r)
     db.flush()
@@ -72,7 +76,7 @@ def create_report_submission(
         db,
         user_id=user.id,
         user_role=user.role,
-        action_type="REPORT_SUBMITTED",
+        action_type="REPORT_SAVED",
         table_name="report_submissions",
         record_id=r.id,
         detail_message=f"{user.full_name}: {body.template_label} — {patient.first_name} {patient.last_name}",
@@ -81,7 +85,91 @@ def create_report_submission(
     )
     db.commit()
     db.refresh(r)
-    return {"message": "Shablon adminga yuborildi", "id": r.id}
+    return {"message": "Natija saqlandi", "id": r.id}
+
+
+class YuborishBody(BaseModel):
+    ids: Optional[list[int]] = None   # bo'sh bo'lsa — barcha qoralamalar
+
+
+@router.get("/my-drafts")
+def list_my_drafts(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_doctor_or_admin_or_ceo),
+):
+    """Shifokor saqlagan, lekin hali yuborilmagan natijalar."""
+    rows = (
+        db.query(ReportSubmission)
+        .options(joinedload(ReportSubmission.patient))
+        .filter(
+            ReportSubmission.status == "draft",
+            ReportSubmission.doctor_id == user.id,
+        )
+        .order_by(ReportSubmission.created_at.desc())
+        .all()
+    )
+    return [_row(r) for r in rows]
+
+
+@router.post("/submit")
+def submit_drafts(
+    body: YuborishBody,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_doctor_or_admin_or_ceo),
+):
+    """Saqlangan natijalarni adminga yuboradi (bir nechtasini birdaniga)."""
+    q = db.query(ReportSubmission).filter(
+        ReportSubmission.status == "draft",
+        ReportSubmission.doctor_id == user.id,
+    )
+    if body.ids:
+        q = q.filter(ReportSubmission.id.in_(body.ids))
+    rows = q.all()
+    if not rows:
+        raise HTTPException(status_code=400, detail="Yuboriladigan saqlangan natija yo'q")
+
+    hozir = datetime.now()
+    for r in rows:
+        r.status = "submitted"
+        r.submitted_at = hozir
+
+    ip, ua = get_client_info(request)
+    log_audit(
+        db,
+        user_id=user.id,
+        user_role=user.role,
+        action_type="REPORT_SUBMITTED",
+        table_name="report_submissions",
+        record_id=rows[0].id,
+        detail_message=f"{user.full_name}: {len(rows)} ta natija adminga yuborildi",
+        ip_address=ip,
+        device_info=ua,
+    )
+    db.commit()
+    return {"message": f"{len(rows)} ta natija adminga yuborildi", "count": len(rows)}
+
+
+@router.delete("/{report_id}")
+def delete_draft(
+    report_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_doctor_or_admin_or_ceo),
+):
+    """Yuborilmagan qoralamani o'chiradi. Yuborilgani o'chirilmaydi."""
+    r = db.query(ReportSubmission).filter(ReportSubmission.id == report_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Topilmadi")
+    if r.status != "draft":
+        raise HTTPException(
+            status_code=400,
+            detail="Bu natija allaqachon adminga yuborilgan — o'chirib bo'lmaydi.",
+        )
+    if r.doctor_id != user.id and user.role not in ("ceo", "admin"):
+        raise HTTPException(status_code=403, detail="Bu sizning natijangiz emas")
+    db.delete(r)
+    db.commit()
+    return {"message": "O'chirildi"}
 
 
 @router.get("/pending")

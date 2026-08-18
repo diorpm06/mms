@@ -35,12 +35,11 @@ export function paymentLabel(type) {
       return '💵 Naqd'
     case 'card':
     case 'karta':
-      return '💳 Karta'
+    case 'qr':
+      return '💳 Karta / QR'
     case 'click':
     case 'payme':
       return '📱 Click/Payme'
-    case 'qr':
-      return '🔳 QR Code'
     case 'split':
     case 'aralash':
       return '🔀 Aralash'

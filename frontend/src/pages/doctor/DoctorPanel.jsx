@@ -32,6 +32,9 @@ import {
   MinusCircle,
   TestTube,
   ClipboardList,
+  Send,
+  Eye,
+  Trash2,
 } from 'lucide-react'
 import MedicalReportModal from '../../components/MedicalReportModal'
 import Modal from '../../components/Modal'
@@ -74,6 +77,65 @@ export default function DoctorPanel() {
 
   // Report Template Modal State (UZI/Lab shablonlari)
   const [templatePatient, setTemplatePatient] = useState(null)
+
+  // To'ldirilib saqlangan, lekin hali adminga yuborilmagan natijalar
+  const [drafts, setDrafts] = useState([])
+  const [draftsLoading, setDraftsLoading] = useState(false)
+  const [selectedDrafts, setSelectedDrafts] = useState([])
+  const [sendingDrafts, setSendingDrafts] = useState(false)
+  const [previewDraft, setPreviewDraft] = useState(null)
+
+  const fetchDrafts = async () => {
+    setDraftsLoading(true)
+    try {
+      const res = await api('/report-submissions/my-drafts')
+      setDrafts(res || [])
+      setSelectedDrafts((res || []).map((d) => d.id))
+    } catch (_) {
+      setDrafts([])
+    } finally {
+      setDraftsLoading(false)
+    }
+  }
+
+  const toggleDraft = (id) => {
+    setSelectedDrafts((oldin) =>
+      oldin.includes(id) ? oldin.filter((x) => x !== id) : [...oldin, id]
+    )
+  }
+
+  const handleSendDrafts = async () => {
+    if (selectedDrafts.length === 0) {
+      showToast('Yuborish uchun kamida bitta natijani belgilang')
+      return
+    }
+    const soni = selectedDrafts.length
+    if (!window.confirm(`${soni} ta natija adminga yuborilsinmi?\n\nYuborilgandan keyin o'zgartirib bo'lmaydi.`)) return
+    setSendingDrafts(true)
+    try {
+      const res = await api('/report-submissions/submit', {
+        method: 'POST',
+        body: JSON.stringify({ ids: selectedDrafts }),
+      })
+      showToast(res.message || `${soni} ta natija yuborildi`)
+      fetchDrafts()
+    } catch (e) {
+      showToast(e.message || 'Yuborishda xatolik')
+    } finally {
+      setSendingDrafts(false)
+    }
+  }
+
+  const handleDeleteDraft = async (d) => {
+    if (!window.confirm(`"${d.template_label}" (${d.patient_name}) natijasi o'chirilsinmi?`)) return
+    try {
+      await api(`/report-submissions/${d.id}`, { method: 'DELETE' })
+      showToast("Natija o'chirildi")
+      fetchDrafts()
+    } catch (e) {
+      showToast(e.message || "O'chirib bo'lmadi")
+    }
+  }
 
   // Inventory Modal State
   const [inventoryModal, setInventoryModal] = useState(false)
@@ -175,6 +237,10 @@ export default function DoctorPanel() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchDrafts()
+  }, [])
 
   useEffect(() => {
     if (!isManagement || selectedProviderId) {
@@ -466,6 +532,11 @@ export default function DoctorPanel() {
   }
 
   // ─── VIEW 2: SELECTED DOCTOR'S LIVE PANEL ───
+  // Joriy bemor Lab yoki UZI ga tegishlimi — tugmalar shunga qarab chiqadi
+  const joriyShablonKat = data?.current_patient
+    ? guessTemplateCategory(data.current_patient.service_category, data.current_patient.service_name)
+    : null
+
   if (loading && !data) {
     return (
       <div className="p-8 text-center flex flex-col items-center justify-center min-h-[60vh]">
@@ -530,6 +601,70 @@ export default function DoctorPanel() {
           patient={printableRecord}
           onClose={() => setPrintableRecord(null)}
         />
+      )}
+
+      {/* ── SAQLANGAN NATIJANI KO'RISH ──────────────────────────────
+          Adminga yuborishdan oldin shifokor to'ldirganini tekshirib oladi. */}
+      {previewDraft && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="card max-w-3xl w-full p-5 space-y-4 my-6">
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
+              <div className="min-w-0">
+                <h3 className="text-base font-black text-gold truncate">
+                  {previewDraft.template_label}
+                </h3>
+                <p className="text-xs text-muted font-bold mt-0.5">
+                  {previewDraft.ticket_number ? `${previewDraft.ticket_number} · ` : ''}
+                  {previewDraft.patient_name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewDraft(null)}
+                className="p-2 rounded-xl text-muted hover:text-body shrink-0"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div
+              className="mms-shablon bg-white text-black rounded-xl p-5 text-[13px] leading-relaxed overflow-x-auto"
+              style={{ fontFamily: "'Times New Roman', Cambria, serif" }}
+              dangerouslySetInnerHTML={{ __html: previewDraft.content || '' }}
+            />
+
+            <div className="flex gap-2 pt-1">
+              <Btn variant="ghost" full icon={<X className="h-4 w-4" />} onClick={() => setPreviewDraft(null)}>
+                Yopish
+              </Btn>
+              <Btn
+                variant="gold"
+                full
+                icon={<Send className="h-4 w-4" />}
+                loading={sendingDrafts}
+                onClick={async () => {
+                  setSelectedDrafts([previewDraft.id])
+                  setPreviewDraft(null)
+                  setSendingDrafts(true)
+                  try {
+                    const res = await api('/report-submissions/submit', {
+                      method: 'POST',
+                      body: JSON.stringify({ ids: [previewDraft.id] }),
+                    })
+                    showToast(res.message || 'Yuborildi')
+                    fetchDrafts()
+                  } catch (e) {
+                    showToast(e.message || 'Yuborishda xatolik')
+                  } finally {
+                    setSendingDrafts(false)
+                  }
+                }}
+              >
+                Shu natijani yuborish
+              </Btn>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Header Bar */}
@@ -695,54 +830,60 @@ export default function DoctorPanel() {
               </div>
             </div>
 
-            {/* Actions for Current Patient */}
-            <div className="flex flex-col gap-2.5">
-              <Btn
-                variant="cyan"
-                size="md"
-                icon={<FileText className="h-4 w-4" />}
-                onClick={() => openMedicalRecord(current_patient)}
-                className="w-full font-bold"
-              >
-                📝 Tashxis & Retsept Yozish
-              </Btn>
-
-              <Btn
-                variant="info"
-                size="sm"
-                icon={<TestTube className="h-4 w-4" />}
-                onClick={() => setLabPatient(current_patient)}
-                className="w-full font-bold"
-              >
-                🧪 Laboratoriya Javoblari
-              </Btn>
-
-              {guessTemplateCategory(current_patient.service_category, current_patient.service_name) && (
+            {/* Joriy bemor amallari.
+                Lab / UZI bemorida tashxis-retsept, laboratoriya javoblari va
+                ombor tugmalari ko'rsatilmaydi — u yerda faqat natija blankasi
+                to'ldiriladi. Ilgari hamma tugma har doim chiqib, ekran
+                chalkash bo'lardi. */}
+            <div className="flex flex-col gap-2">
+              {joriyShablonKat ? (
                 <Btn
-                  variant="success"
-                  size="sm"
+                  variant="gold"
+                  size="md"
                   icon={<ClipboardList className="h-4 w-4" />}
                   onClick={() => setTemplatePatient(current_patient)}
-                  className="w-full font-bold"
+                  className="w-full font-black"
                 >
-                  📋 Shablonni To'ldirish
+                  📋 Natija blankasini to'ldirish
                 </Btn>
+              ) : (
+                <>
+                  <Btn
+                    variant="cyan"
+                    size="md"
+                    icon={<FileText className="h-4 w-4" />}
+                    onClick={() => openMedicalRecord(current_patient)}
+                    className="w-full font-bold"
+                  >
+                    📝 Tashxis va retsept
+                  </Btn>
+
+                  <Btn
+                    variant="info"
+                    size="sm"
+                    icon={<TestTube className="h-4 w-4" />}
+                    onClick={() => setLabPatient(current_patient)}
+                    className="w-full font-bold"
+                  >
+                    🧪 Laboratoriya javoblari
+                  </Btn>
+
+                  <Btn
+                    variant="amber"
+                    size="sm"
+                    icon={<Package className="h-4 w-4" />}
+                    onClick={() => {
+                      fetchInventory()
+                      setInventoryModal(true)
+                    }}
+                    className="w-full font-bold"
+                  >
+                    💊 Ombordan material
+                  </Btn>
+                </>
               )}
 
-              <Btn
-                variant="amber"
-                size="sm"
-                icon={<Package className="h-4 w-4" />}
-                onClick={() => {
-                  fetchInventory()
-                  setInventoryModal(true)
-                }}
-                className="w-full font-bold"
-              >
-                💊 Material / Dorilar Sarflash
-              </Btn>
-
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 pt-1.5 mt-1 border-t border-border/60">
                 <Btn
                   variant="success"
                   size="sm"
@@ -751,7 +892,7 @@ export default function DoctorPanel() {
                   onClick={handleCompleteCurrent}
                   className="flex-1 font-bold"
                 >
-                  ✓ Qabulni Yakunlash
+                  ✓ Yakunlash
                 </Btn>
 
                 <Btn
@@ -761,9 +902,9 @@ export default function DoctorPanel() {
                   loading={actionLoading}
                   onClick={handleSkipCurrent}
                   className="text-rose-400 border-rose-500/40 hover:bg-rose-500/10 font-bold"
-                  title="O'tkazib yuborish"
+                  title="Bemor kelmadi — navbatdan o'tkazib yuborish"
                 >
-                  O'tkazib Yuborish
+                  O'tkazish
                 </Btn>
               </div>
             </div>
@@ -777,6 +918,126 @@ export default function DoctorPanel() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* ── TO'LDIRILGAN NATIJALAR ──────────────────────────────────────
+          Shifokor blankani to'ldirib SAQLAYDI — natija shu yerda yig'ilib
+          turadi. Keyin bir yoki bir nechtasini belgilab, bitta tugma bilan
+          adminga yuboradi. Ilgari har bir blanka to'ldirilishi bilan darrov
+          adminga ketardi va tuzatish imkoni bo'lmasdi. */}
+      <div className="card p-0 overflow-hidden border-gold/30">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-surface-2 border-b border-border">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-gold" />
+            <h3 className="font-extrabold text-xs uppercase tracking-wider text-gold">
+              To'ldirilgan natijalar
+            </h3>
+            <span className="badge badge-muted text-[10px] font-bold">
+              {drafts.length} ta yuborilmagan
+            </span>
+          </div>
+
+          {drafts.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedDrafts(
+                    selectedDrafts.length === drafts.length ? [] : drafts.map((d) => d.id)
+                  )
+                }
+                className="text-[11px] font-bold text-cyan hover:underline"
+              >
+                {selectedDrafts.length === drafts.length ? 'Belgini olib tashlash' : 'Hammasini belgilash'}
+              </button>
+
+              <Btn
+                variant="gold"
+                size="sm"
+                icon={<Send className="h-4 w-4" />}
+                loading={sendingDrafts}
+                disabled={selectedDrafts.length === 0}
+                onClick={handleSendDrafts}
+                className="font-black"
+              >
+                Adminga yuborish ({selectedDrafts.length})
+              </Btn>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4">
+          {draftsLoading ? (
+            <p className="text-xs text-muted italic text-center py-6">Yuklanmoqda...</p>
+          ) : drafts.length === 0 ? (
+            <div className="py-8 text-center space-y-2">
+              <div className="text-3xl">📋</div>
+              <p className="text-xs text-muted font-bold">Yuborilmagan natija yo'q</p>
+              <p className="text-[11px] text-muted max-w-sm mx-auto">
+                Bemorni chaqirib, <strong>"Natija blankasini to'ldirish"</strong> tugmasi
+                bilan blankani to'ldiring va saqlang — natija shu yerga tushadi.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {drafts.map((d) => {
+                const belgilangan = selectedDrafts.includes(d.id)
+                return (
+                  <div
+                    key={d.id}
+                    className={`flex flex-wrap items-center gap-3 p-3 rounded-xl border transition-all ${
+                      belgilangan
+                        ? 'border-gold/50 bg-gold/[0.07]'
+                        : 'border-border bg-surface-2/40'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={belgilangan}
+                      onChange={() => toggleDraft(d.id)}
+                      className="rounded accent-gold h-4 w-4 shrink-0"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="badge badge-cyan text-[10px] font-bold">
+                          {d.category === 'UZI' ? '🩻 UZI' : '🔬 Lab'}
+                        </span>
+                        <h4 className="font-extrabold text-sm text-body truncate">
+                          {d.template_label}
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-muted font-semibold mt-0.5">
+                        {d.ticket_number ? `${d.ticket_number} · ` : ''}
+                        {d.patient_name}
+                        {d.created_at ? ` · ${d.created_at.split('T')[1]?.substring(0, 5)}` : ''}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Btn
+                        variant="ghost"
+                        size="xs"
+                        icon={<Eye className="h-3.5 w-3.5" />}
+                        onClick={() => setPreviewDraft(d)}
+                      >
+                        Ko'rish
+                      </Btn>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDraft(d)}
+                        className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/15 transition-colors"
+                        title="O'chirish"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── QUEUE LIST TABS (WAITING / HISTORY) ── */}
@@ -883,13 +1144,31 @@ export default function DoctorPanel() {
                         {p.queue_status === 'yakunlandi' ? '✓ Qabul qilindi' : '⏭ O\'tkazib yuborildi'}
                       </span>
 
+                      {/* O'tkazib yuborilgan bemor keyin kelib qolsa, shifokor
+                          uni qaytadan chaqira olishi kerak. Ilgari bunday
+                          imkon yo'q edi — bemor navbatdan butunlay tushib
+                          qolardi. */}
+                      {p.queue_status !== 'yakunlandi' && (
+                        <Btn
+                          variant="gold"
+                          size="xs"
+                          icon={<Volume2 className="h-3.5 w-3.5" />}
+                          loading={actionLoading}
+                          disabled={data?.is_shift_closed || is_paused}
+                          onClick={() => handleCallSpecific(p.id)}
+                          title="Bemorni qaytadan xonaga chaqirish"
+                        >
+                          Qayta chaqirish
+                        </Btn>
+                      )}
+
                       <Btn
                         variant="outline"
                         size="xs"
                         icon={<FileText className="h-3.5 w-3.5" />}
                         onClick={() => setPrintableRecord(p)}
                       >
-                        Kvitansiya / Blanka
+                        Blanka
                       </Btn>
                     </div>
                   </div>
@@ -964,7 +1243,11 @@ export default function DoctorPanel() {
           category={guessTemplateCategory(templatePatient.service_category, templatePatient.service_name)}
           defaultTemplateKey={templatePatient.template_key}
           serviceId={templatePatient.service_id}
-          onClose={() => setTemplatePatient(null)}
+          onClose={() => {
+            setTemplatePatient(null)
+            // Saqlangan natija pastdagi ro'yxatda darrov ko'rinsin
+            fetchDrafts()
+          }}
         />
       )}
 

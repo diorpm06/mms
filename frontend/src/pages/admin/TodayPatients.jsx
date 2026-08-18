@@ -427,12 +427,16 @@ export default function TodayPatients() {
           { id: 'split', label: '🔀 Aralash' },
           { id: 'click', label: '📱 Click / Payme' },
           { id: 'cash', label: '💵 Naqd' },
-          { id: 'card', label: '💳 Karta' },
+          { id: 'card', label: '💳 Karta / QR' },
           { id: 'later', label: '⏳ Nasiya' },
         ].map((f) => {
           const count = f.id === 'all'
             ? patients.length
-            : patients.filter((p) => (p.payment_type || '').toLowerCase() === f.id).length
+            : patients.filter((p) => {
+                const pt = (p.payment_type || '').toLowerCase()
+                if (f.id === 'card') return pt === 'card' || pt === 'karta' || pt === 'qr'
+                return pt === f.id
+              }).length
           return (
             <button
               key={f.id}
@@ -471,8 +475,8 @@ export default function TodayPatients() {
                   className={p.is_cancelled ? 'row-cancelled' : 'hover:bg-white/[0.02] transition-colors'}
                 >
                   {/* Talon & Vaqt */}
-                  <td className="p-2.5 whitespace-nowrap">
-                    <span className="font-mono font-black text-cyan-300 text-xs tracking-wider inline-block bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
+                  <td className="p-2 text-center w-24">
+                    <span className="font-mono font-black text-cyan-300 text-xs tracking-wider inline-block bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-500/30">
                       {p.ticket_number || `A-${p.id}`}
                     </span>
                     <span className="text-[10px] text-muted font-mono block mt-0.5">
@@ -485,41 +489,41 @@ export default function TodayPatients() {
                   </td>
 
                   {/* Bemor */}
-                  <td className="p-2.5 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-extrabold text-body text-xs">{p.first_name} {p.last_name}</span>
-                      {p.is_paper_entry ? (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold">📄 Navbatchilik</span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold">🟢 Jonli</span>
-                      )}
+                  <td className="p-2">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-extrabold text-body text-xs">{p.first_name} {p.last_name}</span>
+                        {p.is_paper_entry ? (
+                          <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold">📄 Navbatchilik</span>
+                        ) : (
+                          <span className="px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold">🟢 Jonli</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted font-mono block">{p.phone || '—'}</span>
                     </div>
-                    <span className="text-[10px] text-muted font-mono block">{p.phone || '—'}</span>
                   </td>
 
                   {/* Xizmat & Shifokor */}
-                  <td className="p-2.5 max-w-[200px]">
+                  <td className="p-2 max-w-[180px]">
                     {(p.services || []).length > 1 ? (
                       <div className="space-y-0.5">
                         {p.services.map((s, i) => (
-                          <div key={i} className="flex items-baseline gap-1">
-                            <span className="font-bold text-cyan text-xs truncate">
-                              {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
-                            </span>
-                          </div>
+                          <span key={i} className="font-bold text-cyan text-xs block leading-tight">
+                            {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+                          </span>
                         ))}
                       </div>
                     ) : (
-                      <span className="font-bold block text-cyan text-xs truncate">
+                      <span className="font-bold text-cyan text-xs block leading-tight">
                         {p.services?.[0]?.service_name || p.service_name}
                       </span>
                     )}
-                    <span className="text-[10px] text-muted font-medium block truncate">{p.provider_name || '—'}</span>
+                    <span className="text-[10px] text-muted font-medium block truncate mt-0.5">{p.provider_name || '—'}</span>
                   </td>
 
                   {/* Summa */}
-                  <td className="p-2.5 whitespace-nowrap">
-                    <div className="flex items-center gap-1">
+                  <td className="p-2">
+                    <div className="flex items-center gap-1 flex-wrap">
                       <span className="font-mono font-black text-emerald text-xs">{formatMoney(p.payment_amount)}</span>
                       <span className="badge badge-gold text-[9px] uppercase font-bold px-1 py-0">{paymentLabel(p.payment_type)}</span>
                     </div>
@@ -541,15 +545,15 @@ export default function TodayPatients() {
                   </td>
 
                   {/* Kabinet & Holat */}
-                  <td className="p-2.5 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
+                  <td className="p-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-bold text-xs text-amber">{p.cabinet || '—'}</span>
                       <StatusBadge status={p.queue_status} />
                     </div>
                   </td>
 
                   {/* Fast Action Button + 3 Dots Menu */}
-                  <td className="p-2.5 whitespace-nowrap text-right align-middle">
+                  <td className="p-2 text-right align-middle">
                     {p.is_cancelled ? (
                       <span className="badge badge-danger text-[9px] font-black uppercase">
                         ✗ Bekor qilingan
@@ -798,10 +802,9 @@ export default function TodayPatients() {
                 }}
               >
                 <option value="cash">💵 Naqd</option>
-                <option value="card">💳 Karta (terminal)</option>
+                <option value="card">💳 Karta / QR (Terminal & Bank)</option>
                 <option value="click">📱 Click / Payme</option>
-                <option value="qr">🔳 QR Kod</option>
-                <option value="split">🔀 Aralash (Naqd + Karta)</option>
+                <option value="split">🔀 Aralash (Naqd + Karta/QR)</option>
                 <option value="later">⏳ Keyinroq (nasiya)</option>
               </select>
             </div>

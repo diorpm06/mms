@@ -6,6 +6,7 @@ import { Btn, Icons } from './UIKit'
 import { getTemplateByKey, getTemplatesByCategory } from '../utils/reportTemplates'
 
 const STATUS_LABEL = {
+  draft: { text: 'Saqlangan (yuborilmagan)', cls: 'badge-muted' },
   submitted: { text: 'Adminga yuborilgan', cls: 'badge-gold' },
   printed: { text: 'Chop etilgan', cls: 'badge-cyan' },
 }
@@ -65,6 +66,11 @@ function katakchalarniQoy(container, bemorIsmi, qoyilgan) {
       const span = document.createElement('span')
       span.className = 'mms-blank'
       span.setAttribute('data-blank', '1')
+      // FAQAT shu katakcha tahrirlanadi. Ilgari butun hujjat contentEditable
+      // edi: shifokor blankaning o'z matnini ham o'zgartirib yuborardi va
+      // katakchani o'chirib yuborsa u butunlay yo'q bo'lardi.
+      span.contentEditable = 'true'
+      span.setAttribute('spellcheck', 'false')
       // Har bir tur (ism / sana) faqat BIR MARTA to'ldiriladi. Ba'zi
       // blankalarda yorliq va bo'sh joy alohida qatorlarda turadi va
       // ikkala qoida ham ishlab, ism ikki joyga yozilib qolardi.
@@ -119,6 +125,8 @@ function jadvalKataklariniToldir(container, bemorIsmi, qoyilgan) {
     const span = document.createElement('span')
     span.className = 'mms-blank'
     span.setAttribute('data-blank', '1')
+    span.contentEditable = 'true'
+    span.setAttribute('spellcheck', 'false')
     span.textContent = matn
     qiymat.appendChild(span)
   })
@@ -164,6 +172,10 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
   if (!patient) return null
 
   const openPicker = () => {
+    // Xizmatga shablon biriktirilgan bo'lsa o'sha ochiladi, lekin shifokor
+    // ro'yxatga qaytib boshqasini tanlay oladi. Ilgari biriktirilgan shablon
+    // bo'lsa ro'yxat umuman ko'rsatilmasdi — bemor bir necha tahlil topshirsa
+    // faqat bittasini to'ldirib bo'lardi.
     setSelectedKey(defaultTemplateKey || null)
     setView(defaultTemplateKey ? 'fill' : 'picker')
   }
@@ -201,7 +213,7 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
           content: filledHtml,
         }),
       })
-      toast('✓ Shablon adminga yuborildi!')
+      toast("✓ Natija saqlandi. Adminga yuborish uchun pastdagi \"To'ldirilgan natijalar\" bo'limidan foydalaning.")
       setView('history')
       loadHistory()
     } catch (err) {
@@ -279,35 +291,31 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
 
         {view === 'fill' && template && (
           <form onSubmit={handleSubmit} className="space-y-3 pt-1 animate-in fade-in">
-            {!defaultTemplateKey && (
-              <button
-                type="button"
-                onClick={() => setView('picker')}
-                className="text-xs text-cyan font-bold hover:underline"
-              >
-                ← Boshqa sohani tanlash
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setView('picker')}
+              className="text-xs text-cyan font-bold hover:underline"
+            >
+              ← Boshqa shablonni tanlash ({candidateTemplates.length} ta mavjud)
+            </button>
             <p className="text-[11px] text-muted italic">
-              Asl Word blankasi. Istalgan joyga bosib yozing yoki o'zgartiring —
-              Word'dagidek ishlaydi. Tagiga chizilgan oltin joylar bo'lsa, ular alohida katakcha.
+              Asl Word blankasi. Sariq katakchalarga bosib natijani yozing —
+              boshqa matn o'zgarmaydi. Bemor ismi va bugungi sana o'zi qo'yiladi.
             </p>
             {/* Hujjat asl faylidagidek ko'rsatiladi va to'liq tahrirlanadi.
                 Ilgari faqat "______" joylari tahrirlanardi, qolgani qulflangan edi —
                 asl blankalarda esa bunday belgilar yo'q. */}
             <div
               ref={fillRef}
-              contentEditable
               suppressContentEditableWarning
-              spellCheck={false}
-              className="mms-shablon bg-white text-black rounded-xl p-5 text-[13px] leading-relaxed overflow-x-auto focus:outline-none focus:ring-2 focus:ring-gold/50"
+              className="mms-shablon bg-white text-black rounded-xl p-5 text-[13px] leading-relaxed overflow-x-auto"
               style={{ fontFamily: "'Times New Roman', Cambria, serif", minHeight: '200px' }}
             />
 
             <div className="flex gap-2 pt-2">
               <Btn variant="ghost" full icon={Icons.x} type="button" onClick={onClose}>Bekor</Btn>
               <Btn variant="gold" full icon={<Send className="h-4 w-4" />} type="submit" loading={submitting}>
-                Adminga yuborish
+                Saqlash
               </Btn>
             </div>
           </form>
@@ -319,7 +327,7 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
               <p className="text-xs text-muted italic text-center py-8">Yuklanmoqda...</p>
             ) : history.length === 0 ? (
               <div className="p-8 text-center text-xs text-muted card-2">
-                Hali shablon to'ldirilmagan. "+ Yangi to'ldirish" tugmasini bosing.
+                Bu bemor uchun hali natija to'ldirilmagan.
               </div>
             ) : (
               history.map((h) => (

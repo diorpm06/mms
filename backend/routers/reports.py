@@ -71,6 +71,8 @@ def ceo_dashboard(db: Session = Depends(get_db), _: User = Depends(require_ceo))
         "daily_income": daily["total_income"],
         "current_balance": daily["current_balance"],
         "today_patients": daily["patients_count"],
+        "paper_income": daily.get("paper_income", 0),
+        "paper_count": daily.get("paper_count", 0),
         "month_expenses": int(month_exp or 0),
         "income_chart": chart,
         "top_services": [{"name": t[0], "count": t[1], "total": int(t[2] or 0)} for t in tops],

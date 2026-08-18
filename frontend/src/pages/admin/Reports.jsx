@@ -10,7 +10,7 @@ import { hasPositiveValues, paymentPieData, truncateLabel, formatYAxis } from '.
 import { useTheme } from '../../hooks/useTheme'
 import { useToastStore } from '../../store/toastStore'
 
-const PIE_COLORS = ['#D4AF37', '#22C55E']
+const PIE_COLORS = ['#D4AF37', '#3B82F6', '#06B6D4', '#A855F7']
 
 export default function AdminReports() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
@@ -76,8 +76,9 @@ export default function AdminReports() {
     { label: "Xizmatlar to'liq summasi", value: formatMoney(report.gross_income ?? report.total_income) },
     { label: 'Chegirmalar (-)', value: `-${formatMoney(report.total_discount || 0)}` },
     { label: "Jami tushgan mablag'", value: formatMoney(report.total_income) },
-    { label: 'Naqd', value: formatMoney(report.cash) },
-    { label: 'Karta', value: formatMoney(report.card) },
+    { label: '💵 Naqd', value: formatMoney(report.cash) },
+    { label: '💳 Karta / QR', value: formatMoney((report.card || 0) + (report.qr || 0)) },
+    { label: '📱 Click / Payme', value: formatMoney(report.click || 0) },
   ]
 
   return (

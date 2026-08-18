@@ -7,9 +7,9 @@ import { Btn, Icons } from './UIKit'
 
 const PAYMENT_TYPES = [
   { id: 'naqd', label: '💵 Naqd pul' },
-  { id: 'karta', label: '💳 Karta (Terminal)' },
+  { id: 'karta', label: '💳 Karta / QR (Terminal & Bank)' },
   { id: 'click', label: '📱 Click / Payme' },
-  { id: 'aralash', label: '⚖️ Aralash (Naqd + Karta)' },
+  { id: 'aralash', label: '⚖️ Aralash (Naqd + Karta/QR)' },
   { id: 'later', label: '⏳ Keyinroq to\'lash (Nasiya)' },
 ]
 

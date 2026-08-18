@@ -158,7 +158,6 @@ export default function CeoPatients() {
   const totalUniqueCount = uniquePatientsList.length
   const totalRevenue = uniquePatientsList.reduce((acc, u) => acc + u.total_spent, 0)
   const totalVisitsCount = uniquePatientsList.reduce((acc, u) => acc + u.visit_count, 0)
-  const averageSpent = totalUniqueCount > 0 ? totalRevenue / totalUniqueCount : 0
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -198,7 +197,7 @@ export default function CeoPatients() {
       />
 
       {/* ── PRO TOP KPI METRICS CARDS ────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card p-4 border-cyan-500/30 bg-cyan-500/5 flex items-center justify-between shadow-md">
           <div>
             <span className="text-xs font-extrabold text-cyan uppercase tracking-wider">Unikal Bemorlar</span>
@@ -226,16 +225,6 @@ export default function CeoPatients() {
           </div>
           <div className="w-12 h-12 rounded-2xl bg-gold/20 flex items-center justify-center text-gold">
             <Activity className="h-6 w-6" />
-          </div>
-        </div>
-
-        <div className="card p-4 border-purple-500/30 bg-purple-500/5 flex items-center justify-between shadow-md">
-          <div>
-            <span className="text-xs font-extrabold text-purple-400 uppercase tracking-wider">O'rtacha Chek</span>
-            <p className="text-2xl font-black text-purple-400 font-mono mt-1">{formatMoney(averageSpent)}</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-purple-500/20 flex items-center justify-center text-purple-400">
-            <HeartPulse className="h-6 w-6" />
           </div>
         </div>
       </div>
@@ -457,69 +446,68 @@ export default function CeoPatients() {
         /* ── TAB 1: UNIQUE PATIENTS TABLE ── */
         <div className="card overflow-x-auto p-0 border-gold/20 shadow-lg">
           <table className="w-full text-xs">
-            <THead cols={['#', 'Bemor F.I.SH', 'Telefon', "Yo'naltiruvchi", 'Olgan Xizmatlari', 'Tashriflar', 'Jami Sarflangan', 'So\'nggi Tashrif', 'Harakatlar']} />
+            <THead cols={['#', 'Bemor & Telefon', "Yo'naltiruvchi & Xizmatlar", 'Tashrif & Summa', 'So\'nggi Tashrif', 'Amallar']} />
             <tbody className="divide-y divide-border font-semibold">
               {uniquePatientsList.length === 0 ? (
-                <tr><td colSpan={9} className="py-8"><EmptyState icon="👤" message="Bemorlar topilmadi" /></td></tr>
+                <tr><td colSpan={6} className="py-8"><EmptyState icon="👤" message="Bemorlar topilmadi" /></td></tr>
               ) : uniquePatientsList.map((u, idx) => {
                 const initials = `${(u.first_name || 'B')[0]}${(u.last_name || 'M')[0]}`.toUpperCase()
                 return (
-                  <tr key={u.key} className="hover:bg-surface-hover transition-colors whitespace-nowrap">
-                    <td className="p-3 text-muted font-mono font-bold">#{idx + 1}</td>
+                  <tr key={u.key} className="hover:bg-surface-hover transition-colors">
+                    <td className="p-2.5 text-muted font-mono font-bold text-center w-10">#{idx + 1}</td>
 
-                    <td className="p-3 text-body font-bold">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-gold/15 border border-gold/30 flex items-center justify-center text-gold font-extrabold text-xs">
+                    <td className="p-2.5 text-body font-bold">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-gold/15 border border-gold/30 flex items-center justify-center text-gold font-extrabold text-xs flex-shrink-0">
                           {initials}
                         </div>
-                        <div>
-                          <p className="font-extrabold text-sm text-body">{u.first_name} {u.last_name}</p>
-                          {u.address && <p className="text-[10px] text-muted flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" /> {u.address}</p>}
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-xs text-body truncate">{u.first_name} {u.last_name}</p>
+                          <div className="flex items-center gap-2 text-[10px] text-muted font-mono">
+                            <span>{u.phone || '—'}</span>
+                            {u.address && <span className="truncate flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5 text-gold" /> {u.address}</span>}
+                          </div>
                         </div>
                       </div>
                     </td>
 
-                    <td className="p-3 font-mono text-muted text-xs">
-                      {u.phone || '—'}
-                    </td>
-
-                    <td className="p-3">
-                      {u.referrer_name ? (
-                        <span className="badge badge-gold font-bold text-xs">📢 {u.referrer_name}</span>
-                      ) : (
-                        <span className="text-muted italic text-[11px]">—</span>
-                      )}
-                    </td>
-
-                    <td className="p-3">
-                      <div className="flex flex-wrap gap-1 max-w-xs">
-                        {u.services.slice(0, 2).map((sn, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/30 text-cyan text-[11px] font-bold">
-                            {sn}
+                    <td className="p-2.5">
+                      <div className="space-y-1">
+                        {u.referrer_name ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold">
+                            📢 {u.referrer_name}
                           </span>
-                        ))}
-                        {u.services.length > 2 && (
-                          <span className="px-2 py-0.5 rounded-md bg-gold/10 border border-gold/30 text-gold text-[11px] font-bold" title={u.services.join(', ')}>
-                            +{u.services.length - 2} ta boshqa
-                          </span>
+                        ) : (
+                          <span className="text-muted italic text-[10px] block">—</span>
                         )}
+                        <div className="flex flex-wrap gap-1">
+                          {u.services.slice(0, 2).map((sn, i) => (
+                            <span key={i} className="px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan text-[10px] font-bold">
+                              {sn}
+                            </span>
+                          ))}
+                          {u.services.length > 2 && (
+                            <span className="px-1.5 py-0.5 rounded bg-gold/10 border border-gold/30 text-gold text-[10px] font-bold" title={u.services.join(', ')}>
+                              +{u.services.length - 2}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
 
-                    <td className="p-3 font-mono font-bold text-center">
-                      <span className="badge badge-info text-xs">{u.visit_count} marta</span>
+                    <td className="p-2.5 font-mono text-xs">
+                      <div className="flex flex-col">
+                        <span className="font-black text-emerald text-xs">{formatMoney(u.total_spent)}</span>
+                        <span className="text-[10px] text-cyan font-bold">{u.visit_count} marta qabul</span>
+                      </div>
                     </td>
 
-                    <td className="p-3 font-mono font-black text-emerald text-sm">
-                      {formatMoney(u.total_spent)}
-                    </td>
-
-                    <td className="p-3 text-muted font-mono text-xs">
+                    <td className="p-2.5 text-muted font-mono text-[11px]">
                       {formatDate(u.created_at)}
                     </td>
 
-                    <td className="p-3">
-                      <div className="flex items-center gap-1.5">
+                    <td className="p-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <Btn
                           variant="gold"
                           size="xs"
@@ -530,34 +518,27 @@ export default function CeoPatients() {
                           Karta
                         </Btn>
 
-                        <Btn
-                          variant="cyan"
-                          size="xs"
-                          onClick={() => setReRegisterPatient(u.latestPatient)}
-                          title="Bemorni yangi xizmatga yozish"
-                        >
-                          ➕ Yozish
-                        </Btn>
-
-                        <Btn
-                          variant="ghost"
-                          size="xs"
-                          icon={Icons.history}
-                          onClick={() => openVisits(u.latestPatient)}
-                          title="Tashriflar tarixi"
-                        >
-                          Tarix
-                        </Btn>
-
-                        <Btn
-                          variant="danger"
-                          size="xs"
-                          icon={Icons.trash}
-                          onClick={() => handleDeletePatient(u.latestPatient)}
-                          title="Bemorni bazadan to'liq o'chirish"
-                        >
-                          O'chirish
-                        </Btn>
+                        <ActionMenu
+                          items={[
+                            {
+                              label: 'Yangi xizmatga yozish',
+                              icon: Icons.plus,
+                              variant: 'gold',
+                              onClick: () => setReRegisterPatient(u.latestPatient),
+                            },
+                            {
+                              label: 'Tashriflar tarixi',
+                              icon: Icons.history,
+                              onClick: () => openVisits(u.latestPatient),
+                            },
+                            {
+                              label: "Bazadan to'liq o'chirish",
+                              icon: Icons.trash,
+                              variant: 'danger',
+                              onClick: () => handleDeletePatient(u.latestPatient),
+                            },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -570,67 +551,64 @@ export default function CeoPatients() {
         /* ── TAB 2: ALL INDIVIDUAL VISITS TABLE ── */
         <div className="card overflow-x-auto p-0 border-cyan-500/20 shadow-lg">
           <table className="w-full text-xs">
-            <THead cols={['Sana', 'Bemor F.I.SH', 'Telefon', "Yo'naltiruvchi", 'Xizmat Nomi', 'Summa', 'Kiritdi', 'Harakatlar']} />
+            <THead cols={['Vaqt', 'Bemor & Telefon', "Yo'naltiruvchi & Xizmat", 'Summa & To\'lov', 'Kiritdi', 'Amallar']} />
             <tbody className="divide-y divide-border font-semibold">
               {filteredPatients.length === 0 ? (
-                <tr><td colSpan={8} className="py-8"><EmptyState icon="👤" message="Bemorlar topilmadi" /></td></tr>
+                <tr><td colSpan={6} className="py-8"><EmptyState icon="👤" message="Bemorlar topilmadi" /></td></tr>
               ) : filteredPatients.map((p) => (
                 <tr
                   key={p.id}
-                  className={p.is_cancelled ? 'bg-rose-500/10 text-rose-300' : 'hover:bg-surface-hover transition-colors whitespace-nowrap'}
+                  className={p.is_cancelled ? 'bg-rose-500/10 text-rose-300' : 'hover:bg-surface-hover transition-colors'}
                 >
-                  <td className="p-3 text-muted font-mono text-xs">{formatDate(p.created_at)}</td>
+                  <td className="p-2.5 text-muted font-mono text-[11px]">{formatDate(p.created_at)}</td>
 
-                  <td className="p-3 text-body font-bold text-sm">
-                    <div className="flex items-center gap-1.5">
-                      <span>{p.first_name} {p.last_name}</span>
-                      {p.is_paper_entry ? (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold">📄 Navbatchilik</span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold">🟢 Jonli</span>
+                  <td className="p-2.5 text-body font-bold">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-xs text-body">{p.first_name} {p.last_name}</span>
+                        {p.is_paper_entry ? (
+                          <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold">📄 Navbatchilik</span>
+                        ) : (
+                          <span className="px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold">🟢 Jonli</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-mono text-muted">{p.phone || '—'}</p>
+                    </div>
+                  </td>
+
+                  <td className="p-2.5">
+                    <div className="space-y-0.5">
+                      <p className="text-cyan font-extrabold text-xs">
+                        {(p.services || []).length > 1 ? (
+                          <span>{p.services.map((s) => s.service_name).join(', ')}</span>
+                        ) : (
+                          p.services?.[0]?.service_name || p.service_name
+                        )}
+                      </p>
+                      {p.referrer_name && (
+                        <span className="inline-block px-1.5 py-0.2 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[9px] font-bold">
+                          📢 {p.referrer_name}
+                        </span>
                       )}
                     </div>
                   </td>
 
-                  <td className="p-3 text-muted font-mono text-xs">{p.phone || '—'}</td>
-
-                  <td className="p-3">
-                    {p.referrer_name ? (
-                      <span className="badge badge-gold font-bold text-xs">📢 {p.referrer_name}</span>
-                    ) : (
-                      <span className="text-muted italic text-[11px]">—</span>
-                    )}
+                  <td className="p-2.5 font-mono">
+                    <div className="flex flex-col">
+                      <span className="font-black text-emerald text-xs">{formatMoney(p.payment_amount)}</span>
+                      <span className="text-[9px] uppercase font-bold text-gold">{paymentLabel(p.payment_type)}</span>
+                    </div>
                   </td>
 
-                  <td className="p-3 text-cyan font-extrabold text-xs">
-                    {(p.services || []).length > 1 ? (
-                      <div className="space-y-0.5">
-                        {p.services.map((s, i) => (
-                          <span key={i} className="block">
-                            {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      p.services?.[0]?.service_name || p.service_name
-                    )}
-                  </td>
+                  <td className="p-2.5 text-muted text-[11px]">{p.creator_name || '—'}</td>
 
-                  <td className="p-3 font-mono">
-                    <span className="font-black text-emerald text-sm">{formatMoney(p.payment_amount)}</span>
-                    <span className="badge badge-gold ml-1.5 text-[10px] uppercase font-bold">{paymentLabel(p.payment_type)}</span>
-                  </td>
-
-                  <td className="p-3 text-muted text-xs">{p.creator_name || '—'}</td>
-
-                  <td className="p-3">
+                  <td className="p-2.5 text-right">
                     {p.is_cancelled ? (
-                      <span className="text-xs font-bold text-rose-400">
+                      <span className="text-[10px] font-bold text-rose-400">
                         ✗ Bekor: {p.cancel_reason}
                       </span>
                     ) : (
-                      <div className="flex items-center justify-end gap-1.5">
-                        {/* Eng ko'p ishlatiladigani ochiq, qolgani ⋮ menyusida */}
+                      <div className="flex items-center justify-end gap-1">
                         <Btn
                           variant="gold"
                           size="xs"
