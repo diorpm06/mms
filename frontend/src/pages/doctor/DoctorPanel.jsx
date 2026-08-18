@@ -33,8 +33,6 @@ import {
   TestTube,
   ClipboardList,
   Send,
-  Eye,
-  Trash2,
 } from 'lucide-react'
 import MedicalReportModal from '../../components/MedicalReportModal'
 import Modal from '../../components/Modal'
@@ -80,28 +78,18 @@ export default function DoctorPanel() {
 
   // To'ldirilib saqlangan, lekin hali adminga yuborilmagan natijalar
   const [drafts, setDrafts] = useState([])
-  const [draftsLoading, setDraftsLoading] = useState(false)
   const [selectedDrafts, setSelectedDrafts] = useState([])
   const [sendingDrafts, setSendingDrafts] = useState(false)
   const [previewDraft, setPreviewDraft] = useState(null)
 
   const fetchDrafts = async () => {
-    setDraftsLoading(true)
     try {
       const res = await api('/report-submissions/my-drafts')
       setDrafts(res || [])
       setSelectedDrafts((res || []).map((d) => d.id))
     } catch (_) {
       setDrafts([])
-    } finally {
-      setDraftsLoading(false)
     }
-  }
-
-  const toggleDraft = (id) => {
-    setSelectedDrafts((oldin) =>
-      oldin.includes(id) ? oldin.filter((x) => x !== id) : [...oldin, id]
-    )
   }
 
   const handleSendDrafts = async () => {
@@ -123,17 +111,6 @@ export default function DoctorPanel() {
       showToast(e.message || 'Yuborishda xatolik')
     } finally {
       setSendingDrafts(false)
-    }
-  }
-
-  const handleDeleteDraft = async (d) => {
-    if (!window.confirm(`"${d.template_label}" (${d.patient_name}) natijasi o'chirilsinmi?`)) return
-    try {
-      await api(`/report-submissions/${d.id}`, { method: 'DELETE' })
-      showToast("Natija o'chirildi")
-      fetchDrafts()
-    } catch (e) {
-      showToast(e.message || "O'chirib bo'lmadi")
     }
   }
 
