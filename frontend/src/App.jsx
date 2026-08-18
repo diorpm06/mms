@@ -7,44 +7,66 @@ import Toast from './components/Toast'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 
-// Route-level code splitting: every role only downloads the pages it
-// actually visits, instead of one bundle containing all CEO/Admin/Doctor
-// screens up front. Login/Layout/Toast stay eager since they're needed
-// immediately on every visit.
-const CeoDashboard = lazy(() => import('./pages/ceo/Dashboard'))
-const CeoPatients = lazy(() => import('./pages/ceo/Patients'))
-const CeoServices = lazy(() => import('./pages/ceo/Services'))
-const AdminReportQueue = lazy(() => import('./pages/admin/ReportQueue'))
-const CeoReferrers = lazy(() => import('./pages/ceo/Referrers'))
-const CeoCommissions = lazy(() => import('./pages/ceo/Commissions'))
-const CeoProviders = lazy(() => import('./pages/ceo/Providers'))
-const CeoEmployees = lazy(() => import('./pages/ceo/Employees'))
-const CeoBalance = lazy(() => import('./pages/ceo/Balance'))
-const CeoAdvances = lazy(() => import('./pages/ceo/Advances'))
-const CeoSavedReports = lazy(() => import('./pages/ceo/SavedReports'))
-const CeoActivity = lazy(() => import('./pages/ceo/Activity'))
-const CeoDuty = lazy(() => import('./pages/ceo/Duty'))
-const CeoInpatients = lazy(() => import('./pages/ceo/Inpatients'))
-const CeoInpatientSettings = lazy(() => import('./pages/ceo/InpatientSettings'))
-const CeoCash = lazy(() => import('./pages/ceo/Cash'))
-const ChangePassword = lazy(() => import('./pages/ceo/ChangePassword'))
-const CeoBackup = lazy(() => import('./pages/ceo/Backup'))
-const CeoExpenses = lazy(() => import('./pages/ceo/Expenses'))
-const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'))
-const NewPatient = lazy(() => import('./pages/admin/NewPatient'))
-const Search = lazy(() => import('./pages/admin/Search'))
-const TodayPatients = lazy(() => import('./pages/admin/TodayPatients'))
-const AdminExpenses = lazy(() => import('./pages/admin/Expenses'))
-const AdminCatalog = lazy(() => import('./pages/admin/Catalog'))
-const AdminReports = lazy(() => import('./pages/admin/Reports'))
-const TvQueueDisplay = lazy(() => import('./pages/TvQueueDisplay'))
-const DoctorPanel = lazy(() => import('./pages/doctor/DoctorPanel'))
-const DoctorResults = lazy(() => import('./pages/doctor/MyResults'))
-const Appointments = lazy(() => import('./pages/admin/Appointments'))
-const Inventory = lazy(() => import('./pages/admin/Inventory'))
-const Payroll = lazy(() => import('./pages/ceo/Payroll'))
-const TvManagerDashboard = lazy(() => import('./pages/TvManagerDashboard'))
-const UnifiedReportsHub = lazy(() => import('./pages/ceo/UnifiedReportsHub'))
+// Helper wrapper for React lazy dynamic imports: if Vercel deploys a new commit while
+// a user is on an open tab, old chunk hashes disappear resulting in 404/chunk load errors.
+// This wrapper automatically catches dynamic import errors and reloads the window once.
+function safeLazy(importFn) {
+  return lazy(() =>
+    importFn().catch((err) => {
+      const msg = String(err?.message || '').toLowerCase()
+      if (
+        msg.includes('dynamically imported module') ||
+        msg.includes('loading chunk') ||
+        msg.includes('failed to fetch') ||
+        msg.includes('importing a module script failed')
+      ) {
+        const lastReload = sessionStorage.getItem('last_chunk_reload_time')
+        const now = Date.now()
+        if (!lastReload || now - Number(lastReload) > 10000) {
+          sessionStorage.setItem('last_chunk_reload_time', String(now))
+          window.location.reload()
+          return new Promise(() => {})
+        }
+      }
+      throw err
+    })
+  )
+}
+
+const CeoDashboard = safeLazy(() => import('./pages/ceo/Dashboard'))
+const CeoPatients = safeLazy(() => import('./pages/ceo/Patients'))
+const CeoServices = safeLazy(() => import('./pages/ceo/Services'))
+const AdminReportQueue = safeLazy(() => import('./pages/admin/ReportQueue'))
+const CeoReferrers = safeLazy(() => import('./pages/ceo/Referrers'))
+const CeoCommissions = safeLazy(() => import('./pages/ceo/Referrers'))
+const CeoProviders = safeLazy(() => import('./pages/ceo/Providers'))
+const CeoEmployees = safeLazy(() => import('./pages/ceo/Employees'))
+const CeoBalance = safeLazy(() => import('./pages/ceo/Balance'))
+const CeoAdvances = safeLazy(() => import('./pages/ceo/Advances'))
+const CeoSavedReports = safeLazy(() => import('./pages/ceo/SavedReports'))
+const CeoActivity = safeLazy(() => import('./pages/ceo/Activity'))
+const CeoDuty = safeLazy(() => import('./pages/ceo/Duty'))
+const CeoInpatients = safeLazy(() => import('./pages/ceo/Inpatients'))
+const CeoInpatientSettings = safeLazy(() => import('./pages/ceo/InpatientSettings'))
+const CeoCash = safeLazy(() => import('./pages/ceo/Cash'))
+const ChangePassword = safeLazy(() => import('./pages/ceo/ChangePassword'))
+const CeoBackup = safeLazy(() => import('./pages/ceo/Backup'))
+const CeoExpenses = safeLazy(() => import('./pages/ceo/Expenses'))
+const AdminDashboard = safeLazy(() => import('./pages/admin/Dashboard'))
+const NewPatient = safeLazy(() => import('./pages/admin/NewPatient'))
+const Search = safeLazy(() => import('./pages/admin/Search'))
+const TodayPatients = safeLazy(() => import('./pages/admin/TodayPatients'))
+const AdminExpenses = safeLazy(() => import('./pages/admin/Expenses'))
+const AdminCatalog = safeLazy(() => import('./pages/admin/Catalog'))
+const AdminReports = safeLazy(() => import('./pages/admin/Reports'))
+const TvQueueDisplay = safeLazy(() => import('./pages/TvQueueDisplay'))
+const DoctorPanel = safeLazy(() => import('./pages/doctor/DoctorPanel'))
+const DoctorResults = safeLazy(() => import('./pages/doctor/MyResults'))
+const Appointments = safeLazy(() => import('./pages/admin/Appointments'))
+const Inventory = safeLazy(() => import('./pages/admin/Inventory'))
+const Payroll = safeLazy(() => import('./pages/ceo/Payroll'))
+const TvManagerDashboard = safeLazy(() => import('./pages/TvManagerDashboard'))
+const UnifiedReportsHub = safeLazy(() => import('./pages/ceo/UnifiedReportsHub'))
 
 function PageLoader() {
   return (

@@ -12,6 +12,21 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('UI runtime xato:', error, info)
+    const msg = String(error?.message || '').toLowerCase()
+    // Auto reload if version redeployment / chunk hash changed on Vercel
+    if (
+      msg.includes('dynamically imported module') ||
+      msg.includes('loading chunk') ||
+      msg.includes('failed to fetch') ||
+      msg.includes('importing a module script failed')
+    ) {
+      const lastReload = sessionStorage.getItem('last_chunk_reload_time')
+      const now = Date.now()
+      if (!lastReload || now - Number(lastReload) > 10000) {
+        sessionStorage.setItem('last_chunk_reload_time', String(now))
+        window.location.reload()
+      }
+    }
   }
 
   render() {
