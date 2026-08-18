@@ -185,7 +185,13 @@ def get_report(db: Session, start: date, end: date) -> dict:
                 click += (p.click_amount or 0)
             else:
                 card += amt
-        referrer_share = sum((getattr(p, "referrer_amount", 0) or 0) for p in all_patients)
+        from services.finance import get_referrer_rates_for_service, calculate_financial_split
+        referrer_share = 0
+        for p in all_patients:
+            if p.referrer_id and p.service:
+                ref_pct, ref_sum = get_referrer_rates_for_service(p.referrer, p.service, db)
+                r_share, _, _ = calculate_financial_split(p.payment_amount or 0, 0, ref_pct, ref_sum)
+                referrer_share += r_share
         provider_share = sum((getattr(p, "provider_amount", 0) or 0) for p in all_patients)
         center_share = total_income - referrer_share - provider_share
 
