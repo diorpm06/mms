@@ -660,6 +660,9 @@ def admin_daily_report(db: Session, d: date) -> dict:
         "gross_income": full["gross_income"],
         "total_discount": full["total_discount"],
         "discounts": full["discounts"],
+        "active_inpatients": full.get("active_inpatients", 0),
+        "discharged_today": full.get("discharged_today", 0),
+        "inpatient_income": full.get("inpatient_income", 0),
         "report_date": d.isoformat(),
     }
     if out["patients_count"] == 0 and out["total_income"] == 0:

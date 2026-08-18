@@ -72,6 +72,7 @@ export default function AdminReports() {
     { label: 'Jami Mijozlar', value: `${report.patients_count} nafar` },
     { label: '🟢 Jonli Qabul', value: `${report.live_patients_count || 0} nafar (${formatMoney(report.live_patients_total || 0)})` },
     { label: "📄 Navbatchilik (qog'oz)", value: `${report.paper_entry_count || 0} nafar (${formatMoney(report.paper_entry_total || 0)})` },
+    { label: '🏥 Statsionar (yotganlar)', value: `${report.active_inpatients || 0} nafar yotibdi (${formatMoney(report.inpatient_income || 0)})` },
     { label: '🔴 Bekor Qilinganlar (-)', value: `${report.cancelled_count || 0} nafar (-${formatMoney(report.cancelled_total || 0)})` },
     { label: "Xizmatlar to'liq summasi", value: formatMoney(report.gross_income ?? report.total_income) },
     { label: 'Chegirmalar (-)', value: `-${formatMoney(report.total_discount || 0)}` },
