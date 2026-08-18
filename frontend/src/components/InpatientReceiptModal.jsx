@@ -169,14 +169,14 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
           <ReceiptHeader subtitle="Statsionar Bemor Kvitansiyasi" />
 
           {/* PALATA & KOYKA BOX */}
-          <div className="ticket-number-box my-4 py-3 bg-white dark:bg-slate-900 border-2 border-slate-900 rounded-xl text-center">
-            <span className="text-[10px] font-bold text-slate-700 uppercase tracking-widest block">
+          <div className="ticket-number-box my-4 py-3 bg-slate-100 dark:bg-slate-900 border-2 border-slate-800 dark:border-slate-700 rounded-xl text-center">
+            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest block">
               PALATA / KOYKA
             </span>
-            <div className="ticket-number-text text-3xl font-black text-slate-900 tracking-tight font-mono my-0.5">
+            <div className="ticket-number-text text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight font-mono my-0.5">
               {inpatient.room_number || 'Palata'}/{inpatient.bed_number || '1'}
             </div>
-            <div className="text-xs font-bold text-slate-900 uppercase">
+            <div className="text-xs font-bold text-slate-900 dark:text-slate-200 uppercase">
               {inpatient.tariff_name ? `Tarif: ${inpatient.tariff_name}` : 'Standart Palata'}
             </div>
           </div>
@@ -302,10 +302,9 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
           </div>
 
           {/* Footer Note */}
-          <div className="mt-4 text-center border-t border-dashed border-slate-300 dark:border-slate-700 pt-3 space-y-1">
+          <div className="mt-4 text-center border-t border-dashed border-slate-300 dark:border-slate-700 pt-3 space-y-0.5">
             <p className="font-bold text-[9px] text-slate-900 dark:text-slate-100">Marjona med servis sizning sog'lig'ingiz haqida qayg'uradi</p>
             <p className="font-bold text-[9px] text-slate-900 dark:text-slate-200">Klinikamizda davolanganingiz uchun rahmat!</p>
-            <p className="font-black text-[11px] text-slate-900 dark:text-slate-100 uppercase tracking-wider pt-1">TUGAL SALOMATLIK TILAYMIZ</p>
           </div>
         </div>
 
