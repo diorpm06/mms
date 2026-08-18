@@ -116,20 +116,24 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
   // Bir necha kunga oldindan to'langan xizmatlar (masalan 3 ta elektroforez).
   // Bularni chekda ALOHIDA, ko'rinarli qutida ko'rsatamiz — bemor 2- va
   // 3-kuni kelganda qayta to'lov so'ralmasligi uchun.
-  const kurslar = []
+  // Bir xil xizmat bir necha chekka bo'linib kiritilishi mumkin (masalan
+  // avval 1 kun, keyin 3 kun). Ilgari har bir yozuv alohida sanalgani uchun
+  // chekda 4 kun o'rniga 3 kun chiqardi. Endi xizmat NOMI bo'yicha qo'shiladi.
+  const kursMap = {}
   patientList.forEach((p) => {
     ;(p.services || []).forEach((s) => {
-      const soni = Number(s.quantity) || 1
-      if (soni > 1) {
-        kurslar.push({
-          nomi: cleanServiceName(s.service_name),
-          soni,
-          ishlatilgan: Number(s.used_count) || 1,
-          narx: s.total_price || 0,
-        })
-      }
+      const nomi = cleanServiceName(s.service_name)
+      if (!nomi) return
+      if (!kursMap[nomi]) kursMap[nomi] = { nomi, soni: 0, narx: 0 }
+      kursMap[nomi].soni += Number(s.quantity) || 1
+      kursMap[nomi].narx += Number(s.total_price) || 0
     })
   })
+  // Faqat bir kundan ko'p bo'lganlari kurs hisoblanadi.
+  // Ro'yxatga olingan kun — 1-kun, qolgani keyingi kunlarga.
+  const kurslar = Object.values(kursMap)
+    .filter((k) => k.soni > 1)
+    .map((k) => ({ ...k, ishlatilgan: 1 }))
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">

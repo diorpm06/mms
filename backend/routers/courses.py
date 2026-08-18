@@ -84,14 +84,38 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
             }
             guruh[kalit] = g
         g["quantity"] += int(ps.quantity or 1)
-        g["used_count"] += int(ps.used_count if ps.used_count is not None else 1)
         g["total_price"] += int(ps.total_price or 0)
         if p.ticket_number:
             g["tickets"].append(p.ticket_number)
         g["_rows"].append(ps)
 
+    # Ishlatilgan kunlar TASHRIF bo'yicha sanaladi, yozuv bo'yicha emas.
+    #
+    # Bemor bir kunda ikki marta kassaga kelib "1 kun" va "3 kun" deb
+    # alohida to'lasa ham, o'sha kuni FAQAT BIR MARTA muolaja oladi.
+    # Ilgari har bir yozuvning ishlatilgan kuni qo'shilib, 4 kunlik kursda
+    # birinchi kuniyoq 2 kun ishlatilgan bo'lib ko'rinardi.
+    #
+    # Shuning uchun: ro'yxatga olingan kun = 1 kun, ustiga keyingi kunlardagi
+    # "Keldi" tashriflari qo'shiladi.
+    barcha_id = [ps.id for g in guruh.values() for ps in g["_rows"]]
+    tashrif_soni: dict[int, int] = {}
+    if barcha_id:
+        for (ps_id, soni) in (
+            db.query(Patient.prepaid_from_id, func.count(Patient.id))
+            .filter(
+                Patient.prepaid_from_id.in_(barcha_id),
+                Patient.is_cancelled == False,  # noqa: E712
+            )
+            .group_by(Patient.prepaid_from_id)
+            .all()
+        ):
+            tashrif_soni[ps_id] = int(soni)
+
     natija = []
     for g in guruh.values():
+        keyingilar = sum(tashrif_soni.get(ps.id, 0) for ps in g["_rows"])
+        g["used_count"] = 1 + keyingilar
         g["remaining"] = max(0, g["quantity"] - g["used_count"])
         if faqat_tugallanmagan and (g["quantity"] < 2 or g["remaining"] <= 0):
             continue
@@ -169,13 +193,10 @@ def use_session(
         )
 
     # Bo'sh o'rni qolgan birinchi yozuvni ishlatamiz
-    nishon = None
-    for ps in g["_rows"]:
-        if int(ps.used_count if ps.used_count is not None else 1) < int(ps.quantity or 1):
-            nishon = ps
-            break
-    if nishon is None:
-        raise HTTPException(status_code=400, detail="Bo'sh kun qolmagan")
+    # Tashrifni qaysidir to'lov yozuviga bog'lab qo'yamiz (kuzatish uchun).
+    # Qolgan kun GURUH bo'yicha hisoblanadi — yuqorida tekshirilgan — shuning
+    # uchun bu yerda yozuv sig'imi cheklov emas: eng katta yozuv tanlanadi.
+    nishon = max(g["_rows"], key=lambda ps: int(ps.quantity or 1))
 
     svc = db.query(Service).filter(Service.id == g["service_id"]).first()
 
