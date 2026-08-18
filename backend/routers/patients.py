@@ -1,8 +1,8 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import Session, joinedload
 
 from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
@@ -289,6 +289,8 @@ def today_patients(db: Session = Depends(get_db), _: User = Depends(require_doct
     today = date.today()
     start = datetime.combine(today, datetime.min.time())
     end = datetime.combine(today, datetime.max.time())
+    paper_start = datetime.combine(today - timedelta(days=30), datetime.min.time())
+
     patients = (
         db.query(Patient)
         .options(
@@ -297,7 +299,12 @@ def today_patients(db: Session = Depends(get_db), _: User = Depends(require_doct
             joinedload(Patient.service),
             joinedload(Patient.creator),
         )
-        .filter(Patient.created_at >= start, Patient.created_at <= end)
+        .filter(
+            or_(
+                and_(Patient.created_at >= start, Patient.created_at <= end),
+                and_(Patient.is_paper_entry == True, Patient.created_at >= paper_start)
+            )
+        )
         .order_by(Patient.created_at.desc())
         .all()
     )

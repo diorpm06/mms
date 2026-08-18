@@ -12,83 +12,116 @@ const STATUS_LABEL = {
 
 const BLANK_RE = /_{4,}/
 
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+// Bugungi sana — blankalardagi kabi kun.oy.yil
+function bugungiSana() {
+  const d = new Date()
+  const ikki = (n) => String(n).padStart(2, '0')
+  return `${ikki(d.getDate())}.${ikki(d.getMonth() + 1)}.${d.getFullYear()}`
 }
 
-// Konteyner ichidagi "______" matnlarini haqiqiy <input> elementlariga almashtiradi.
-// Qolgan matn (formatlash bilan) butunlay qulflangan holicha qoladi.
-function injectBlankInputs(container, prefillFirst) {
-  const inputs = []
+// Bo'sh joydan oldingi yozuvga qarab u nima uchun ekanini aniqlaydi.
+// Blankalar kirill va lotin alifbosida — ikkalasi ham tanilishi kerak
+const FIO_KALIT = /(ф\s*\.?\s*и\s*\.?\s*о|f\s*\.?\s*i\s*\.?\s*sh|f\s*\.?\s*i\s*\.?\s*o|бемор|bemorni)\s*\.?\s*:?\s*$/i
+const SANA_KALIT = /(дата|сана|sana|sanasi|топширган|topshirgan|tekshiruv\s+sanasi)[^:]{0,24}:?\s*$/i
 
-  function processTextNode(textNode) {
-    const text = textNode.nodeValue
-    const match = BLANK_RE.exec(text)
-    if (!match) return null
+function nimaUchun(oldingiMatn) {
+  const oxiri = oldingiMatn.slice(-40)
+  if (FIO_KALIT.test(oxiri)) return 'fio'
+  if (SANA_KALIT.test(oxiri)) return 'sana'
+  return null
+}
 
-    const before = document.createTextNode(text.slice(0, match.index))
-    const after = document.createTextNode(text.slice(match.index + match[0].length))
-
-    const input = document.createElement('input')
-    input.type = 'text'
-    input.className = 'mms-blank-input'
-    input.autocomplete = 'off'
-    input.spellcheck = false
-    input.size = Math.max(4, Math.min(match[0].length, 20))
-    input.style.cssText =
-      'display:inline-block;min-width:50px;border:none;border-bottom:2px solid var(--gold);' +
-      'background:transparent;font:inherit;color:var(--cyan,#22d3ee);font-weight:700;padding:0 3px;outline:none;'
-
-    if (inputs.length === 0 && prefillFirst) {
-      input.value = prefillFirst
-    }
-
-    const parent = textNode.parentNode
-    parent.insertBefore(before, textNode)
-    parent.insertBefore(input, textNode)
-    parent.insertBefore(after, textNode)
-    parent.removeChild(textNode)
-
-    inputs.push(input)
-    return after
+// "______" larni o'sadigan katakchalarga almashtiradi.
+//
+// Ilgari bu yerda qat'iy kenglikdagi <input> ishlatilardi — uzun familiya
+// sig'masdi va yonidagi "Дата" surilmasdi. Endi contenteditable <span>:
+// u matn bilan birga kengayadi, qolgan matn esa o'z-o'zidan siljiydi.
+function katakchalarniQoy(container, bemorIsmi, qoyilgan) {
+  // Yorliq ("Ф.И.О:") va bo'sh joy ko'pincha boshqa-boshqa teglarda bo'ladi.
+  // Shuning uchun avval barcha matn tugunlarini tartib bilan yig'ib, har bir
+  // bo'sh joy uchun undan OLDINGI butun matnni bilib turamiz.
+  const tugunlar = []
+  const yur = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) tugunlar.push(node)
+    else if (node.nodeType === Node.ELEMENT_NODE) Array.from(node.childNodes).forEach(yur)
   }
+  yur(container)
 
-  function walk(node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      let current = node
-      while (current && BLANK_RE.test(current.nodeValue)) {
-        current = processTextNode(current)
+  const kataklar = []
+  let oldingiMatn = ''
+
+  for (const tugun of tugunlar) {
+    let joriy = tugun
+    while (joriy && BLANK_RE.test(joriy.nodeValue)) {
+      const text = joriy.nodeValue
+      const match = BLANK_RE.exec(text)
+      const parent = joriy.parentNode
+      if (!parent) break
+
+      const before = document.createTextNode(text.slice(0, match.index))
+      const after = document.createTextNode(text.slice(match.index + match[0].length))
+      const tur = nimaUchun(oldingiMatn + before.nodeValue)
+
+      const span = document.createElement('span')
+      span.className = 'mms-blank'
+      span.setAttribute('data-blank', '1')
+      // Har bir tur (ism / sana) faqat BIR MARTA to'ldiriladi. Ba'zi
+      // blankalarda yorliq va bo'sh joy alohida qatorlarda turadi va
+      // ikkala qoida ham ishlab, ism ikki joyga yozilib qolardi.
+      if (tur === 'fio' && bemorIsmi && !qoyilgan.fio) {
+        span.textContent = bemorIsmi
+        qoyilgan.fio = true
+      } else if (tur === 'sana' && !qoyilgan.sana) {
+        span.textContent = bugungiSana()
+        qoyilgan.sana = true
+      } else {
+        span.textContent = ''
       }
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      Array.from(node.childNodes).forEach(walk)
+
+      parent.insertBefore(before, joriy)
+      parent.insertBefore(span, joriy)
+      parent.insertBefore(after, joriy)
+      parent.removeChild(joriy)
+
+      kataklar.push(span)
+      oldingiMatn += before.nodeValue + (span.textContent || '')
+      joriy = after
     }
+    if (joriy) oldingiMatn += joriy.nodeValue || ''
   }
 
-  walk(container)
-  return inputs
+  return kataklar
 }
 
-// Konteynerni (to'ldirilgan qiymatlar bilan) qayta HTML matniga aylantiradi.
-function serializeFilled(node) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return escapeHtml(node.nodeValue)
-  }
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    if (node.classList && node.classList.contains('mms-blank-input')) {
-      return `<strong>${escapeHtml(node.value?.trim() || '______')}</strong>`
+// Laboratoriya blankalarida "F.I.O | (bo'sh)" ko'rinishidagi jadval bor —
+// u yerda "______" belgisi yo'q, shuning uchun alohida to'ldiriladi.
+const JADVAL_FIO = /^(ф\s*\.?\s*и\s*\.?\s*о|f\s*\.?\s*i\s*\.?\s*o)\b/i
+const JADVAL_SANA = /(дата|сана|sana|топширган\s*сана|topshirgan\s*sana|распечатки|исследования)/i
+
+function jadvalKataklariniToldir(container, bemorIsmi, qoyilgan) {
+  container.querySelectorAll('tr').forEach((tr) => {
+    const kataklar = Array.from(tr.children)
+    if (kataklar.length < 2) return
+    const sarlavha = (kataklar[0].textContent || '').replace(/ /g, ' ').trim()
+    const qiymat = kataklar[1]
+    if ((qiymat.textContent || '').replace(/ /g, ' ').trim()) return
+
+    let matn = null
+    if (JADVAL_FIO.test(sarlavha) && bemorIsmi && !qoyilgan.fio) {
+      matn = bemorIsmi
+      qoyilgan.fio = true
+    } else if (JADVAL_SANA.test(sarlavha) && !qoyilgan.sana) {
+      matn = bugungiSana()
+      qoyilgan.sana = true
     }
-    const tag = node.tagName.toLowerCase()
-    const children = Array.from(node.childNodes).map(serializeFilled).join('')
-    const style = node.getAttribute('style')
-    const extra = ['border', 'cellpadding'].map((a) =>
-      node.hasAttribute(a) ? ` ${a}="${node.getAttribute(a)}"` : ''
-    ).join('')
-    return `<${tag}${style ? ` style="${style}"` : ''}${extra}>${children}</${tag}>`
-  }
-  return ''
+    if (!matn) return
+
+    const span = document.createElement('span')
+    span.className = 'mms-blank'
+    span.setAttribute('data-blank', '1')
+    span.textContent = matn
+    qiymat.appendChild(span)
+  })
 }
 
 // view: 'history' | 'picker' | 'fill'
@@ -121,7 +154,10 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
     if (view === 'fill' && template && fillRef.current) {
       fillRef.current.innerHTML = template.bodyHtml
       const fullName = `${patient.last_name || ''} ${patient.first_name || ''}`.trim()
-      injectBlankInputs(fillRef.current, fullName)
+      // Ism va sana avtomat qo'yiladi — shifokor har safar qo'lda yozmasin
+      const qoyilgan = { fio: false, sana: false }
+      katakchalarniQoy(fillRef.current, fullName, qoyilgan)
+      jadvalKataklariniToldir(fillRef.current, fullName, qoyilgan)
     }
   }, [view, selectedKey])
 
@@ -142,7 +178,18 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
     if (!template || !fillRef.current) return
     setSubmitting(true)
     try {
-      const filledHtml = Array.from(fillRef.current.childNodes).map(serializeFilled).join('')
+      // Hujjatni asl ko'rinishi bilan saqlaymiz. Nusxa olib ishlaymiz —
+      // shifokor ekranidagi hujjatga tegmasligi uchun.
+      const nusxa = fillRef.current.cloneNode(true)
+      // To'ldirilgan katakchalar oddiy qalin matnga aylanadi — chop etilganda
+      // sariq fon va tag chiziq chiqmasligi uchun
+      nusxa.querySelectorAll('[data-blank]').forEach((el) => {
+        const qiymat = (el.textContent || '').trim()
+        const kuchli = document.createElement('strong')
+        kuchli.textContent = qiymat || '______'
+        el.replaceWith(kuchli)
+      })
+      const filledHtml = nusxa.innerHTML
       await api('/report-submissions', {
         method: 'POST',
         body: JSON.stringify({
@@ -242,12 +289,19 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
               </button>
             )}
             <p className="text-[11px] text-muted italic">
-              Asl blanka matni — faqat tagiga chizilgan (oltin rang) joylarga bosib, natijani yozing. Qolgan matn qulflangan.
+              Asl Word blankasi. Istalgan joyga bosib yozing yoki o'zgartiring —
+              Word'dagidek ishlaydi. Tagiga chizilgan oltin joylar bo'lsa, ular alohida katakcha.
             </p>
+            {/* Hujjat asl faylidagidek ko'rsatiladi va to'liq tahrirlanadi.
+                Ilgari faqat "______" joylari tahrirlanardi, qolgani qulflangan edi —
+                asl blankalarda esa bunday belgilar yo'q. */}
             <div
               ref={fillRef}
-              className="bg-white text-black rounded-xl p-5 text-[13px] leading-relaxed"
-              style={{ fontFamily: "'Times New Roman', Cambria, serif" }}
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck={false}
+              className="mms-shablon bg-white text-black rounded-xl p-5 text-[13px] leading-relaxed overflow-x-auto focus:outline-none focus:ring-2 focus:ring-gold/50"
+              style={{ fontFamily: "'Times New Roman', Cambria, serif", minHeight: '200px' }}
             />
 
             <div className="flex gap-2 pt-2">

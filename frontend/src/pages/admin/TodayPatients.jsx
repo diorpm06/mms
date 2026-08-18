@@ -455,12 +455,12 @@ export default function TodayPatients() {
 
       {/* Table */}
       <div className="card overflow-x-auto p-0 border-cyan-500/20">
-        <table className="w-full text-sm">
-          <THead cols={['Talon', 'Vaqt', 'Bemor', 'Xizmat & Shifokor', 'Summa', 'Kabinet', 'Holat', 'Harakatlar']} />
-          <tbody>
+        <table className="w-full text-xs">
+          <THead cols={['Talon / Vaqt', 'Bemor', 'Xizmat & Shifokor', 'Summa', 'Kabinet & Holat', 'Amallar']} />
+          <tbody className="divide-y divide-border">
             {filteredPatients.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={6}>
                   <EmptyState icon="📋" message="Bugun hali bemor yo'q yoki qidiruv bo'yicha topilmadi" />
                 </td>
               </tr>
@@ -470,109 +470,92 @@ export default function TodayPatients() {
                   key={p.id}
                   className={p.is_cancelled ? 'row-cancelled' : 'hover:bg-white/[0.02] transition-colors'}
                 >
-                  {/* Talon */}
-                  <td className="td-cell whitespace-nowrap">
-                    <span className="font-mono font-black text-cyan-300 text-sm tracking-wider whitespace-nowrap inline-block bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-500/30">
+                  {/* Talon & Vaqt */}
+                  <td className="p-2.5 whitespace-nowrap">
+                    <span className="font-mono font-black text-cyan-300 text-xs tracking-wider inline-block bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
                       {p.ticket_number || `A-${p.id}`}
+                    </span>
+                    <span className="text-[10px] text-muted font-mono block mt-0.5">
+                      {p.created_at ? (
+                        p.created_at.slice(0, 10) === new Date().toISOString().slice(0, 10)
+                          ? p.created_at.slice(11, 16)
+                          : `${p.created_at.slice(8, 10)}.${p.created_at.slice(5, 7)} ${p.created_at.slice(11, 16)}`
+                      ) : '—'}
                     </span>
                   </td>
 
-                  {/* Vaqt */}
-                  <td className="td-muted text-xs whitespace-nowrap font-mono">
-                    {p.created_at?.slice(11, 16)}
-                  </td>
-
                   {/* Bemor */}
-                  <td className="td-cell whitespace-nowrap">
+                  <td className="p-2.5 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-body">{p.first_name} {p.last_name}</span>
+                      <span className="font-extrabold text-body text-xs">{p.first_name} {p.last_name}</span>
                       {p.is_paper_entry ? (
                         <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold">📄 Navbatchilik</span>
                       ) : (
                         <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold">🟢 Jonli</span>
                       )}
                     </div>
-                    <span className="text-[11px] text-muted font-mono block">{p.phone}</span>
+                    <span className="text-[10px] text-muted font-mono block">{p.phone || '—'}</span>
                   </td>
 
-                  {/* Xizmat & Shifokor — bemor bir nechta xizmat olgan bo'lsa
-                      hammasi ko'rsatiladi (avval faqat bittasi ko'rinardi) */}
-                  <td className="td-cell">
+                  {/* Xizmat & Shifokor */}
+                  <td className="p-2.5 max-w-[200px]">
                     {(p.services || []).length > 1 ? (
                       <div className="space-y-0.5">
                         {p.services.map((s, i) => (
-                          <div key={i} className="flex items-baseline gap-1.5">
-                            <span className="font-bold text-cyan text-xs">
+                          <div key={i} className="flex items-baseline gap-1">
+                            <span className="font-bold text-cyan text-xs truncate">
                               {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
                             </span>
-                            <span className="text-[10px] text-muted font-mono">{formatMoney(s.total_price)}</span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <span className="font-bold block text-cyan">
+                      <span className="font-bold block text-cyan text-xs truncate">
                         {p.services?.[0]?.service_name || p.service_name}
                       </span>
                     )}
-                    <span className="text-[11px] text-muted font-medium">{p.provider_name || '—'}</span>
+                    <span className="text-[10px] text-muted font-medium block truncate">{p.provider_name || '—'}</span>
                   </td>
 
                   {/* Summa */}
-                  <td className="td-cell whitespace-nowrap">
-                    <span className="accent-value font-mono font-black text-emerald">{formatMoney(p.payment_amount)}</span>
-                    <span className="badge badge-gold ml-1.5 text-[10px] uppercase font-bold">{paymentLabel(p.payment_type)}</span>
+                  <td className="p-2.5 whitespace-nowrap">
+                    <div className="flex items-center gap-1">
+                      <span className="font-mono font-black text-emerald text-xs">{formatMoney(p.payment_amount)}</span>
+                      <span className="badge badge-gold text-[9px] uppercase font-bold px-1 py-0">{paymentLabel(p.payment_type)}</span>
+                    </div>
                     {p.payment_type === 'split' && (
-                      <span className="block text-[10px] text-cyan-400 font-bold font-mono mt-0.5">
-                        {/* Har bir usul o'z nomi bilan ko'rinadi — avval hammasi "K" edi */}
+                      <span className="block text-[9px] text-cyan-400 font-bold font-mono">
                         {[
-                          (p.cash_amount || 0) > 0 && `💵 ${formatMoney(p.cash_amount)} naqd`,
-                          (p.card_amount || 0) > 0 && `💳 ${formatMoney(p.card_amount)} karta`,
-                          (p.click_amount || 0) > 0 && `📱 ${formatMoney(p.click_amount)} Click`,
-                          (p.qr_amount || 0) > 0 && `🔳 ${formatMoney(p.qr_amount)} QR`,
-                        ].filter(Boolean).join('  +  ')}
+                          (p.cash_amount || 0) > 0 && `${formatMoney(p.cash_amount)} N`,
+                          (p.card_amount || 0) > 0 && `${formatMoney(p.card_amount)} K`,
+                          (p.click_amount || 0) > 0 && `${formatMoney(p.click_amount)} Cl`,
+                          (p.qr_amount || 0) > 0 && `${formatMoney(p.qr_amount)} QR`,
+                        ].filter(Boolean).join(' + ')}
                       </span>
                     )}
                     {p.discount_amount > 0 && (
-                      <span className="block text-[10px] text-amber font-bold mt-0.5">
+                      <span className="block text-[9px] text-amber font-bold">
                         🏷️ chegirma −{formatMoney(p.discount_amount)}
                       </span>
                     )}
-                    {(p.services || []).length > 1 && (
-                      <span className="block text-[10px] text-muted mt-0.5">
-                        {p.services.length} ta xizmat
-                      </span>
-                    )}
                   </td>
 
-                  {/* Kabinet */}
-                  <td className="td-cell whitespace-nowrap">
-                    <span className="font-bold text-xs" style={{ color: 'var(--gold)' }}>
-                      {p.cabinet || '—'}
-                    </span>
+                  {/* Kabinet & Holat */}
+                  <td className="p-2.5 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-xs text-amber">{p.cabinet || '—'}</span>
+                      <StatusBadge status={p.queue_status} />
+                    </div>
                   </td>
 
-                  {/* Holat */}
-                  <td className="td-cell whitespace-nowrap">
-                    <StatusBadge status={p.queue_status} />
-                  </td>
-
-                  {/* Action Buttons */}
-                  <td className="py-2 px-3 whitespace-nowrap text-right align-middle">
+                  {/* Fast Action Button + 3 Dots Menu */}
+                  <td className="p-2.5 whitespace-nowrap text-right align-middle">
                     {p.is_cancelled ? (
-                      <div className="text-right">
-                        <span className="badge badge-danger text-[10px] font-black uppercase">
-                          ✗ Bekor qilingan
-                        </span>
-                        {p.cancel_reason && (
-                          <span className="block text-[10px] text-muted mt-0.5 no-underline">
-                            {p.cancel_reason}
-                          </span>
-                        )}
-                      </div>
+                      <span className="badge badge-danger text-[9px] font-black uppercase">
+                        ✗ Bekor qilingan
+                      </span>
                     ) : (
-                      <div className="flex items-center justify-end gap-1.5">
-                        {/* Eng ko'p ishlatiladigan ikkitasi ochiq turadi —
-                            qolgani ⋮ menyusida, joy tejash uchun */}
+                      <div className="flex items-center justify-end gap-1">
                         <Btn
                           variant="amber"
                           size="xs"
@@ -583,32 +566,19 @@ export default function TodayPatients() {
                           Chek
                         </Btn>
 
-                        {p.queue_status !== 'qabulda' && p.queue_status !== 'yakunlandi' ? (
-                          <Btn
-                            variant="success"
-                            size="xs"
-                            icon={Icons.bell}
-                            onClick={() => openCallModal(p)}
-                            title="Xonaga chaqirish"
-                          >
-                            Chaqir
-                          </Btn>
-                        ) : p.queue_status === 'qabulda' ? (
-                          <Btn
-                            variant="cyan"
-                            size="xs"
-                            icon={Icons.check}
-                            onClick={() => handleUpdateStatus(p.id, 'yakunlandi')}
-                            title="Qabulni yakunlash"
-                          >
-                            Tugatish
-                          </Btn>
-                        ) : (
-                          <span className="text-[10px] font-bold text-muted px-1.5">✓ Yakunlandi</span>
-                        )}
-
                         <ActionMenu
                           items={[
+                            p.queue_status !== 'qabulda' && p.queue_status !== 'yakunlandi' ? {
+                              label: 'Xonaga chaqirish',
+                              icon: Icons.bell,
+                              variant: 'success',
+                              onClick: () => openCallModal(p),
+                            } : p.queue_status === 'qabulda' ? {
+                              label: 'Qabulni yakunlash',
+                              icon: Icons.check,
+                              variant: 'cyan',
+                              onClick: () => handleUpdateStatus(p.id, 'yakunlandi'),
+                            } : null,
                             {
                               label: 'Bemor kartasi',
                               icon: Icons.folder,
@@ -636,7 +606,7 @@ export default function TodayPatients() {
                               variant: 'danger',
                               onClick: () => { setCancelPatient(p); setCancelReason('') },
                             },
-                          ]}
+                          ].filter(Boolean)}
                         />
                       </div>
                     )}

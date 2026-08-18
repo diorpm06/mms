@@ -50,6 +50,20 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
     })
   }, [open])
 
+  // Qidiruv kiritilganda birinchi mos kelgan xizmatni va narxni avtomatik tanlash
+  useEffect(() => {
+    if (!serviceSearch.trim() || !services.length) return
+    const q = serviceSearch.toLowerCase().trim()
+    const filtered = services.filter((s) =>
+      (s.name || '').toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q)
+    )
+    if (filtered.length > 0) {
+      const match = filtered[0]
+      setSelectedServiceId(match.id)
+      setPrice(match.price || 0)
+    }
+  }, [serviceSearch, services])
+
   if (!open || !patient) return null
 
   const handleServiceChange = (svcId) => {

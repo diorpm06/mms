@@ -582,7 +582,14 @@ export default function CeoPatients() {
                   <td className="p-3 text-muted font-mono text-xs">{formatDate(p.created_at)}</td>
 
                   <td className="p-3 text-body font-bold text-sm">
-                    {p.first_name} {p.last_name}
+                    <div className="flex items-center gap-1.5">
+                      <span>{p.first_name} {p.last_name}</span>
+                      {p.is_paper_entry ? (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold">📄 Navbatchilik</span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold">🟢 Jonli</span>
+                      )}
+                    </div>
                   </td>
 
                   <td className="p-3 text-muted font-mono text-xs">{p.phone || '—'}</td>
