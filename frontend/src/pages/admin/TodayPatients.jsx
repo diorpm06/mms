@@ -14,6 +14,41 @@ export default function TodayPatients() {
   const [callingId, setCallingId] = useState(null)
   const [cabinetInput, setCabinetInput] = useState('')
   const [selectedReceiptPatient, setSelectedReceiptPatient] = useState(null)
+
+  // Bir odamni tanish uchun kalit: telefon bo'lsa telefon, aks holda
+  // ism/familiya va tug'ilgan sana (hisobotlardagi bilan bir xil qoida).
+  const odamKaliti = (p) => {
+    const tel = (p.phone || '').trim()
+    if (tel && tel !== '+998') return `tel:${tel}`
+    return `ism:${(p.first_name || '').trim().toLowerCase()}|${(p.last_name || '').trim().toLowerCase()}|${p.birth_date || ''}`
+  }
+
+  // Chekni ochadi. Bemor kun davomida bir necha marta kassaga kelgan bo'lsa
+  // (alohida cheklar), hammasi BITTA chekka yig'iladi va umumiy summa
+  // ko'rsatiladi. Ilgari har bir kelish alohida chek bo'lib chiqardi.
+  const chekniOch = (p) => {
+    const kalit = odamKaliti(p)
+    const hammasi = (patients || []).filter(
+      (x) => !x.is_cancelled && odamKaliti(x) === kalit
+    )
+    if (hammasi.length <= 1) {
+      setSelectedReceiptPatient(p)
+      return
+    }
+    // To'lov turlari bo'yicha yig'indi ham qayta hisoblanadi — aks holda
+    // chek faqat bosilgan qatorning naqd/karta summasini ko'rsatardi.
+    const yig = (maydon) => hammasi.reduce((s, x) => s + (x[maydon] || 0), 0)
+    setSelectedReceiptPatient({
+      ...p,
+      batch: true,
+      patients: hammasi,
+      total_amount: yig('payment_amount'),
+      cash_amount: yig('cash_amount'),
+      card_amount: yig('card_amount'),
+      click_amount: yig('click_amount'),
+      qr_amount: yig('qr_amount'),
+    })
+  }
   const [ehrPatient, setEhrPatient] = useState(null)
   const [reRegisterPatient, setReRegisterPatient] = useState(null)
   const [reissuingId, setReissuingId] = useState(null)
@@ -564,8 +599,8 @@ export default function TodayPatients() {
                           variant="amber"
                           size="xs"
                           icon={Icons.printer}
-                          onClick={() => setSelectedReceiptPatient(p)}
-                          title="Talon va Chekni chop etish"
+                          onClick={() => chekniOch(p)}
+                          title="Talon va Chekni chop etish (bugungi barcha to'lovlari bitta chekda)"
                         >
                           Chek
                         </Btn>
