@@ -25,4 +25,10 @@ class PatientService(Base):
     unit_price: Mapped[int] = mapped_column(Integer, default=0)
     total_price: Mapped[int] = mapped_column(Integer, default=0)
 
+    # Bemor bir necha kunlik xizmatni OLDINDAN to'lashi mumkin (masalan 3 ta
+    # elektroforez). Shunda quantity=3 bo'ladi va bemor uch marta keladi.
+    # used_count nechta seans ishlatilganini ko'rsatadi: birinchi tashrif
+    # ro'yxatga olishning o'zida hisoblanadi, keyingilarida "Keldi" bosiladi.
+    used_count: Mapped[int] = mapped_column(Integer, default=1, nullable=True)
+
     service = relationship("Service")

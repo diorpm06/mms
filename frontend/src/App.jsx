@@ -62,6 +62,7 @@ const AdminReports = safeLazy(() => import('./pages/admin/Reports'))
 const TvQueueDisplay = safeLazy(() => import('./pages/TvQueueDisplay'))
 const DoctorPanel = safeLazy(() => import('./pages/doctor/DoctorPanel'))
 const DoctorResults = safeLazy(() => import('./pages/doctor/MyResults'))
+const Courses = safeLazy(() => import('./pages/admin/Courses'))
 const Appointments = safeLazy(() => import('./pages/admin/Appointments'))
 const Inventory = safeLazy(() => import('./pages/admin/Inventory'))
 const Payroll = safeLazy(() => import('./pages/ceo/Payroll'))
@@ -142,6 +143,7 @@ function AppRoutes() {
           <Route path="inventory" element={<Inventory />} />
           <Route path="report-queue" element={<AdminReportQueue />} />
           <Route path="new-patient" element={<NewPatient homePath="/ceo" />} />
+          <Route path="courses" element={<Courses />} />
           <Route path="search" element={<Search homePath="/ceo" />} />
           <Route path="patients" element={<CeoPatients />} />
           <Route path="services" element={<CeoServices />} />
@@ -174,6 +176,7 @@ function AppRoutes() {
           <Route path="report-queue" element={<AdminReportQueue />} />
           <Route path="new-patient" element={<NewPatient homePath="/admin" />} />
           <Route path="today" element={<TodayPatients />} />
+          <Route path="courses" element={<Courses />} />
           <Route path="patients" element={<CeoPatients />} />
           <Route path="catalog" element={<AdminCatalog />} />
           <Route path="tv-manager" element={<TvManagerDashboard />} />

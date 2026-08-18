@@ -38,12 +38,25 @@ class Patient(CancelMixin, TimestampMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     is_paper_entry: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Oldindan to'langan kursning navbatdagi tashrifi (2-, 3-kun). To'lov
+    # birinchi kuni olingan, shuning uchun bu yozuvda summa 0 bo'ladi va
+    # tushum hisobotiga qo'shilmaydi. Qaysi to'lovdan kelgani saqlanadi.
+    prepaid_from_id: Mapped[int | None] = mapped_column(
+        ForeignKey("patient_services.id"), nullable=True, index=True
+    )
 
     referrer = relationship("Referrer", foreign_keys=[referrer_id])
     provider = relationship("Provider")
     service = relationship("Service")
     creator = relationship("User", foreign_keys=[created_by])
-    # Bemor olgan barcha xizmatlar (service_id faqat asosiysini saqlaydi)
+    # Bemor olgan barcha xizmatlar (service_id faqat asosiysini saqlaydi).
+    #
+    # foreign_keys ANIQ ko'rsatilgan: prepaid_from_id qo'shilgach ikki jadval
+    # o'rtasida ikkita tashqi kalit yo'li paydo bo'ldi va SQLAlchemy qaysi
+    # biri bo'yicha bog'lashni bilmay qoldi.
     services_detail = relationship(
-        "PatientService", cascade="all, delete-orphan", lazy="selectin"
+        "PatientService",
+        foreign_keys="PatientService.patient_id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )

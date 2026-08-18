@@ -239,6 +239,9 @@ def _patient_row(p: Patient) -> dict:
         "is_cancelled": p.is_cancelled,
         "cancel_reason": p.cancel_reason,
         "is_paper_entry": bool(p.is_paper_entry),
+        # Oldindan to'langan kursning navbatdagi tashrifi bo'lsa — to'lov 0
+        "prepaid_from_id": p.prepaid_from_id,
+        "is_prepaid_visit": p.prepaid_from_id is not None,
         "ticket_number": p.ticket_number or f"A-{p.id:03d}",
         "queue_status": p.queue_status or "kutmoqda",
         "cabinet": p.cabinet,
@@ -252,12 +255,18 @@ def _patient_row(p: Patient) -> dict:
         # xizmatni ko'rsatadi — ro'yxatlarda hammasi ko'rinishi uchun shu kerak.
         "services": [
             {
+                "patient_service_id": ps.id,
                 "service_id": ps.service_id,
                 "service_name": ps.service.name if ps.service else None,
                 "category": ps.service.category if ps.service else "Umumiy",
                 "quantity": ps.quantity,
                 "unit_price": ps.unit_price,
                 "total_price": ps.total_price,
+                # Bir necha kunlik oldindan to'lov bo'lsa — chekda va
+                # ro'yxatlarda qolgan kun ko'rsatiladi
+                "used_count": int(ps.used_count if ps.used_count is not None else 1),
+                "remaining": max(0, int(ps.quantity or 1)
+                                 - int(ps.used_count if ps.used_count is not None else 1)),
             }
             for ps in (p.services_detail or [])
         ],

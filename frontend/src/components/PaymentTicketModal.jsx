@@ -113,6 +113,24 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
     }
   })
 
+  // Bir necha kunga oldindan to'langan xizmatlar (masalan 3 ta elektroforez).
+  // Bularni chekda ALOHIDA, ko'rinarli qutida ko'rsatamiz — bemor 2- va
+  // 3-kuni kelganda qayta to'lov so'ralmasligi uchun.
+  const kurslar = []
+  patientList.forEach((p) => {
+    ;(p.services || []).forEach((s) => {
+      const soni = Number(s.quantity) || 1
+      if (soni > 1) {
+        kurslar.push({
+          nomi: cleanServiceName(s.service_name),
+          soni,
+          ishlatilgan: Number(s.used_count) || 1,
+          narx: s.total_price || 0,
+        })
+      }
+    })
+  })
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
       {/* ── PRINT STYLES ── */}
@@ -264,6 +282,43 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
                 </div>
               ))}
             </div>
+
+            {/* ── OLDINDAN TO'LANGAN KURS ──────────────────────────────
+                Bemor bir necha kunlik xizmatni bir marta to'lagan. Chekda buni
+                ko'rinarli qilib yozamiz: keyingi kunlarda qayta pul so'ralmasin
+                va bemorning qo'lida dalil bo'lsin. */}
+            {kurslar.length > 0 && (
+              <div className="border-2 border-slate-900 rounded p-1.5 my-1.5 space-y-1">
+                <div className="text-center font-black text-[11px] tracking-wide text-slate-900 border-b border-slate-400 pb-0.5">
+                  OLDINDAN TO'LANGAN
+                </div>
+                {kurslar.map((k, i) => (
+                  <div key={i} className="space-y-0.5">
+                    <div className="flex justify-between text-[10px] font-bold text-slate-900">
+                      <span>{k.nomi}</span>
+                      <span className="font-mono">{k.soni} KUN</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 justify-center pt-0.5">
+                      {Array.from({ length: k.soni }).map((_, n) => (
+                        <span
+                          key={n}
+                          className={`text-[9px] font-mono border border-slate-700 rounded px-1 py-[1px] ${
+                            n < k.ishlatilgan ? 'bg-slate-900 text-white font-black' : 'text-slate-700'
+                          }`}
+                        >
+                          {n + 1}-kun{n < k.ishlatilgan ? ' ✓' : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div className="text-center text-[9px] font-bold text-slate-900 border-t border-slate-400 pt-0.5">
+                  Keyingi kunlarda QAYTA TO'LOV OLINMAYDI.
+                  <br />
+                  Ushbu chekni saqlang va har kelganingizda ko'rsating.
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-between border-b border-slate-200 pb-1 pt-1">
               <span className="text-slate-600 font-bold">To'lov Turi:</span>

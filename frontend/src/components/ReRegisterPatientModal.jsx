@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Plus, Trash2, Search, Check, Stethoscope, CreditCard } from 'lucide-react'
+import { X, Plus, Trash2, Search, Check, Stethoscope, CreditCard, UserPlus } from 'lucide-react'
 import { api } from '../utils/api'
 import { formatMoney } from '../utils/format'
 import { useToastStore } from '../store/toastStore'
@@ -28,6 +28,18 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
   const [cashAmount, setCashAmount] = useState(0)
   const [cardAmount, setCardAmount] = useState(0)
   
+  // Quick Add Referrer Modal State
+  const [newRefModal, setNewRefModal] = useState(false)
+  const [newRefForm, setNewRefForm] = useState({
+    full_name: '',
+    phone: '',
+    lab_percent: 22,
+    fizio_percent: 20,
+    uzi_sum: 15000,
+    ozon_sum: 10000,
+  })
+  const [savingRef, setSavingRef] = useState(false)
+
   const [loading, setLoading] = useState(false)
   const toast = useToastStore((s) => s.add)
 
@@ -44,7 +56,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
       setServiceSearch('')
       setDiscountAmount(0)
       setDiscountReason('')
-      // Boshlanishida bitta bo'sh xizmat qatorini yaratamiz (avtomatik UZI tanlanmasligi uchun)
+      // Boshlanishida bitta bo'sh xizmat qatorini yaratamiz
       setSelectedServices([
         { service_id: '', price: 0, quantity: 1, provider_id: null }
       ])
@@ -68,7 +80,6 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
     if (svcObj) {
       const autoDoctorId = findMatchingDoctor(svcObj.id)
       setSelectedServices((prev) => {
-        // Agar birinchi qator bo'sh bo'lsa, o'shani to'ldiramiz
         if (prev.length === 1 && !prev[0].service_id) {
           return [{
             service_id: svcObj.id,
@@ -102,7 +113,6 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
 
   const removeServiceRow = (index) => {
     if (selectedServices.length <= 1) {
-      // Oxirgi qatorni tozalaymiz
       setSelectedServices([{ service_id: '', price: 0, quantity: 1, provider_id: null }])
       return
     }
@@ -126,6 +136,45 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
       }
       return copy
     })
+  }
+
+  const handleQuickAddReferrer = async (e) => {
+    if (e) e.preventDefault()
+    if (!newRefForm.full_name.trim()) {
+      toast("Yo'naltiruvchi ismini kiriting", 'error')
+      return
+    }
+    setSavingRef(true)
+    try {
+      const res = await api('/referrers', {
+        method: 'POST',
+        body: JSON.stringify({
+          full_name: newRefForm.full_name.trim(),
+          phone: newRefForm.phone ? newRefForm.phone.trim() : '',
+          percentage: Number(newRefForm.fizio_percent) || 20,
+          lab_percent: Number(newRefForm.lab_percent) || 22,
+          fizio_percent: Number(newRefForm.fizio_percent) || 20,
+          uzi_sum: Number(newRefForm.uzi_sum) || 15000,
+          ozon_sum: Number(newRefForm.ozon_sum) || 10000,
+        }),
+      })
+      toast("✓ Yangi yo'naltiruvchi muvaffaqiyatli saqlandi va tanlandi!")
+      setReferrers((prev) => [...prev, res])
+      setSelectedReferrerId(String(res.id))
+      setNewRefModal(false)
+      setNewRefForm({
+        full_name: '',
+        phone: '',
+        lab_percent: 22,
+        fizio_percent: 20,
+        uzi_sum: 15000,
+        ozon_sum: 10000,
+      })
+    } catch (err) {
+      toast(err.message || "Yo'naltiruvchini saqlashda xatolik", 'error')
+    } finally {
+      setSavingRef(false)
+    }
   }
 
   // Calculate Total Base Price across all selected services with quantities
@@ -161,7 +210,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
         card_amount: paymentType === 'aralash'
           ? Number(cardAmount)
           : (['karta', 'click'].includes(paymentType) ? finalAmount : 0),
-        confirm_duplicate: true, // Qayta xizmatga yozishda 409 duplicate xatosini oldini olish
+        confirm_duplicate: true,
         services: validServices.map((s) => ({
           service_id: Number(s.service_id),
           provider_id: s.provider_id ? Number(s.provider_id) : null,
@@ -178,7 +227,6 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
         })
       } catch (err) {
         if (err.status === 409) {
-          // Agar baribir 409 bersa (majburiy confirm_duplicate bilan qayta yuboramiz)
           res = await api('/patients', {
             method: 'POST',
             body: JSON.stringify({ ...payload, confirm_duplicate: true }),
@@ -369,9 +417,20 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
             </div>
           </div>
 
-          {/* Select Referrer */}
+          {/* Select Referrer with Quick Add */}
           <div>
-            <label className="form-label text-xs font-bold text-muted">🤝 Yo'naltiruvchi Shifokor / Muassasa (Ixtiyoriy)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="form-label text-xs font-bold text-muted mb-0">
+                🤝 Yo'naltiruvchi Shifokor / Muassasa (Ixtiyoriy)
+              </label>
+              <button
+                type="button"
+                onClick={() => setNewRefModal(true)}
+                className="text-xs font-bold text-cyan hover:text-cyan-300 flex items-center gap-1 bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20 transition-all"
+              >
+                <Plus className="h-3 w-3" /> Yangi yo'naltiruvchi
+              </button>
+            </div>
             <select
               className="input-field text-xs text-muted py-2"
               value={selectedReferrerId}
@@ -441,6 +500,98 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
             </Btn>
           </div>
         </form>
+
+        {/* Quick Add Referrer Sub-Modal */}
+        {newRefModal && (
+          <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="card max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 border border-cyan-500/40">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 text-cyan" />
+                  <h4 className="text-sm font-black text-cyan uppercase tracking-wide">
+                    Yangi Yo'naltiruvchi Qo'shish
+                  </h4>
+                </div>
+                <button type="button" onClick={() => setNewRefModal(false)} className="text-muted hover:text-white">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="form-label font-bold text-gold">F.I.Sh / Muassasa Nomi *</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="Masalan: Dr. Karimov"
+                    value={newRefForm.full_name}
+                    onChange={(e) => setNewRefForm({ ...newRefForm, full_name: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label font-bold">Telefon raqami</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="+998 90 123 45 67"
+                    value={newRefForm.phone}
+                    onChange={(e) => setNewRefForm({ ...newRefForm, phone: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/40">
+                  <div>
+                    <label className="form-label text-[11px]">Laboratoriya (%)</label>
+                    <input
+                      type="number"
+                      className="input-field text-center font-bold"
+                      value={newRefForm.lab_percent}
+                      onChange={(e) => setNewRefForm({ ...newRefForm, lab_percent: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label text-[11px]">Fizioterapiya (%)</label>
+                    <input
+                      type="number"
+                      className="input-field text-center font-bold"
+                      value={newRefForm.fizio_percent}
+                      onChange={(e) => setNewRefForm({ ...newRefForm, fizio_percent: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label text-[11px]">UZI ulushi (so'm)</label>
+                    <input
+                      type="number"
+                      className="input-field text-center font-bold"
+                      value={newRefForm.uzi_sum}
+                      onChange={(e) => setNewRefForm({ ...newRefForm, uzi_sum: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label text-[11px]">Ozon ulushi (so'm)</label>
+                    <input
+                      type="number"
+                      className="input-field text-center font-bold"
+                      value={newRefForm.ozon_sum}
+                      onChange={(e) => setNewRefForm({ ...newRefForm, ozon_sum: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Btn variant="ghost" full size="xs" onClick={() => setNewRefModal(false)} type="button">
+                  Bekor
+                </Btn>
+                <Btn variant="cyan" full size="xs" onClick={handleQuickAddReferrer} loading={savingRef} type="button">
+                  Saqlash va Tanlash
+                </Btn>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   )

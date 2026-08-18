@@ -24,7 +24,7 @@ from services.inpatient_accrual import (
     reverse_inpatient_accruals,
     sync_inpatient_accruals,
 )
-from services.telegram_notify import send_telegram_message
+from services.telegram_notify import send_telegram_background, send_telegram_message
 
 router = APIRouter(prefix="/api/inpatients", tags=["inpatients"])
 

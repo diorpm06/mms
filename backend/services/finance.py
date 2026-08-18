@@ -153,15 +153,17 @@ def get_referrer_rates_for_service(referrer, service, db: Session | None = None)
         if oz_sessiyam:
             db.close()
 
-    kalit = main_category(getattr(service, "category", None)).lower()
-    rejim, qiymat = istisnolar.get((referrer.id, kalit)) or bolimlar.get(kalit) or ("none", 0)
+    cat_name = main_category(getattr(service, "category", None)).lower()
+    svc_name = (getattr(service, "name", None) or "").lower()
+    c_name = f"{cat_name} {svc_name}"
+
+    rejim, qiymat = istisnolar.get((referrer.id, cat_name)) or bolimlar.get(cat_name) or ("none", 0)
 
     if rejim == "percent":
         return int(qiymat), 0
     if rejim == "sum":
         return 0, int(qiymat)
     
-    c_name = kalit
     # 1. Laboratoriya
     if any(k in c_name for k in [
         "labora", "tahlil", "gormon", "infeksiya", "biokimyo", "klinik",
@@ -171,26 +173,30 @@ def get_referrer_rates_for_service(referrer, service, db: Session | None = None)
         pct = getattr(referrer, "lab_percent", 22)
         return (pct if pct is not None and pct > 0 else 22), 0
 
-    # 2. Fizioterapiya
-    if any(k in c_name for k in [
-        "fizio", "terapiya", "aktivator", "lazer", "magnit", "elektro",
-        "parafin", "xijoma", "ultrazvuk", "uvch", "darsanval", "tubus",
-        "limfo", "traksion", "gidro", "cho'zish", "iglo", "bochka"
-    ]):
-        pct = getattr(referrer, "fizio_percent", 20)
-        return (pct if pct is not None and pct > 0 else 20), 0
-
-    # 3. UZI
+    # 2. UZI
     if any(k in c_name for k in ["uzi", "ultratovush", "mashonka"]):
         s_val = getattr(referrer, "uzi_sum", 15000)
         return 0, (s_val if s_val is not None and s_val > 0 else 15000)
 
-    # 4. Ozonaterapiya
+    # 3. Ozonaterapiya
     if any(k in c_name for k in ["ozon", "ozonoterap", "ozonaterap"]):
         s_val = getattr(referrer, "ozon_sum", 10000)
         return 0, (s_val if s_val is not None and s_val > 0 else 10000)
 
-    # Qolgan barcha xizmatlar (EKG, Konsultatsiya, Massaj va h.k.) -> 0 so'm
+    # 4. Fizioterapiya & Massaj
+    if any(k in c_name for k in [
+        "fizio", "terapiya", "aktivator", "lazer", "magnit", "elektro",
+        "parafin", "xijoma", "ultrazvuk", "uvch", "darsanval", "tubus",
+        "limfo", "traksion", "gidro", "cho'zish", "iglo", "bochka", "massaj", "массаж"
+    ]):
+        pct = getattr(referrer, "fizio_percent", 20)
+        return (pct if pct is not None and pct > 0 else 20), 0
+
+    # 5. Qolgan barcha xizmatlar uchun yo'naltiruvchining umumiy yoki fizio foizini qo'llash
+    gen_pct = getattr(referrer, "percentage", 0) or getattr(referrer, "fizio_percent", 20)
+    if gen_pct and gen_pct > 0:
+        return int(gen_pct), 0
+
     return 0, 0
 
 
