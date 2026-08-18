@@ -8,6 +8,7 @@ import Modal from '../../components/Modal'
 import InpatientReceiptModal from '../../components/InpatientReceiptModal'
 import VisualRoomMap from '../../components/VisualRoomMap'
 import InpatientDetailsModal from '../../components/InpatientDetailsModal'
+import ActionMenu from '../../components/ActionMenu'
 
 export default function CeoInpatients() {
   const [active, setActive] = useState([])
@@ -539,15 +540,24 @@ export default function CeoInpatients() {
             {active.map((i) => (
               <tr key={i.id} className="hover:bg-surface-hover transition-colors">
                 <td className="p-3 font-bold text-foreground">
-                  <div>{i.first_name} {i.last_name}</div>
-                  <div className="text-xs text-muted font-normal">{i.doctor_name ? `Dr. ${i.doctor_name}` : ''}</div>
+                  <button
+                    type="button"
+                    onClick={() => setViewPatientModal(i)}
+                    className="hover:underline hover:text-cyan-400 text-left font-extrabold"
+                    title="Bemor kartasini ko'rish"
+                  >
+                    {i.first_name} {i.last_name}
+                  </button>
+                  <div className="text-xs text-muted font-normal">
+                    {i.doctor_name ? (i.doctor_name.toLowerCase().startsWith('dr.') ? i.doctor_name : `Dr. ${i.doctor_name}`) : ''}
+                  </div>
                 </td>
                 <td className="p-3 font-mono font-bold text-cyan-400">{i.room_number}/{i.bed_number}</td>
                 <td className="p-3">
                   <div className="font-bold">{i.tariff_name || 'Standart'}</div>
                   <div className="text-xs text-muted font-mono">{formatMoney(i.daily_rate)}/kun</div>
                 </td>
-                <td className="p-3 font-bold">{i.days}{i.planned_days ? ` / ${i.planned_days}` : ''} kun</td>
+                <td className="p-3 font-bold">{i.days || i.days_count || 1}{i.planned_days ? ` / ${i.planned_days}` : ''} kun</td>
                 <td className="p-3 font-mono font-bold text-foreground">
                   {formatMoney(i.total_amount)}
                   {i.extra_items_total > 0 && (
@@ -570,49 +580,58 @@ export default function CeoInpatients() {
                     </span>
                   )}
                 </td>
-                <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
-                  <button
-                    type="button"
-                    className="btn-outline text-xs py-1 px-2.5 border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/40 font-bold"
-                    title="Qo'shimcha tahlil, xizmat yoki dori biriktirish"
-                    onClick={() => {
-                      setItemForm({ item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false })
-                      setItemModal(i)
-                    }}
-                  >
-                    🧪 + Xizmat/Dori
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-outline text-xs py-1 px-2 border-amber-500/30 text-amber-300"
-                    title="To'lov kiritish (Bosh to'lov/Oraliq)"
-                    onClick={() => {
-                      setPayForm({ amount: '', payment_type: 'cash', payment_stage: 'interim', days_count: 1, cash_amount: '', card_amount: '', click_amount: '', qr_amount: '' })
-                      setPayModal(i)
-                    }}
-                  >
-                    💳 To'lov
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-gold text-xs py-1 px-2"
-                    onClick={() => {
-                      const rem = i.balance_due !== undefined ? i.balance_due : Math.max(0, (i.total_amount || 0) - (i.paid_total || 0))
-                      setDischargeForm({
-                        discharged_at: new Date().toISOString().slice(0, 10),
-                        payment_type: 'cash',
-                        days_count: i.planned_days || i.days || 1,
-                        amount: rem > 0 ? String(rem) : '0',
-                        cash_amount: '', card_amount: '', click_amount: '', qr_amount: ''
-                      })
-                      setDischargeModal(i)
-                    }}
-                  >
-                    Chiqarish
-                  </button>
-                  <button type="button" className="btn-ghost text-xs text-rose-400 py-1 px-2" onClick={() => handleCancelInpatient(i.id)}>
-                    Bekor
-                  </button>
+                <td className="p-3 text-right">
+                  <ActionMenu
+                    title="Amallar"
+                    items={[
+                      {
+                        label: '👁️ Bemor kartochkasi',
+                        variant: 'gold',
+                        onClick: () => setViewPatientModal(i),
+                      },
+                      {
+                        label: '🧪 + Xizmat/Dori qo\'shish',
+                        variant: 'default',
+                        onClick: () => {
+                          setItemForm({ item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false })
+                          setItemModal(i)
+                        },
+                      },
+                      {
+                        label: '💳 To\'lov kiritish',
+                        variant: 'success',
+                        onClick: () => {
+                          setPayForm({ amount: '', payment_type: 'cash', payment_stage: 'interim', days_count: 1, cash_amount: '', card_amount: '', click_amount: '', qr_amount: '' })
+                          setPayModal(i)
+                        },
+                      },
+                      {
+                        label: '🧾 Chek chiqarish',
+                        variant: 'gold',
+                        onClick: () => setSelectedReceipt({ ...i, status: 'yotmoqda' }),
+                      },
+                      {
+                        label: '🚪 Chiqarish (Выписка)',
+                        variant: 'gold',
+                        onClick: () => {
+                          const rem = i.balance_due !== undefined ? i.balance_due : Math.max(0, (i.total_amount || 0) - (i.paid_total || 0))
+                          setDischargeForm({
+                            discharged_at: new Date().toISOString().slice(0, 10),
+                            payment_type: 'cash',
+                            days_count: i.planned_days || i.days || 1,
+                            amount: rem > 0 ? String(rem) : '0',
+                            cash_amount: '', card_amount: '', click_amount: '', qr_amount: ''
+                          })
+                          setDischargeModal(i)
+                        },
+                      },
+                      {
+                        label: '❌ Yotishni bekor qilish',
+                        variant: 'danger',
+                        onClick: () => handleCancelInpatient(i.id),
+                      },
+                    ]}
+                  />
                 </td>
               </tr>
             ))}
