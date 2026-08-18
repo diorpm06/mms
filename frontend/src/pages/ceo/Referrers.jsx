@@ -1003,39 +1003,30 @@ export default function CeoReferrers() {
                               )}
                             </td>
 
-                            {/* Harakatlar (Actions) */}
-                            <td className="td-cell whitespace-nowrap">
-                              <ActionRow>
-                                {r.net_payable > 0 && (
-                                  <Btn
-                                    variant="success"
-                                    size="xs"
-                                    icon={Icons.arrowDown}
-                                    onClick={() => payout(r.referrer_id)}
-                                    title="10-kunlik hisobni to'lash (Balansni chiqarish)"
-                                  >
-                                    Chiqarish
-                                  </Btn>
-                                )}
-
-                                <Btn
-                                  variant={isDeferred ? "cyan" : "amber"}
-                                  size="xs"
-                                  onClick={() => toggleDefer(r.referrer_id)}
-                                  title={isDeferred ? "Kechiktirishni bekor qilish" : "To'lovni keyinroqqa surish"}
-                                >
-                                  {isDeferred ? "Hozir to'lash" : "Keyinroq"}
-                                </Btn>
-
-                                <Btn
-                                  variant="outline"
-                                  size="xs"
-                                  onClick={() => openPrintVoucher(r)}
-                                  title="10-kunlik hujjatingizni chop etish"
-                                >
-                                  🖨️ Chop etish
-                                </Btn>
-                              </ActionRow>
+                            {/* Harakatlar (Actions - 3 Dots Menu) */}
+                            <td className="td-cell whitespace-nowrap text-center">
+                              <ActionMenu
+                                items={[
+                                  {
+                                    label: "Chiqarish (Balans to'lovi)",
+                                    icon: Icons.arrowDown,
+                                    variant: "success",
+                                    hidden: !(r.net_payable > 0),
+                                    onClick: () => payout(r.referrer_id),
+                                  },
+                                  {
+                                    label: isDeferred ? "Hozir to'lash (Tayyor)" : "Keyinroqqa surish (Kechiktirish)",
+                                    icon: Icons.clock,
+                                    variant: isDeferred ? "cyan" : "amber",
+                                    onClick: () => toggleDefer(r.referrer_id),
+                                  },
+                                  {
+                                    label: "Chop etish (10-kunlik Hujjat)",
+                                    icon: Icons.printer,
+                                    onClick: () => openPrintVoucher(r),
+                                  },
+                                ]}
+                              />
                             </td>
                           </tr>
                         )
