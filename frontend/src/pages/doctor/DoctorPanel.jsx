@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../utils/api'
 import { useAuthStore } from '../../store/authStore'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   UserCheck,
   PhoneOff,
@@ -920,125 +920,44 @@ export default function DoctorPanel() {
         )}
       </div>
 
-      {/* ── TO'LDIRILGAN NATIJALAR ──────────────────────────────────────
-          Shifokor blankani to'ldirib SAQLAYDI — natija shu yerda yig'ilib
-          turadi. Keyin bir yoki bir nechtasini belgilab, bitta tugma bilan
-          adminga yuboradi. Ilgari har bir blanka to'ldirilishi bilan darrov
-          adminga ketardi va tuzatish imkoni bo'lmasdi. */}
-      <div className="card p-0 overflow-hidden border-gold/30">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-surface-2 border-b border-border">
-          <div className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-gold" />
-            <h3 className="font-extrabold text-xs uppercase tracking-wider text-gold">
-              To'ldirilgan natijalar
-            </h3>
-            <span className="badge badge-muted text-[10px] font-bold">
-              {drafts.length} ta yuborilmagan
-            </span>
-          </div>
-
-          {drafts.length > 0 && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedDrafts(
-                    selectedDrafts.length === drafts.length ? [] : drafts.map((d) => d.id)
-                  )
-                }
-                className="text-[11px] font-bold text-cyan hover:underline"
-              >
-                {selectedDrafts.length === drafts.length ? 'Belgini olib tashlash' : 'Hammasini belgilash'}
-              </button>
-
-              <Btn
-                variant="gold"
-                size="sm"
-                icon={<Send className="h-4 w-4" />}
-                loading={sendingDrafts}
-                disabled={selectedDrafts.length === 0}
-                onClick={handleSendDrafts}
-                className="font-black"
-              >
-                Adminga yuborish ({selectedDrafts.length})
-              </Btn>
-            </div>
-          )}
-        </div>
-
-        <div className="p-4">
-          {draftsLoading ? (
-            <p className="text-xs text-muted italic text-center py-6">Yuklanmoqda...</p>
-          ) : drafts.length === 0 ? (
-            <div className="py-8 text-center space-y-2">
-              <div className="text-3xl">📋</div>
-              <p className="text-xs text-muted font-bold">Yuborilmagan natija yo'q</p>
-              <p className="text-[11px] text-muted max-w-sm mx-auto">
-                Bemorni chaqirib, <strong>"Natija blankasini to'ldirish"</strong> tugmasi
-                bilan blankani to'ldiring va saqlang — natija shu yerga tushadi.
+      {/* ── YUBORILMAGAN NATIJALAR (ixcham) ──────────────────────────
+          To'liq ro'yxat, ko'rish va o'chirish "Natijalarim" sahifasida.
+          Bu yerda faqat eslatma turadi — panel tartibli qolishi uchun. */}
+      {drafts.length > 0 && (
+        <div className="card p-3.5 flex flex-wrap items-center justify-between gap-3 border-gold/40 bg-gold/[0.05]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <ClipboardList className="h-5 w-5 text-gold shrink-0" />
+            <div className="min-w-0">
+              <p className="font-extrabold text-sm text-body">
+                {drafts.length} ta natija adminga yuborilmagan
+              </p>
+              <p className="text-[11px] text-muted font-semibold truncate">
+                {drafts.slice(0, 3).map((d) => d.patient_name).join(', ')}
+                {drafts.length > 3 ? ` va yana ${drafts.length - 3} ta` : ''}
               </p>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {drafts.map((d) => {
-                const belgilangan = selectedDrafts.includes(d.id)
-                return (
-                  <div
-                    key={d.id}
-                    className={`flex flex-wrap items-center gap-3 p-3 rounded-xl border transition-all ${
-                      belgilangan
-                        ? 'border-gold/50 bg-gold/[0.07]'
-                        : 'border-border bg-surface-2/40'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={belgilangan}
-                      onChange={() => toggleDraft(d.id)}
-                      className="rounded accent-gold h-4 w-4 shrink-0"
-                    />
+          </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="badge badge-cyan text-[10px] font-bold">
-                          {d.category === 'UZI' ? '🩻 UZI' : '🔬 Lab'}
-                        </span>
-                        <h4 className="font-extrabold text-sm text-body truncate">
-                          {d.template_label}
-                        </h4>
-                      </div>
-                      <p className="text-[11px] text-muted font-semibold mt-0.5">
-                        {d.ticket_number ? `${d.ticket_number} · ` : ''}
-                        {d.patient_name}
-                        {d.created_at ? ` · ${d.created_at.split('T')[1]?.substring(0, 5)}` : ''}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Btn
-                        variant="ghost"
-                        size="xs"
-                        icon={<Eye className="h-3.5 w-3.5" />}
-                        onClick={() => setPreviewDraft(d)}
-                      >
-                        Ko'rish
-                      </Btn>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteDraft(d)}
-                        className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/15 transition-colors"
-                        title="O'chirish"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Link to="/doctor/natijalar" className="text-xs font-bold text-cyan hover:underline">
+              Ro'yxatni ochish
+            </Link>
+            <Btn
+              variant="gold"
+              size="sm"
+              icon={<Send className="h-4 w-4" />}
+              loading={sendingDrafts}
+              onClick={() => {
+                setSelectedDrafts(drafts.map((d) => d.id))
+                handleSendDrafts()
+              }}
+              className="font-black"
+            >
+              Hammasini yuborish
+            </Btn>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── QUEUE LIST TABS (WAITING / HISTORY) ── */}
       <div className="card p-0 overflow-hidden border-border">

@@ -111,6 +111,24 @@ def list_my_drafts(
     return [_row(r) for r in rows]
 
 
+@router.get("/mine")
+def list_my_reports(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_doctor_or_admin_or_ceo),
+):
+    """Shifokorning barcha natijalari — saqlangani ham, yuborilgani ham."""
+    rows = (
+        db.query(ReportSubmission)
+        .options(joinedload(ReportSubmission.patient))
+        .filter(ReportSubmission.doctor_id == user.id)
+        .order_by(ReportSubmission.created_at.desc())
+        .limit(max(1, min(limit, 500)))
+        .all()
+    )
+    return [_row(r) for r in rows]
+
+
 @router.post("/submit")
 def submit_drafts(
     body: YuborishBody,

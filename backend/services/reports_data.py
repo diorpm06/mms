@@ -225,11 +225,11 @@ def get_report(db: Session, start: date, end: date) -> dict:
 
     inpatient_counts = (
         db.query(
-            func.count(case((Inpatient.status == "yotibdi", Inpatient.id))),
+            func.count(case((Inpatient.status.in_(["yotibdi", "yotmoqda"]), Inpatient.id))),
             func.count(case(
                 (and_(
                     Inpatient.discharged_at >= s, Inpatient.discharged_at <= e,
-                    Inpatient.status == "chiqdi",
+                    Inpatient.status.in_(["chiqdi", "discharged"]),
                 ), Inpatient.id)
             )),
         )

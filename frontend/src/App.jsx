@@ -39,6 +39,7 @@ const AdminCatalog = lazy(() => import('./pages/admin/Catalog'))
 const AdminReports = lazy(() => import('./pages/admin/Reports'))
 const TvQueueDisplay = lazy(() => import('./pages/TvQueueDisplay'))
 const DoctorPanel = lazy(() => import('./pages/doctor/DoctorPanel'))
+const DoctorResults = lazy(() => import('./pages/doctor/MyResults'))
 const Appointments = lazy(() => import('./pages/admin/Appointments'))
 const Inventory = lazy(() => import('./pages/admin/Inventory'))
 const Payroll = lazy(() => import('./pages/ceo/Payroll'))
@@ -110,6 +111,7 @@ function AppRoutes() {
         <Route path="/queue" element={<TvQueueDisplay />} />
         <Route path="/doctor" element={<DoctorLayout />}>
           <Route index element={<DoctorPanel />} />
+          <Route path="natijalar" element={<DoctorResults />} />
         </Route>
         <Route path="/ceo" element={<CeoLayout />}>
           <Route index element={<CeoDashboard />} />

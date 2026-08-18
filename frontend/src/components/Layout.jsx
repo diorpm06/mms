@@ -47,6 +47,8 @@ const ADMIN_LINKS = [
 
 const DOCTOR_LINKS = [
   { to: '/doctor',              label: 'Doctor Paneli',         icon: '🩺', end: true },
+  { to: '/doctor/natijalar',    label: 'Natijalarim',           icon: '📋' },
+  { to: '/tv',                  label: 'TV Navbat Ekrani',      icon: '📺', external: true },
 ]
 
 
