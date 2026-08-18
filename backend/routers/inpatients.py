@@ -137,18 +137,13 @@ class CancelBody(BaseModel):
 # SERIALIZATION & HELPERS
 # -------------------------------------------------------------------------
 def _telegram_yubor(matn: str) -> None:
-    """Telegram xabarini yuboradi va tugashini kutadi.
-
-    Ilgari bu alohida fon oqimida (daemon) yuborilardi — Vercel'da
-    so'rov tugashi bilan oqim o'ldirilar va xabar hech qachon yetib bormasdi.
-    Harajatlar bo'limida bu allaqachon tuzatilgan, endi statsionarda ham.
+    """Telegram xabarini alohida fon oqimida (non-blocking thread) yuboradi.
+    API javobi 0.1 millisekundda qaytadi va telegram sababli aylanib (hang) qolmaydi.
     """
-    import asyncio
-    import logging
-
     try:
-        asyncio.run(send_telegram_message(matn, section="inpatients"))
+        send_telegram_background(matn, section="inpatients")
     except Exception as e:
+        import logging
         logging.getLogger(__name__).warning("Statsionar telegram xabari yuborilmadi: %s", e)
 
 

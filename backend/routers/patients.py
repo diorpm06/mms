@@ -432,7 +432,8 @@ def _sync_patient_background(patient_ids: list, user_role: str, first_name: str,
             f"💰 Jami: {total_batch_paid:,} so'm\n"
             f"💼 Balans: {report['current_balance']:,} so'm"
         ).replace(",", " ")
-        asyncio.run(send_telegram_message(msg, section="registration"))
+        from services.telegram_notify import send_telegram_background
+        send_telegram_background(msg, section="registration")
     except Exception as ex:
         print(f"[BG Task Error]: {ex}")
     finally:

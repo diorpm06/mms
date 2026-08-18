@@ -12,7 +12,7 @@ from models.expense import Expense
 from models.user import User
 from schemas import ExpenseCreate, ExpenseOut
 from services.finance import process_expense
-from services.telegram_notify import send_telegram_message
+from services.telegram_notify import send_telegram_background, send_telegram_message
 
 logger = logging.getLogger(__name__)
 
@@ -247,12 +247,11 @@ def create_expense(
     # bildirishnomalari Telegramga umuman bormagani shundan. Ustiga, ichidagi
     # har qanday xato ham jimgina yutilardi.
     # Endi ro'yxatga olishdagi kabi kutamiz va xatoni log qilamiz.
-    import asyncio
     try:
-        asyncio.run(send_telegram_message(
+        send_telegram_background(
             f"💸 Harajat: {data.amount:,} so'm\n📁 {data.category or 'Boshqa'}\n🧾 {data.description}".replace(",", " "),
             section="finance",
-        ))
+        )
     except Exception as err:
         logger.warning(f"Telegram xabari yuborilmadi (harajat): {err}")
     return _expense_out(expense)
@@ -273,12 +272,11 @@ def _perform_expense_cancel(e: Expense, reason: str, user: User, db: Session):
     e.cancelled_by = user.id
     e.cancel_reason = reason
     db.commit()
-    import asyncio
     try:
-        asyncio.run(send_telegram_message(
+        send_telegram_background(
             f"❌ Harajat bekor qilindi\n🧾 {e.description}\n📝 Sabab: {reason}",
             section="cancellations",
-        ))
+        )
     except Exception as err:
         logger.warning(f"Telegram xabari yuborilmadi (harajat bekor): {err}")
 

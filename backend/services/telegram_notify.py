@@ -83,7 +83,7 @@ async def send_telegram_message(text: str, section: str = "system"):
             logger.warning("Telegram target topilmadi: section=%s", section)
             return
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=2.0) as client:
             for chat_id, thread_id in targets:
                 payload = {"chat_id": chat_id, "text": text}
                 if thread_id:
@@ -93,6 +93,25 @@ async def send_telegram_message(text: str, section: str = "system"):
                     logger.error("Telegram yuborilmadi (%s): %s", resp.status_code, resp.text[:300])
     except Exception as e:
         logger.error("Telegram xabar xato: %s", e)
+
+
+def send_telegram_background(text: str, section: str = "system") -> None:
+    """Telegram xabarini alohida fon oqimida (daemon thread) yuboradi.
+    FastAPI API javobi telegram sababli 1 millisekund ham ushlanib qolmaydi!
+    """
+    import asyncio
+    import threading
+
+    def _worker():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(send_telegram_message(text, section=section))
+            loop.close()
+        except Exception as e:
+            logger.warning("Telegram background xatosi: %s", e)
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 def format_daily_message(db, d: date | None = None) -> str:
