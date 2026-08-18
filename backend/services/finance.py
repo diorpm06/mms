@@ -77,22 +77,12 @@ def calculate_financial_split(
         remaining = max(0, total - clinic_fixed_fee)
         pct = provider_percentage if provider_percentage > 0 else 50
         provider_amount = int(remaining * pct / 100)
-        # DIQQAT: max(0, ...) QO'YMANG. Komissiya to'lovdan oshib ketsa markaz
-        # ulushi minusga tushishi kerak — nolga qisilsa ulushlar yig'indisi
-        # to'lovdan katta bo'lib qoladi va tizim yo'qdan pul yaratadi.
         center_amount = total - referrer_amount - provider_amount
         return referrer_amount, provider_amount, center_amount
 
-    provider_base = int(total * provider_percentage / 100)
-
-    ref_doc_deduction = 0
-    if referrer_amount > 0:
-        if ref_doc_split_sum and ref_doc_split_sum > 0:
-            ref_doc_deduction = int(ref_doc_split_sum)
-        elif ref_doc_split_pct is not None and ref_doc_split_pct > 0:
-            ref_doc_deduction = int((referrer_amount * ref_doc_split_pct) / 100)
-
-    provider_amount = max(0, provider_base - ref_doc_deduction)
+    # Normal services: Direct percentage split (Doctor gets provider_percentage % of total,
+    # Referrer gets referrer_percentage % or fixed sum of total, Center gets remaining)
+    provider_amount = int(total * provider_percentage / 100)
     center_amount = total - referrer_amount - provider_amount
 
     return referrer_amount, provider_amount, center_amount
