@@ -8,7 +8,7 @@ export default function PeakHeatmapChart({ heatmap, busiestHour, avgDailyRevenue
 
   const getIntensityClass = (count) => {
     if (!count) return 'bg-slate-100 dark:bg-slate-800/40 text-slate-400 dark:text-slate-600'
-    if (count <= 2) return 'bg-cyan-100 dark:bg-cyan-950/80 text-cyan-800 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800/50'
+    if (count <= 2) return 'bg-cyan-100 dark:bg-cyan-950/80 text-cyan-900 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800/50 font-bold'
     if (count <= 5) return 'bg-cyan-500 text-white font-bold shadow-sm'
     return 'bg-amber-500 text-slate-950 font-black shadow-md animate-pulse'
   }
@@ -17,34 +17,34 @@ export default function PeakHeatmapChart({ heatmap, busiestHour, avgDailyRevenue
     <div className="space-y-6">
       {/* Forecast Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="card bg-gradient-to-br from-cyan-900/30 to-blue-900/30 border border-cyan-500/30 p-4">
-          <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block mb-1">
+        <div className="bg-cyan-500/10 dark:bg-cyan-950/40 border border-cyan-500/30 dark:border-cyan-500/40 p-4 rounded-2xl shadow-sm">
+          <span className="text-xs font-extrabold text-cyan-700 dark:text-cyan-400 uppercase tracking-wider block mb-1">
             📈 Kelgusi 30-Kunlik Prognoz
           </span>
-          <p className="text-2xl font-black text-cyan-300 font-mono">
+          <p className="text-2xl font-black text-slate-900 dark:text-cyan-200 font-mono">
             {Number(projectedNext30Days || 0).toLocaleString()} so'm
           </p>
-          <span className="text-[10px] text-muted mt-1 block">O'rtacha kunlik ko'rsatkichlar asosida</span>
+          <span className="text-[10px] text-slate-700 dark:text-slate-400 mt-1 block font-medium">O'rtacha kunlik ko'rsatkichlar asosida</span>
         </div>
 
-        <div className="card bg-gradient-to-br from-amber-900/30 to-yellow-900/30 border border-amber-500/30 p-4">
-          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-1">
+        <div className="bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 dark:border-amber-500/40 p-4 rounded-2xl shadow-sm">
+          <span className="text-xs font-extrabold text-amber-800 dark:text-amber-400 uppercase tracking-wider block mb-1">
             🔥 Eng Gavjum Soat
           </span>
-          <p className="text-2xl font-black text-amber-300 font-mono">
+          <p className="text-2xl font-black text-slate-900 dark:text-amber-200 font-mono">
             {busiestHour || '10:00 - 11:00'}
           </p>
-          <span className="text-[10px] text-muted mt-1 block">Mijozlar eng ko'p keladigan vaqt</span>
+          <span className="text-[10px] text-slate-700 dark:text-slate-400 mt-1 block font-medium">Mijozlar eng ko'p keladigan vaqt</span>
         </div>
 
-        <div className="card bg-gradient-to-br from-emerald-900/30 to-teal-900/30 border border-emerald-500/30 p-4">
-          <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block mb-1">
+        <div className="bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 dark:border-emerald-500/40 p-4 rounded-2xl shadow-sm">
+          <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider block mb-1">
             💵 O'rtacha Kunlik Tushum
           </span>
-          <p className="text-2xl font-black text-emerald-300 font-mono">
+          <p className="text-2xl font-black text-slate-900 dark:text-emerald-200 font-mono">
             {Number(avgDailyRevenue || 0).toLocaleString()} so'm
           </p>
-          <span className="text-[10px] text-muted mt-1 block">Oxirgi 30 kunlik ko'rsatkich</span>
+          <span className="text-[10px] text-slate-700 dark:text-slate-400 mt-1 block font-medium">Oxirgi 30 kunlik ko'rsatkich</span>
         </div>
       </div>
 
