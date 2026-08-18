@@ -41,11 +41,13 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
       setServices(svcs || [])
       setProviders(provs || [])
       setReferrers(refs || [])
-      if (svcs && svcs.length > 0) {
-        setSelectedServices([
-          { service_id: svcs[0].id, price: svcs[0].price || 0, quantity: 1, provider_id: null }
-        ])
-      }
+      setServiceSearch('')
+      setDiscountAmount(0)
+      setDiscountReason('')
+      // Boshlanishida bitta bo'sh xizmat qatorini yaratamiz (avtomatik UZI tanlanmasligi uchun)
+      setSelectedServices([
+        { service_id: '', price: 0, quantity: 1, provider_id: null }
+      ])
     })
   }, [open])
 
@@ -63,23 +65,45 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
   }
 
   const addServiceRow = (svcObj = null) => {
-    const found = svcObj || services[0]
-    if (!found) return
-    const autoDoctorId = findMatchingDoctor(found.id)
-    setSelectedServices((prev) => [
-      ...prev,
-      {
-        service_id: found.id,
-        price: found.price || 0,
-        quantity: 1,
-        provider_id: autoDoctorId || null
-      }
-    ])
+    if (svcObj) {
+      const autoDoctorId = findMatchingDoctor(svcObj.id)
+      setSelectedServices((prev) => {
+        // Agar birinchi qator bo'sh bo'lsa, o'shani to'ldiramiz
+        if (prev.length === 1 && !prev[0].service_id) {
+          return [{
+            service_id: svcObj.id,
+            price: svcObj.price || 0,
+            quantity: 1,
+            provider_id: autoDoctorId || null
+          }]
+        }
+        return [
+          ...prev,
+          {
+            service_id: svcObj.id,
+            price: svcObj.price || 0,
+            quantity: 1,
+            provider_id: autoDoctorId || null
+          }
+        ]
+      })
+    } else {
+      setSelectedServices((prev) => [
+        ...prev,
+        {
+          service_id: '',
+          price: 0,
+          quantity: 1,
+          provider_id: null
+        }
+      ])
+    }
   }
 
   const removeServiceRow = (index) => {
     if (selectedServices.length <= 1) {
-      toast("Kamida 1 ta xizmat bo'lishi kerak", "warning")
+      // Oxirgi qatorni tozalaymiz
+      setSelectedServices([{ service_id: '', price: 0, quantity: 1, provider_id: null }])
       return
     }
     setSelectedServices((prev) => prev.filter((_, idx) => idx !== index))
@@ -95,6 +119,9 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
           copy[index].price = found.price || 0
           const autoDoc = findMatchingDoctor(found.id)
           if (autoDoc) copy[index].provider_id = autoDoc
+        } else {
+          copy[index].price = 0
+          copy[index].provider_id = null
         }
       }
       return copy
@@ -134,6 +161,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
         card_amount: paymentType === 'aralash'
           ? Number(cardAmount)
           : (['karta', 'click'].includes(paymentType) ? finalAmount : 0),
+        confirm_duplicate: true, // Qayta xizmatga yozishda 409 duplicate xatosini oldini olish
         services: validServices.map((s) => ({
           service_id: Number(s.service_id),
           provider_id: s.provider_id ? Number(s.provider_id) : null,
@@ -142,10 +170,23 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
         })),
       }
 
-      const res = await api('/patients', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      })
+      let res
+      try {
+        res = await api('/patients', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+      } catch (err) {
+        if (err.status === 409) {
+          // Agar baribir 409 bersa (majburiy confirm_duplicate bilan qayta yuboramiz)
+          res = await api('/patients', {
+            method: 'POST',
+            body: JSON.stringify({ ...payload, confirm_duplicate: true }),
+          })
+        } else {
+          throw err
+        }
+      }
 
       toast(`✓ ${patient.first_name} yangi xizmat(lar)ga muvaffaqiyatli yozildi! (Talon: ${res.ticket_number || `A-${res.id}`})`)
       if (onSuccess) onSuccess(res)
@@ -175,7 +216,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
             </div>
             <div>
               <h3 className="text-lg font-black text-gold uppercase tracking-wide">
-                Qayta Xizmatga Yozish (Bir nechta xizmat va Soni)
+                Qayta Xizmatga Yozish
               </h3>
               <p className="text-xs text-muted font-bold">
                 Bemor: <strong className="text-cyan">{patient.first_name} {patient.last_name}</strong> ({patient.phone || 'Telefon yo\'q'})
@@ -239,7 +280,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="form-label text-xs font-black text-gold uppercase tracking-wider mb-0">
-                📋 Tanlangan Xizmatlar Ro'yxati ({selectedServices.length} ta)
+                📋 Tanlangan Xizmatlar Ro'yxati ({selectedServices.filter(s => s.service_id).length} ta)
               </label>
               <Btn type="button" variant="cyan" size="xs" icon={Plus} onClick={() => addServiceRow()}>
                 Xizmat Qo'shish
@@ -248,7 +289,6 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
 
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
               {selectedServices.map((row, idx) => {
-                const curSvc = services.find((s) => String(s.id) === String(row.service_id))
                 return (
                   <div key={idx} className="p-3 rounded-xl bg-surface-2 border border-border flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 shadow-sm">
                     {/* Service Dropdown */}
@@ -258,6 +298,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
                         value={row.service_id}
                         onChange={(e) => updateServiceRow(idx, 'service_id', e.target.value)}
                       >
+                        <option value="">— Xizmat turini tanlang —</option>
                         {services.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.category ? `[${s.category}] ` : ''}{s.name} — {formatMoney(s.price)}
