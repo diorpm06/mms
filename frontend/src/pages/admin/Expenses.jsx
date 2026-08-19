@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../utils/api'
 import { formatMoney, formatWithCommas, parseDigits } from '../../utils/format'
-import { useToastStore } from '../../store/toastStore'
+import Modal from '../../components/Modal'
 import { Btn, Icons, PageHeader, THead, EmptyState } from '../../components/UIKit'
 
 // "Avans" va "Oylik" oddiy harajat emas — ular aniq xodimga bog'lanadi va
@@ -20,6 +20,9 @@ export default function AdminExpenses() {
   const [empSummary,  setEmpSummary]  = useState(null)
   const [loading,     setLoading]     = useState(false)
   const [todayList,   setTodayList]   = useState([])
+  const [editExpense, setEditExpense] = useState(null)
+  const [editForm,    setEditForm]    = useState({ description: '', amount: '', category: '', source: 'Naqt kassa' })
+  const [editLoading, setEditLoading] = useState(false)
   const toast = useToastStore((s) => s.add)
 
   const isStaffPayment = STAFF_CATEGORIES.includes(category)
@@ -28,6 +31,44 @@ export default function AdminExpenses() {
     const d = new Date()
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     api(`/expenses?from=${today}&to=${today}`).then((r) => setTodayList(r || [])).catch(() => {})
+  }
+
+  const openEditModal = (item) => {
+    setEditExpense(item)
+    setEditForm({
+      description: item.description || '',
+      amount: String(item.amount || 0),
+      category: item.category || '',
+      source: item.source || 'Naqt kassa',
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editExpense) return
+    const newAmt = parseInt(parseDigits(editForm.amount), 10) || 0
+    if (!editForm.description.trim()) {
+      toast("Harajat tavsifi (sababi)ni kiriting", "error")
+      return
+    }
+    setEditLoading(true)
+    try {
+      await api(`/expenses/${editExpense.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          description: editForm.description.trim(),
+          amount: newAmt,
+          category: editForm.category || null,
+          source: editForm.source || null,
+        }),
+      })
+      toast("Harajat tahrirlandi — kassa balansi va hisobotlar avtomatik yangilandi ✓")
+      setEditExpense(null)
+      loadToday()
+    } catch (err) {
+      toast(err.message || "Saqlashda xatolik", "error")
+    } finally {
+      setEditLoading(false)
+    }
   }
 
   useEffect(() => { loadToday() }, [])
@@ -227,7 +268,7 @@ export default function AdminExpenses() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <THead cols={['Vaqt', 'Kategoriya', 'Nima uchun', 'Summa']} />
+              <THead cols={['Vaqt', 'Kategoriya', 'Nima uchun', 'Summa', 'Amallar']} />
               <tbody className="divide-y divide-border">
                 {todayList.map((x) => (
                   <tr key={x.id} className="hover:bg-surface-hover font-semibold">
@@ -241,6 +282,15 @@ export default function AdminExpenses() {
                     <td className="p-2.5 text-right font-mono font-bold text-rose-400">
                       -{formatMoney(x.amount)}
                     </td>
+                    <td className="p-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(x)}
+                        className="px-2 py-1 rounded-lg bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 text-[11px] font-bold transition-all"
+                      >
+                        ✏️ Tahrirlash
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -248,6 +298,71 @@ export default function AdminExpenses() {
           </div>
         )}
       </div>
+
+      {/* EDIT EXPENSE MODAL */}
+      <Modal open={!!editExpense} onClose={() => setEditExpense(null)} title="Harajatni Tahrirlash (Balans avtomatik yangilanadi)">
+        <div className="space-y-4 pt-1">
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
+            ⚠️ Summa yoki tavsif o'zgartirilganda, kassa balansi va moliya hisobotlari avtomatik qayta hisoblanadi.
+          </div>
+
+          <div>
+            <label className="form-label">Kategoriya</label>
+            <select
+              className="input-field text-xs font-bold"
+              value={editForm.category}
+              onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+            >
+              <option value="">— Kategoriya tanlanmagan</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">Pul Manbasi</label>
+            <select
+              className="input-field text-xs font-bold"
+              value={editForm.source}
+              onChange={(e) => setEditForm({ ...editForm, source: e.target.value })}
+            >
+              {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">Tavsif (Sababi / Nima uchun?) *</label>
+            <input
+              type="text"
+              className="input-field text-xs font-bold"
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              placeholder="Harajat sababini yozing..."
+            />
+          </div>
+
+          <div>
+            <label className="form-label">Summa (so'm) *</label>
+            <input
+              type="text"
+              className="input-field text-sm font-mono font-bold text-rose-400"
+              value={formatWithCommas(editForm.amount)}
+              onChange={(e) => setEditForm({ ...editForm, amount: parseDigits(e.target.value) })}
+              placeholder="0"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Btn variant="ghost" full icon={Icons.x} onClick={() => setEditExpense(null)}>
+              Bekor qilish
+            </Btn>
+            <Btn variant="gold" full icon={Icons.save} loading={editLoading} onClick={handleSaveEdit}>
+              Saqlash ✓
+            </Btn>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

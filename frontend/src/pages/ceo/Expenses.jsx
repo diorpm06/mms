@@ -33,7 +33,48 @@ export default function CeoExpenses() {
   const [staffList,   setStaffList]   = useState([])
   const [empSummary,  setEmpSummary]  = useState(null)
   const [addLoading,   setAddLoading]   = useState(false)
+  const [editExpense, setEditExpense] = useState(null)
+  const [editForm,    setEditForm]    = useState({ description: '', amount: '', category: '', source: 'Naqt kassa' })
+  const [editLoading, setEditLoading] = useState(false)
   const toast = useToastStore((s) => s.add)
+
+  const openEditModal = (item) => {
+    setEditExpense(item)
+    setEditForm({
+      description: item.description || '',
+      amount: String(item.amount || 0),
+      category: item.category || '',
+      source: item.source || 'Naqt kassa',
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editExpense) return
+    const newAmt = parseInt(editForm.amount, 10) || 0
+    if (!editForm.description.trim()) {
+      toast("Harajat tavsifi (sababi)ni kiriting", "error")
+      return
+    }
+    setEditLoading(true)
+    try {
+      await api(`/expenses/${editExpense.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          description: editForm.description.trim(),
+          amount: newAmt,
+          category: editForm.category || null,
+          source: editForm.source || null,
+        }),
+      })
+      toast("Harajat tahrirlandi — kassa balansi va hisobotlar avtomatik yangilandi ✓")
+      setEditExpense(null)
+      load()
+    } catch (err) {
+      toast(err.message || "Saqlashda xatolik", "error")
+    } finally {
+      setEditLoading(false)
+    }
+  }
 
   const isStaffPayment = STAFF_CATEGORIES.includes(category)
 
@@ -239,15 +280,24 @@ export default function CeoExpenses() {
                   </td>
                   <td className="td-cell">
                     {!e.is_cancelled ? (
-                      <Btn
-                        variant="danger"
-                        size="xs"
-                        icon={Icons.trash}
-                        onClick={() => handleDeleteDirectly(e)}
-                        title="O'chirish (balansga qaytarish)"
-                      >
-                        O'chirish
-                      </Btn>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(e)}
+                          className="px-2 py-1 rounded-lg bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 text-xs font-bold transition-all"
+                        >
+                          ✏️ Tahrirlash
+                        </button>
+                        <Btn
+                          variant="danger"
+                          size="xs"
+                          icon={Icons.trash}
+                          onClick={() => handleDeleteDirectly(e)}
+                          title="O'chirish (balansga qaytarish)"
+                        >
+                          O'chirish
+                        </Btn>
+                      </div>
                     ) : (
                       <Btn
                         variant="cyan"
@@ -364,6 +414,71 @@ export default function CeoExpenses() {
             <Btn variant="ghost" full onClick={() => setAddModalOpen(false)}>Orqaga</Btn>
             <Btn variant="gold" full icon={Icons.save} loading={addLoading} onClick={handleAddExpense}>
               {addLoading ? 'Saqlanmoqda...' : category === 'Avans' ? 'Avansni berish' : category === 'Oylik' ? "Oylikni to'lash" : 'Harajatni Saqlash'}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      {/* EDIT EXPENSE MODAL */}
+      <Modal open={!!editExpense} onClose={() => setEditExpense(null)} title="Harajatni Tahrirlash (Balans avtomatik yangilanadi)">
+        <div className="space-y-4 pt-1">
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
+            ⚠️ Summa yoki tavsif o'zgartirilganda, kassa balansi va moliya hisobotlari avtomatik qayta hisoblanadi.
+          </div>
+
+          <div>
+            <label className="form-label">Kategoriya</label>
+            <select
+              className="input-field text-xs font-bold"
+              value={editForm.category}
+              onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+            >
+              <option value="">— Kategoriya tanlanmagan</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">Pul Manbasi</label>
+            <select
+              className="input-field text-xs font-bold"
+              value={editForm.source}
+              onChange={(e) => setEditForm({ ...editForm, source: e.target.value })}
+            >
+              {['Naqt kassa', 'Karta kassa', 'Bank hisob', 'Boshqa'].map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">Tavsif (Sababi / Nima uchun?) *</label>
+            <input
+              type="text"
+              className="input-field text-xs font-bold"
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              placeholder="Harajat sababini yozing..."
+            />
+          </div>
+
+          <div>
+            <label className="form-label">Summa (so'm) *</label>
+            <input
+              type="number"
+              className="input-field text-sm font-mono font-bold text-rose-400"
+              value={editForm.amount}
+              onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+              placeholder="0"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Btn variant="ghost" full icon={Icons.x} onClick={() => setEditExpense(null)}>
+              Bekor qilish
+            </Btn>
+            <Btn variant="gold" full icon={Icons.save} loading={editLoading} onClick={handleSaveEdit}>
+              Saqlash ✓
             </Btn>
           </div>
         </div>

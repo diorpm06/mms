@@ -265,6 +265,58 @@ def create_expense(
     return _expense_out(expense)
 
 
+class ExpenseUpdate(_BaseModel):
+    description: str | None = None
+    amount: int | None = Field(default=None, ge=0, le=100_000_000)
+    category: str | None = None
+    source: str | None = None
+
+
+@router.put("/{expense_id}", response_model=ExpenseOut)
+def update_expense(
+    expense_id: int,
+    data: ExpenseUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    e = db.query(Expense).filter(Expense.id == expense_id).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Harajat topilmadi")
+    if e.is_cancelled:
+        raise HTTPException(status_code=400, detail="Bekor qilingan harajatni tahrirlab bo'lmaydi")
+
+    old_amount = e.amount
+    old_desc = e.description
+
+    if data.amount is not None and data.amount != old_amount:
+        diff = data.amount - old_amount
+        from services.finance import get_or_create_balance, log_balance_change
+        bal = get_or_create_balance(db)
+        bal.current_balance -= diff
+        bal.updated_at = datetime.now()
+        log_balance_change(
+            db,
+            -diff,
+            "expense_edit",
+            f"Harajat tahrirlandi (#{e.id}): {old_amount:,} so'm -> {data.amount:,} so'm",
+        )
+        e.amount = data.amount
+
+    if data.description is not None:
+        full_desc = data.description
+        if data.source:
+            full_desc = f"[MANBA: {data.source}] {data.description}"
+        e.description = full_desc
+
+    if data.category is not None:
+        e.category = data.category
+
+    e.updated_at = datetime.now()
+    db.commit()
+    db.refresh(e)
+    return _expense_out(e)
+
+
 class CancelBody(_BaseModel):
     reason: str | None = "O'chirildi"
 
