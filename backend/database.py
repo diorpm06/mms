@@ -17,15 +17,66 @@ try:
         _connect_args["check_same_thread"] = False
         engine = create_engine(db_url, connect_args=_connect_args)
     else:
+        # Masofaviy Postgres (Supabase). Asosiy xavf — "yarim ochiq" ulanish:
+        # server yoki oradagi NAT rozetkani jimgina tashlab yuboradi, biz esa
+        # buni bilmay javob kutib turaveramiz. pool_pre_ping bo'sh turgan
+        # ulanishni tutadi, ammo SO'ROV PAYTIDA uzilganini tuta olmaydi —
+        # o'shanda OS ning TCP taym-auti (Linuxda soatlab) kutilardi va
+        # tizim osilib qolardi.
         engine = create_engine(
             db_url,
-            pool_pre_ping=True,
-            pool_recycle=300,
-            connect_args={"connect_timeout": 5}
+            pool_pre_ping=True,      # bo'sh turgan o'lik ulanishni almashtiradi
+            pool_recycle=120,        # 2 daqiqadan eski ulanish yangilanadi
+            connect_args={
+                "connect_timeout": 5,
+                # TCP keepalive — o'lik tomonni ~60 soniyada aniqlaydi.
+                # Busiz OS sozlamasi (odatda 2 soat) kuchda bo'lardi.
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 3,
+            },
         )
 except Exception as e:
     logger.error(f"Database engine init error: {e}. Falling back to SQLite memory.")
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+
+if not str(engine.url).startswith("sqlite"):
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def _ulanish_chegaralari(dbapi_conn, connection_record):
+        """Har bir yangi ulanishga vaqt chegarasini qo'yadi.
+
+        Bazadagi statement_timeout 2 daqiqa — bitta osilib qolgan so'rov
+        shuncha vaqt butun so'rovni ushlab turishi mumkin edi. Buni
+        connect_args ichidagi "options" bilan qo'yib bo'lmaydi: Supabase
+        pooleri (Supavisor) startup parametrlarini o'tkazib yubormaydi,
+        jimgina e'tiborsiz qoldiradi. Shuning uchun ulangandan keyin SET
+        qilamiz.
+
+        DIQQAT: bu poolerning SESSION rejimi (5432-port) uchun to'g'ri.
+        Agar kelajakda transaction rejimiga (6543) o'tilsa, SET boshqa
+        mijozlarga ham o'tib ketishi mumkin — o'shanda qayta ko'rilsin.
+        """
+        try:
+            with dbapi_conn.cursor() as cur:
+                cur.execute("SET statement_timeout = '20s'")
+                # Vercel so'rov tugagach jarayonni muzlatadi. O'sha payt
+                # ochiq qolgan tranzaksiya serverda MANGU "idle in
+                # transaction" bo'lib, jadval qulfini ushlab turardi.
+                cur.execute("SET idle_in_transaction_session_timeout = '30s'")
+                # Qulf navbatida cheksiz turmasin: kutgandan ko'ra xato
+                # bergani yaxshi. Bitta ALTER TABLE butun tizimni
+                # to'xtatib qo'yishining oldini oladi.
+                # 5 soniya: oddiy yozuv amallari qulfni millisekundlarda
+                # qo'yib yuboradi, shuning uchun bu chegara ularga tegmaydi.
+                cur.execute("SET lock_timeout = '5s'")
+                cur.execute("SET application_name = 'marjona-crm'")
+            dbapi_conn.commit()
+        except Exception as err:      # sozlanmasa ham ish to'xtamasin
+            logger.warning(f"Ulanish chegaralari qo'yilmadi: {err}")
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -34,8 +85,38 @@ class Base(DeclarativeBase):
     pass
 
 
+def migratsiya_kerakmi() -> bool:
+    """Migratsiyani ishga tushirish mumkinmi.
+
+    Vercel'da har bir "cold start" da butun run_migrations() qayta ishlardi:
+    75 ta ALTER TABLE / CREATE INDEX, ustun allaqachon bor-yo'qligi
+    tekshirilmasdan. Har bir ALTER TABLE esa ACCESS EXCLUSIVE qulf so'raydi.
+
+    PostgreSQL qulf navbati FIFO: kutib turgan ACCESS EXCLUSIVE ortidan
+    KEYIN kelgan hamma oddiy SELECT ham navbatga tushadi. Natijada bitta
+    ALTER TABLE butun jadvalni, u orqali butun tizimni muzlatib qo'yardi —
+    ekranda yuklanish aylanasi to'xtamas edi.
+
+    Ustiga, migratsiya daemon oqimda ishga tushirilgan. So'rov tugashi
+    bilan Vercel jarayonni muzlatadi va o'sha oqim DDL o'rtasida o'ladi —
+    tranzaksiya ochiq qolib, qulf serverda abadiy ushlanib turadi.
+
+    Shuning uchun Vercel'da avtomatik ishlamaydi. Kerak bo'lganda
+    RUN_MIGRATIONS=1 muhit o'zgaruvchisi bilan bir marta ishga tushiriladi.
+    """
+    if os.environ.get("RUN_MIGRATIONS") == "1":
+        return True
+    if os.environ.get("VERCEL"):
+        logger.info("Migratsiya Vercel'da o'tkazib yuborildi "
+                    "(kerak bo'lsa RUN_MIGRATIONS=1)")
+        return False
+    return True
+
+
 def run_migrations():
     """Ensure missing columns in database are added automatically."""
+    if not migratsiya_kerakmi():
+        return
     try:
         with engine.connect() as conn:
             if settings.DATABASE_URL.startswith("sqlite"):

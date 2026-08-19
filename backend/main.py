@@ -87,7 +87,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"DB init/migration warning: {e}")
 
-    threading.Thread(target=_init_db, daemon=True).start()
+    # Vercel'da jadval yaratish/migratsiya QILINMAYDI. Bu yerda daemon oqim
+    # ishlatilgan edi: so'rov tugashi bilan Vercel jarayonni muzlatadi va
+    # oqim DDL o'rtasida o'ladi — bazada ochiq tranzaksiya qolib, jadval
+    # qulflanib turadi. Keyingi so'rovlar o'sha qulf ortida to'planib,
+    # tizim butunlay osilib qolardi.
+    if os.environ.get("VERCEL") and os.environ.get("RUN_MIGRATIONS") != "1":
+        logger.info("Vercel: baza sxemasi o'zgartirilmaydi")
+    else:
+        threading.Thread(target=_init_db, daemon=True).start()
 
     if not os.environ.get("VERCEL"):
         try:
