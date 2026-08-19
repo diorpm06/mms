@@ -141,6 +141,9 @@ class ReferrerOut(BaseModel):
     balance: int
     is_active: bool
     is_confirmed: bool = True
+    # Balansdan alohida: qancha ishlagani (tranzaksiyalardan)
+    today_earned: Optional[int] = 0
+    total_earned: Optional[int] = 0
 
     class Config:
         from_attributes = True
@@ -194,6 +197,10 @@ class ProviderOut(BaseModel):
     is_active: bool
     username: Optional[str] = None
     service_ids: Optional[list[int]] = None
+    # Tranzaksiyalardan hisoblanadi (balansdan alohida): balans bitta yig'ma
+    # raqam, bu ikkalasi esa qancha ishlaganini ko'rsatadi
+    today_earned: Optional[int] = 0
+    total_earned: Optional[int] = 0
 
     class Config:
         from_attributes = True
@@ -230,6 +237,7 @@ class ServiceItem(BaseModel):
     # xatosi bilan yiqitardi. Soni 0 yoki manfiy ham qabul qilinardi.
     price: Optional[int] = Field(default=None, ge=0, le=100_000_000)
     quantity: Optional[int] = Field(default=1, ge=1, le=100)
+    is_course: Optional[bool] = False
 
 
 class PatientCreate(BaseModel):

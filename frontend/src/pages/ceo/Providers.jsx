@@ -10,6 +10,7 @@ import Modal from '../../components/Modal'
 import { TableSkeleton } from '../../components/Skeleton'
 import { Btn, Icons, PageHeader, THead, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
 import ActionMenu from '../../components/ActionMenu'
+import EarningsDailyModal from '../../components/EarningsDailyModal'
 
 const SOURCES = ['Naqt kassa', 'Karta kassa', 'Bank hisob', 'Boshqa']
 const STATSIONAR_STANDART = 50000
@@ -192,6 +193,8 @@ export default function CeoProviders() {
   const [form, setForm] = useState(emptyForm)
   const [payoutSource, setPayoutSource] = useState('Naqt kassa')
   const [advances, setAdvances] = useState({})
+  // "Jami ishlagan" bosilganda ochiladigan kunma-kun oynasi
+  const [kunlik, setKunlik] = useState(null)   // {kind, id, name}
   const [advanceModal, setAdvanceModal] = useState(false)
   const [selectedProviderForAdvance, setSelectedProviderForAdvance] = useState(null)
   const [advanceAmount, setAdvanceAmount] = useState('1000000')
@@ -363,6 +366,15 @@ export default function CeoProviders() {
 
   return (
     <div className="space-y-5">
+      {/* "Jami ishlagan" bosilganda: qaysi kuni qancha kelgani */}
+      <EarningsDailyModal
+        open={!!kunlik}
+        onClose={() => setKunlik(null)}
+        kind={kunlik?.kind}
+        id={kunlik?.id}
+        name={kunlik?.name}
+      />
+
       {/* Bo'lim tanlash */}
       <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border w-fit">
         <button
@@ -512,7 +524,28 @@ export default function CeoProviders() {
 
                 {/* Balance & Actions */}
                 <div className="bg-surface-2 p-3 rounded-xl border border-border/60 space-y-2">
-                 <div className="flex items-center justify-between">
+                 {/* Bugungi va jami ishlagani — balans bitta yig'ma raqam
+                     bo'lgani uchun, qancha ishlagani alohida ko'rsatiladi */}
+                 <div className="grid grid-cols-2 gap-2">
+                   <div>
+                     <span className="text-[10px] font-extrabold text-muted uppercase block">Bugun</span>
+                     <span className="font-black text-gold font-mono text-sm">
+                       {p.today_earned > 0 ? `+${formatMoney(p.today_earned)}` : '—'}
+                     </span>
+                   </div>
+                   <div>
+                     <span className="text-[10px] font-extrabold text-muted uppercase block">Jami ishlagan</span>
+                     <button
+                       type="button"
+                       onClick={() => setKunlik({ kind: 'providers', id: p.id, name: p.full_name })}
+                       className="font-black text-cyan font-mono text-sm hover:underline"
+                       title="Kunma-kun ko'rish"
+                     >
+                       {formatMoney(p.total_earned)}
+                     </button>
+                   </div>
+                 </div>
+                 <div className="flex items-center justify-between border-t border-border/60 pt-2">
                   <div>
                     <span className="text-[10px] font-extrabold text-muted uppercase block">Ish Haq Balansi</span>
                     <span className="font-black text-emerald font-mono text-base">{formatMoney(p.balance)}</span>
@@ -604,7 +637,7 @@ export default function CeoProviders() {
         /* ── TABLE VIEW FOR DOCTORS ── */
         <div className="card overflow-x-auto p-0 border-cyan-500/20 shadow-lg">
           <table className="w-full text-xs">
-            <THead cols={['Shifokor', 'Mutaxassislik', 'Bajaradigan Xizmatlari', 'Telefon / Login', 'Oylik / KPI Stavka', 'Status', 'Balans', 'Avans olgan', 'Qoladi / Qarzi', 'Harakatlar']} />
+            <THead cols={['Shifokor', 'Mutaxassislik', 'Bajaradigan Xizmatlari', 'Telefon / Login', 'Oylik / KPI Stavka', 'Status', 'Bugun', 'Jami ishlagan', 'Balans', 'Avans olgan', 'Qoladi / Qarzi', 'Harakatlar']} />
             <tbody className="divide-y divide-border font-semibold">
               {items.length === 0 ? (
                 <tr><td colSpan={8} className="py-8"><EmptyState icon="🩺" message="Hali shifokor qo'shilmagan" action={<Btn variant="cyan" icon={Icons.plus} onClick={handleOpenAdd}>Qo'shish</Btn>} /></td></tr>
@@ -642,6 +675,20 @@ export default function CeoProviders() {
                       ) : (
                         <span className="badge badge-danger text-[10px] font-bold">🔴 Ishdan ketgan</span>
                       )}
+                    </td>
+                    <td className="p-3 font-mono font-bold text-gold text-sm">
+                      {p.today_earned > 0 ? `+${formatMoney(p.today_earned)}` : '—'}
+                    </td>
+                    {/* Jami — bosilsa qaysi kundan qancha kelgani ochiladi */}
+                    <td className="p-3">
+                      <button
+                        type="button"
+                        onClick={() => setKunlik({ kind: 'providers', id: p.id, name: p.full_name })}
+                        className="font-mono font-black text-cyan text-sm hover:underline"
+                        title="Kunma-kun ko'rish"
+                      >
+                        {formatMoney(p.total_earned)}
+                      </button>
                     </td>
                     <td className="p-3 font-black font-mono text-emerald text-sm">{formatMoney(p.balance)}</td>
                     <td className="p-3 font-mono font-bold text-amber-400 text-sm">

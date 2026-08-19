@@ -247,7 +247,7 @@ export default function Appointments() {
           <select className="input-field" value={form.service_id} onChange={(e) => setForm({ ...form, service_id: e.target.value })} required>
             <option value="">Xizmat turi *</option>
             {services.map((s) => (
-              <option key={s.id} value={s.id}>{s.name} — {formatMoney(s.price)}</option>
+              <option key={s.id} value={s.id}>{s.category ? `[${s.category}] ` : ''}{s.name} — {formatMoney(s.price)}</option>
             ))}
           </select>
 

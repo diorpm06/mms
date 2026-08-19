@@ -22,6 +22,7 @@ Uch muhim qoida:
    navbat taloni chop etiladi.
 """
 from datetime import date, datetime
+from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
@@ -94,13 +95,15 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
                 "category": ps.service.category if ps.service else None,
                 "quantity": 0,
                 "total_price": 0,
-                # Kamida bitta yozuvda "soni" birdan katta bo'lsa, bu
-                # OLDINDAN to'langan kurs. Aks holda — kunlik to'lovlar.
                 "_oldindan": False,
             }
             g["services"][ps.service_id] = x
+
+        # STRICT RULE: A service is ONLY a multi-day treatment course if is_course is explicitly True.
+        # A quantity of 5 or 10 today in a single visit with is_course=False must NEVER be split into 5 days!
         soni = int(ps.quantity or 1)
-        if soni > 1:
+        is_c = getattr(ps, "is_course", False)
+        if is_c is True:
             x["_oldindan"] = True
         x["quantity"] += soni
         x["total_price"] += int(ps.total_price or 0)
@@ -129,8 +132,9 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
         # xizmat bo'yicha ishlatilgan kunlar
         xizmat_ishlatilgan: dict[int, int] = {}
         for ps in g["_rows"]:
+            effective_used = max(tashriflar.get(ps.id, 0), int(ps.used_count or 0))
             xizmat_ishlatilgan[ps.service_id] = (
-                xizmat_ishlatilgan.get(ps.service_id, 0) + tashriflar.get(ps.id, 0)
+                xizmat_ishlatilgan.get(ps.service_id, 0) + effective_used
             )
 
         xizmatlar = []
@@ -393,3 +397,45 @@ def undo_session(
         "message": "%d ta tashrif bekor qilindi" % len(tashriflar),
         "remaining": kurs_qolgan + len(tashriflar),
     }
+
+
+class EditCourseItemSchema(BaseModel):
+    service_id: int
+    quantity: int
+    used_count: int
+
+
+class EditCourseRequest(BaseModel):
+    key: str
+    items: list[EditCourseItemSchema]
+
+
+@router.put("/edit")
+def edit_course(
+    body: EditCourseRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    """Davolanish kursi kunlari va bajarilgan kunlar sonini tahrirlaydi."""
+    g = _kursni_top(db, body.key)
+    rows_by_sid = {ps.service_id: ps for ps in g["_rows"]}
+
+    for item in body.items:
+        ps = rows_by_sid.get(item.service_id)
+        if ps:
+            ps.quantity = max(1, item.quantity)
+            ps.used_count = max(0, min(ps.quantity, item.used_count))
+            ps.is_course = True
+            if ps.unit_price:
+                ps.total_price = ps.unit_price * ps.quantity
+
+    ip, ua = get_client_info(request)
+    log_audit(
+        db, user_id=user.id, user_role=user.role, action_type="COURSE_EDIT",
+        table_name="patient_services", record_id=g["_rows"][0].id,
+        new_data={"patient": g["patient_name"], "key": body.key},
+        ip_address=ip, device_info=ua,
+    )
+    db.commit()
+    return {"message": "Davolanish kursi kunlari muvaffaqiyatli tahrirlandi ✓"}

@@ -462,13 +462,14 @@ async def create_patient(
     if data.services and len(data.services) > 0:
         consolidated = {}
         for s in data.services:
-            key = (s.service_id, s.provider_id)
+            key = (s.service_id, s.provider_id, bool(getattr(s, "is_course", False)))
             if key not in consolidated:
                 consolidated[key] = {
                     "service_id": s.service_id,
                     "provider_id": s.provider_id,
                     "price": s.price,
                     "quantity": s.quantity if (s.quantity and s.quantity > 0) else 1,
+                    "is_course": bool(getattr(s, "is_course", False)),
                 }
             else:
                 consolidated[key]["quantity"] += (s.quantity if (s.quantity and s.quantity > 0) else 1)
@@ -486,6 +487,7 @@ async def create_patient(
                 "price": price,
                 "quantity": qty,
                 "unit_price": unit_price,
+                "is_course": item["is_course"],
             })
     elif data.service_id:
         svc = db.query(Service).filter(Service.id == data.service_id, Service.is_active == True).first()
@@ -752,11 +754,13 @@ async def create_patient(
             if s_obj:
                 qty = it.get("quantity", 1)
                 unit = it.get("unit_price") or (it["price"] // max(qty, 1))
+                is_c = bool(it.get("is_course", False))
                 sub_items.append({
                     "service_name": s_obj.name,
                     "category": s_obj.category or "Umumiy",
                     "price": it["price"],
                     "quantity": qty,
+                    "is_course": is_c,
                 })
                 services_detail.append({
                     "service_id": s_obj.id,
@@ -765,6 +769,7 @@ async def create_patient(
                     "quantity": qty,
                     "unit_price": unit,
                     "total_price": it["price"],
+                    "is_course": is_c,
                 })
                 # Har bir xizmatni alohida saqlaymiz. Ilgari faqat guruhning
                 # birinchi xizmati (patients.service_id) qolib, qolganlari
@@ -775,6 +780,7 @@ async def create_patient(
                     quantity=qty,
                     unit_price=unit,
                     total_price=it["price"],
+                    is_course=is_c,
                 ))
 
         row_dict = _patient_row(patient)
@@ -880,6 +886,7 @@ def update_patient(
             db.add(PatientService(
                 patient_id=p.id, service_id=svc.id,
                 quantity=qty, unit_price=int(unit), total_price=line,
+                is_course=bool(it.get("is_course", False)),
             ))
 
         p.service_id = first_sid

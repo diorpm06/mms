@@ -122,7 +122,11 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
   const updateServiceRow = (index, field, value) => {
     setSelectedServices((prev) => {
       const copy = [...prev]
-      copy[index] = { ...copy[index], [field]: value }
+      const nextVal = field === 'is_course' ? Boolean(value) : value
+      copy[index] = { ...copy[index], [field]: nextVal }
+      if (field === 'is_course' && nextVal && (!copy[index].quantity || copy[index].quantity <= 1)) {
+        copy[index].quantity = 2
+      }
       if (field === 'service_id') {
         const found = services.find((s) => String(s.id) === String(value))
         if (found) {
@@ -216,6 +220,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
           provider_id: s.provider_id ? Number(s.provider_id) : null,
           price: Number(s.price) || 0,
           quantity: Math.max(1, Number(s.quantity) || 1),
+          is_course: Boolean(s.is_course),
         })),
       }
 
@@ -317,7 +322,7 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
                     }}
                     className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan border border-cyan-500/30 text-xs font-bold flex items-center gap-1 transition-all"
                   >
-                    <span>+ {s.name} ({formatMoney(s.price)})</span>
+                    <span>+ {s.category ? `[${s.category}] ` : ''}{s.name} ({formatMoney(s.price)})</span>
                   </button>
                 ))}
               </div>
@@ -372,29 +377,46 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
                     </div>
 
                     {/* Quantity (Soni) input with - / + buttons */}
-                    <div className="flex items-center gap-1 border border-border rounded-lg bg-surface px-1 py-0.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1 border border-border rounded-lg bg-surface px-1 py-0.5">
+                        <button
+                          type="button"
+                          onClick={() => updateServiceRow(idx, 'quantity', Math.max(1, (Number(row.quantity) || 1) - 1))}
+                          className="w-6 h-6 rounded-md bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          className="w-10 text-center font-mono font-bold text-xs bg-transparent focus:outline-none text-gold"
+                          value={row.quantity || 1}
+                          onChange={(e) => updateServiceRow(idx, 'quantity', Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateServiceRow(idx, 'quantity', (Number(row.quantity) || 1) + 1)}
+                          className="w-6 h-6 rounded-md bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
+                        >
+                          +
+                        </button>
+                        <span className="text-[10px] text-muted font-bold pr-1">dona</span>
+                      </div>
+
+                      {/* Multi-day course toggle */}
                       <button
                         type="button"
-                        onClick={() => updateServiceRow(idx, 'quantity', Math.max(1, (Number(row.quantity) || 1) - 1))}
-                        className="w-6 h-6 rounded-md bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
+                        onClick={() => updateServiceRow(idx, 'is_course', !row.is_course)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold border transition-all flex items-center gap-1.5 ${
+                          row.is_course
+                            ? 'bg-purple-500/20 border-purple-500/60 text-purple-300 shadow-sm'
+                            : 'bg-surface-2 border-border text-muted hover:text-body hover:border-purple-500/40'
+                        }`}
+                        title={row.is_course ? "Ko'p kunlik davolanish kursi" : "Buni ko'p kunlik davolanish kursiga aylantirish uchun bosing"}
                       >
-                        -
+                        <span>{row.is_course ? '🔁' : '➕'}</span>
+                        <span>{row.is_course ? `Ko'p kunlik kurs (${row.quantity || 1} kun) ✓` : "Kurs qilish"}</span>
                       </button>
-                      <input
-                        type="number"
-                        min="1"
-                        className="w-10 text-center font-mono font-bold text-xs bg-transparent focus:outline-none text-gold"
-                        value={row.quantity || 1}
-                        onChange={(e) => updateServiceRow(idx, 'quantity', Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => updateServiceRow(idx, 'quantity', (Number(row.quantity) || 1) + 1)}
-                        className="w-6 h-6 rounded-md bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
-                      >
-                        +
-                      </button>
-                      <span className="text-[10px] text-muted font-bold pr-1">ta</span>
                     </div>
 
                     {/* Price Subtotal */}

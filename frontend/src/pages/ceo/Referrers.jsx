@@ -8,12 +8,15 @@ import { Btn, Icons, PageHeader, THead, ActionRow, EmptyState } from '../../comp
 import { BRAND } from '../../config/brand'
 import CommissionSettings from './Commissions'
 import ActionMenu from '../../components/ActionMenu'
+import EarningsDailyModal from '../../components/EarningsDailyModal'
 
 const SOURCES = ['Naqt kassa', 'Karta kassa', 'Bank hisob', 'Boshqa']
 
 export default function CeoReferrers() {
   const [activeTab, setActiveTab] = useState('catalog') // 'catalog' | '10day' | 'commission'
   const [items, setItems] = useState(null)
+  // "Jami ishlagan" bosilganda ochiladigan kunma-kun oynasi
+  const [kunlik, setKunlik] = useState(null)   // {kind, id, name}
   const [topAnalytics, setTopAnalytics] = useState([])
   const [modal, setModal] = useState(false)
   const [edit, setEdit] = useState(null)
@@ -565,6 +568,15 @@ export default function CeoReferrers() {
 
   return (
     <div className="space-y-6">
+      {/* "Jami ishlagan" bosilganda: qaysi kuni qancha kelgani */}
+      <EarningsDailyModal
+        open={!!kunlik}
+        onClose={() => setKunlik(null)}
+        kind={kunlik?.kind}
+        id={kunlik?.id}
+        name={kunlik?.name}
+      />
+
       <PageHeader
         title="Yo'naltiruvchilar"
         subtitle="Katalog va balanslar, 10-kunlik hisobot, komissiya tariflari"
@@ -727,6 +739,8 @@ export default function CeoReferrers() {
                     <th className="p-2.5 text-center w-24">⚡ Fizio (%)</th>
                     <th className="p-2.5 text-center w-24">🖥️ UZI</th>
                     <th className="p-2.5 text-center w-28">🧪 Ozonaterapiya</th>
+                    <th className="p-2.5 text-right w-28">Bugun</th>
+                    <th className="p-2.5 text-right w-32">Jami ishlagan</th>
                     <th className="p-2.5 text-right w-32">To'lanadigan Balans</th>
                     <th className="p-2.5 text-center w-16">Amallar</th>
                   </tr>
@@ -760,6 +774,22 @@ export default function CeoReferrers() {
                         <span className="inline-block px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-300 font-mono font-extrabold border border-violet-500/30 text-xs">
                           {formatMoney(r.ozon_sum ?? 10000)}
                         </span>
+                      </td>
+
+                      <td className="p-2.5 text-right font-mono font-bold text-gold text-sm">
+                        {r.today_earned > 0 ? `+${formatMoney(r.today_earned)}` : '—'}
+                      </td>
+
+                      {/* Jami — bosilsa qaysi kuni qancha kelgani ochiladi */}
+                      <td className="p-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setKunlik({ kind: 'referrers', id: r.id, name: r.full_name })}
+                          className="font-mono font-black text-cyan text-sm hover:underline"
+                          title="Kunma-kun ko'rish"
+                        >
+                          {formatMoney(r.total_earned)}
+                        </button>
                       </td>
 
                       <td className="p-2.5 text-right font-mono font-black accent-value text-sm">

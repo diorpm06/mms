@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -35,14 +37,50 @@ def list_providers(
         for u in users:
             user_map[u.provider_id] = u.username
 
+    # Balans bitta yig'ma raqam — u qaysi kundan yig'ilganini ko'rsatmaydi.
+    # Jadvalda "Bugun" va "Jami ishlagan" ustunlari bo'lishi uchun shu
+    # ikkalasi tranzaksiyalardan hisoblanadi.
+    from services.earnings_daily import providers_summary
+    xulosa = providers_summary(db, providers)
+
     res = []
     for p in providers:
         item = ProviderOut.model_validate(p)
         item.username = user_map.get(p.id)
         item.service_ids = [s.id for s in p.services] if p.services else []
+        x = xulosa.get(p.id) or {}
+        item.today_earned = x.get("today", 0)
+        item.total_earned = x.get("total_earned", 0)
         res.append(item)
 
     return res
+
+
+@router.get("/{provider_id}/earnings-daily")
+def provider_earnings_daily(
+    provider_id: int,
+    limit: int = 60,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Shifokorning ishlagan puli kunma-kun: jami qaysi kundan kelgani."""
+    from services.earnings_daily import provider_daily
+    natija = provider_daily(db, provider_id, limit)
+    if not natija:
+        raise HTTPException(status_code=404, detail="Shifokor topilmadi")
+    return natija
+
+
+@router.get("/{provider_id}/earnings-daily/{kun}")
+def provider_earnings_day(
+    provider_id: int,
+    kun: date,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Bir kundagi bemorlar — o'sha kunning summasi qanday yig'ilgani."""
+    from services.earnings_daily import provider_day_patients
+    return provider_day_patients(db, provider_id, kun)
 
 
 @router.post("", response_model=ProviderOut)

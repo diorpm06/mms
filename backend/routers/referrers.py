@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -43,7 +45,47 @@ def list_referrers(
     q = db.query(Referrer)
     if active_only:
         q = q.filter(Referrer.is_active == True)
-    return q.order_by(Referrer.full_name).all()
+    referrers = q.order_by(Referrer.full_name).all()
+
+    # "Bugun" va "Jami ishlagan" ustunlari uchun (balansdan alohida)
+    from services.earnings_daily import referrers_summary
+    xulosa = referrers_summary(db, referrers)
+
+    res = []
+    for r in referrers:
+        item = ReferrerOut.model_validate(r)
+        x = xulosa.get(r.id) or {}
+        item.today_earned = x.get("today", 0)
+        item.total_earned = x.get("total_earned", 0)
+        res.append(item)
+    return res
+
+
+@router.get("/{referrer_id}/earnings-daily")
+def referrer_earnings_daily(
+    referrer_id: int,
+    limit: int = 60,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Yo'naltiruvchining ishlagan puli kunma-kun."""
+    from services.earnings_daily import referrer_daily
+    natija = referrer_daily(db, referrer_id, limit)
+    if not natija:
+        raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
+    return natija
+
+
+@router.get("/{referrer_id}/earnings-daily/{kun}")
+def referrer_earnings_day(
+    referrer_id: int,
+    kun: date,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Bir kundagi bemorlar ro'yxati."""
+    from services.earnings_daily import referrer_day_patients
+    return referrer_day_patients(db, referrer_id, kun)
 
 
 @router.get("/pending", response_model=list[ReferrerOut])

@@ -242,7 +242,7 @@ export default function NewPatient({ homePath = '/admin' }) {
       const autoDoctorId = findMatchingDoctor(s.id)
       setSelectedServices((prev) => [
         ...prev.filter((item) => item.service_id),
-        { service_id: sid, price: s.price, quantity: 1, provider_id: autoDoctorId || null },
+        { service_id: sid, price: s.price, quantity: 1, is_course: false, provider_id: autoDoctorId || null },
       ])
     }
   }
@@ -268,6 +268,19 @@ export default function NewPatient({ homePath = '/admin' }) {
       prev.map((item) =>
         String(item.service_id) === String(sid) ? { ...item, quantity: qty } : item
       )
+    )
+  }
+
+  const updateServiceIsCourse = (sid, isCourse) => {
+    const nextBool = Boolean(isCourse)
+    setSelectedServices((prev) =>
+      prev.map((item) => {
+        if (String(item.service_id) === String(sid)) {
+          const newQty = nextBool && (!item.quantity || item.quantity <= 1) ? 2 : item.quantity
+          return { ...item, is_course: nextBool, quantity: newQty }
+        }
+        return item
+      })
     )
   }
 
@@ -445,6 +458,7 @@ export default function NewPatient({ homePath = '/admin' }) {
         provider_id: s.provider_id ? +s.provider_id : null,
         price: Number(s.price) || 0,
         quantity: Math.max(1, Number(s.quantity) || 1),
+        is_course: Boolean(s.is_course),
       })),
     }
 
@@ -909,7 +923,12 @@ export default function NewPatient({ homePath = '/admin' }) {
                                         : 'bg-surface-2 border-border text-body hover:border-border-strong hover:text-body'
                                     }`}
                                   >
-                                    <span className="block font-bold">{s.name} {s.allow_custom_price && <span className="text-[9px] text-cyan-300">✏️</span>}</span>
+                                    <span className="block font-bold">
+                                      {serviceQuery.trim() && (
+                                        <span className="text-[9px] text-amber-400 font-bold block uppercase tracking-tight">📁 {s.category || 'Umumiy'}</span>
+                                      )}
+                                      {s.name} {s.allow_custom_price && <span className="text-[9px] text-cyan-300">✏️</span>}
+                                    </span>
                                     <span className="block text-[10px] mt-0.5 tabular-nums opacity-80">
                                       {s.allow_custom_price ? (s.price > 0 ? `${formatMoney(s.price)} (Tavsiya)` : "✏️ Erkin narx") : formatMoney(s.price)}
                                     </span>
@@ -991,89 +1010,133 @@ export default function NewPatient({ homePath = '/admin' }) {
                       return (
                         <div
                           key={svcObj.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-surface border border-emerald-500/20 text-xs ml-3"
+                          className="p-3.5 rounded-2xl bg-surface border border-emerald-500/20 text-xs ml-0 sm:ml-2 space-y-3 shadow-sm"
                         >
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-bold text-foreground text-sm">{svcObj.name}</p>
-                              {svcObj.allow_custom_price && (
-                                <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/20 px-1.5 py-0.5 rounded border border-cyan-500/40">
-                                  ✏️ Erkin Narx
+                          {/* Top Row: Service Title, Price & Doctor */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2.5">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-extrabold text-foreground text-sm">{svcObj.name}</p>
+                                <span className="text-[10px] font-extrabold text-gold bg-gold/10 px-2 py-0.5 rounded-lg border border-gold/30 uppercase tracking-tight">
+                                  📁 {svcObj.category || 'Umumiy'}
                                 </span>
-                              )}
-                            </div>
-
-                            {svcObj.allow_custom_price ? (
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <span className="text-[11px] font-bold text-cyan-300">Narx kiritish:</span>
-                                <input
-                                  type="text"
-                                  value={formatWithCommas(row.price)}
-                                  onChange={(e) => updateServicePrice(svcObj.id, parseDigits(e.target.value))}
-                                  placeholder="0"
-                                  className="w-28 px-2 py-1 rounded-lg bg-surface-sunken border border-cyan-500/60 font-mono font-bold text-cyan-300 text-xs text-center focus:outline-none focus:border-cyan-400"
-                                />
-                                <span className="text-[11px] text-cyan-300 font-semibold">so'm</span>
+                                {svcObj.allow_custom_price && (
+                                  <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/20 px-1.5 py-0.5 rounded border border-cyan-500/40">
+                                    ✏️ Erkin Narx
+                                  </span>
+                                )}
                               </div>
-                            ) : (
-                              <p className="text-[11px] text-muted mt-0.5">
-                                1 dona: <span className="font-mono text-body">{formatMoney(unitPrice)}</span>
-                              </p>
-                            )}
 
-                            {/* Doctor Selection Dropdown */}
-                            <div className="mt-2 flex items-center gap-1.5">
-                              <span className="text-[11px] text-amber-400 font-bold">👨‍⚕️ Shifokor:</span>
-                              <select
-                                value={row.provider_id || ''}
-                                onChange={(e) => updateServiceDoctor(svcObj.id, e.target.value)}
-                                className={`px-2 py-1 rounded-lg bg-surface-sunken border text-[11px] font-bold focus:outline-none focus:border-amber-400 max-w-[240px] ${
-                                  row.provider_id ? 'border-emerald-500/60 text-emerald-300' : 'border-amber-500/40 text-amber-300'
-                                }`}
-                              >
-                                <option value="">(Avto-biriktirish / Navbat bo'yicha)</option>
-                                {providers.map((p) => {
-                                  const isMatched = Array.isArray(p.service_ids) && p.service_ids.map(Number).includes(svcObj.id)
-                                  return (
-                                    <option key={p.id} value={p.id}>
-                                      {p.full_name} ({p.specialization || 'Shifokor'}){isMatched ? ' ⭐ (Biriktirilgan)' : ''}
-                                    </option>
-                                  )
-                                })}
-                              </select>
+                              {svcObj.allow_custom_price ? (
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="text-[11px] font-bold text-cyan-300">Narx kiritish:</span>
+                                  <input
+                                    type="text"
+                                    value={formatWithCommas(row.price)}
+                                    onChange={(e) => updateServicePrice(svcObj.id, parseDigits(e.target.value))}
+                                    placeholder="0"
+                                    className="w-28 px-2 py-1 rounded-lg bg-surface-sunken border border-cyan-500/60 font-mono font-bold text-cyan-300 text-xs text-center focus:outline-none focus:border-cyan-400"
+                                  />
+                                  <span className="text-[11px] text-cyan-300 font-semibold">so'm</span>
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-muted mt-0.5">
+                                  1 dona: <span className="font-mono text-body font-bold">{formatMoney(unitPrice)}</span>
+                                </p>
+                              )}
+
+                              {/* Doctor Selection Dropdown */}
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                <span className="text-[11px] text-amber-400 font-bold">👨‍⚕️ Shifokor:</span>
+                                <select
+                                  value={row.provider_id || ''}
+                                  onChange={(e) => updateServiceDoctor(svcObj.id, e.target.value)}
+                                  className={`px-2 py-1 rounded-lg bg-surface-sunken border text-[11px] font-bold focus:outline-none focus:border-amber-400 max-w-[240px] ${
+                                    row.provider_id ? 'border-emerald-500/60 text-emerald-300' : 'border-amber-500/40 text-amber-300'
+                                  }`}
+                                >
+                                  <option value="">(Avto-biriktirish / Navbat bo'yicha)</option>
+                                  {providers.map((p) => {
+                                    const isMatched = Array.isArray(p.service_ids) && p.service_ids.map(Number).includes(svcObj.id)
+                                    return (
+                                      <option key={p.id} value={p.id}>
+                                        {p.full_name} ({p.specialization || 'Shifokor'}){isMatched ? ' ⭐ (Biriktirilgan)' : ''}
+                                      </option>
+                                    )
+                                  })}
+                                </select>
+                              </div>
                             </div>
+
+                            {/* Remove Service Button */}
+                            <button
+                              type="button"
+                              onClick={() => toggleServiceSelection(svcObj)}
+                              className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors self-start shrink-0"
+                              title="Xizmatni olib tashlash"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
 
-                          <div className="flex items-center gap-3 shrink-0 justify-between sm:justify-end">
-                            {/* Quantity Counter (- 1 +) */}
-                            <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border">
+                          {/* Bottom Row: Controls & Subtotal */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-0.5">
+                            {/* Quantity Counter & Multi-day course toggle */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border">
+                                <button
+                                  type="button"
+                                  onClick={() => updateServiceQuantity(svcObj.id, qty - 1)}
+                                  disabled={qty <= 1}
+                                  className="w-7 h-7 rounded-lg bg-slate-700 text-foreground font-bold hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-sm"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={qty}
+                                  onChange={(e) => updateServiceQuantity(svcObj.id, e.target.value)}
+                                  className="w-12 text-center font-mono font-black text-emerald-400 bg-transparent text-sm focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => updateServiceQuantity(svcObj.id, qty + 1)}
+                                  className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-500 flex items-center justify-center text-sm"
+                                >
+                                  +
+                                </button>
+                                <span className="text-[10px] text-muted font-semibold px-1">dona</span>
+                              </div>
+
+                              {/* Multi-day course toggle */}
                               <button
                                 type="button"
-                                onClick={() => updateServiceQuantity(svcObj.id, qty - 1)}
-                                disabled={qty <= 1}
-                                className="w-7 h-7 rounded-lg bg-slate-700 text-foreground font-bold hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-sm"
+                                onClick={() => updateServiceIsCourse(svcObj.id, !row.is_course)}
+                                className={`px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                                  row.is_course
+                                    ? 'bg-purple-500/20 border-purple-500/60 text-purple-300 shadow-md ring-2 ring-purple-500/30'
+                                    : 'bg-surface-2/60 border-border text-muted hover:text-body hover:border-purple-500/40'
+                                }`}
+                                title={
+                                  row.is_course
+                                    ? "Ko'p kunlik davolanish kursi (Bemor bir necha kun keladi, 'Davolanishdagilar' bo'limiga o'tadi)"
+                                    : "Buni bir necha kunlik davolanish kursiga aylantirish uchun bosing"
+                                }
                               >
-                                -
+                                <span>{row.is_course ? '🔁' : '➕'}</span>
+                                <span>
+                                  {row.is_course
+                                    ? `Ko'p kunlik kurs (${qty} kun) ✓`
+                                    : qty > 1
+                                    ? `Bugungi tashrifda ${qty} dona`
+                                    : "Davolanish kursi qilish"}
+                                </span>
                               </button>
-                              <input
-                                type="number"
-                                min={1}
-                                value={qty}
-                                onChange={(e) => updateServiceQuantity(svcObj.id, e.target.value)}
-                                className="w-12 text-center font-mono font-black text-emerald-400 bg-transparent text-sm focus:outline-none"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => updateServiceQuantity(svcObj.id, qty + 1)}
-                                className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-500 flex items-center justify-center text-sm"
-                              >
-                                +
-                              </button>
-                              <span className="text-[10px] text-muted font-semibold px-1">dona</span>
                             </div>
 
                             {/* Subtotal */}
-                            <div className="text-right min-w-24">
+                            <div className="text-right ml-auto">
                               <span className="font-black text-sm text-emerald-400 font-mono block">
                                 {formatMoney(subtotal)}
                               </span>
@@ -1081,16 +1144,6 @@ export default function NewPatient({ homePath = '/admin' }) {
                                 <span className="text-[10px] text-muted block">({unitPrice.toLocaleString()} × {qty})</span>
                               )}
                             </div>
-
-                            {/* Remove Service */}
-                            <button
-                              type="button"
-                              onClick={() => toggleServiceSelection(svcObj)}
-                              className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors"
-                              title="Xizmatni olib tashlash"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
                           </div>
                         </div>
                       )

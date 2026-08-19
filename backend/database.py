@@ -346,6 +346,7 @@ def run_migrations():
         "ALTER TABLE inpatient_payments ADD COLUMN cancelled_at TIMESTAMP",
         "ALTER TABLE inpatient_payments ADD COLUMN cancelled_by INTEGER",
         "ALTER TABLE inpatient_payments ADD COLUMN cancel_reason TEXT",
+        "ALTER TABLE patient_services ADD COLUMN is_course BOOLEAN DEFAULT FALSE",
     ):
         try:
             with engine.connect() as conn:
@@ -355,7 +356,7 @@ def run_migrations():
                 except Exception:
                     conn.rollback()
         except Exception as e:
-            logger.warning(f"inpatient_payments migration warning: {e}")
+            logger.warning(f"inpatient_payments / patient_services migration warning: {e}")
 
     # inpatient_items table migrations (SQLite & PostgreSQL)
     for stmt in (
