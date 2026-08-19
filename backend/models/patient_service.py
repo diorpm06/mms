@@ -26,10 +26,15 @@ class PatientService(Base):
     total_price: Mapped[int] = mapped_column(Integer, default=0)
 
     # Bemor bir necha kunlik xizmatni OLDINDAN to'lashi mumkin (masalan 3 ta
-    # elektroforez). Shunda quantity=3, is_course=True bo'ladi va bemor uch marta keladi.
-    # used_count nechta seans ishlatilganini ko'rsatadi: birinchi tashrif
-    # ro'yxatga olishning o'zida hisoblanadi, keyingilarida "Keldi" bosiladi.
-    used_count: Mapped[int] = mapped_column(Integer, default=1, nullable=True)
+    # elektroforez). Shunda quantity=3, is_course=True bo'ladi va bemor uch
+    # marta keladi.
+    #
+    # used_count — nechta seans ISHLATILGANI. Yangi yozuvda 0: ro'yxatga
+    # olishning o'zi kunni yemaydi, birinchi kun uchun ham "Keldi" bosiladi.
+    # Ilgari bu yerda default=1 turgan edi va har bir kurs bir kunni
+    # yo'qotardi: 4 kunga to'lagan bemor bir marta kelib "1 kun qoldi"
+    # holatiga tushib qolardi.
+    used_count: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
     is_course: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     service = relationship("Service")

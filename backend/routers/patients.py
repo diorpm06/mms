@@ -264,9 +264,8 @@ def _patient_row(p: Patient) -> dict:
                 "total_price": ps.total_price,
                 # Bir necha kunlik oldindan to'lov bo'lsa — chekda va
                 # ro'yxatlarda qolgan kun ko'rsatiladi
-                "used_count": int(ps.used_count if ps.used_count is not None else 1),
-                "remaining": max(0, int(ps.quantity or 1)
-                                 - int(ps.used_count if ps.used_count is not None else 1)),
+                "used_count": int(ps.used_count or 0),
+                "remaining": max(0, int(ps.quantity or 1) - int(ps.used_count or 0)),
             }
             for ps in (p.services_detail or [])
         ],

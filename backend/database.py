@@ -386,7 +386,8 @@ def run_migrations():
         # Shifokor shablonni saqlaydi (draft), keyin alohida adminga yuboradi
         "ALTER TABLE report_submissions ADD COLUMN submitted_at TIMESTAMP",
         # Oldindan to'langan ko'p kunlik xizmat: nechta seans ishlatilgani
-        "ALTER TABLE patient_services ADD COLUMN used_count INTEGER DEFAULT 1",
+        # 0: ro'yxatga olishning o'zi kunni yemaydi, "Keldi" bosilganda sanaladi
+        "ALTER TABLE patient_services ADD COLUMN used_count INTEGER DEFAULT 0",
         # Kursning navbatdagi tashrifi qaysi to'lovdan kelgani
         "ALTER TABLE patients ADD COLUMN prepaid_from_id INTEGER",
         "CREATE INDEX IF NOT EXISTS ix_patients_prepaid_from ON patients (prepaid_from_id)",
@@ -405,8 +406,8 @@ def run_migrations():
     for stmt in (
         "UPDATE providers SET is_inpatient_provider = FALSE WHERE is_inpatient_provider IS NULL",
         "UPDATE providers SET inpatient_daily_rate = 50000 WHERE inpatient_daily_rate IS NULL",
-        # Mavjud yozuvlar: birinchi seans ro'yxatga olishda ishlatilgan hisoblanadi
-        "UPDATE patient_services SET used_count = 1 WHERE used_count IS NULL",
+        # Hali bir marta ham "Keldi" bosilmagan bo'lsa — 0
+        "UPDATE patient_services SET used_count = 0 WHERE used_count IS NULL",
     ):
         try:
             with engine.connect() as conn:
