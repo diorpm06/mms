@@ -149,8 +149,8 @@ def get_report(db: Session, start: date, end: date) -> dict:
     card = 0
     click = 0
     qr = 0
+    later_total = 0
     if txs:
-        total_income = sum(t.total_amount for t in txs)
         for t in txs:
             ptype = (t.payment_type or "").lower()
             if ptype in ("cash", "naqd"):
@@ -163,15 +163,17 @@ def get_report(db: Session, start: date, end: date) -> dict:
                 cash += (t.cash_amount or 0)
                 card += (t.card_amount or 0) + (t.qr_amount or 0)
                 click += (t.click_amount or 0)
-            elif ptype in ("later", "keyinroq", "nasiya", "qarz", "prepaid", "bekor"):
+            elif ptype in ("later", "keyinroq", "nasiya", "qarz"):
+                later_total += t.total_amount
+            elif ptype in ("prepaid", "bekor"):
                 pass
             else:
                 cash += t.total_amount
+        total_income = cash + card + click + qr
         referrer_share = sum((t.referrer_amount or 0) for t in txs)
         provider_share = sum((t.provider_amount or 0) for t in txs)
         center_share = sum((t.center_amount or 0) for t in txs)
     else:
-        total_income = sum((p.payment_amount or 0) for p in all_patients)
         for p in all_patients:
             ptype = (p.payment_type or "").lower()
             amt = int(p.payment_amount or 0)
@@ -185,10 +187,13 @@ def get_report(db: Session, start: date, end: date) -> dict:
                 cash += (p.cash_amount or 0)
                 card += (p.card_amount or 0) + (getattr(p, "qr_amount", 0) or 0)
                 click += (p.click_amount or 0)
-            elif ptype in ("later", "keyinroq", "nasiya", "qarz", "prepaid", "bekor"):
+            elif ptype in ("later", "keyinroq", "nasiya", "qarz"):
+                later_total += amt
+            elif ptype in ("prepaid", "bekor"):
                 pass
             else:
                 cash += amt
+        total_income = cash + card + click + qr
         from services.finance import get_referrer_rates_for_service, calculate_financial_split
         referrer_share = 0
         for p in all_patients:
