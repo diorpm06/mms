@@ -37,6 +37,10 @@ def _expense_out(e: Expense) -> dict:
         "created_at": e.created_at,
         "category": e.category,
         "source": source,
+        "is_cancelled": bool(getattr(e, "is_cancelled", False)),
+        "cancelled_at": e.cancelled_at,
+        "cancelled_by": e.cancelled_by,
+        "cancel_reason": e.cancel_reason,
     }
 
 
@@ -188,6 +192,7 @@ def list_expenses(
     year: int | None = None,
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
+    include_cancelled: bool = Query(False),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_or_ceo),
 ):
@@ -196,7 +201,10 @@ def list_expenses(
     except Exception as err:
         print("Expense sync error:", err)
 
-    q = db.query(Expense).filter(Expense.is_cancelled == False)
+    q = db.query(Expense)
+    if not include_cancelled:
+        q = q.filter(Expense.is_cancelled == False)
+
     if from_date and to_date:
         q = q.filter(
             Expense.created_at >= datetime.combine(from_date, datetime.min.time()),
@@ -312,3 +320,27 @@ def delete_expense(
         raise HTTPException(status_code=404, detail="Harajat topilmadi")
     _perform_expense_cancel(e, reason or "O'chirildi", user, db)
     return {"message": "Harajat o'chirildi"}
+
+
+@router.post("/{expense_id}/restore")
+def restore_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    e = db.query(Expense).filter(Expense.id == expense_id, Expense.is_cancelled == True).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Bekor qilingan harajat topilmadi")
+
+    from services.finance import get_or_create_balance, log_balance_change
+    bal = get_or_create_balance(db)
+    bal.current_balance -= e.amount
+    bal.updated_at = datetime.now()
+    log_balance_change(db, -e.amount, "expense_restore", f"Harajat qayta tiklandi: {e.description}")
+
+    e.is_cancelled = False
+    e.cancelled_at = None
+    e.cancelled_by = None
+    e.cancel_reason = None
+    db.commit()
+    return {"message": "Harajat qayta tiklandi ✓", "expense": _expense_out(e)}

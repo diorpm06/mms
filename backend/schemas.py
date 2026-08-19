@@ -318,6 +318,10 @@ class ExpenseOut(BaseModel):
     created_at: datetime
     category: Optional[str] = None
     source: Optional[str] = None
+    is_cancelled: Optional[bool] = False
+    cancelled_at: Optional[datetime] = None
+    cancelled_by: Optional[int] = None
+    cancel_reason: Optional[str] = None
 
     class Config:
         from_attributes = True

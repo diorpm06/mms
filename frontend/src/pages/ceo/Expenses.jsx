@@ -20,6 +20,7 @@ export default function CeoExpenses() {
   const [items,        setItems]        = useState(null)
   const [month,        setMonth]        = useState(new Date().getMonth() + 1)
   const [year,         setYear]         = useState(new Date().getFullYear())
+  const [showCancelled, setShowCancelled] = useState(false)
   const [total,        setTotal]        = useState(0)
   const [cancelId,     setCancelId]     = useState(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -37,10 +38,10 @@ export default function CeoExpenses() {
   const isStaffPayment = STAFF_CATEGORIES.includes(category)
 
   const load = () => {
-    api(`/expenses?month=${month}&year=${year}`).then(setItems)
+    api(`/expenses?month=${month}&year=${year}&include_cancelled=${showCancelled}`).then(setItems)
     api(`/expenses/summary?month=${month}&year=${year}`).then((r) => setTotal(r.total))
   }
-  useEffect(() => { load() }, [month, year])
+  useEffect(() => { load() }, [month, year, showCancelled])
 
   useEffect(() => {
     if (isStaffPayment && !staffList.length) {
@@ -180,6 +181,18 @@ export default function CeoExpenses() {
         </select>
         <input type="number" className="input-field text-xs py-2 w-24" value={year} onChange={(e) => setYear(+e.target.value)} />
 
+        <button
+          type="button"
+          onClick={() => setShowCancelled(!showCancelled)}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+            showCancelled
+              ? 'bg-rose-500/20 border-rose-500/50 text-rose-300'
+              : 'bg-surface-2 border-border text-muted hover:text-body'
+          }`}
+        >
+          {showCancelled ? "🔴 O'chirilganlar ko'rinmoqda" : "👁️ O'chirilganlarni ko'rsat"}
+        </button>
+
         {/* Jami */}
         <div className="flex items-center gap-2 rounded-xl border px-4 py-2" style={{ borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)' }}>
           <span className="text-xs text-muted">Jami harajat:</span>
@@ -194,10 +207,10 @@ export default function CeoExpenses() {
       ) : (
         <div className="card overflow-x-auto p-0">
           <table className="w-full text-sm">
-            <THead cols={['Sana', 'Kategoriya', 'Manba', 'Tavsif', 'Summa', '']} />
+            <THead cols={['Sana', 'Kategoriya', 'Manba', 'Tavsif', 'Summa', 'Amallar']} />
             <tbody>
               {items.map((e) => (
-                <tr key={e.id} className={`hover:bg-white/[0.02] transition-colors ${e.is_cancelled ? 'opacity-40' : ''}`}>
+                <tr key={e.id} className={`hover:bg-white/[0.02] transition-colors ${e.is_cancelled ? 'bg-rose-500/5 opacity-70 line-through' : ''}`}>
                   <td className="td-muted text-xs whitespace-nowrap">{formatDate(e.created_at)}</td>
                   <td className="td-cell">
                     {e.category ? (
@@ -213,12 +226,19 @@ export default function CeoExpenses() {
                     ) : <span className="text-muted">—</span>}
                   </td>
                   <td className="td-muted text-xs">{e.source || '—'}</td>
-                  <td className="td-cell">{e.description}</td>
+                  <td className="td-cell">
+                    <div>{e.description}</div>
+                    {e.is_cancelled && e.cancel_reason && (
+                      <div className="text-[10px] text-rose-400 no-underline font-semibold mt-0.5">
+                        ⚠️ O'chirish sababi: {e.cancel_reason}
+                      </div>
+                    )}
+                  </td>
                   <td className="td-cell font-bold" style={{ color: 'var(--danger)' }}>
                     {formatMoney(e.amount)}
                   </td>
                   <td className="td-cell">
-                    {!e.is_cancelled && (
+                    {!e.is_cancelled ? (
                       <Btn
                         variant="danger"
                         size="xs"
@@ -228,9 +248,24 @@ export default function CeoExpenses() {
                       >
                         O'chirish
                       </Btn>
-                    )}
-                    {e.is_cancelled && (
-                      <span className="text-xs" style={{ color: 'var(--danger)' }}>✗ Bekor</span>
+                    ) : (
+                      <Btn
+                        variant="cyan"
+                        size="xs"
+                        onClick={async () => {
+                          if (!confirm("Ushbu harajatni qayta tiklamoqchimisiz?")) return
+                          try {
+                            await api(`/expenses/${e.id}/restore`, { method: 'POST' })
+                            toast("Harajat qayta tiklandi ✓")
+                            load()
+                          } catch (err) {
+                            toast(err.message, 'error')
+                          }
+                        }}
+                        title="Harajatni qayta tiklash"
+                      >
+                        ↩️ Tiklash
+                      </Btn>
                     )}
                   </td>
                 </tr>

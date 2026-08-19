@@ -73,6 +73,11 @@ export default function TodayPatients() {
     const initialCard = p.card_amount ?? (p.payment_type === 'split' ? paidAmt - initialCash : (p.payment_type !== 'cash' && p.payment_type !== 'later') ? paidAmt : 0)
 
     setEditForm({
+      first_name: p.first_name || '',
+      last_name: p.last_name || '',
+      birth_date: p.birth_date ? p.birth_date.slice(0, 10) : '',
+      phone: p.phone || '+998',
+      address: p.address || '',
       referrer_id: p.referrer_id || '',
       payment_type: p.payment_type || 'cash',
       cash_amount: initialCash,
@@ -167,6 +172,11 @@ export default function TodayPatients() {
       await api(`/patients/${editPatient.id}`, {
         method: 'PUT',
         body: JSON.stringify({
+          first_name: editForm.first_name.trim(),
+          last_name: editForm.last_name?.trim() || null,
+          birth_date: editForm.birth_date || null,
+          phone: editForm.phone?.trim() || null,
+          address: editForm.address?.trim() || null,
           referrer_id: editForm.referrer_id ? Number(editForm.referrer_id) : null,
           payment_type: editForm.payment_type,
           discount_amount: discAmt,
@@ -704,11 +714,75 @@ export default function TodayPatients() {
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="card max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto overscroll-contain">
             <div>
-              <h3 className="text-lg font-black text-gold">Yozuvni tuzatish</h3>
+              <h3 className="text-lg font-black text-gold">Bemor Ma'lumotlarini Tahrirlash</h3>
               <p className="text-xs text-muted mt-1">
                 <strong className="text-body">{editPatient.first_name} {editPatient.last_name}</strong>
                 {' — '}{formatMoney(editPatient.payment_amount)} · {editPatient.ticket_number}
               </p>
+            </div>
+
+            {/* BEMOR SHAXSIY MA'LUMOTLARI (Ism, Familiya, Tug'ilgan sanasi, Telefon, Manzil) */}
+            <div className="p-3.5 rounded-2xl bg-surface-2 border border-border space-y-3 shadow-inner">
+              <span className="text-xs font-black uppercase tracking-wider text-cyan-400 block border-b border-border/40 pb-1.5">
+                👤 Bemor Shaxsiy Ma'lumotlari
+              </span>
+              
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-[11px] font-bold text-muted block mb-1">Ism *</label>
+                  <input
+                    type="text"
+                    className="input-field text-xs font-bold"
+                    value={editForm.first_name}
+                    onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                    placeholder="Ism"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-muted block mb-1">Familiya</label>
+                  <input
+                    type="text"
+                    className="input-field text-xs font-bold"
+                    value={editForm.last_name}
+                    onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                    placeholder="Familiya"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-[11px] font-bold text-muted block mb-1">Tug'ilgan sanasi / yili</label>
+                  <input
+                    type="date"
+                    className="input-field text-xs font-bold"
+                    value={editForm.birth_date}
+                    onChange={(e) => setEditForm({ ...editForm, birth_date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-muted block mb-1">Telefon raqami</label>
+                  <input
+                    type="text"
+                    className="input-field text-xs font-bold font-mono"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    placeholder="+998"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-muted block mb-1">Yashash manzili</label>
+                <input
+                  type="text"
+                  className="input-field text-xs font-medium"
+                  value={editForm.address}
+                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                  placeholder="Masalan: Urganch shahar"
+                />
+              </div>
             </div>
 
             {/* XIZMATLAR */}
