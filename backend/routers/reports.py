@@ -12,6 +12,7 @@ from models.transaction import Transaction
 from models.user import User
 from services.reports_data import (
     admin_daily_report,
+    admin_dashboard_summary,
     daily_report,
     dashboard_summary,
     get_report,
@@ -88,6 +89,16 @@ def report_admin_daily(
     _: User = Depends(require_admin_or_ceo),
 ):
     return admin_daily_report(db, date_param)
+
+
+@router.get("/admin-summary")
+def report_admin_summary(
+    date_param: date = Query(..., alias="date"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Admin bosh sahifasi uchun yengil xulosa (3 ta SQL so'rov)."""
+    return admin_dashboard_summary(db, date_param)
 
 
 @router.get("/period-chart")

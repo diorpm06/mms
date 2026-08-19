@@ -678,6 +678,119 @@ def admin_daily_report(db: Session, d: date) -> dict:
     return out
 
 
+def admin_dashboard_summary(db: Session, d: date) -> dict:
+    """Admin bosh sahifasi uchun YENGIL xulosa.
+
+    Ilgari bosh sahifa to'liq kunlik hisobotni (get_report) chaqirardi — u
+    14 ta ketma-ket SQL so'rov qiladi. Supabase masofada bo'lgani uchun har
+    bir so'rov ~180 ms, ya'ni sahifa 3 sekunddan ko'p kutardi va serverless
+    funksiya ba'zan uzilib ketardi. Bu yerda faqat kartochkalarga kerak
+    bo'lgan raqamlar, 3 ta so'rovda hisoblanadi.
+
+    Raqamlar Kunlik Hisobot bilan bir xil chiqishi uchun ayni o'sha
+    qoidalar ishlatiladi (tungi navbatchilik oynasi, to'lov turlari,
+    harajat manbasi).
+    """
+    s, e = _day_range(d)
+    paper_shift_s = s - timedelta(hours=16)
+
+    # 1-so'rov: kunlik tranzaksiyalar (tungi navbatchilik yozuvlari bilan)
+    qatorlar = (
+        _active_tx_filter(
+            db.query(
+                Transaction.payment_type, Transaction.total_amount,
+                Transaction.cash_amount, Transaction.card_amount,
+                Transaction.click_amount, Transaction.qr_amount,
+            ).filter(
+                or_(
+                    and_(Transaction.created_at >= s, Transaction.created_at <= e),
+                    and_(
+                        Transaction.created_at >= paper_shift_s,
+                        Transaction.created_at < s,
+                        Transaction.patient_id.in_(
+                            db.query(Patient.id).filter(Patient.is_paper_entry == True)
+                        ),
+                    ),
+                )
+            )
+        ).all()
+    )
+
+    cash = card = click = qr = total_income = 0
+    for ptype, jami, naqd, karta, klik, qr_sum in qatorlar:
+        jami = int(jami or 0)
+        total_income += jami
+        t = (ptype or "").lower()
+        if t in ("cash", "naqd"):
+            cash += int(naqd or 0) or jami
+        elif t in ("card", "karta", "terminal", "qr"):
+            card += (int(karta or 0) or jami) + int(qr_sum or 0)
+        elif t in ("click", "payme"):
+            click += jami
+        elif t in ("split", "aralash"):
+            cash += int(naqd or 0)
+            card += int(karta or 0) + int(qr_sum or 0)
+            click += int(klik or 0)
+        else:
+            card += jami
+
+    # 2-so'rov: bemorlar soni va navbatchilik tushumi birga
+    bemor = (
+        db.query(
+            func.count(Patient.id),
+            func.coalesce(func.sum(
+                case((Patient.is_paper_entry == True, Patient.payment_amount), else_=0)
+            ), 0),
+        )
+        .filter(
+            or_(
+                and_(Patient.created_at >= s, Patient.created_at <= e),
+                and_(
+                    Patient.created_at >= paper_shift_s,
+                    Patient.created_at < s,
+                    Patient.is_paper_entry == True,
+                ),
+            ),
+            Patient.is_cancelled == False,
+        )
+        .first()
+    )
+    patients_count, paper_total = int(bemor[0] or 0), int(bemor[1] or 0)
+
+    # 3-so'rov: harajatlar, manbasi bo'yicha ajratilgan holda
+    kartadan = (Expense.description.contains("[MANBA: Karta kassa]")
+                | Expense.description.contains("[MANBA: Bank hisob]")
+                | Expense.description.contains("[MANBA: Click]"))
+    xar = (
+        db.query(
+            func.coalesce(func.sum(Expense.amount), 0),
+            func.coalesce(func.sum(case((kartadan, Expense.amount), else_=0)), 0),
+        )
+        .filter(Expense.created_at >= s, Expense.created_at <= e,
+                Expense.is_cancelled == False)
+        .first()
+    )
+    expense_total, card_expenses = int(xar[0] or 0), int(xar[1] or 0)
+    cash_expenses = expense_total - card_expenses
+
+    return {
+        "patients_count": patients_count,
+        "total_income": total_income,
+        "cash": cash,
+        "card": card,
+        "click": click,
+        "qr": qr,
+        "expenses": expense_total,
+        "cash_expenses": cash_expenses,
+        "card_expenses": card_expenses,
+        "net_cash": max(0, cash - cash_expenses),
+        "net_card": max(0, (card + click + qr) - card_expenses),
+        "net_total": max(0, total_income - expense_total),
+        "paper_entry_total": paper_total,
+        "report_date": d.isoformat(),
+    }
+
+
 def daily_report(db: Session, d: date) -> dict:
     return get_report(db, d, d)
 

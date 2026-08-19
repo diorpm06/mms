@@ -16,30 +16,32 @@ import {
   Smartphone,
 } from 'lucide-react'
 
+// Mahalliy sana. new Date().toISOString() UTC beradi — Toshkent vaqti bilan
+// yarim tundan ertalab 5 gacha KECHAGI kunni so'rab qolardi.
+function bugun() {
+  const d = new Date()
+  const oy = String(d.getMonth() + 1).padStart(2, '0')
+  const kun = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${oy}-${kun}`
+}
+
 export default function AdminDashboard() {
   const [data, setData] = useState(null)
   const [today, setToday] = useState([])
+  const [xato, setXato] = useState(false)
 
   const load = useCallback(() => {
-    const d = new Date().toISOString().slice(0, 10)
-    api(`/reports/admin-daily?date=${d}`)
-      .then(setData)
-      .catch(() =>
-        setData({
-          patients_count: 0,
-          total_income: 0,
-          cash: 0,
-          card: 0,
-          click: 0,
-          expenses: 0,
-          cash_expenses: 0,
-          card_expenses: 0,
-          net_cash: 0,
-          net_card: 0,
-          net_total: 0,
-        })
-      )
-    api('/patients/today').then(setToday).catch(() => setToday([]))
+    api(`/reports/admin-summary?date=${bugun()}`)
+      .then((res) => {
+        setData(res)
+        setXato(false)
+      })
+      // DIQQAT: ilgari bu yerda hamma raqam 0 qilib qo'yilardi. So'rov
+      // uzilib ketsa (server sekin javob bersa) ekrandagi to'g'ri summalar
+      // birdan 0 ga tushib qolardi. Endi eski raqamlar joyida qoladi,
+      // faqat "yangilanmadi" belgisi chiqadi.
+      .catch(() => setXato(true))
+    api('/patients/today').then(setToday).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -55,13 +57,32 @@ export default function AdminDashboard() {
           <h1 className="page-title">Admin Dashboard</h1>
           <p className="text-muted mt-1 text-sm">
             Bugungi hisob-kitoblar — {new Date().toLocaleDateString('uz-UZ')}
+            {xato && data && (
+              <span className="ml-2 text-[11px] font-bold text-amber-400">
+                • yangilanmadi, oxirgi ma'lumot ko'rsatilyapti
+              </span>
+            )}
           </p>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="my-6">
-        {!data ? (
+        {!data && xato ? (
+          // Birinchi yuklash ham muvaffaqiyatsiz bo'lsa, skelet abadiy
+          // aylanib turmasin — sababi ko'rsatilib, qayta urinish beriladi.
+          <div className="card p-6 text-center space-y-3">
+            <p className="text-sm font-bold text-body">
+              Hisob-kitoblar yuklanmadi
+            </p>
+            <p className="text-xs text-muted">
+              Server javob bermadi. Internet aloqasini tekshiring.
+            </p>
+            <button type="button" onClick={load} className="btn-gold text-sm px-4 py-2">
+              Qayta urinish
+            </button>
+          </div>
+        ) : !data ? (
           <CardSkeleton count={7} />
         ) : (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
