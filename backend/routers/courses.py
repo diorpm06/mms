@@ -94,9 +94,15 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
                 "category": ps.service.category if ps.service else None,
                 "quantity": 0,
                 "total_price": 0,
+                # Kamida bitta yozuvda "soni" birdan katta bo'lsa, bu
+                # OLDINDAN to'langan kurs. Aks holda — kunlik to'lovlar.
+                "_oldindan": False,
             }
             g["services"][ps.service_id] = x
-        x["quantity"] += int(ps.quantity or 1)
+        soni = int(ps.quantity or 1)
+        if soni > 1:
+            x["_oldindan"] = True
+        x["quantity"] += soni
         x["total_price"] += int(ps.total_price or 0)
 
         if p.ticket_number and p.ticket_number not in g["tickets"]:
@@ -135,8 +141,13 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
             jami_qolgan += qolgan
             xizmatlar.append({**x, "used_count": ishlatilgan, "remaining": qolgan})
 
-        # Kurs deb faqat bir kundan ko'p to'langan xizmatlar hisoblanadi
-        kursli = [x for x in xizmatlar if x["quantity"] > 1]
+        # Kurs deb faqat OLDINDAN to'langani hisoblanadi: bitta yozuvda
+        # "soni" birdan katta kiritilgan bo'lishi shart.
+        #
+        # Bemor bir kunda bir xizmatdan ikki marta foydalanib, har safar
+        # alohida to'lasa — bu ikkita kunlik to'lov, kurs emas. Ilgari
+        # 1 + 1 qo'shilib "2 kunlik kurs" bo'lib chiqardi.
+        kursli = [x for x in xizmatlar if x["_oldindan"]]
         if faqat_tugallanmagan:
             if not kursli:
                 continue
@@ -154,7 +165,13 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
 
 
 def _tozala(g: dict) -> dict:
-    return {k: v for k, v in g.items() if not k.startswith("_")}
+    """Ichki (_ bilan boshlanadigan) maydonlarni javobdan olib tashlaydi."""
+    toza = {k: v for k, v in g.items() if not k.startswith("_")}
+    toza["services"] = [
+        {k: v for k, v in x.items() if not k.startswith("_")}
+        for x in g.get("services", [])
+    ]
+    return toza
 
 
 def _kursni_top(db: Session, kalit: str) -> dict:
@@ -221,10 +238,14 @@ def use_session(
                    "Bir kunda bir marta bosiladi.",
         )
 
-    qoldi_bor = [x for x in g["services"] if x["remaining"] > 0]
+    # Faqat OLDINDAN to'langan xizmatlar. Bemorning o'sha kuni alohida
+    # to'lab olgan bir martalik xizmatlari bu yerga tushmasligi kerak —
+    # ular uchun bepul tashrif ochilib qolmasin.
+    qoldi_bor = [x for x in g["services"] if x["_oldindan"] and x["remaining"] > 0]
     if not qoldi_bor:
         raise HTTPException(status_code=400,
                             detail="Bu kurs tugagan — qolgan kun yo'q")
+    qolgan_keyin = sum(x["remaining"] for x in qoldi_bor) - len(qoldi_bor)
 
     from routers.patients import _keyingi_raqam, get_queue_prefix_letter
 
@@ -282,10 +303,10 @@ def use_session(
 
     return {
         "message": f"{asl.first_name} navbatga qo'yildi ({', '.join(talonlar)}). "
-                   f"Qolgan kun: {g['total_remaining'] - len(qoldi_bor)}",
+                   f"Qolgan kun: {qolgan_keyin}",
         "ticket_number": talonlar[0],
         "tickets": talonlar,
-        "remaining": g["total_remaining"] - len(qoldi_bor),
+        "remaining": qolgan_keyin,
         # Navbat talonini darrov chop etish uchun
         "patient": {
             "id": birinchi.id,
@@ -367,7 +388,8 @@ def undo_session(
         ip_address=ip, device_info=ua,
     )
     db.commit()
+    kurs_qolgan = sum(x["remaining"] for x in g["services"] if x["_oldindan"])
     return {
         "message": "%d ta tashrif bekor qilindi" % len(tashriflar),
-        "remaining": g["total_remaining"] + len(tashriflar),
+        "remaining": kurs_qolgan + len(tashriflar),
     }
