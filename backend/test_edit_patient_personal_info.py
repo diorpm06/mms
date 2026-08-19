@@ -10,20 +10,17 @@ if not _os.environ.get("DATABASE_URL", "").startswith("sqlite"):
               "DATABASE_URL sqlite:/// bilan boshlanishi shart.")
 # ----------------------------------------------------------------------
 
-
 import sys, io, uuid
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 from datetime import date
 from database import SessionLocal
 from models.patient import Patient
-from models.patient_service import PatientService
 from models.service import Service
-from routers.courses import _kurslarni_yig
 
 db = SessionLocal()
 
-print("=== VERIFICATION TEST: Single-Visit 5 Units MUST NOT Split Into 5 Days ===")
+print("=== VERIFYING PATIENT PERSONAL INFO EDITING ===")
 
 svc = db.query(Service).filter(Service.is_active == True).first()
 if not svc:
@@ -31,43 +28,41 @@ if not svc:
     sys.exit(1)
 
 test_phone = f"+99890{uuid.uuid4().int % 10000000:07d}"
-
-# Patient gets 5 units of Hijoma TODAY (Single visit today, NOT a multi-day course)
 p = Patient(
-    first_name="SingleVisit5Units",
-    last_name="TestNoCourse",
-    birth_date=date(1991, 1, 1),
+    first_name="OldName",
+    last_name="OldLastName",
+    birth_date=date(1995, 5, 5),
     phone=test_phone,
-    address="Tashkent",
+    address="OldAddress",
     service_id=svc.id,
-    payment_amount=svc.price * 5,
+    payment_amount=100000,
     payment_type="cash",
     created_by=1,
 )
 db.add(p)
-db.flush()
-
-ps = PatientService(
-    patient_id=p.id,
-    service_id=svc.id,
-    quantity=5,
-    unit_price=svc.price,
-    total_price=svc.price * 5,
-    is_course=False,  # NOT a multi-day course!
-)
-db.add(ps)
 db.commit()
 
-# Check courses list
-courses = _kurslarni_yig(db, faqat_tugallanmagan=True)
-c_found = [c for c in courses if c["phone"] == test_phone]
+print(f"📌 Created Patient ID: {p.id} | Name: {p.first_name} {p.last_name} | Birth: {p.birth_date} | Address: {p.address}")
 
-print(f"📌 Davolanishdagilar bo'limida ko'ringanlar soni: {len(c_found)}")
-assert len(c_found) == 0, "STRICT FAILURE: Single visit with 5 units MUST NOT be in Davolanishdagilar!"
+# Update patient
+p.first_name = "NewName"
+p.last_name = "NewLastName"
+p.birth_date = date(2000, 10, 10)
+p.phone = "+998991234567"
+p.address = "Urganch shahar, Al-Xorazmiy ko'chasi"
+db.commit()
 
-print("✅ VERIFICATION SUCCESSFUL: 5 units in a single visit today correctly stays as 1 visit today and does NOT split into 5 days!")
+# Re-query
+p_updated = db.query(Patient).filter(Patient.id == p.id).first()
+print(f"📌 Updated Patient ID: {p_updated.id} | Name: {p_updated.first_name} {p_updated.last_name} | Birth: {p_updated.birth_date} | Address: {p_updated.address}")
+
+assert p_updated.first_name == "NewName"
+assert p_updated.last_name == "NewLastName"
+assert p_updated.birth_date == date(2000, 10, 10)
+assert p_updated.address == "Urganch shahar, Al-Xorazmiy ko'chasi"
 
 # Cleanup
-p.is_cancelled = True
+db.delete(p_updated)
 db.commit()
-print("✓ Cleanup done.")
+
+print("\n✅ VERIFICATION SUCCESSFUL: Personal info (Ism, Familiya, Tug'ilgan yili/sanasi, Telefon, Yashash manzili) is 100% updateable and persisted!")

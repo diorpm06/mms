@@ -1,3 +1,16 @@
+# --- QALQON: JONLI BAZAGA ULANISHNI TAQIQLAYDI -------------------------
+# 2026-08-19: bu test skripti qalqonsiz edi va jonli Supabase bazasida
+# haqiqiy bemor yozuvlari yaratgan (21 ta topilib o'chirildi). Tozalash
+# qismi ham yo'q edi. Endi faqat vaqtinchalik SQLite bazada ishlaydi:
+#   $env:DATABASE_URL='sqlite:///C:/Temp/sinov.db'
+import os as _os
+import sys as _sys
+if not _os.environ.get("DATABASE_URL", "").startswith("sqlite"):
+    _sys.exit("TO'XTATILDI: test skripti jonli bazada ishlamaydi. "
+              "DATABASE_URL sqlite:/// bilan boshlanishi shart.")
+# ----------------------------------------------------------------------
+
+
 import sys, io, uuid
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
