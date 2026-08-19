@@ -103,6 +103,19 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
           quantity: sub.quantity || 1,
         })
       })
+    } else if (p.services && Array.isArray(p.services) && p.services.length > 0) {
+      // Bemor bir nechta xizmat tanlagan bo'lsa (masalan 3 ta laboratoriya
+      // tahlili) — hammasi chekda alohida qator bo'lib chiqishi kerak.
+      // Ilgari bu yerga tushib qolgan chek faqat BITTA (asosiy) xizmatni
+      // ko'rsatardi, chunki ro'yxat faqat breakdown/sub_items dan olinardi.
+      p.services.forEach((s) => {
+        allPrintItems.push({
+          category: cleanCategory(s.category || p.service_category || p.category),
+          service_name: cleanServiceName(s.service_name),
+          payment_amount: s.total_price ?? s.price ?? 0,
+          quantity: s.quantity || 1,
+        })
+      })
     } else {
       allPrintItems.push({
         category: cleanCategory(p.service_category || p.category),
