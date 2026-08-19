@@ -292,6 +292,10 @@ def reprice_patient_payment(db: Session, patient: Patient, tx: Transaction) -> T
     va balanslar to'g'rilanishi kerak. Buning uchun avvalgi taqsimot
     balanslardan ayiriladi, so'ng yangisi qo'shiladi.
     """
+    # Eski markaz ulushini eslab qolamiz: kassa tarixiga YANGI summa emas,
+    # HAQIQIY o'zgarish (yangi - eski) yozilishi kerak.
+    eski_markaz = int(tx.center_amount or 0)
+
     # 1) Eski taqsimotni orqaga qaytaramiz
     if tx.referrer_id:
         old_ref = db.query(Referrer).filter(Referrer.id == tx.referrer_id).first()
@@ -330,9 +334,15 @@ def reprice_patient_payment(db: Session, patient: Patient, tx: Transaction) -> T
     tx.qr_amount = patient.qr_amount or 0
     tx.card_amount = patient.card_amount or 0
 
+    # DIQQAT: ilgari bu yerda `center_amount - (0)` turgan edi, ya'ni kassa
+    # tarixiga yangi summaning O'ZI yozilardi. Kassa esa aslida faqat
+    # (yangi - eski) ga o'zgaradi. Natijada har bir tahrirdan keyin tarix
+    # eski summacha ortiqcha ko'rsatardi va "kassada pul kam" degan
+    # nomutanosiblik chiqardi.
     log_balance_change(
-        db, center_amount - (0), "correction",
-        f"Tahrirlandi: mijoz #{patient.id} {patient.first_name} {patient.last_name}",
+        db, center_amount - eski_markaz, "correction",
+        f"Tahrirlandi: mijoz #{patient.id} {patient.first_name} "
+        f"{patient.last_name} ({eski_markaz:,} -> {center_amount:,})",
     )
     return tx
 
