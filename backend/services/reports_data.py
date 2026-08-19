@@ -163,8 +163,10 @@ def get_report(db: Session, start: date, end: date) -> dict:
                 cash += (t.cash_amount or 0)
                 card += (t.card_amount or 0) + (t.qr_amount or 0)
                 click += (t.click_amount or 0)
+            elif ptype in ("later", "keyinroq", "nasiya", "qarz", "prepaid", "bekor"):
+                pass
             else:
-                card += t.total_amount
+                cash += t.total_amount
         referrer_share = sum((t.referrer_amount or 0) for t in txs)
         provider_share = sum((t.provider_amount or 0) for t in txs)
         center_share = sum((t.center_amount or 0) for t in txs)
@@ -183,8 +185,10 @@ def get_report(db: Session, start: date, end: date) -> dict:
                 cash += (p.cash_amount or 0)
                 card += (p.card_amount or 0) + (getattr(p, "qr_amount", 0) or 0)
                 click += (p.click_amount or 0)
+            elif ptype in ("later", "keyinroq", "nasiya", "qarz", "prepaid", "bekor"):
+                pass
             else:
-                card += amt
+                cash += amt
         from services.finance import get_referrer_rates_for_service, calculate_financial_split
         referrer_share = 0
         for p in all_patients:
@@ -731,8 +735,10 @@ def admin_dashboard_summary(db: Session, d: date) -> dict:
             cash += int(naqd or 0)
             card += int(karta or 0) + int(qr_sum or 0)
             click += int(klik or 0)
+        elif t in ("later", "keyinroq", "nasiya", "qarz", "prepaid", "bekor"):
+            pass
         else:
-            card += jami
+            cash += jami
 
     # 2-so'rov: bemorlar soni va navbatchilik tushumi birga
     bemor = (
