@@ -567,11 +567,12 @@ def get_report(db: Session, start: date, end: date) -> dict:
                 "amount": 0,
                 "paid": 0,
                 "date": p.created_at.strftime("%d.%m.%Y %H:%M") if p.created_at else "",
+                "_raw_dt": p.created_at,
             }
         _disc_map[key]["amount"] += d
         _disc_map[key]["paid"] += p.payment_amount or 0
 
-    discounts_list = sorted(_disc_map.values(), key=lambda x: -x["amount"])
+    discounts_list = sorted(_disc_map.values(), key=lambda x: x.get("_raw_dt") or datetime.min, reverse=True)
     total_discount = sum(x["amount"] for x in discounts_list)
 
     paper_entry_patients = [
@@ -583,7 +584,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
             "visit_date": p.created_at.strftime("%Y-%m-%d") if p.created_at else None,
             "visit_time": p.created_at.strftime("%H:%M") if p.created_at else None,
         }
-        for p in sorted(all_patients, key=lambda x: x.created_at)
+        for p in sorted(all_patients, key=lambda x: x.created_at or datetime.min, reverse=True)
         if p.is_paper_entry
     ]
     paper_entry_count = len(paper_entry_patients)
@@ -659,7 +660,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
             "cancel_reason": p.cancel_reason or "Sabab ko'rsatilmagan",
             "date": p.cancelled_at.strftime("%d.%m.%Y %H:%M") if p.cancelled_at else (p.created_at.strftime("%d.%m.%Y %H:%M") if p.created_at else ""),
         }
-        for p in cancelled_patients
+        for p in sorted(cancelled_patients, key=lambda x: x.cancelled_at or x.created_at or datetime.min, reverse=True)
     ]
 
     return {
