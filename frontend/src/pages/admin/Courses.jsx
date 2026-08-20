@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { CalendarCheck, Pencil, RefreshCw, Search, Undo2 } from 'lucide-react'
+import { CalendarCheck, RefreshCw, Search, Undo2 } from 'lucide-react'
 import { api } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import { Btn, Icons, PageHeader, EmptyState } from '../../components/UIKit'
 import { TableSkeleton } from '../../components/Skeleton'
 import PaymentTicketModal from '../../components/PaymentTicketModal'
-import Modal from '../../components/Modal'
 
 function sana(iso) {
   if (!iso) return '—'
@@ -22,10 +21,6 @@ export default function Courses() {
   // "Keldi" bosilgach bemorga navbat taloni chop etib beriladi
   const [talon, setTalon] = useState(null)
   
-  // Tahrirlash modali
-  const [editRecord, setEditRecord] = useState(null)
-  const [editItems, setEditItems] = useState([])
-  const [savingEdit, setSavingEdit] = useState(false)
 
   const toast = useToastStore((s) => s.add)
 
@@ -81,41 +76,6 @@ export default function Courses() {
       toast(e.message, 'error')
     } finally {
       setIshlanmoqda(null)
-    }
-  }
-
-  const openEditModal = (r) => {
-    setEditRecord(r)
-    setEditItems(
-      (r.services || []).map((x) => ({
-        service_id: x.service_id,
-        service_name: x.service_name,
-        quantity: x.quantity || 1,
-        used_count: x.used_count || 0,
-      }))
-    )
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editRecord) return
-    setSavingEdit(true)
-    try {
-      const payload = {
-        key: editRecord.key,
-        items: editItems.map((x) => ({
-          service_id: x.service_id,
-          quantity: Math.max(1, Number(x.quantity) || 1),
-          used_count: Math.max(0, Math.min(Number(x.quantity) || 1, Number(x.used_count) || 0)),
-        })),
-      }
-      const res = await api('/courses/edit', { method: 'PUT', body: JSON.stringify(payload) })
-      toast(res.message || '✓ Kurs kunlari tahrirlandi')
-      setEditRecord(null)
-      yukla()
-    } catch (e) {
-      toast(e.message || 'Tahrirlashda xatolik', 'error')
-    } finally {
-      setSavingEdit(false)
     }
   }
 
@@ -199,25 +159,57 @@ export default function Courses() {
                         : ''}
                   </p>
 
-                  {/* Bemorning har bir xizmati o'z qatorida, kunlari bilan */}
+                  {/* Har bir xizmat o'z qatorida. Kurs uzunligi bo'yicha
+                      kunlar chiziladi: shu xizmatga tegishli kunlar
+                      belgilanadi, o'tganlari ✓ bilan. */}
                   <div className="space-y-1.5 mt-2">
-                    {(r.services || []).map((x) => (
-                      <div key={x.service_id} className="flex flex-wrap items-center gap-1.5">
-                        <span className="badge badge-cyan text-[10px] font-bold">{x.service_name}</span>
-                        {Array.from({ length: x.quantity }).map((_, n) => (
-                          <span
-                            key={n}
-                            className={`text-[10px] font-mono font-bold rounded px-1.5 py-0.5 border ${
-                              n < x.used_count
-                                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                                : 'bg-surface-2 border-border text-muted'
-                            }`}
-                          >
-                            {n + 1}-kun{n < x.used_count ? ' ✓' : ''}
-                          </span>
-                        ))}
-                      </div>
-                    ))}
+                    {(r.services || []).map((x) => {
+                      // Jadval bo'lmasa — eski tartib: 1..quantity ketma-ket
+                      const jadval = (x.days && x.days.length)
+                        ? x.days
+                        : Array.from({ length: x.quantity }, (_, i) => i + 1)
+                      const uzunlik = Math.max(
+                        ...(r.services || []).map((s) =>
+                          s.days && s.days.length
+                            ? Math.max(...s.days)
+                            : s.quantity
+                        )
+                      )
+                      return (
+                        <div key={x.service_id} className="flex flex-wrap items-center gap-1.5">
+                          <span className="badge badge-cyan text-[10px] font-bold">{x.service_name}</span>
+                          {Array.from({ length: uzunlik }).map((_, n) => {
+                            const kun = n + 1
+                            const tegishli = jadval.includes(kun)
+                            const otgan = kun <= (r.otgan_kun ?? 0)
+                            if (!tegishli) {
+                              // Bu kuni shu muolaja berilmaydi
+                              return (
+                                <span
+                                  key={kun}
+                                  className="text-[10px] font-mono rounded px-1.5 py-0.5 border border-dashed border-border/50 text-muted/40"
+                                  title={`${kun}-kuni bu muolaja yo'q`}
+                                >
+                                  {kun}
+                                </span>
+                              )
+                            }
+                            return (
+                              <span
+                                key={kun}
+                                className={`text-[10px] font-mono font-bold rounded px-1.5 py-0.5 border ${
+                                  otgan
+                                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                                    : 'bg-surface-2 border-border text-muted'
+                                }`}
+                              >
+                                {kun}-kun{otgan ? ' ✓' : ''}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
 
@@ -238,15 +230,10 @@ export default function Courses() {
                     Keldi
                   </Btn>
 
-                  <button
-                    type="button"
-                    onClick={() => openEditModal(r)}
-                    disabled={band}
-                    className="p-2 rounded-lg text-cyan hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors border border-cyan-500/30"
-                    title="Kurs kunlarini va bajarilgan kunlarni tahrirlash"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
+                  {/* Kurs kunlarini tahrirlash tugmasi bu yerdan olib
+                      tashlandi: kun soni ro'yxatga olish paytida, "Yangi
+                      Mijoz Qabul" oynasida belgilanadi. Bu sahifa faqat
+                      "bemor keldi" ni qayd qilish uchun. */}
 
                   <button
                     type="button"
@@ -264,190 +251,6 @@ export default function Courses() {
         </div>
       )}
 
-      {/* EDIT COURSE MODAL */}
-      {editRecord && (
-        <Modal
-          open={!!editRecord}
-          onClose={() => setEditRecord(null)}
-          title={`✏️ ${editRecord.patient_name} — Kurs Kunlarini Tahrirlash`}
-          size="md"
-        >
-          <div className="space-y-4 pt-1">
-            <p className="text-xs text-muted">
-              Ushbu bemorning davolanish kursi bo'yicha jami kunlar sonini va o'tilgan (bajarilgan) kunlarini har bir xizmat uchun alohida sozlang.
-            </p>
-
-            <div className="space-y-4">
-              {editItems.map((x, idx) => (
-                <div key={x.service_id} className="p-3.5 rounded-2xl bg-surface-2 border border-border space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-gold uppercase tracking-wide">
-                      🩺 {x.service_name}
-                    </span>
-                    <span className="text-xs font-mono font-extrabold text-cyan">
-                      Qolgan: {Math.max(0, x.quantity - x.used_count)} kun
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Quantity (Jami kunlar soni) */}
-                    <div>
-                      <label className="text-[11px] font-bold text-muted block mb-1">
-                        Jami Kurs Kunlari:
-                      </label>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextQ = Math.max(1, x.quantity - 1)
-                            const nextU = Math.min(nextQ, x.used_count)
-                            setEditItems((prev) => {
-                              const c = [...prev]
-                              c[idx] = { ...c[idx], quantity: nextQ, used_count: nextU }
-                              return c
-                            })
-                          }}
-                          className="w-7 h-7 rounded-lg bg-slate-700 text-foreground font-bold text-sm hover:bg-slate-600"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min={1}
-                          max={100}
-                          value={x.quantity}
-                          onChange={(e) => {
-                            const nextQ = Math.max(1, parseInt(e.target.value, 10) || 1)
-                            const nextU = Math.min(nextQ, x.used_count)
-                            setEditItems((prev) => {
-                              const c = [...prev]
-                              c[idx] = { ...c[idx], quantity: nextQ, used_count: nextU }
-                              return c
-                            })
-                          }}
-                          className="w-16 text-center font-mono font-black text-sm bg-surface-sunken border border-border rounded-lg py-1 text-gold"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextQ = x.quantity + 1
-                            setEditItems((prev) => {
-                              const c = [...prev]
-                              c[idx] = { ...c[idx], quantity: nextQ }
-                              return c
-                            })
-                          }}
-                          className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-500"
-                        >
-                          +
-                        </button>
-                        <span className="text-[11px] text-muted font-bold ml-1">kun</span>
-                      </div>
-                    </div>
-
-                    {/* Used Count (Bajarilgan kunlar soni) */}
-                    <div>
-                      <label className="text-[11px] font-bold text-muted block mb-1">
-                        O'tilgan (Bajarilgan) Kun:
-                      </label>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextU = Math.max(0, x.used_count - 1)
-                            setEditItems((prev) => {
-                              const c = [...prev]
-                              c[idx] = { ...c[idx], used_count: nextU }
-                              return c
-                            })
-                          }}
-                          className="w-7 h-7 rounded-lg bg-slate-700 text-foreground font-bold text-sm hover:bg-slate-600"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min={0}
-                          max={x.quantity}
-                          value={x.used_count}
-                          onChange={(e) => {
-                            const nextU = Math.max(0, Math.min(x.quantity, parseInt(e.target.value, 10) || 0))
-                            setEditItems((prev) => {
-                              const c = [...prev]
-                              c[idx] = { ...c[idx], used_count: nextU }
-                              return c
-                            })
-                          }}
-                          className="w-16 text-center font-mono font-black text-sm bg-surface-sunken border border-border rounded-lg py-1 text-emerald-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextU = Math.min(x.quantity, x.used_count + 1)
-                            setEditItems((prev) => {
-                              const c = [...prev]
-                              c[idx] = { ...c[idx], used_count: nextU }
-                              return c
-                            })
-                          }}
-                          className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-500"
-                        >
-                          +
-                        </button>
-                        <span className="text-[11px] text-muted font-bold ml-1">kun</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Day Badges Preview & Interactive Toggle */}
-                  <div className="space-y-1.5 pt-1">
-                    <span className="text-[10px] text-muted font-bold block uppercase tracking-wider">
-                      Kunlar holati (Bosing — bajarildi / kutilmoqda):
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {Array.from({ length: x.quantity }).map((_, n) => {
-                        const isDone = n < x.used_count
-                        return (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => {
-                              // Clicking day badge sets used_count to this day
-                              const newUsed = isDone ? n : n + 1
-                              setEditItems((prev) => {
-                                const c = [...prev]
-                                c[idx] = { ...c[idx], used_count: newUsed }
-                                return c
-                              })
-                            }}
-                            className={`text-xs font-mono font-extrabold rounded-lg px-2.5 py-1 border transition-all ${
-                              isDone
-                                ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300 shadow-sm'
-                                : 'bg-surface border-border text-muted hover:border-border-strong'
-                            }`}
-                            title={isDone ? `${n + 1}-kun bajarildi (Bosing: kutilmoqda qilish)` : `${n + 1}-kun kutilmoqda (Bosing: bajarildi qilish)`}
-                          >
-                            {n + 1}-kun{isDone ? ' ✓' : ' ⏳'}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Btn variant="ghost" full icon={Icons.x} onClick={() => setEditRecord(null)}>
-                Bekor
-              </Btn>
-              <Btn variant="gold" full icon={Icons.save} loading={savingEdit} onClick={handleSaveEdit}>
-                {savingEdit ? 'Saqlanmoqda...' : 'O\'zgarishlarni Saqlash ✓'}
-              </Btn>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   )
 }

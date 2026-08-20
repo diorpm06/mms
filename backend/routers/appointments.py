@@ -11,6 +11,7 @@ from models.provider import Provider
 from models.service import Service
 from models.user import User
 from auth_utils import require_admin_or_ceo, get_current_user
+from services.ism import ism_tuzat
 from routers.patients import _next_ticket
 
 router = APIRouter(prefix="/api/appointments", tags=["appointments"])
@@ -75,8 +76,9 @@ def create_appointment(
         raise HTTPException(status_code=404, detail="Xizmat turi topilmadi")
 
     item = Appointment(
-        first_name=body.first_name,
-        last_name=body.last_name,
+        # Qanday yozilganidan qat'i nazar bosh harf bilan saqlaymiz
+        first_name=ism_tuzat(body.first_name),
+        last_name=ism_tuzat(body.last_name),
         phone=body.phone,
         appointment_date=body.appointment_date,
         appointment_time=body.appointment_time,

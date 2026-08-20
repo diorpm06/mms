@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../utils/api'
-import { formatMoney, formatWithCommas, parseDigits } from '../../utils/format'
+import { formatMoney, formatWithCommas, parseDigits, ismTuzat } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import { savePendingPatient } from '../../utils/offline'
 import PageHeader from '../../components/PageHeader'
@@ -265,9 +265,14 @@ export default function NewPatient({ homePath = '/admin' }) {
   const updateServiceQuantity = (sid, newQty) => {
     const qty = Math.max(1, parseInt(newQty, 10) || 1)
     setSelectedServices((prev) =>
-      prev.map((item) =>
-        String(item.service_id) === String(sid) ? { ...item, quantity: qty } : item
-      )
+      prev.map((item) => {
+        if (String(item.service_id) !== String(sid)) return item
+        // Kurs bo'lsa jadval ham kun soniga moslanadi: 1..qty
+        const kunlar = item.is_course
+          ? Array.from({ length: qty }, (_, i) => i + 1)
+          : item.course_days
+        return { ...item, quantity: qty, course_days: kunlar }
+      })
     )
   }
 
@@ -277,12 +282,46 @@ export default function NewPatient({ homePath = '/admin' }) {
       prev.map((item) => {
         if (String(item.service_id) === String(sid)) {
           const newQty = nextBool && (!item.quantity || item.quantity <= 1) ? 2 : item.quantity
-          return { ...item, is_course: nextBool, quantity: newQty }
+          return {
+            ...item,
+            is_course: nextBool,
+            quantity: newQty,
+            // Kurs yoqilganda jadval to'liq bo'ladi: 1..N. Admin keyin
+            // kerakmas kunlarni bosib o'chiradi (masalan 2- va 4-kun).
+            course_days: nextBool
+              ? Array.from({ length: newQty }, (_, i) => i + 1)
+              : null,
+          }
         }
         return item
       })
     )
   }
+
+  // Kurs jadvalida bitta kunni yoqish/o'chirish.
+  // Kun soni (quantity) tanlangan kunlar soniga teng bo'ladi.
+  const toggleServiceDay = (sid, kun) => {
+    setSelectedServices((prev) =>
+      prev.map((item) => {
+        if (String(item.service_id) !== String(sid)) return item
+        const bor = item.course_days || []
+        const yangi = bor.includes(kun)
+          ? bor.filter((k) => k !== kun)
+          : [...bor, kun].sort((a, b) => a - b)
+        if (yangi.length === 0) return item      // kamida bitta kun qolsin
+        return { ...item, course_days: yangi, quantity: yangi.length }
+      })
+    )
+  }
+
+  // Kurs uzunligini o'zgartirish — jadvalda nechta kun ko'rsatilishi.
+  // Uzunlik hamma kursli xizmatlarning eng katta kunidan kelib chiqadi.
+  const kursUzunligi = Math.max(
+    2,
+    ...selectedServices
+      .filter((s) => s.is_course)
+      .map((s) => Math.max(s.quantity || 1, ...(s.course_days || [1])))
+  )
 
   const updateServicePrice = (sid, newPrice) => {
     setSelectedServices((prev) =>
@@ -459,6 +498,11 @@ export default function NewPatient({ homePath = '/admin' }) {
         price: Number(s.price) || 0,
         quantity: Math.max(1, Number(s.quantity) || 1),
         is_course: Boolean(s.is_course),
+        // Kurs jadvali: "1,3,5". Faqat kursli xizmatga yuboriladi.
+        course_days:
+          s.is_course && s.course_days && s.course_days.length
+            ? s.course_days.join(',')
+            : null,
       })),
     }
 
@@ -689,7 +733,7 @@ export default function NewPatient({ homePath = '/admin' }) {
               className="input-field font-semibold"
               placeholder="Masalan: Karim Alisherov Vahobovich *"
               value={form.full_name}
-              onChange={(e) => handleSearchChange('full_name', e.target.value)}
+              onChange={(e) => handleSearchChange('full_name', ismTuzat(e.target.value))}
               onFocus={() => { if (suggestions.length > 0) setShowDropdown(true) }}
               required
             />
@@ -1106,7 +1150,9 @@ export default function NewPatient({ homePath = '/admin' }) {
                                 >
                                   +
                                 </button>
-                                <span className="text-[10px] text-muted font-semibold px-1">dona</span>
+                                <span className="text-[10px] text-muted font-semibold px-1">
+                                  {row.is_course ? 'kun' : 'dona'}
+                                </span>
                               </div>
 
                               {/* Multi-day course toggle */}
@@ -1145,6 +1191,69 @@ export default function NewPatient({ homePath = '/admin' }) {
                               )}
                             </div>
                           </div>
+
+                          {/* Kurs jadvali — bemor qaysi kunlari shu muolajani
+                              oladi. Ilgari buni faqat "Davolanishdagilar"da
+                              tuzatish mumkin edi; endi ro'yxatga olish
+                              paytining o'zida ko'rinadi va sozlanadi. */}
+                          {row.is_course && (() => {
+                            const tanlangan = row.course_days || []
+                            return (
+                              <div className="mt-2 pt-2 border-t border-purple-500/20">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {/* Ranglar ikkala mavzuda ham o'qilishi kerak:
+                                      yorug'da to'q binafsha, qorong'ida och binafsha */}
+                                  <span className="text-[10px] font-extrabold text-purple-700 dark:text-purple-300 uppercase tracking-wide mr-1">
+                                    📅 Qaysi kunlari:
+                                  </span>
+                                  {Array.from({ length: Math.min(kursUzunligi, 30) }).map((_, n) => {
+                                    const kun = n + 1
+                                    const yoq = tanlangan.includes(kun)
+                                    return (
+                                      <button
+                                        key={kun}
+                                        type="button"
+                                        onClick={() => toggleServiceDay(svcObj.id, kun)}
+                                        title={yoq ? `${kun}-kunni o'chirish` : `${kun}-kunni qo'shish`}
+                                        className={`text-[10px] font-mono font-bold rounded px-2 py-1 border transition-colors ${
+                                          yoq
+                                            ? 'bg-purple-600 border-purple-700 text-white shadow-sm'
+                                            : 'bg-surface-2 border-border text-muted hover:border-purple-500/60 hover:text-body'
+                                        }`}
+                                      >
+                                        {kun}{yoq ? ' ✓' : ''}
+                                      </button>
+                                    )
+                                  })}
+                                  <button
+                                    type="button"
+                                    onClick={() => updateServiceQuantity(svcObj.id, kursUzunligi + 1)}
+                                    className="text-[10px] font-bold rounded px-2 py-1 border border-border bg-surface-2 text-muted hover:text-body"
+                                    title="Kursni bir kunga uzaytirish"
+                                  >
+                                    + kun
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                  <span className="text-[10px] text-muted font-semibold">Tez tanlash:</span>
+                                  {[3, 5, 7, 10].map((k) => (
+                                    <button
+                                      key={k}
+                                      type="button"
+                                      onClick={() => updateServiceQuantity(svcObj.id, k)}
+                                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold border bg-surface-2 border-border text-muted hover:text-body"
+                                    >
+                                      {k} kun
+                                    </button>
+                                  ))}
+                                  <span className="text-[10px] text-purple-700 dark:text-purple-300 font-bold ml-1">
+                                    {tanlangan.length} marta ·{' '}
+                                    {tanlangan.length ? tanlangan.join(', ') + '-kunlari' : 'kun tanlanmagan'}
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          })()}
                         </div>
                       )
                     })}

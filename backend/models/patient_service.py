@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, ForeignKey, Integer
+from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -35,6 +35,13 @@ class PatientService(Base):
     # yo'qotardi: 4 kunga to'lagan bemor bir marta kelib "1 kun qoldi"
     # holatiga tushib qolardi.
     used_count: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
+
+    # Kurs jadvali: shu xizmat kursning QAYSI kunlarida beriladi.
+    # Masalan "1,3,5" — bemor 1-, 3- va 5-tashrifida shu muolajani oladi.
+    #
+    # Bo'sh (NULL) bo'lsa — eski tartib: kuni qolguncha HAR tashrifda
+    # beriladi. Shuning uchun eski yozuvlar o'z holicha ishlayveradi.
+    course_days: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_course: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     service = relationship("Service")

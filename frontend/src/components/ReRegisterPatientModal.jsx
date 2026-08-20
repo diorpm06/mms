@@ -341,101 +341,151 @@ export default function ReRegisterPatientModal({ open, patient, onClose, onSucce
             </div>
 
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {selectedServices.map((row, idx) => {
-                return (
-                  <div key={idx} className="p-3 rounded-xl bg-surface-2 border border-border flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 shadow-sm">
-                    {/* Service Dropdown */}
-                    <div className="min-w-[180px] flex-1">
-                      <select
-                        className="input-field text-xs font-bold text-body py-1.5"
-                        value={row.service_id}
-                        onChange={(e) => updateServiceRow(idx, 'service_id', e.target.value)}
-                      >
-                        <option value="">— Xizmat turini tanlang —</option>
-                        {services.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.category ? `[${s.category}] ` : ''}{s.name} — {formatMoney(s.price)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Doctor Dropdown */}
-                    <div className="w-40 shrink-0">
-                      <select
-                        className="input-field text-xs text-muted py-1.5"
-                        value={row.provider_id || ''}
-                        onChange={(e) => updateServiceRow(idx, 'provider_id', e.target.value)}
-                      >
-                        <option value="">— Shifokor —</option>
-                        {providers.map((pr) => (
-                          <option key={pr.id} value={pr.id}>
-                            Dr. {pr.full_name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Quantity (Soni) input with - / + buttons */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="flex items-center gap-1 border border-border rounded-lg bg-surface px-1 py-0.5">
-                        <button
-                          type="button"
-                          onClick={() => updateServiceRow(idx, 'quantity', Math.max(1, (Number(row.quantity) || 1) - 1))}
-                          className="w-6 h-6 rounded-md bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
+              {selectedServices.map((row, idx) => (
+                  <div key={idx} className="p-3 rounded-xl bg-surface-2 border border-border space-y-2 shadow-sm">
+                    {/* Top Row: Service Dropdown + Delete Button */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <select
+                          className="input-field text-xs font-bold text-body py-1.5"
+                          value={row.service_id}
+                          onChange={(e) => updateServiceRow(idx, 'service_id', e.target.value)}
                         >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          className="w-10 text-center font-mono font-bold text-xs bg-transparent focus:outline-none text-gold"
-                          value={row.quantity || 1}
-                          onChange={(e) => updateServiceRow(idx, 'quantity', Math.max(1, parseInt(e.target.value, 10) || 1))}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => updateServiceRow(idx, 'quantity', (Number(row.quantity) || 1) + 1)}
-                          className="w-6 h-6 rounded-md bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
-                        >
-                          +
-                        </button>
-                        <span className="text-[10px] text-muted font-bold pr-1">dona</span>
+                          <option value="">— Xizmat turini tanlang —</option>
+                          {Object.entries(
+                            services
+                              .filter((x) => x.is_active !== false)
+                              .reduce((acc, s) => {
+                                const dept = s.department_name || s.category || "Boshqa bo'limlar"
+                                if (!acc[dept]) acc[dept] = []
+                                acc[dept].push(s)
+                                return acc
+                              }, {})
+                          ).map(([deptName, deptServices]) => (
+                            <optgroup key={deptName} label={`📂 ${deptName.toUpperCase()}`}>
+                              {deptServices.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  [📁 {deptName}] {s.name} — {formatMoney(s.price)}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
                       </div>
 
-                      {/* Multi-day course toggle */}
                       <button
                         type="button"
-                        onClick={() => updateServiceRow(idx, 'is_course', !row.is_course)}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold border transition-all flex items-center gap-1.5 ${
-                          row.is_course
-                            ? 'bg-purple-500/20 border-purple-500/60 text-purple-300 shadow-sm'
-                            : 'bg-surface-2 border-border text-muted hover:text-body hover:border-purple-500/40'
-                        }`}
-                        title={row.is_course ? "Ko'p kunlik davolanish kursi" : "Buni ko'p kunlik davolanish kursiga aylantirish uchun bosing"}
+                        onClick={() => removeServiceRow(idx)}
+                        className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-all shrink-0 border border-rose-500/20"
+                        title="O'chirish"
                       >
-                        <span>{row.is_course ? '🔁' : '➕'}</span>
-                        <span>{row.is_course ? `Ko'p kunlik kurs (${row.quantity || 1} kun) ✓` : "Kurs qilish"}</span>
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
 
-                    {/* Price Subtotal */}
-                    <div className="w-24 text-right font-mono font-extrabold text-xs text-emerald shrink-0">
-                      {formatMoney((Number(row.price) || 0) * (Number(row.quantity) || 1))}
+                    {/* Bottom Row: Doctor Dropdown + Quantity + Price */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/40">
+                      <div className="w-40 shrink-0">
+                        <select
+                          className="input-field text-xs text-muted py-1"
+                          value={row.provider_id || ''}
+                          onChange={(e) => updateServiceRow(idx, 'provider_id', e.target.value)}
+                        >
+                          <option value="">— Shifokor —</option>
+                          {providers.map((pr) => (
+                            <option key={pr.id} value={pr.id}>
+                              Dr. {pr.full_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 ml-auto flex-wrap">
+                        {/* Quantity (Soni) input */}
+                        <div className="flex items-center gap-1 border border-border rounded-lg bg-surface px-1 py-0.5">
+                          <button
+                            type="button"
+                            onClick={() => updateServiceRow(idx, 'quantity', Math.max(1, (Number(row.quantity) || 1) - 1))}
+                            className="w-5 h-5 rounded bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            className="w-8 text-center font-mono font-bold text-xs bg-transparent focus:outline-none text-gold"
+                            value={row.quantity || 1}
+                            onChange={(e) => updateServiceRow(idx, 'quantity', Math.max(1, parseInt(e.target.value, 10) || 1))}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateServiceRow(idx, 'quantity', (Number(row.quantity) || 1) + 1)}
+                            className="w-5 h-5 rounded bg-surface-2 hover:bg-white/10 font-bold text-xs text-muted flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                          <span className="text-[10px] text-muted font-bold pr-0.5">
+                            {row.is_course ? 'kun' : 'dona'}
+                          </span>
+                        </div>
+
+                        {/* Multi-day course toggle */}
+                        <button
+                          type="button"
+                          onClick={() => updateServiceRow(idx, 'is_course', !row.is_course)}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border transition-all flex items-center gap-1 ${
+                            row.is_course
+                              ? 'bg-purple-500/20 border-purple-500/60 text-purple-300 shadow-sm'
+                              : 'bg-surface-2 border-border text-muted hover:text-body hover:border-purple-500/40'
+                          }`}
+                          title={row.is_course ? "Ko'p kunlik davolanish kursi" : "Buni ko'p kunlik davolanish kursiga aylantirish uchun bosing"}
+                        >
+                          <span>{row.is_course ? '🔁' : '➕'}</span>
+                          <span>{row.is_course ? `Kurs (${row.quantity || 1} kun) ✓` : "Kurs qilish"}</span>
+                        </button>
+
+                        {/* Price Subtotal */}
+                        <span className="font-mono font-extrabold text-xs text-emerald min-w-[70px] text-right">
+                          {formatMoney((Number(row.price) || 0) * (Number(row.quantity) || 1))}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Delete button */}
-                    <button
-                      type="button"
-                      onClick={() => removeServiceRow(idx)}
-                      className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition-all shrink-0"
-                      title="O'chirish"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {/* Kurs jadvali — bemor qaysi kunlari shu muolajani
+                        oladi. Ro'yxatga olish paytida ko'rinadi.
+                        w-full: o'rab turgan flex qatorida yangi satrga tushadi. */}
+                    {row.is_course && (
+                      <div className="w-full mt-1 pt-2 border-t border-purple-500/20 flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-extrabold text-purple-700 dark:text-purple-300 uppercase tracking-wide">
+                          📅 Kurs jadvali:
+                        </span>
+                        {Array.from({ length: Math.min(Number(row.quantity) || 1, 30) }).map((_, n) => (
+                          <span
+                            key={n}
+                            className="text-[10px] font-mono font-bold rounded px-2 py-1 border bg-purple-600 border-purple-700 text-white shadow-sm"
+                          >
+                            {n + 1}-kun
+                          </span>
+                        ))}
+                        <span className="text-[10px] text-muted font-semibold ml-1">Tez tanlash:</span>
+                        {[3, 5, 7, 10].map((k) => (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => updateServiceRow(idx, 'quantity', k)}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors ${
+                              (Number(row.quantity) || 1) === k
+                                ? 'bg-purple-500/30 border-purple-500/60 text-purple-200'
+                                : 'bg-surface-2 border-border text-muted hover:text-body'
+                            }`}
+                          >
+                            {k} kun
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )
-              })}
+                ))}
             </div>
           </div>
 

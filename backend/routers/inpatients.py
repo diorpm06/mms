@@ -18,6 +18,7 @@ from services.finance import (
     cancel_patient_payment,
     process_inpatient_payment,
 )
+from services.ism import ism_tuzat
 from services.inpatient_accrual import (
     provider_accrual_detail,
     provider_inpatient_summary,
@@ -722,13 +723,21 @@ def admit(
         if not p:
             raise HTTPException(status_code=404, detail="Bazada bemor topilmadi")
         f_name, l_name = p.first_name, p.last_name
-    elif data.full_name or (data.first_name and data.last_name):
-        if data.full_name and data.full_name.strip():
-            parts = data.full_name.strip().split(maxsplit=1)
-            f_name = parts[0]
-            l_name = parts[1] if len(parts) > 1 else "."
+    elif data.full_name and data.full_name.strip():
+        parts = data.full_name.strip().split(maxsplit=1)
+        f_name = parts[0]
+        l_name = parts[1] if len(parts) > 1 else "."
+    elif data.first_name and data.last_name:
+        # Ilgari bu holat `elif` shartida bor edi, lekin ichkarida ishlov
+        # berilmasdi — natijada f_name/l_name aniqlanmay NameError chiqardi.
+        f_name = data.first_name.strip()
+        l_name = data.last_name.strip()
     else:
         raise HTTPException(status_code=400, detail="Bazada bemor tanlanishi yoki yangi bemor ismi-familiyasi kiritilishi shart")
+
+    # Qanday yozilganidan qat'i nazar bosh harf bilan saqlaymiz
+    f_name = ism_tuzat(f_name) or f_name
+    l_name = ism_tuzat(l_name) or l_name
 
     telefon = (p.phone if p else (data.phone or "").strip()) or "mavjud emas"
 

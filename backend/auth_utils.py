@@ -1,3 +1,9 @@
+import bcrypt
+if not hasattr(bcrypt, "__about__"):
+    class _BcryptAbout:
+        __version__ = getattr(bcrypt, "__version__", "4.0.0")
+    bcrypt.__about__ = _BcryptAbout()
+
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -51,10 +57,20 @@ def get_current_user(
     payload = decode_token(credentials.credentials)
     if not payload or payload.get("type") != "access":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token yaroqsiz")
-    user_id = payload.get("sub")
-    if not user_id:
+    sub = payload.get("sub")
+    if not sub:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token yaroqsiz")
-    user = db.query(User).filter(User.id == int(user_id), User.is_active == True).first()
+    
+    user = None
+    if isinstance(sub, int) or (isinstance(sub, str) and sub.isdigit()):
+        user = db.query(User).filter(User.id == int(sub), User.is_active == True).first()
+    if not user:
+        user = db.query(User).filter(User.username == str(sub), User.is_active == True).first()
+    if not user and "user_id" in payload:
+        uid = payload.get("user_id")
+        if isinstance(uid, int) or (isinstance(uid, str) and str(uid).isdigit()):
+            user = db.query(User).filter(User.id == int(uid), User.is_active == True).first()
+
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Foydalanuvchi topilmadi")
     return user

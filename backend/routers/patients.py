@@ -17,6 +17,7 @@ from models.user import User
 from schemas import PatientCreate
 from services.audit import get_client_info, log_audit
 from services.finance import cancel_patient_payment, process_payment, reprice_patient_payment
+from services.ism import ism_tuzat
 from services.reports_data import daily_report
 from services.sheets import add_patient_to_sheets
 from services.sheets_backup import push_row_to_backup_url
@@ -469,6 +470,7 @@ async def create_patient(
                     "price": s.price,
                     "quantity": s.quantity if (s.quantity and s.quantity > 0) else 1,
                     "is_course": bool(getattr(s, "is_course", False)),
+                    "course_days": getattr(s, "course_days", None),
                 }
             else:
                 consolidated[key]["quantity"] += (s.quantity if (s.quantity and s.quantity > 0) else 1)
@@ -487,6 +489,7 @@ async def create_patient(
                 "quantity": qty,
                 "unit_price": unit_price,
                 "is_course": item["is_course"],
+                "course_days": item.get("course_days"),
             })
     elif data.service_id:
         svc = db.query(Service).filter(Service.id == data.service_id, Service.is_active == True).first()
@@ -532,6 +535,11 @@ async def create_patient(
         parts = first_name_clean.split(" ", 1)
         first_name_clean = parts[0]
         last_name_clean = parts[1]
+
+    # Qanday yozilganidan qat'i nazar bosh harf bilan saqlaymiz:
+    # "aBduLLayev" -> "Abdullayev",  "g'ANIJON" -> "G'anijon"
+    first_name_clean = ism_tuzat(first_name_clean) or ""
+    last_name_clean = ism_tuzat(last_name_clean) or ""
 
     # Bir xil F.I.Sh + tug'ilgan sana bilan bemor SHU KUNI allaqachon ro'yxatga
     # olingan bo'lsa — bu tasodifiy ikki marta kiritish ehtimoli juda yuqori
@@ -780,6 +788,8 @@ async def create_patient(
                     unit_price=unit,
                     total_price=it["price"],
                     is_course=is_c,
+                    # Kurs jadvali faqat kursli xizmatga tegishli
+                    course_days=(it.get("course_days") or None) if is_c else None,
                 ))
 
         row_dict = _patient_row(patient)
@@ -861,6 +871,11 @@ def update_patient(
     updates = data.model_dump(exclude_unset=True, exclude={"reason"})
     new_services = updates.pop("services", None)
 
+    # Tahrirlashda ham ism-familiya bosh harf bilan saqlanadi
+    for nom_maydoni in ("first_name", "last_name"):
+        if updates.get(nom_maydoni):
+            updates[nom_maydoni] = ism_tuzat(updates[nom_maydoni])
+
     for k, v in updates.items():
         setattr(p, k, v)
 
@@ -882,10 +897,12 @@ def update_patient(
             line = int(unit) * qty
             raw_total += line
             first_sid = first_sid or svc.id
+            _kursmi = bool(it.get("is_course", False))
             db.add(PatientService(
                 patient_id=p.id, service_id=svc.id,
                 quantity=qty, unit_price=int(unit), total_price=line,
-                is_course=bool(it.get("is_course", False)),
+                is_course=_kursmi,
+                course_days=(it.get("course_days") or None) if _kursmi else None,
             ))
 
         p.service_id = first_sid
@@ -1130,6 +1147,10 @@ def patient_visits(patient_id: int, db: Session = Depends(get_db), _: User = Dep
     return [
         {
             "id": v.id,
+            "first_name": v.first_name,
+            "last_name": v.last_name,
+            "ticket_number": v.ticket_number,
+            "cabinet": v.cabinet,
             "service_name": v.service.name if v.service else None,
             "provider_name": v.provider.full_name if v.provider else None,
             "payment_amount": v.payment_amount,

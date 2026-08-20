@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -734,6 +734,51 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                   📄 Navbatchilikda (qog'oz jurnalidan) kiritilgan bemorlar — {reportsData.paper_entry_count} ta, jami {formatMoney(reportsData.paper_entry_total)}
                 </h4>
                 <p className="text-[11px] text-muted">Bu bemorlar yuqoridagi umumiy tushum va mijozlar soniga allaqachon qo'shilgan holda hisoblangan.</p>
+
+                {/* Qaysi xizmatdan qancha tushgani */}
+                {(reportsData.paper_entry_departments || []).length > 0 && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-amber-500/30 text-amber-800 dark:text-amber-300 font-bold text-left">
+                          <th className="p-2.5">Bo'lim / Xizmat</th>
+                          <th className="p-2.5 text-right w-24">Soni</th>
+                          <th className="p-2.5 text-right w-32">Summa</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-amber-500/10">
+                        {reportsData.paper_entry_departments.map((d) => (
+                          <Fragment key={d.department}>
+                            <tr className="bg-amber-500/10 font-black">
+                              <td className="p-2.5 text-amber-900 dark:text-amber-200">{d.department}</td>
+                              <td className="p-2.5 text-right font-mono text-amber-900 dark:text-amber-200">{d.count} ta</td>
+                              <td className="p-2.5 text-right font-mono text-amber-900 dark:text-amber-200">{formatMoney(d.total)}</td>
+                            </tr>
+                            {(reportsData.paper_entry_services || [])
+                              .filter((s) => s.department === d.department)
+                              .map((s) => (
+                                <tr key={`${d.department}-${s.service_name}`} className="font-semibold">
+                                  <td className="p-2.5 pl-6 text-muted">{s.service_name}</td>
+                                  <td className="p-2.5 text-right font-mono text-muted">{s.count} ta</td>
+                                  <td className="p-2.5 text-right font-mono text-emerald">{formatMoney(s.total)}</td>
+                                </tr>
+                              ))}
+                          </Fragment>
+                        ))}
+                        <tr className="border-t-2 border-amber-500/40 bg-amber-500/10 font-black">
+                          <td className="p-2.5 text-amber-900 dark:text-amber-200 uppercase">Jami</td>
+                          <td className="p-2.5 text-right font-mono text-amber-200">
+                            {reportsData.paper_entry_count} ta
+                          </td>
+                          <td className="p-2.5 text-right font-mono text-amber-200">
+                            {formatMoney(reportsData.paper_entry_total)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <THead cols={['#', 'F.I.Sh', 'Xizmat', 'Sana / Vaqt', 'Summa']} />

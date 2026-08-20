@@ -388,6 +388,9 @@ def run_migrations():
         # Oldindan to'langan ko'p kunlik xizmat: nechta seans ishlatilgani
         # 0: ro'yxatga olishning o'zi kunni yemaydi, "Keldi" bosilganda sanaladi
         "ALTER TABLE patient_services ADD COLUMN used_count INTEGER DEFAULT 0",
+        # Kurs jadvali: xizmat qaysi kunlarda beriladi ("1,3,5").
+        # Bo'sh bo'lsa — har tashrifda beriladi (eski tartib).
+        "ALTER TABLE patient_services ADD COLUMN course_days VARCHAR(200)",
         # Kursning navbatdagi tashrifi qaysi to'lovdan kelgani
         "ALTER TABLE patients ADD COLUMN prepaid_from_id INTEGER",
         "CREATE INDEX IF NOT EXISTS ix_patients_prepaid_from ON patients (prepaid_from_id)",

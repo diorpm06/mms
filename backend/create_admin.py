@@ -11,7 +11,7 @@ Base.metadata.create_all(bind=engine)
 def main():
     username = sys.argv[1] if len(sys.argv) > 1 else "admin"
     password = sys.argv[2] if len(sys.argv) > 2 else "admin123"
-    full_name = sys.argv[3] if len(sys.argv) > 3 else "Admin User"
+    full_name = sys.argv[3] if len(sys.argv) > 3 else "Admin"
 
     db = SessionLocal()
     if db.query(User).filter(User.username == username).first():

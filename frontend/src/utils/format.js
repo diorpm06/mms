@@ -28,6 +28,36 @@ export function toISODate(ddmmyyyy) {
   return `${y}-${m}-${d}`
 }
 
+// O'zbek tilidagi apostroflar so'zni bo'lmaydi: O'ktam, G'anijon.
+// Shu sababli oddiy "capitalize" yaramaydi — u "G'Anijon" qilib yuboradi.
+const APOSTROFLAR = "'’‘ʻʼ`´"
+const AJRATGICHLAR = ' -–—/.'
+
+/**
+ * Ism-familiyani bosh harf bilan yozadi, qanday kiritilganidan qat'i nazar.
+ * "aBduLLayev" -> "Abdullayev",  "g'ANIJON" -> "G'anijon"
+ * Backend'dagi services/ism.py bilan bir xil qoida.
+ */
+export function ismTuzat(matn) {
+  if (!matn) return matn
+  let natija = ''
+  let yangiSoz = true
+  for (const ch of String(matn)) {
+    if (AJRATGICHLAR.includes(ch)) {
+      natija += ch
+      yangiSoz = true
+    } else if (APOSTROFLAR.includes(ch)) {
+      natija += ch
+    } else if (yangiSoz) {
+      natija += ch.toUpperCase()
+      yangiSoz = false
+    } else {
+      natija += ch.toLowerCase()
+    }
+  }
+  return natija
+}
+
 export function paymentLabel(type) {
   switch (type) {
     case 'cash':

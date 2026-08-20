@@ -15,6 +15,8 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
   const [showLab, setShowLab] = useState(false)
   const [newTicketPatient, setNewTicketPatient] = useState(null)
 
+  const [ticketModalData, setTicketModalData] = useState(null)
+
   const fetchHistory = () => {
     if (!patient) return
     setLoading(true)
@@ -83,12 +85,13 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-      <div className="card max-w-3xl w-full p-6 relative animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto space-y-5">
+      <div className="card max-w-3xl w-full p-5 sm:p-6 relative animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto space-y-5">
         
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="no-print absolute top-5 right-5 p-2 rounded-xl text-muted hover:text-foreground hover:bg-surface-2 transition-all border border-border"
+          className="no-print absolute top-3 right-3 sm:top-4 sm:right-4 z-20 p-1.5 rounded-xl text-muted hover:text-rose-400 hover:bg-rose-500/15 transition-all border border-border/80 bg-surface shadow-sm"
+          title="Yopish"
         >
           <X className="h-5 w-5" />
         </button>
@@ -97,7 +100,7 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
         <div id="patient-ehr-container" className="space-y-5">
           
           {/* Header Profile Banner */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-border card-2 p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-border card-2 p-4 pr-12">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-gold-dim text-gold font-mono font-black text-3xl flex items-center justify-center border-2 border-border-strong shadow-lg">
                 👤
@@ -164,7 +167,9 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
             </div>
             <div>
               <span className="text-muted text-[10px] uppercase font-bold block">🗓️ Tug'ilgan yili:</span>
-              <strong className="font-mono font-bold text-body">{patient.birth_date ? patient.birth_date.slice(0, 10) : '—'}</strong>
+              <strong className="font-mono font-bold text-body">
+                {patient.birth_date ? (patient.birth_date.length >= 4 ? `${patient.birth_date.slice(0, 4)}-yil` : patient.birth_date) : '—'}
+              </strong>
             </div>
             <div>
               <span className="text-muted text-[10px] uppercase font-bold block">🏠 Manzil:</span>
@@ -277,44 +282,113 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
             </div>
           )}
 
-          {/* TAB 2: VISITS & PAYMENTS TABLE */}
+          {/* TAB 2: VISITS & PAYMENTS TABLE (GROUPED BY DATE WITH COMBINED RECEIPT) */}
           {activeTab === 'visits' && (
-            <div className="space-y-3">
-              <div className="card-2 p-0 overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-surface-2 border-b border-border text-gold font-bold">
-                      <th className="p-2.5 text-left">Sana</th>
-                      <th className="p-2.5 text-left">Xizmat Nomi</th>
-                      <th className="p-2.5 text-left">Shifokor</th>
-                      <th className="p-2.5 text-right">To'lov Summasi</th>
-                      <th className="p-2.5 text-center">To'lov Turi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    <tr className="hover:bg-surface-hover font-bold text-body bg-gold/5">
-                      <td className="p-2.5 font-mono text-cyan">{new Date(patient.created_at).toLocaleDateString('uz-UZ')}</td>
-                      <td className="p-2.5 font-bold">{patient.service_name}</td>
-                      <td className="p-2.5 text-muted">{patient.provider_name || '—'}</td>
-                      <td className="p-2.5 text-right font-mono text-emerald font-extrabold">{formatMoney(patient.payment_amount)}</td>
-                      <td className="p-2.5 text-center">
-                        <span className="badge badge-gold uppercase text-[10px]">{patient.payment_type || 'Naqd'}</span>
-                      </td>
-                    </tr>
-                    {history.filter(h => h.id !== patient.id).map((h) => (
-                      <tr key={h.id} className="hover:bg-surface-hover text-body">
-                        <td className="p-2.5 font-mono text-muted">{new Date(h.created_at).toLocaleDateString('uz-UZ')}</td>
-                        <td className="p-2.5 font-semibold">{h.service_name}</td>
-                        <td className="p-2.5 text-muted">{h.provider_name || '—'}</td>
-                        <td className="p-2.5 text-right font-mono font-bold text-emerald">{formatMoney(h.payment_amount)}</td>
-                        <td className="p-2.5 text-center">
-                          <span className="badge badge-info uppercase text-[10px]">{h.payment_type || 'Naqd'}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="space-y-4">
+              {(() => {
+                const allVisits = [
+                  ...(patient ? [patient] : []),
+                  ...history.filter((h) => h.id !== patient?.id),
+                ]
+
+                if (allVisits.length === 0) {
+                  return (
+                    <div className="p-6 rounded-2xl card-2 text-center text-xs text-muted">
+                      Hali tashriflar tarixi mavjud emas
+                    </div>
+                  )
+                }
+
+                // Group all visits by formatted date YYYY-MM-DD
+                const groupedByDate = allVisits.reduce((acc, v) => {
+                  const rawDate = v.created_at || new Date().toISOString()
+                  const dStr = new Date(rawDate).toLocaleDateString('uz-UZ')
+                  if (!acc[dStr]) acc[dStr] = []
+                  acc[dStr].push(v)
+                  return acc
+                }, {})
+
+                return Object.entries(groupedByDate).map(([dateStr, dateVisits]) => {
+                  const totalDayAmount = dateVisits.reduce((sum, v) => sum + (Number(v.payment_amount) || 0), 0)
+                  const totalDayCash = dateVisits.reduce((sum, v) => sum + (Number(v.cash_amount) || (v.payment_type === 'cash' ? Number(v.payment_amount) : 0)), 0)
+                  const totalDayCard = dateVisits.reduce((sum, v) => sum + (Number(v.card_amount) || (v.payment_type === 'card' ? Number(v.payment_amount) : 0)), 0)
+
+                  const handlePrintCombinedDay = () => {
+                    setTicketModalData({
+                      batch: true,
+                      patients: dateVisits,
+                      total_amount: totalDayAmount,
+                      cash_amount: totalDayCash,
+                      card_amount: totalDayCard,
+                    })
+                  }
+
+                  return (
+                    <div key={dateStr} className="card-2 p-3.5 space-y-3 border border-border">
+                      {/* Date Header + Combined Day Receipt Button */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🗓️</span>
+                          <h4 className="text-xs font-black uppercase text-gold tracking-wide">
+                            {dateStr} Kundagi Tashriflar ({dateVisits.length} ta xizmat)
+                          </h4>
+                          <span className="badge badge-emerald text-xs font-mono font-extrabold">
+                            {formatMoney(totalDayAmount)}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handlePrintCombinedDay}
+                          className="btn-gold py-2 px-4 text-xs font-black flex items-center gap-2 self-start sm:self-auto shadow-md"
+                          title={`${dateStr} kunidagi barcha xizmatlarni bitta hammasi yozilgan birlashtirilgan chekda chop etish`}
+                        >
+                          <Printer className="h-4 w-4" />
+                          🧾 Hammasi bittada yozilgan chekni chiqarish
+                        </button>
+                      </div>
+
+                      {/* Individual Visit Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-surface-2 border-b border-border text-gold font-bold text-[11px]">
+                              <th className="p-2 text-left">Xizmat Nomi</th>
+                              <th className="p-2 text-left">Shifokor</th>
+                              <th className="p-2 text-right">Summa</th>
+                              <th className="p-2 text-center">To'lov Turi</th>
+                              <th className="p-2 text-right">Chek</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/40">
+                            {dateVisits.map((v, i) => (
+                              <tr key={v.id || i} className="hover:bg-surface-hover text-body">
+                                <td className="p-2 font-extrabold text-foreground">{v.service_name || 'Xizmat'}</td>
+                                <td className="p-2 text-muted">{v.provider_name || '—'}</td>
+                                <td className="p-2 text-right font-mono font-bold text-emerald">{formatMoney(v.payment_amount)}</td>
+                                <td className="p-2 text-center">
+                                  <span className="badge badge-gold uppercase text-[10px]">{v.payment_type || 'Naqd'}</span>
+                                </td>
+                                <td className="p-2 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => setTicketModalData(v)}
+                                    className="px-2 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan border border-cyan-500/30 text-[10px] font-bold inline-flex items-center gap-1 transition-all"
+                                    title="Faqat ushbu xizmat uchun alohida chek chiqarish"
+                                  >
+                                    <Printer className="h-3 w-3" />
+                                    Alohida chek
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
             </div>
           )}
 
@@ -371,8 +445,17 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
 
       {newTicketPatient && (
         <PaymentTicketModal
+          open={Boolean(newTicketPatient)}
           patient={newTicketPatient}
           onClose={() => setNewTicketPatient(null)}
+        />
+      )}
+
+      {ticketModalData && (
+        <PaymentTicketModal
+          open={Boolean(ticketModalData)}
+          patient={ticketModalData}
+          onClose={() => setTicketModalData(null)}
         />
       )}
     </div>

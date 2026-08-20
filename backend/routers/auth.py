@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -36,7 +37,8 @@ LOCKOUT_MINUTES = 15
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("10/minute")
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == data.username, User.is_active == True).first()
+    clean_username = data.username.strip() if data.username else ""
+    user = db.query(User).filter(func.lower(User.username) == func.lower(clean_username), User.is_active == True).first()
 
     # DB-backed lockout — IP-based rate limiting above doesn't reliably survive
     # serverless cold starts across instances, so the real guard lives here,

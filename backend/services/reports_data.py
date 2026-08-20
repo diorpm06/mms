@@ -546,6 +546,50 @@ def get_report(db: Session, start: date, end: date) -> dict:
     paper_entry_count = len(paper_entry_patients)
     paper_entry_total = sum(p["amount"] for p in paper_entry_patients)
 
+    # Navbatchilik tushumini XIZMATLAR bo'yicha ajratamiz.
+    # Ilgari faqat bemorlar ro'yxati chiqardi va "qaysi xizmatdan qancha
+    # tushgan" ko'rinmasdi. Endi: "Ineksiya — 7 ta, 140 000".
+    #
+    # Bemor bir tashrifda bir necha xizmat olishi mumkin (patient_services),
+    # shuning uchun har bir xizmat alohida sanaladi.
+    _paper_ids = [p.id for p in all_patients if p.is_paper_entry]
+    _paper_xizmat: dict[str, dict] = {}
+    if _paper_ids:
+        from models.patient_service import PatientService
+        for nom, kat, xona, soni, summa in (
+            db.query(
+                Service.name, Service.category, Service.cabinet,
+                func.sum(PatientService.quantity),
+                func.sum(PatientService.total_price),
+            )
+            .join(PatientService, PatientService.service_id == Service.id)
+            .filter(PatientService.patient_id.in_(_paper_ids))
+            .group_by(Service.name, Service.category, Service.cabinet)
+            .all()
+        ):
+            bolim = _extract_department_name(nom, kat, xona)
+            kalit = "%s|%s" % (bolim, nom)
+            yozuv = _paper_xizmat.setdefault(kalit, {
+                "department": bolim, "service_name": nom,
+                "count": 0, "total": 0,
+            })
+            yozuv["count"] += int(soni or 0)
+            yozuv["total"] += int(summa or 0)
+
+    paper_entry_services = sorted(
+        _paper_xizmat.values(), key=lambda x: (-x["total"], x["service_name"]))
+
+    # Bo'limlar bo'yicha yig'ma ("Ineksiya — 7 ta, 140 000")
+    _paper_bolim: dict[str, dict] = {}
+    for x in paper_entry_services:
+        y = _paper_bolim.setdefault(x["department"], {
+            "department": x["department"], "count": 0, "total": 0,
+        })
+        y["count"] += x["count"]
+        y["total"] += x["total"]
+    paper_entry_departments = sorted(
+        _paper_bolim.values(), key=lambda x: (-x["total"], x["department"]))
+
     live_patients = [p for p in all_patients if not p.is_paper_entry]
     live_count = len(live_patients)
     live_total = sum(int(p.payment_amount or 0) for p in live_patients)
@@ -595,6 +639,10 @@ def get_report(db: Session, start: date, end: date) -> dict:
         "net_card": int(net_card),
         "net_total": int(net_total),
         "provider_share": int(provider_share),
+        # 6b2399d (15.08) da "click" maydoni qo'shilayotganda bu qator
+        # tasodifan o'chib ketgan edi. Natijada CEO hisobotida
+        # "Yo'naltiruvchilar hissi" doim 0 ko'rinardi.
+        "referrer_share": int(referrer_share),
         "center_share": int(center_share),
         "expenses": int(expense_total),
         "expenses_list": [
@@ -634,6 +682,9 @@ def get_report(db: Session, start: date, end: date) -> dict:
         "paper_entry_patients": paper_entry_patients,
         "paper_entry_count": paper_entry_count,
         "paper_entry_total": paper_entry_total,
+        # Navbatchilik tushumi xizmat va bo'lim bo'yicha ajratilgan
+        "paper_entry_services": paper_entry_services,
+        "paper_entry_departments": paper_entry_departments,
         "cancelled_count": cancelled_count,
         "cancelled_total": cancelled_total,
         "cancelled_list": cancelled_list,
@@ -658,6 +709,9 @@ def admin_daily_report(db: Session, d: date) -> dict:
         "click": full.get("click", 0),
         "qr": full.get("qr", 0),
         "expenses": full["expenses"],
+        # Harajatlar ro'yxati (sabab + vaqt) — Kunlik Hisobot sahifasida
+        # "Harajatlar" jadvali shundan chiqadi.
+        "expenses_list": full.get("expenses_list", []),
         "cash_expenses": full.get("cash_expenses", 0),
         "card_expenses": full.get("card_expenses", 0),
         "net_cash": full.get("net_cash", 0),
@@ -669,6 +723,9 @@ def admin_daily_report(db: Session, d: date) -> dict:
         "paper_entry_patients": full["paper_entry_patients"],
         "paper_entry_count": full["paper_entry_count"],
         "paper_entry_total": full["paper_entry_total"],
+        # Navbatchilik tushumi bo'lim va xizmat bo'yicha ajratilgan
+        "paper_entry_services": full.get("paper_entry_services", []),
+        "paper_entry_departments": full.get("paper_entry_departments", []),
         "cancelled_count": full["cancelled_count"],
         "cancelled_total": full["cancelled_total"],
         "cancelled_list": full["cancelled_list"],

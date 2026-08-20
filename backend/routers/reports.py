@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
@@ -84,21 +85,23 @@ def ceo_dashboard(db: Session = Depends(get_db), _: User = Depends(require_ceo))
 
 @router.get("/admin-daily")
 def report_admin_daily(
-    date_param: date = Query(..., alias="date"),
+    date_param: Optional[date] = Query(None, alias="date"),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_or_ceo),
 ):
-    return admin_daily_report(db, date_param)
+    target_date = date_param or date.today()
+    return admin_daily_report(db, target_date)
 
 
 @router.get("/admin-summary")
 def report_admin_summary(
-    date_param: date = Query(..., alias="date"),
+    date_param: Optional[date] = Query(None, alias="date"),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_or_ceo),
 ):
     """Admin bosh sahifasi uchun yengil xulosa (3 ta SQL so'rov)."""
-    return admin_dashboard_summary(db, date_param)
+    target_date = date_param or date.today()
+    return admin_dashboard_summary(db, target_date)
 
 
 @router.get("/period-chart")

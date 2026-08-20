@@ -31,15 +31,12 @@ export default function AdminDashboard() {
   const [xato, setXato] = useState(false)
 
   const load = useCallback(() => {
+    setXato(false)
     api(`/reports/admin-summary?date=${bugun()}`)
       .then((res) => {
         setData(res)
         setXato(false)
       })
-      // DIQQAT: ilgari bu yerda hamma raqam 0 qilib qo'yilardi. So'rov
-      // uzilib ketsa (server sekin javob bersa) ekrandagi to'g'ri summalar
-      // birdan 0 ga tushib qolardi. Endi eski raqamlar joyida qoladi,
-      // faqat "yangilanmadi" belgisi chiqadi.
       .catch(() => setXato(true))
     api('/patients/today').then(setToday).catch(() => {})
   }, [])

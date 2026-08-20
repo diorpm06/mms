@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { RefreshCw } from 'lucide-react'
-import { api } from '../../utils/api'
+import { RefreshCw, Printer, Download } from 'lucide-react'
+import { api, downloadBlob } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { hasPositiveValues, paymentPieData, truncateLabel, formatYAxis } from '../../utils/charts'
 import { useTheme } from '../../hooks/useTheme'
@@ -12,36 +12,50 @@ import { useToastStore } from '../../store/toastStore'
 
 const PIE_COLORS = ['#D4AF37', '#3B82F6', '#06B6D4', '#A855F7']
 
+function getTodayLocalStr() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export default function AdminReports() {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(getTodayLocalStr())
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [autoAdjusted, setAutoAdjusted] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
   const { chartAxis, chartGrid, chartGold, tooltipStyle } = useTheme()
   const toast = useToastStore((s) => s.add)
+
+  const handleDownloadDailyPdf = async () => {
+    setDownloadingPdf(true)
+    try {
+      const blob = await api(`/reports/export/pdf?type=daily&date=${date}`)
+      downloadBlob(blob, `Kunlik_Hisobot_${date}.pdf`)
+      toast("✓ Kunlik PDF Hisobot yuklab olindi!")
+    } catch (e) {
+      toast(e.message || "PDF hisobot yuklashda xatolik", 'error')
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
+  const handlePrintReport = () => {
+    window.print()
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await api(`/reports/admin-daily?date=${date}`)
-      if (
-        !autoAdjusted
-        && res.suggested_date
-        && res.patients_count === 0
-        && res.total_income === 0
-      ) {
-        setAutoAdjusted(true)
-        setDate(res.suggested_date)
-        toast(`Bugun ma'lumot yo'q. Oxirgi kun ko'rsatildi: ${res.suggested_date}`, 'info')
-        return
-      }
       setReport(res)
     } catch (e) {
       toast(e.message || 'Hisobot yuklanmadi', 'error')
     } finally {
       setLoading(false)
     }
-  }, [date, toast, autoAdjusted])
+  }, [date, toast])
 
   useEffect(() => {
     load()
@@ -77,28 +91,62 @@ export default function AdminReports() {
     { label: "Xizmatlar to'liq summasi", value: formatMoney(report.gross_income ?? report.total_income) },
     { label: 'Chegirmalar (-)', value: `-${formatMoney(report.total_discount || 0)}` },
     { label: "Jami tushgan mablag'", value: formatMoney(report.total_income) },
+    { label: '💸 Harajatlar (-)', value: `-${formatMoney(report.expenses || 0)}` },
+    {
+      label: "✅ Sof qoldiq (tushum - harajat)",
+      value: formatMoney((report.total_income || 0) - (report.expenses || 0)),
+    },
     { label: '💵 Naqd', value: formatMoney(report.cash) },
     { label: '💳 Karta / QR', value: formatMoney((report.card || 0) + (report.qr || 0)) },
     { label: '📱 Click / Payme', value: formatMoney(report.click || 0) },
   ]
 
+  const expensesList = report.expenses_list || []
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-4">
         <div>
-          <h1 className="page-title mb-1">Kunlik hisobot</h1>
-          <p className="text-muted text-sm">Mijozlar, xizmatlar, tushum va harajatlar</p>
+          <h1 className="page-title mb-0.5">Kunlik Hisobot</h1>
+          <p className="text-muted text-xs">Mijozlar, xizmatlar, tushum va harajatlar</p>
         </div>
-        <div className="flex gap-2">
+
+        {/* Action Controls Toolbar — Neat single line layout */}
+        <div className="flex flex-wrap items-center gap-2">
           <input
             type="date"
-            className="input-field max-w-[180px]"
+            className="input-field text-xs py-2 font-mono font-bold max-w-[160px]"
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
-          <button type="button" className="btn-gold flex items-center gap-2" onClick={load} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Ko'rsatish
+
+          <button
+            type="button"
+            className="px-3 py-2 rounded-xl bg-surface-2 hover:bg-white/10 border border-border text-body text-xs font-bold flex items-center gap-1.5 transition-all"
+            onClick={load}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 text-gold ${loading ? 'animate-spin' : ''}`} />
+            <span>Ko'rsatish</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn-gold px-3.5 py-2 text-xs font-black flex items-center gap-1.5 shadow-md"
+            onClick={handleDownloadDailyPdf}
+            disabled={downloadingPdf}
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>{downloadingPdf ? "Yuklanmoqda..." : "PDF Yuklab Olish"}</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn-cyan px-3.5 py-2 text-xs font-black flex items-center gap-1.5 shadow-md"
+            onClick={handlePrintReport}
+          >
+            <Printer className="h-3.5 w-3.5" />
+            <span>Chop Etish</span>
           </button>
         </div>
       </div>
@@ -256,6 +304,52 @@ export default function AdminReports() {
             📄 Navbatchilikda kiritilgan bemorlar — {report.paper_entry_count} ta, jami {formatMoney(report.paper_entry_total)}
           </h3>
           <p className="text-muted text-[11px] mb-3">Ish vaqtidan tashqari qog'ozga yozilib, keyin tizimga kiritilgan bemorlar. Yuqoridagi umumiy statistikaga allaqachon qo'shilgan.</p>
+
+          {/* Qaysi xizmatdan qancha tushgani — bemorlar ro'yxatidan oldin,
+              chunki hisobotda birinchi navbatda shu kerak bo'ladi. */}
+          {(report.paper_entry_departments || []).length > 0 && (
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-amber-500/30 text-amber-800 dark:text-amber-300 font-bold text-left">
+                    <th className="p-2.5">Bo'lim / Xizmat</th>
+                    <th className="p-2.5 text-right w-24">Soni</th>
+                    <th className="p-2.5 text-right w-32">Summa</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-500/10">
+                  {report.paper_entry_departments.map((d) => (
+                    <Fragment key={d.department}>
+                      <tr className="bg-amber-500/10 font-black">
+                        <td className="p-2.5 text-amber-900 dark:text-amber-200">{d.department}</td>
+                        <td className="p-2.5 text-right font-mono text-amber-900 dark:text-amber-200">{d.count} ta</td>
+                        <td className="p-2.5 text-right font-mono text-amber-900 dark:text-amber-200">{formatMoney(d.total)}</td>
+                      </tr>
+                      {(report.paper_entry_services || [])
+                        .filter((s) => s.department === d.department)
+                        .map((s) => (
+                          <tr key={`${d.department}-${s.service_name}`} className="font-semibold">
+                            <td className="p-2.5 pl-6 text-muted">{s.service_name}</td>
+                            <td className="p-2.5 text-right font-mono text-muted">{s.count} ta</td>
+                            <td className="p-2.5 text-right font-mono text-emerald">{formatMoney(s.total)}</td>
+                          </tr>
+                        ))}
+                    </Fragment>
+                  ))}
+                  <tr className="border-t-2 border-amber-500/40 bg-amber-500/10 font-black">
+                    <td className="p-2.5 text-amber-900 dark:text-amber-200 uppercase">Jami</td>
+                    <td className="p-2.5 text-right font-mono text-amber-900 dark:text-amber-200">
+                      {report.paper_entry_count} ta
+                    </td>
+                    <td className="p-2.5 text-right font-mono text-amber-900 dark:text-amber-200">
+                      {formatMoney(report.paper_entry_total)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -277,6 +371,65 @@ export default function AdminReports() {
                     <td className="p-3 text-right font-mono font-bold text-emerald">{formatMoney(p.amount)}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Harajatlar — sababi va vaqti bilan, oxirida sof qoldiq */}
+      {expensesList.length > 0 && (
+        <div className="card border border-rose-500/30 bg-rose-500/[0.03]">
+          <h3 className="text-rose-500 dark:text-rose-400 mb-1 font-bold text-sm uppercase tracking-wide">
+            💸 Harajatlar — {expensesList.length} ta, jami {formatMoney(report.expenses || 0)}
+          </h3>
+          <p className="text-muted text-[11px] mb-3">
+            Bugun kassadan chiqarilgan pullar. Tushumdan ayirilgach kassada
+            {' '}{formatMoney((report.total_income || 0) - (report.expenses || 0))} qoladi.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-gold font-bold text-left bg-surface-2">
+                  <th className="p-3">#</th>
+                  <th className="p-3">Turi</th>
+                  <th className="p-3">Sababi / Izoh</th>
+                  <th className="p-3">Vaqt</th>
+                  <th className="p-3 text-right">Summa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {expensesList.map((ex, i) => (
+                  <tr key={ex.id || i} className="hover:bg-surface-hover font-semibold">
+                    <td className="p-3 text-muted font-mono">#{i + 1}</td>
+                    <td className="p-3 text-body font-bold">{ex.category}</td>
+                    <td className="p-3 text-muted">{ex.description}</td>
+                    <td className="p-3 font-mono text-muted">
+                      {ex.created_at ? ex.created_at.slice(11, 16) : '—'}
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-rose-500 dark:text-rose-400">
+                      -{formatMoney(ex.amount)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-border bg-surface-2 font-black">
+                  <td className="p-3" colSpan={3}>
+                    <span className="text-body uppercase">Jami harajat</span>
+                  </td>
+                  <td className="p-3" />
+                  <td className="p-3 text-right font-mono text-rose-500 dark:text-rose-400">
+                    -{formatMoney(report.expenses || 0)}
+                  </td>
+                </tr>
+                <tr className="bg-emerald-500/10 font-black">
+                  <td className="p-3" colSpan={3}>
+                    <span className="text-emerald uppercase">Kassada qolgan (tushum - harajat)</span>
+                  </td>
+                  <td className="p-3" />
+                  <td className="p-3 text-right font-mono text-emerald">
+                    {formatMoney((report.total_income || 0) - (report.expenses || 0))}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>

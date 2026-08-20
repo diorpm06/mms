@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Calendar as CalendarIcon, Clock, Plus, CheckCircle2, XCircle, UserCheck, Phone, Stethoscope } from 'lucide-react'
 import { api } from '../../utils/api'
-import { formatMoney } from '../../utils/format'
+import { formatMoney, ismTuzat } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import PageHeader from '../../components/PageHeader'
 import Modal from '../../components/Modal'
@@ -221,8 +221,8 @@ export default function Appointments() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Qabulga Oldindan Yozish">
         <form onSubmit={handleCreate} className="space-y-3 pt-2">
           <div className="grid grid-cols-2 gap-3">
-            <input className="input-field" placeholder="Ism *" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} required />
-            <input className="input-field" placeholder="Familiya *" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required />
+            <input className="input-field" placeholder="Ism *" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: ismTuzat(e.target.value) })} required />
+            <input className="input-field" placeholder="Familiya *" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: ismTuzat(e.target.value) })} required />
           </div>
           <input className="input-field" placeholder="Telefon raqami *" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
           

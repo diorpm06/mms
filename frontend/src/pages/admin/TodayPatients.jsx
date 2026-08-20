@@ -26,7 +26,13 @@ export default function TodayPatients() {
   // Chekni ochadi. Bemor kun davomida bir necha marta kassaga kelgan bo'lsa
   // (alohida cheklar), hammasi BITTA chekka yig'iladi va umumiy summa
   // ko'rsatiladi. Ilgari har bir kelish alohida chek bo'lib chiqardi.
+  // Chekni ochadi: Bosilgan alohida xizmat qatori uchun aynan o'sha xizmat cheki chiqariladi
   const chekniOch = (p) => {
+    setSelectedReceiptPatient(p)
+  }
+
+  // Barcha bugungi xizmatlarini bitta chekka yig'ib chiqarish
+  const chekniBirlashtiribOch = (p) => {
     const kalit = odamKaliti(p)
     const hammasi = (patients || []).filter(
       (x) => !x.is_cancelled && odamKaliti(x) === kalit
@@ -35,8 +41,6 @@ export default function TodayPatients() {
       setSelectedReceiptPatient(p)
       return
     }
-    // To'lov turlari bo'yicha yig'indi ham qayta hisoblanadi — aks holda
-    // chek faqat bosilgan qatorning naqd/karta summasini ko'rsatardi.
     const yig = (maydon) => hammasi.reduce((s, x) => s + (x[maydon] || 0), 0)
     setSelectedReceiptPatient({
       ...p,
@@ -95,6 +99,7 @@ export default function TodayPatients() {
         service_name: s.service_name,
         quantity: s.quantity || 1,
         price: s.unit_price ?? s.total_price,
+        department_name: s.department_name || s.category || '',
       }))
     )
     setAddServiceId('')
@@ -115,7 +120,13 @@ export default function TodayPatients() {
     if (!svc) return
     setEditServices((prev) => [
       ...prev,
-      { service_id: svc.id, service_name: svc.name, quantity: 1, price: svc.price },
+      {
+        service_id: svc.id,
+        service_name: svc.name,
+        quantity: 1,
+        price: svc.price,
+        department_name: svc.department_name || svc.category || '',
+      },
     ])
     setAddServiceId('')
   }
@@ -367,9 +378,6 @@ export default function TodayPatients() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="input-field text-xs py-2 min-w-[200px]"
           />
-          <Btn variant="gold" size="sm" icon={Icons.printer} loading={downloadingPdf} onClick={handleDownloadDailyPdf}>
-            Kunlik PDF Hisobot
-          </Btn>
           <Btn variant="ghost" size="sm" icon={Icons.refresh} onClick={fetchPatients}>
             Yangilash
           </Btn>
@@ -549,20 +557,43 @@ export default function TodayPatients() {
                   </td>
 
                   {/* Xizmat & Shifokor */}
-                  <td className="p-2 max-w-[180px]">
-                    {(p.services || []).length > 1 ? (
-                      <div className="space-y-0.5">
-                        {p.services.map((s, i) => (
-                          <span key={i} className="font-bold text-cyan text-xs block leading-tight">
-                            {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="font-bold text-cyan text-xs block leading-tight">
-                        {p.services?.[0]?.service_name || p.service_name}
-                      </span>
-                    )}
+                  <td className="p-2 max-w-[200px]">
+                    {(() => {
+                      const list = p.services || []
+                      if (list.length > 2) {
+                        const firstTwo = list.slice(0, 2)
+                        const remaining = list.length - 2
+                        const allNames = list.map((s) => `${s.service_name}${s.quantity > 1 ? ` (x${s.quantity})` : ''}`).join(', ')
+                        return (
+                          <div className="space-y-0.5" title={allNames}>
+                            {firstTwo.map((s, i) => (
+                              <span key={i} className="font-bold text-cyan text-xs block leading-tight truncate">
+                                {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+                              </span>
+                            ))}
+                            <span className="inline-block mt-0.5 text-[10px] font-black text-gold bg-gold/10 border border-gold/30 px-1.5 py-0.5 rounded cursor-help">
+                              +{remaining} ta xizmat
+                            </span>
+                          </div>
+                        )
+                      }
+                      if (list.length > 1) {
+                        return (
+                          <div className="space-y-0.5">
+                            {list.map((s, i) => (
+                              <span key={i} className="font-bold text-cyan text-xs block leading-tight truncate">
+                                {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+                              </span>
+                            ))}
+                          </div>
+                        )
+                      }
+                      return (
+                        <span className="font-bold text-cyan text-xs block leading-tight truncate">
+                          {list[0]?.service_name || p.service_name}
+                        </span>
+                      )
+                    })()}
                     <span className="text-[10px] text-muted font-medium block truncate mt-0.5">{p.provider_name || '—'}</span>
                   </td>
 
@@ -617,6 +648,17 @@ export default function TodayPatients() {
 
                         <ActionMenu
                           items={[
+                            {
+                              label: 'Ushbu xizmat cheki',
+                              icon: Icons.printer,
+                              onClick: () => chekniOch(p),
+                            },
+                            {
+                              label: 'Barcha xizmatlar cheki (Birlashtirilgan)',
+                              icon: Icons.printer,
+                              variant: 'gold',
+                              onClick: () => chekniBirlashtiribOch(p),
+                            },
                             p.queue_status !== 'qabulda' && p.queue_status !== 'yakunlandi' ? {
                               label: 'Xonaga chaqirish',
                               icon: Icons.bell,
@@ -790,27 +832,36 @@ export default function TodayPatients() {
               <label className="form-label font-bold">Xizmatlar</label>
               <div className="space-y-1.5 max-h-44 overflow-y-auto">
                 {editServices.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 p-2 rounded-xl bg-surface-2 border border-border">
-                    <span className="flex-1 text-xs font-bold text-body">{s.service_name}</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={s.quantity}
-                      onChange={(e) => changeEditQty(i, e.target.value)}
-                      className="w-14 px-1.5 py-1 rounded-lg bg-surface border border-border text-center text-xs font-mono font-bold"
-                      title="Soni"
-                    />
-                    <span className="w-24 text-right text-xs font-mono text-emerald">
-                      {formatMoney((Number(s.price) || 0) * (Number(s.quantity) || 1))}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeEditService(i)}
-                      className="text-rose-400 hover:bg-rose-500/15 rounded-lg px-1.5 py-0.5 text-xs font-bold"
-                      title="Olib tashlash"
-                    >
-                      ✕
-                    </button>
+                  <div key={i} className="flex items-center justify-between gap-2 p-2 rounded-xl bg-surface-2 border border-border">
+                    <div className="flex-1 min-w-0 pr-1">
+                      <div className="text-xs font-bold text-body truncate">{s.service_name}</div>
+                      {(s.department_name || s.category) && (
+                        <div className="text-[10px] font-semibold text-cyan-400 truncate">
+                          📁 {s.department_name || s.category}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <input
+                        type="number"
+                        min={1}
+                        value={s.quantity}
+                        onChange={(e) => changeEditQty(i, e.target.value)}
+                        className="w-12 px-1 py-1 rounded-lg bg-surface border border-border text-center text-xs font-mono font-bold"
+                        title="Soni"
+                      />
+                      <span className="text-xs font-mono font-bold text-emerald whitespace-nowrap">
+                        {formatMoney((Number(s.price) || 0) * (Number(s.quantity) || 1))}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeEditService(i)}
+                        className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 rounded-lg text-xs font-bold transition-all shrink-0 ml-1"
+                        title="Olib tashlash"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {!editServices.length && (
@@ -819,15 +870,28 @@ export default function TodayPatients() {
               </div>
 
               <select
-                className="input-field text-xs mt-2"
+                className="input-field text-xs mt-2 font-bold"
                 value={addServiceId}
                 onChange={(e) => addEditService(e.target.value)}
               >
-                <option value="">+ Xizmat qo'shish...</option>
-                {allServices.filter((x) => x.is_active !== false).map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name} — {formatMoney(x.price)}
-                  </option>
+                <option value="">+ Xizmat qo'shish (bo'limlar bo'yicha)...</option>
+                {Object.entries(
+                  allServices
+                    .filter((x) => x.is_active !== false)
+                    .reduce((acc, s) => {
+                      const dept = s.department_name || s.category || "Boshqa bo'limlar"
+                      if (!acc[dept]) acc[dept] = []
+                      acc[dept].push(s)
+                      return acc
+                    }, {})
+                ).map(([deptName, deptServices]) => (
+                  <optgroup key={deptName} label={`📂 ${deptName.toUpperCase()}`}>
+                    {deptServices.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        [📁 {deptName}] {x.name} — {formatMoney(x.price)}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
 

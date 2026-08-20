@@ -31,8 +31,24 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
 
   const isPayLater = ['later', 'keyinroq', 'nasiya', 'qarz'].includes(String(firstPatient.payment_type || '').toLowerCase())
 
-  const rawTickets = patientList.map((p) => p.ticket_number || `A-${p.id}`).filter(Boolean)
-  const uniqueTickets = Array.from(new Set(rawTickets))
+  const rawTickets = []
+  patientList.forEach((p) => {
+    if (p.ticket_number) {
+      rawTickets.push(p.ticket_number)
+    }
+    if (p.services && Array.isArray(p.services)) {
+      p.services.forEach((s) => {
+        if (s.ticket_number) rawTickets.push(s.ticket_number)
+      })
+    }
+    if (!p.ticket_number && (!p.services || !p.services.some(s => s.ticket_number))) {
+      rawTickets.push(`#BM-${p.id}`)
+    }
+  })
+  const realQueueTickets = rawTickets.filter((t) => t && !t.startsWith('#BM-'))
+  const uniqueTickets = realQueueTickets.length > 0
+    ? Array.from(new Set(realQueueTickets))
+    : Array.from(new Set(rawTickets))
   const ticketsStr = uniqueTickets.join(', ')
   const totalAmount = isBatch
     ? patient.total_amount

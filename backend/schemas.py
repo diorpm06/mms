@@ -238,6 +238,9 @@ class ServiceItem(BaseModel):
     price: Optional[int] = Field(default=None, ge=0, le=100_000_000)
     quantity: Optional[int] = Field(default=1, ge=1, le=100)
     is_course: Optional[bool] = False
+    # Kurs jadvali: xizmat qaysi kunlarda beriladi, masalan "1,3,5".
+    # Bo'sh bo'lsa — kuni qolguncha har tashrifda beriladi.
+    course_days: Optional[str] = Field(default=None, max_length=200)
 
 
 class PatientCreate(BaseModel):

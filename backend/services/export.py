@@ -111,8 +111,16 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
         Spacer(1, 4),
     ]
 
-    # Section 1: Services & Inpatients
-    elements.append(Paragraph("1. FAOLIYAT VA STATSIONAR (XIZMATLAR & YOTIB DAVOLANISH)", section_style))
+    # Bo'lim raqamlari o'zgaruvchan: bo'sh bo'lim umuman chiqmaydi,
+    # shuning uchun raqamlar sakrab ketmasligi kerak.
+    _bolim = {"n": 0}
+
+    def bolim(nom: str) -> Paragraph:
+        _bolim["n"] += 1
+        return Paragraph("%d. %s" % (_bolim["n"], nom), section_style)
+
+    # Section: Services & Inpatients
+    elements.append(bolim("FAOLIYAT VA STATSIONAR (XIZMATLAR & YOTIB DAVOLANISH)"))
 
     svcs = report.get("services_detail") or report.get("services_breakdown") or []
     svc_data = [["№", "Xizmat / Bo'lim nomi", "Soni", "Summa (so'm)"]]
@@ -174,8 +182,8 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
                 ("BACKGROUND", (0, -2), (-1, -2), colors.HexColor("#e2e8f0")),
                 ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#cbd5e1")),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ]
         )
     )
@@ -183,10 +191,10 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
 
     # Section 2: Expenses
     elements.append(Spacer(1, 10))
-    elements.append(Paragraph("2. XARAJATLAR", section_style))
+    elements.append(bolim("XARAJATLAR"))
 
     exp_list = report.get("expenses_list") or []
-    exp_data = [["№", "Xarajat maqsadi va sababi", "Summa (so'm)"]]
+    exp_data = [["№", "Vaqt", "Xarajat maqsadi va sababi", "Summa (so'm)"]]
     exp_idx = 1
     total_exp_sum = report.get("expenses", 0)
 
@@ -195,26 +203,38 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
             if isinstance(ex, dict):
                 amt = ex.get("amount", 0)
                 if amt > 0:
-                    cat = ex.get("category", "Boshqa") or "Boshqa"
+                    cat = (ex.get("category") or "Boshqa").strip()
                     desc = (ex.get("description", "") or "").strip()
                     if desc == "-":
                         desc = ""
-                    detail = f"{cat} — {desc}" if desc and desc != cat else cat
+                    # "Boshqa" hamma yozuvda takrorlanadi va ma'no bermaydi —
+                    # sabab bo'lsa faqat o'shani yozamiz.
+                    if not desc:
+                        detail = cat
+                    elif cat and cat.lower() != "boshqa" and desc != cat:
+                        detail = f"{cat} — {desc}"
+                    else:
+                        detail = desc
+
+                    vaqt = ""
+                    iso = ex.get("created_at") or ""
+                    if "T" in iso:
+                        vaqt = iso.split("T", 1)[1][:5]
+
                     exp_data.append([
-                        str(exp_idx),
-                        detail,
-                        _format_money(int(amt)),
+                        str(exp_idx), vaqt, detail, _format_money(int(amt)),
                     ])
                     exp_idx += 1
     else:
         if total_exp_sum > 0:
-            exp_data.append(["1", "Klinika umumiy xarajatlari", _format_money(int(total_exp_sum))])
+            exp_data.append(["1", "", "Klinika umumiy xarajatlari",
+                             _format_money(int(total_exp_sum))])
         else:
-            exp_data.append(["—", "Xarajatlar mavjud emas", "0 so'm"])
+            exp_data.append(["—", "", "Xarajatlar mavjud emas", "0 so'm"])
 
-    exp_data.append(["", "JAMI XARAJATLAR", _format_money(int(total_exp_sum))])
+    exp_data.append(["", "", "JAMI XARAJATLAR", _format_money(int(total_exp_sum))])
 
-    t_exp = Table(exp_data, colWidths=[1.2 * cm, 12.3 * cm, 5.5 * cm])
+    t_exp = Table(exp_data, colWidths=[1.2 * cm, 2.0 * cm, 10.3 * cm, 5.5 * cm])
     t_exp.setStyle(
         TableStyle(
             [
@@ -223,27 +243,76 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (-1, -1), 10.5),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
-                ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+                ("ALIGN", (1, 0), (1, -1), "CENTER"),
+                ("ALIGN", (3, 0), (3, -1), "RIGHT"),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
                 ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#f1f5f9")),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ]
         )
     )
     elements.append(t_exp)
 
-    # Section 3: Consumed Materials Summary
-    elements.append(Spacer(1, 10))
-    elements.append(Paragraph("3. ISHLATILGAN MATERIALLAR VA TUSHUM", section_style))
+    # Section 3: Navbatchilik (qog'oz jurnalidan kiritilgan tushum)
+    #
+    # Ish vaqtidan tashqari qabul qilingan bemorlar. Yuqoridagi umumiy
+    # summaga allaqachon kirgan, lekin "qaysi xizmatdan qancha tushgan"
+    # alohida ko'rinishi kerak — shu bo'lim aynan shuning uchun.
+    paper_dept = report.get("paper_entry_departments") or []
+    paper_svc = report.get("paper_entry_services") or []
+    paper_count = int(report.get("paper_entry_count") or 0)
+    paper_total = int(report.get("paper_entry_total") or 0)
 
+    if paper_count > 0:
+        elements.append(Spacer(1, 10))
+        elements.append(bolim("NAVBATCHILIK (QOG'OZ JURNALIDAN KIRITILGAN)"))
+
+        # Faqat BO'LIM darajasi: "Ineksiya — 7 ta, 140 000".
+        # Har bir xizmatni alohida yozish hisobotni cho'zib yuborardi.
+        p_data = [["№", "Bo'lim nomi", "Soni", "Summa (so'm)"]]
+        for n, d in enumerate(paper_dept, start=1):
+            p_data.append([
+                str(n), d.get("department", ""),
+                str(d.get("count", 0)), _format_money(int(d.get("total") or 0)),
+            ])
+        p_data.append(["", "JAMI NAVBATCHILIK", str(paper_count),
+                       _format_money(paper_total)])
+
+        t_paper = Table(p_data, colWidths=[1.2 * cm, 10.3 * cm, 2.5 * cm, 5.0 * cm])
+        t_paper.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10.5),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (2, 0), (2, -1), "CENTER"),
+            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#fef3c7")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        elements.append(t_paper)
+
+    # Section: Consumed Materials Summary
+    #
+    # Material ishlatilmagan bo'lsa bu bo'lim UMUMAN chiqmaydi — bo'sh
+    # "materiallar mavjud emas" jadvali hisobotni cho'zib, ikkinchi
+    # sahifaga surib yuborardi.
     mats_list = report.get("materials_used_breakdown") or []
-    mat_data = [["№", "Material Nomi", "Ishlatilgan Miqdor", "Tushum / Ishlab Topilgan Pul"]]
-    mat_idx = 1
-    total_mat_income = report.get("total_material_income", 0)
+    mats_bor = isinstance(mats_list, list) and len(mats_list) > 0
 
-    if isinstance(mats_list, list) and len(mats_list) > 0:
+    if mats_bor:
+        material = [Spacer(1, 10),
+                    bolim("ISHLATILGAN MATERIALLAR VA TUSHUM")]
+
+        mat_data = [["№", "Material Nomi", "Ishlatilgan Miqdor",
+                     "Tushum / Ishlab Topilgan Pul"]]
+        mat_idx = 1
+        total_mat_income = report.get("total_material_income", 0)
         for m in mats_list:
             if isinstance(m, dict):
                 mat_data.append([
@@ -253,35 +322,34 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
                     _format_money(int(m.get("total_income", 0))),
                 ])
                 mat_idx += 1
-    else:
-        mat_data.append(["—", "Ishlatilgan materiallar mavjud emas", "0", "0 so'm"])
+        mat_data.append([
+            "", "JAMI MATERIAL TUSHUMI",
+            f"{report.get('total_material_quantity', 0)} dona",
+            _format_money(int(total_mat_income)),
+        ])
 
-    mat_data.append(["", "JAMI MATERIAL TUSHUMI", f"{report.get('total_material_quantity', 0)} dona", _format_money(int(total_mat_income))])
+        t_mat = Table(mat_data, colWidths=[1.2 * cm, 8.8 * cm, 3.5 * cm, 5.5 * cm])
+        t_mat.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10.5),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (2, 0), (2, -1), "CENTER"),
+            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#f1f5f9")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        material.append(t_mat)
+        elements.append(KeepTogether(material))
 
-    t_mat = Table(mat_data, colWidths=[1.2 * cm, 8.8 * cm, 3.5 * cm, 5.5 * cm])
-    t_mat.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 10.5),
-                ("ALIGN", (0, 0), (0, -1), "CENTER"),
-                ("ALIGN", (2, 0), (2, -1), "CENTER"),
-                ("ALIGN", (3, 0), (3, -1), "RIGHT"),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
-                ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#f1f5f9")),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ]
-        )
-    )
-    elements.append(t_mat)
-
-    # Section 4: Summary & Cash Balance
-    elements.append(Spacer(1, 10))
-    elements.append(Paragraph("3. KASSA YAKUNNING HISOBI", section_style))
+    # Section 5: Summary & Cash Balance
+    # Yakuniy hisob va imzolar BIRGA turishi kerak — ilgari "NAQD" qatori
+    # va imzolar ikkinchi sahifaga yolg'iz tushib qolardi.
+    yakun = [Spacer(1, 10), bolim("KASSA YAKUNIY HISOBI")]
 
     tot_income = int(report.get("total_income", 0))
     tot_exp = int(report.get("expenses", 0))
@@ -327,10 +395,10 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
             ]
         )
     )
-    elements.append(t_box)
+    yakun.append(t_box)
 
-    # Section 4: Signatures
-    elements.append(Spacer(1, 26))
+    # Signatures
+    yakun.append(Spacer(1, 16))
     sig_data = [["Administrator Imzosi: ___________________", "Rahbar Imzosi: ___________________"]]
     t_sig = Table(sig_data, colWidths=[9.5 * cm, 9.5 * cm])
     t_sig.setStyle(
@@ -343,7 +411,8 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
             ]
         )
     )
-    elements.append(t_sig)
+    yakun.append(t_sig)
+    elements.append(KeepTogether(yakun))
 
     doc.build(elements)
     return buf.getvalue()

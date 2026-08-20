@@ -51,6 +51,20 @@ def _odam_kaliti(p: Patient) -> str:
     )
 
 
+def _kunlarni_oqi(matn: str | None) -> list[int]:
+    """ "1,3,5" -> [1, 3, 5].  Bo'sh bo'lsa [] (ya'ni har kuni)."""
+    if not matn:
+        return []
+    kunlar = []
+    for bolak in str(matn).split(","):
+        bolak = bolak.strip()
+        if bolak.isdigit():
+            n = int(bolak)
+            if 0 < n <= 365 and n not in kunlar:
+                kunlar.append(n)
+    return sorted(kunlar)
+
+
 def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
                    kalit_filtr: str | None = None) -> list[dict]:
     qatorlar = (
@@ -95,9 +109,14 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
                 "category": ps.service.category if ps.service else None,
                 "quantity": 0,
                 "total_price": 0,
+                "days": [],          # jadval: qaysi kunlarda beriladi
                 "_oldindan": False,
             }
             g["services"][ps.service_id] = x
+
+        for kun in _kunlarni_oqi(ps.course_days):
+            if kun not in x["days"]:
+                x["days"].append(kun)
 
         # STRICT RULE: A service is ONLY a multi-day treatment course if is_course is explicitly True.
         # A quantity of 5 or 10 today in a single visit with is_course=False must NEVER be split into 5 days!
@@ -112,38 +131,91 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
             g["tickets"].append(p.ticket_number)
         g["_rows"].append(ps)
 
-    # Ishlatilgan kunlar: faqat "Keldi" tashriflari sanaladi
+    # "Keldi" tashriflari. Kurs kuni SANALAR bo'yicha hisoblanadi: bemor
+    # bir kelganda bir necha xizmat olsa ham, bu bitta kun.
     barcha_id = [ps.id for g in guruh.values() for ps in g["_rows"]]
-    tashriflar: dict[int, int] = {}
+    tashrif_sanalari: dict[int, set] = {}   # patient_service_id -> {sana}
     if barcha_id:
-        for ps_id, soni in (
-            db.query(Patient.prepaid_from_id, func.count(Patient.id))
+        for ps_id, sana in (
+            db.query(Patient.prepaid_from_id, func.date(Patient.created_at))
             .filter(
                 Patient.prepaid_from_id.in_(barcha_id),
                 Patient.is_cancelled == False,  # noqa: E712
             )
-            .group_by(Patient.prepaid_from_id)
+            .distinct()
             .all()
         ):
-            tashriflar[ps_id] = int(soni)
+            tashrif_sanalari.setdefault(ps_id, set()).add(str(sana))
 
     natija = []
     for g in guruh.values():
-        # xizmat bo'yicha ishlatilgan kunlar
-        xizmat_ishlatilgan: dict[int, int] = {}
+        # Kursning nechanchi kunidamiz: bemor necha KUN kelgan
+        kurs_sanalari = set()
         for ps in g["_rows"]:
-            effective_used = max(tashriflar.get(ps.id, 0), int(ps.used_count or 0))
-            xizmat_ishlatilgan[ps.service_id] = (
-                xizmat_ishlatilgan.get(ps.service_id, 0) + effective_used
-            )
+            kurs_sanalari |= tashrif_sanalari.get(ps.id, set())
+
+        # Xizmat bo'yicha qo'lda kiritilgan (tahrirlangan) qiymat
+        qolda: dict[int, int] = {}
+        for ps in g["_rows"]:
+            qolda[ps.service_id] = qolda.get(ps.service_id, 0) + int(ps.used_count or 0)
+
+        # Eski yozuvlarda "keldi" tashrifi qoldirilmasdan, faqat used_count
+        # qo'lda kiritilgan bo'lishi mumkin. Bunday holda ham kun o'tgan
+        # deb sanaladi, aks holda xizmat "tugagan" ko'rinib, kurs esa
+        # "hali boshlanmagan" bo'lib qolardi.
+        #
+        # DIQQAT: bu yerda QO'SHILMAYDI, eng KATTASI olinadi. Bir kunda
+        # 2 ta xizmat berilgani baribir 1 kun.
+        qolda_kun = 0
+        for sid, x in g["services"].items():
+            n = qolda.get(sid, 0)
+            if n <= 0:
+                continue
+            jadval = sorted(x["days"])
+            if jadval:
+                # "1,3,5" jadvalida 2 ta seans berilgan bo'lsa -> 3-kun o'tgan
+                qolda_kun = max(qolda_kun, jadval[min(n, len(jadval)) - 1])
+            else:
+                qolda_kun = max(qolda_kun, n)
+
+        otgan_kun = max(len(kurs_sanalari), qolda_kun)
+        g["otgan_kun"] = otgan_kun
+        g["keyingi_kun"] = otgan_kun + 1
 
         xizmatlar = []
-        jami_qolgan = 0
         for sid, x in g["services"].items():
-            ishlatilgan = xizmat_ishlatilgan.get(sid, 0)
+            jadval = sorted(x["days"])
+            if jadval:
+                # Jadvalli xizmat: o'tgan kunlar ichida nechtasi shu
+                # xizmatga to'g'ri kelgan
+                ishlatilgan = sum(1 for k in jadval if k <= otgan_kun)
+            else:
+                # Jadvalsiz (eski tartib): har tashrifda beriladi
+                ishlatilgan = min(otgan_kun, x["quantity"])
+            ishlatilgan = max(ishlatilgan, qolda.get(sid, 0))
             qolgan = max(0, x["quantity"] - ishlatilgan)
-            jami_qolgan += qolgan
-            xizmatlar.append({**x, "used_count": ishlatilgan, "remaining": qolgan})
+            xizmatlar.append({
+                **x, "days": jadval,
+                "used_count": ishlatilgan, "remaining": qolgan,
+            })
+
+        # KUN SONI — xizmatlar bo'yicha QO'SHILMAYDI.
+        #
+        # Bemor bir kelganda o'ziga tegishli hamma muolajani oladi. Ya'ni
+        # bir kunda 2 ta xizmat bo'lsa, bu 2 kun emas, 1 kun.
+        #
+        # Kurs uzunligi:
+        #   jadvalli xizmat  -> eng katta kun raqami   (masalan 1,3,5 -> 5)
+        #   jadvalsiz xizmat -> kunlar soni            (masalan 4 kun -> 4)
+        # Ikkalasidan eng kattasi kursning uzunligi bo'ladi.
+        #
+        # Masalan: Massaj 4 kun + Elektroforez 2 kun = 4 kunlik kurs.
+        #   1-kun: ikkalasi,  2-kun: ikkalasi,  3-4-kun: faqat massaj.
+        uzunlik = max(
+            (max(x["days"]) if x["days"] else x["quantity"]) for x in xizmatlar
+        ) if xizmatlar else 0
+        g["uzunlik"] = uzunlik
+        jami_qolgan = max(0, uzunlik - otgan_kun)
 
         # Kurs deb faqat OLDINDAN to'langani hisoblanadi: bitta yozuvda
         # "soni" birdan katta kiritilgan bo'lishi shart.
@@ -158,7 +230,11 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
             if all(x["remaining"] <= 0 for x in kursli):
                 continue
             xizmatlar = kursli
-            jami_qolgan = sum(x["remaining"] for x in kursli)
+            uzunlik = max(
+                (max(x["days"]) if x["days"] else x["quantity"]) for x in kursli
+            )
+            g["uzunlik"] = uzunlik
+            jami_qolgan = max(0, uzunlik - otgan_kun)
 
         g["services"] = sorted(xizmatlar, key=lambda x: x["service_name"] or "")
         g["total_remaining"] = jami_qolgan
@@ -171,6 +247,8 @@ def _kurslarni_yig(db: Session, faqat_tugallanmagan: bool = True,
 def _tozala(g: dict) -> dict:
     """Ichki (_ bilan boshlanadigan) maydonlarni javobdan olib tashlaydi."""
     toza = {k: v for k, v in g.items() if not k.startswith("_")}
+    toza["otgan_kun"] = g.get("otgan_kun", 0)
+    toza["uzunlik"] = g.get("uzunlik", 0)
     toza["services"] = [
         {k: v for k, v in x.items() if not k.startswith("_")}
         for x in g.get("services", [])
@@ -245,11 +323,29 @@ def use_session(
     # Faqat OLDINDAN to'langan xizmatlar. Bemorning o'sha kuni alohida
     # to'lab olgan bir martalik xizmatlari bu yerga tushmasligi kerak —
     # ular uchun bepul tashrif ochilib qolmasin.
-    qoldi_bor = [x for x in g["services"] if x["_oldindan"] and x["remaining"] > 0]
-    if not qoldi_bor:
+    kursli = [x for x in g["services"] if x["_oldindan"]]
+    if not kursli or all(x["remaining"] <= 0 for x in kursli):
         raise HTTPException(status_code=400,
                             detail="Bu kurs tugagan — qolgan kun yo'q")
-    qolgan_keyin = sum(x["remaining"] for x in qoldi_bor) - len(qoldi_bor)
+
+    # Bugun kursning nechanchi kuni
+    bugungi_kun = g["keyingi_kun"]
+
+    # JADVAL: xizmatda kunlar ro'yxati bo'lsa, faqat bugungi kunga
+    # belgilangani beriladi. Jadvalsiz xizmat esa (eski tartib) kuni
+    # qolguncha har tashrifda beriladi.
+    qoldi_bor = [
+        x for x in kursli
+        if x["remaining"] > 0 and (bugungi_kun in x["days"] if x["days"] else True)
+    ]
+    if not qoldi_bor:
+        raise HTTPException(
+            status_code=400,
+            detail="Kursning %d-kuniga birorta muolaja belgilanmagan. "
+                   "Jadvalni tekshiring." % bugungi_kun)
+
+    # Bitta tashrif = bitta kun, nechta xizmat olinishidan qat'i nazar.
+    qolgan_keyin = max(0, g["uzunlik"] - bugungi_kun)
 
     from routers.patients import _keyingi_raqam, get_queue_prefix_letter
 
@@ -307,7 +403,10 @@ def use_session(
 
     return {
         "message": f"{asl.first_name} navbatga qo'yildi ({', '.join(talonlar)}). "
+                   f"{bugungi_kun}-kun / {g['uzunlik']} kun. "
                    f"Qolgan kun: {qolgan_keyin}",
+        "day": bugungi_kun,
+        "course_length": g["uzunlik"],
         "ticket_number": talonlar[0],
         "tickets": talonlar,
         "remaining": qolgan_keyin,
@@ -329,11 +428,14 @@ def use_session(
             "service_name": qoldi_bor[0]["service_name"],
             "service_category": qoldi_bor[0]["category"],
             "is_prepaid_visit": True,
+            # Chekda: bu kursning nechanchi kuni va jami necha kun
+            "prepaid_day": bugungi_kun,
+            "prepaid_total": g["uzunlik"],
             "prepaid_lines": [
                 {
                     "service_name": x["service_name"],
-                    "day": x["used_count"] + 1,
-                    "total": x["quantity"],
+                    "day": bugungi_kun,
+                    "total": g["uzunlik"],
                 }
                 for x in qoldi_bor
             ],
@@ -392,10 +494,12 @@ def undo_session(
         ip_address=ip, device_info=ua,
     )
     db.commit()
-    kurs_qolgan = sum(x["remaining"] for x in g["services"] if x["_oldindan"])
+    # Bitta tashrif = bitta kun (nechta xizmat bo'lishidan qat'i nazar)
+    kurs_qolgan = max((x["remaining"] for x in g["services"] if x["_oldindan"]),
+                      default=0)
     return {
         "message": "%d ta tashrif bekor qilindi" % len(tashriflar),
-        "remaining": kurs_qolgan + len(tashriflar),
+        "remaining": kurs_qolgan + 1,
     }
 
 

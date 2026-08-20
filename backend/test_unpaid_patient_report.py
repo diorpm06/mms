@@ -1,3 +1,11 @@
+# --- QALQON: JONLI BAZAGA ULANISHNI TAQIQLAYDI -------------------------
+import os as _os
+import sys as _sys
+if not _os.environ.get("DATABASE_URL", "").startswith("sqlite"):
+    _sys.exit("TO'XTATILDI: test skripti jonli bazada ishlamaydi. "
+              "DATABASE_URL sqlite:/// bilan boshlanishi shart.")
+# ----------------------------------------------------------------------
+
 import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 

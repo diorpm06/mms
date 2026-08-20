@@ -75,11 +75,11 @@ export default defineConfig(({ mode }) => {
         // esa faqat proksi manzilini o'zgartiradi, brauzer baribir /api ga
         // murojaat qiladi va CORS umuman ishtirok etmaydi.
         '/api': {
-          target: env.VITE_DEV_API_TARGET || env.VITE_API_URL || 'http://localhost:8000',
+          target: env.VITE_DEV_API_TARGET || env.VITE_API_URL || 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
         '/uploads': {
-          target: env.VITE_DEV_API_TARGET || env.VITE_API_URL || 'http://localhost:8000',
+          target: env.VITE_DEV_API_TARGET || env.VITE_API_URL || 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
       },
