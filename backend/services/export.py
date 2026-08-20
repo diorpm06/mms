@@ -346,6 +346,41 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
         material.append(t_mat)
         elements.append(KeepTogether(material))
 
+    # Section: Doctor KPI Breakdown (Shifokorlar KPI Ulushlari)
+    providers_bd = report.get("providers_breakdown") or []
+    if providers_bd:
+        elements.append(Spacer(1, 10))
+        elements.append(bolim("SHIFOKORLAR KPI ULUSHLARI (10 KUNLIK / DAVRIY)"))
+        prov_data = [["№", "Shifokor F.I.Sh", "Mutaxassisligi", "Bemorlar", "KPI Ulush (so'm)"]]
+        for n, p in enumerate(providers_bd, start=1):
+            prov_data.append([
+                str(n),
+                str(p.get("name", "")),
+                str(p.get("specialization", "—")),
+                str(p.get("count", 0)),
+                _format_money(int(p.get("total", 0))),
+            ])
+        tot_kpi = sum(int(p.get("total", 0)) for p in providers_bd)
+        tot_pats = sum(int(p.get("count", 0)) for p in providers_bd)
+        prov_data.append(["", "JAMI SHIFOKORLAR KPI ULUSHI", "", str(tot_pats), _format_money(tot_kpi)])
+
+        t_prov = Table(prov_data, colWidths=[1.2 * cm, 6.8 * cm, 4.0 * cm, 2.0 * cm, 5.0 * cm])
+        t_prov.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10.5),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (3, 0), (3, -1), "CENTER"),
+            ("ALIGN", (4, 0), (4, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#e0f2fe")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        elements.append(t_prov)
+
     # Section 5: Summary & Cash Balance
     # Yakuniy hisob va imzolar BIRGA turishi kerak — ilgari "NAQD" qatori
     # va imzolar ikkinchi sahifaga yolg'iz tushib qolardi.

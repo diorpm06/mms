@@ -366,6 +366,54 @@ def get_report(db: Session, start: date, end: date) -> dict:
             .all()
         )
 
+    from models.provider import Provider
+
+    if start == end:
+        paper_shift_s = s - timedelta(hours=16)
+        providers_breakdown = (
+            db.query(
+                Provider.full_name,
+                Provider.specialization,
+                func.count(func.distinct(Transaction.patient_id)).label("cnt"),
+                func.sum(Transaction.provider_amount).label("total"),
+            )
+            .join(Transaction, Transaction.provider_id == Provider.id)
+            .filter(
+                or_(
+                    and_(Transaction.created_at >= s, Transaction.created_at <= e),
+                    and_(
+                        Transaction.created_at >= paper_shift_s,
+                        Transaction.created_at < s,
+                        Transaction.patient_id.in_(
+                            db.query(Patient.id).filter(Patient.is_paper_entry == True)
+                        ),
+                    ),
+                ),
+                Transaction.is_cancelled == False,
+            )
+            .group_by(Provider.id, Provider.full_name, Provider.specialization)
+            .order_by(func.sum(Transaction.provider_amount).desc())
+            .all()
+        )
+    else:
+        providers_breakdown = (
+            db.query(
+                Provider.full_name,
+                Provider.specialization,
+                func.count(func.distinct(Transaction.patient_id)).label("cnt"),
+                func.sum(Transaction.provider_amount).label("total"),
+            )
+            .join(Transaction, Transaction.provider_id == Provider.id)
+            .filter(
+                Transaction.created_at >= s,
+                Transaction.created_at <= e,
+                Transaction.is_cancelled == False,
+            )
+            .group_by(Provider.id, Provider.full_name, Provider.specialization)
+            .order_by(func.sum(Transaction.provider_amount).desc())
+            .all()
+        )
+
     duty_date = end if start == end else date.today()
 
     from models.employee import Employee
@@ -663,6 +711,15 @@ def get_report(db: Session, start: date, end: date) -> dict:
         "services_breakdown": formatted_services,
         "referrers_breakdown": [
             {"name": r[0], "count": r[1], "total": int(r[2] or 0)} for r in referrers_breakdown
+        ],
+        "providers_breakdown": [
+            {
+                "name": p[0],
+                "specialization": p[1] or "—",
+                "count": p[2],
+                "total": int(p[3] or 0),
+            }
+            for p in providers_breakdown
         ],
         "materials_used_breakdown": materials_used_breakdown,
         "total_material_income": int(total_material_income),
