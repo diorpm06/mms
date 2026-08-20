@@ -138,6 +138,50 @@ app.add_middleware(
 )
 
 
+# ── Kutilmagan xatolarni bazaga yozish ────────────────────
+# Vercel'da server loglari har doim ham ochiq bo'lmaydi. Ilgari
+# "Serverda xatolik" chiqqanda sababini topishning yagona yo'li taxmin
+# qilish edi. Endi to'liq xato matni audit_logs jadvaliga yoziladi va
+# foydalanuvchiga qisqa raqam ko'rsatiladi.
+@app.exception_handler(Exception)
+async def _kutilmagan_xato(request: Request, exc: Exception):
+    import traceback as _tb
+
+    belgi = "-"
+    try:
+        from database import SessionLocal as _SL
+        from models.audit_log import AuditLog as _AL
+
+        matn = "".join(_tb.format_exception(type(exc), exc, exc.__traceback__))
+        # Xato yozuvi asosiy so'rovdan ALOHIDA ulanishda saqlanadi —
+        # so'rovning o'z tranzaksiyasi allaqachon buzilgan bo'ladi.
+        _db = _SL()
+        try:
+            qator = _AL(
+                user_id=None,
+                user_role="system",
+                action_type="SERVER_ERROR",
+                table_name=str(request.url.path)[:100],
+                reason=f"{type(exc).__name__}: {exc}"[:2000],
+                new_data=matn[-6000:],
+                ip_address=(request.client.host if request.client else None),
+            )
+            _db.add(qator)
+            _db.commit()
+            belgi = str(qator.id)
+        finally:
+            _db.close()
+    except Exception:
+        # Xatoni yozib bo'lmasa ham javob qaytishi shart
+        logger.exception("Kutilmagan xato (bazaga yozib bo'lmadi)")
+
+    logger.exception("Kutilmagan xato [%s] %s", belgi, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Serverda xatolik yuz berdi. Xato raqami: {belgi}"},
+    )
+
+
 # ── Xavfsizlik sarlavhalari ───────────────────────────────
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
