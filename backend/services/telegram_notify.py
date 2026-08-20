@@ -54,10 +54,8 @@ def _target_chat_ids() -> list[str]:
     ids: list[str] = []
     if settings.TELEGRAM_CHAT_IDS.strip():
         ids.extend([x.strip() for x in settings.TELEGRAM_CHAT_IDS.split(",") if x.strip()])
-    # Faqat guruh/superguruh ID (manfiy) bo'lsa qabul qilamiz.
-    if settings.TELEGRAM_CHAT_ID.strip() and settings.TELEGRAM_CHAT_ID.strip().startswith("-"):
+    if settings.TELEGRAM_CHAT_ID.strip():
         ids.append(settings.TELEGRAM_CHAT_ID.strip())
-    # CEO_CHAT_ID (foydalanuvchi) endi auto broadcast uchun ishlatilmaydi.
     return list(dict.fromkeys(ids))
 
 
