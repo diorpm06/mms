@@ -38,7 +38,7 @@ def ceo_dashboard(db: Session = Depends(get_db), _: User = Depends(require_ceo))
     from services.reports_data import top_departments
     today = date.today()
     daily = dashboard_summary(db, today)
-    chart = income_last_n_days(db, 7)
+    chart = income_last_n_days(db, 10)
     # Rahbar panelidagi kartalar — Rasm 3 bo'yicha Top 5 Bo'lim (UZI, Laboratoriya, Massaj, etc.)
     tops = top_departments(db, 5)
     refs = top_referrers(db, 5)

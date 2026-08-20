@@ -49,7 +49,7 @@ export default function CeoDashboard() {
     }
   }
 
-  const [chartPeriod, setChartPeriod] = useState('7days') // '7days' | '1-10' | '11-20' | '21-30'
+  const [chartPeriod, setChartPeriod] = useState('10days') // '10days' | '1-10' | '11-20' | '21-30'
   const [chartData, setChartData]     = useState([])
 
   const loadChart = useCallback(async (period) => {
@@ -77,7 +77,7 @@ export default function CeoDashboard() {
         top_referrers: res.top_referrers || [],
         last_activity: res.last_activity || null,
       })
-      if (chartPeriod === '7days' && res.income_chart) {
+      if (chartPeriod === '10days' && res.income_chart) {
         setChartData(res.income_chart)
       }
       if (forecastData) setAnalytics(forecastData)

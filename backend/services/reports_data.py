@@ -1070,9 +1070,9 @@ def top_services(db: Session, limit: int = 10):
     )
 
 
-def income_by_period(db: Session, period: str = "7days"):
+def income_by_period(db: Session, period: str = "10days"):
     """
-    Rasm 2 bo'yicha: 1-10, 11-20, 21-30 kunlik dekada yoki 7 kunlik daromad charti.
+    Rasm 2 bo'yicha: 1-10, 11-20, 21-30 kunlik dekada yoki 10 kunlik daromad charti.
     """
     today = date.today()
     if period == "1-10":
@@ -1088,7 +1088,7 @@ def income_by_period(db: Session, period: str = "7days"):
         else:
             end_d = date(today.year, today.month + 1, 1) - timedelta(days=1)
     else:
-        start_d = today - timedelta(days=6)
+        start_d = today - timedelta(days=9)
         end_d = today
 
     s, e = _period_range(start_d, end_d)
@@ -1123,8 +1123,8 @@ def income_by_period(db: Session, period: str = "7days"):
     return result
 
 
-def income_last_n_days(db: Session, days: int = 7):
-    return income_by_period(db, "7days")
+def income_last_n_days(db: Session, days: int = 10):
+    return income_by_period(db, "10days")
 
 
 def ten_day_report(db: Session, start: date, end: date) -> dict:

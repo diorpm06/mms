@@ -104,7 +104,28 @@ export default function CeoPatients() {
     setVisits(data || [])
   }
 
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState('all') // 'all' | 'split' | 'click' | 'cash' | 'card' | 'later'
+  const [bolimFilter, setBolimFilter] = useState('all')
+
+  const asosiyBolim = (p) => {
+    const raw = (p.service_category || p.category || p.service_name || '').trim()
+    if (!raw) return 'Boshqa'
+    return raw.includes(':') ? raw.split(':')[0].trim() : raw
+  }
+
+  const bolimlar = [...new Set((patients || []).map(asosiyBolim))].filter(Boolean).sort((a, b) => a.localeCompare(b))
+
   const filteredPatients = (patients || []).filter((p) => {
+    if (paymentTypeFilter !== 'all') {
+      const pt = (p.payment_type || '').toLowerCase()
+      if (paymentTypeFilter === 'card') {
+        if (pt !== 'card' && pt !== 'karta' && pt !== 'qr') return false
+      } else if (pt !== paymentTypeFilter) {
+        return false
+      }
+    }
+    if (bolimFilter !== 'all' && asosiyBolim(p) !== bolimFilter) return false
+
     if (!searchQuery) return true
     const q = searchQuery.toLowerCase()
     return (
@@ -302,6 +323,72 @@ export default function CeoPatients() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ── DEPARTMENT & PAYMENT TYPE FILTER CHIPS ─────────────────── */}
+      {bolimlar.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-surface-2/80 rounded-2xl border border-border">
+          <span className="text-xs font-bold text-muted px-2">Bo'lim bo'yicha:</span>
+          {['all', ...bolimlar].map((b) => {
+            const count = b === 'all'
+              ? (patients || []).length
+              : (patients || []).filter((p) => asosiyBolim(p) === b).length
+            return (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setBolimFilter(b)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  bolimFilter === b
+                    ? 'bg-cyan-500 text-slate-950 shadow-md font-black scale-105'
+                    : 'bg-surface-1 text-muted hover:text-body hover:bg-surface-2'
+                }`}
+              >
+                {b === 'all' ? 'Barchasi' : b}{' '}
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-black/20 font-mono font-bold">
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-1.5 p-2 bg-surface-2/80 rounded-2xl border border-border">
+        <span className="text-xs font-bold text-muted px-2">To'lov turi bo'yicha:</span>
+        {[
+          { id: 'all', label: 'Barchasi' },
+          { id: 'split', label: '🔀 Aralash' },
+          { id: 'click', label: '📱 Click / Payme' },
+          { id: 'cash', label: '💵 Naqd' },
+          { id: 'card', label: '💳 Karta / QR' },
+          { id: 'later', label: '⏳ Nasiya' },
+        ].map((f) => {
+          const count = f.id === 'all'
+            ? (patients || []).length
+            : (patients || []).filter((p) => {
+                const pt = (p.payment_type || '').toLowerCase()
+                if (f.id === 'card') return pt === 'card' || pt === 'karta' || pt === 'qr'
+                return pt === f.id
+              }).length
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setPaymentTypeFilter(f.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                paymentTypeFilter === f.id
+                  ? 'bg-gold text-slate-950 shadow-md font-black scale-105'
+                  : 'bg-surface-1 text-muted hover:text-body hover:bg-surface-2'
+              }`}
+            >
+              {f.label}{' '}
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-black/20 font-mono font-bold">
+                {count}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {/* ── CONTENT AREA (TABLE OR CARDS) ─────────────────────────── */}
