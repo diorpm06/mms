@@ -263,7 +263,6 @@ def get_report(db: Session, start: date, end: date) -> dict:
     )
 
     if start == end:
-        paper_shift_s = s - timedelta(hours=16)
         services_breakdown = (
             db.query(
                 Service.name,
@@ -274,14 +273,9 @@ def get_report(db: Session, start: date, end: date) -> dict:
             )
             .join(Patient, Patient.service_id == Service.id)
             .filter(
-                or_(
-                    and_(Patient.created_at >= s, Patient.created_at <= e),
-                    and_(
-                        Patient.created_at >= paper_shift_s,
-                        Patient.created_at < s,
-                        Patient.is_paper_entry == True,
-                    ),
-                ),
+                Patient.created_at >= s,
+                Patient.created_at <= e,
+                or_(Patient.is_paper_entry == False, Patient.is_paper_entry.is_(None)),
                 Patient.is_cancelled == False,
             )
             .group_by(Service.id, Service.name, Service.category, Service.cabinet)
@@ -301,6 +295,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
             .filter(
                 Patient.created_at >= s,
                 Patient.created_at <= e,
+                or_(Patient.is_paper_entry == False, Patient.is_paper_entry.is_(None)),
                 Patient.is_cancelled == False,
             )
             .group_by(Service.id, Service.name, Service.category, Service.cabinet)
