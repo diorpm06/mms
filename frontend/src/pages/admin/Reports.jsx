@@ -41,8 +41,31 @@ export default function AdminReports() {
     }
   }
 
-  const handlePrintReport = () => {
-    window.print()
+  const handlePrintReport = async () => {
+    setDownloadingPdf(true)
+    try {
+      const blob = await api(`/reports/export/pdf?type=daily&date=${date}`)
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      iframe.src = url
+      document.body.appendChild(iframe)
+      iframe.onload = () => {
+        iframe.contentWindow.focus()
+        iframe.contentWindow.print()
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe)
+          }
+          URL.revokeObjectURL(url)
+        }, 60000)
+      }
+    } catch (e) {
+      toast(e.message || "PDF chop etishda xatolik", 'error')
+    } finally {
+      setDownloadingPdf(false)
+    }
   }
 
   const load = useCallback(async () => {

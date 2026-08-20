@@ -95,6 +95,39 @@ async def send_telegram_message(text: str, section: str = "system"):
         logger.error("Telegram xabar xato: %s", e)
 
 
+async def send_telegram_document(document_bytes: bytes, filename: str, caption: str = "", section: str = "reports"):
+    chat_ids = _target_chat_ids()
+    if not settings.BOT_TOKEN:
+        logger.warning("Telegram sozlanmagan")
+        return
+    url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/sendDocument"
+    topic_key = TOPIC_MAP.get(section)
+    topic_id = getattr(settings, topic_key, None) if topic_key else None
+    try:
+        targets: list[tuple[str, int | None]] = []
+        parsed_topic = int(topic_id) if str(topic_id).strip().isdigit() else None
+        for cid in chat_ids:
+            targets.append((cid, parsed_topic))
+        for linked in resolve_targets(section):
+            if linked not in targets:
+                targets.append(linked)
+        if not targets:
+            logger.warning("Telegram target topilmadi: section=%s", section)
+            return
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for chat_id, thread_id in targets:
+                data = {"chat_id": chat_id, "caption": caption[:1024]}
+                if thread_id:
+                    data["message_thread_id"] = str(thread_id)
+                files = {"document": (filename, document_bytes, "application/pdf")}
+                resp = await client.post(url, data=data, files=files)
+                if resp.status_code >= 400:
+                    logger.error("Telegram document yuborilmadi (%s): %s", resp.status_code, resp.text[:300])
+    except Exception as e:
+        logger.error("Telegram document xato: %s", e)
+
+
 def send_telegram_background(text: str, section: str = "system") -> None:
     """Telegram xabarini alohida fon oqimida (daemon thread) yuboradi.
     FastAPI API javobi telegram sababli 1 millisekund ham ushlanib qolmaydi!

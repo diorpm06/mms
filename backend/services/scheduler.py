@@ -14,7 +14,7 @@ from services.finance import process_monthly_salaries, process_ten_day_payouts
 from services.reports_data import daily_report
 from services.salary_reminder import load_salary_reminder, save_salary_reminder, should_send_now
 from services.sheets_backup import sync_from_configured_url
-from services.telegram_notify import format_daily_message, send_telegram_message
+from services.telegram_notify import format_daily_message, send_telegram_document, send_telegram_message
 
 logger = logging.getLogger(__name__)
 scheduler = BackgroundScheduler()
@@ -73,7 +73,8 @@ def job_daily_report():
             saved.created_at = datetime.now()
 
         msg = format_daily_message(db)
-        _run_async(send_telegram_message(msg, section="reports"))
+        filename = f"Kunlik_Hisobot_{d.strftime('%d.%m.%Y')}.pdf"
+        _run_async(send_telegram_document(pdf_bytes, filename, caption=msg, section="reports"))
 
     _with_db(_job)
 

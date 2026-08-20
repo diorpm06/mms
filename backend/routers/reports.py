@@ -193,10 +193,17 @@ async def send_daily_telegram_report(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_or_ceo),
 ):
-    from services.telegram_notify import format_daily_message, send_telegram_message
-    msg = format_daily_message(db)
-    await send_telegram_message(msg, section="reports")
-    return {"message": "Kunlik hisobot Telegram botga muvaffaqiyatli uzatildi! 📤"}
+    from services.telegram_notify import format_daily_message, send_telegram_document
+    from services.export import export_pdf
+    from services.reports_data import get_report
+
+    today = date.today()
+    rep = get_report(db, today, today)
+    pdf_bytes = export_pdf(rep, title=f"Marjona Med — Kunlik Hisobot ({today.strftime('%d.%m.%Y')})")
+    msg = format_daily_message(db, today)
+    filename = f"Kunlik_Hisobot_{today.strftime('%d.%m.%Y')}.pdf"
+    await send_telegram_document(pdf_bytes, filename, caption=msg, section="reports")
+    return {"message": "Kunlik hisobot PDF fayli bilan birga Telegram botga muvaffaqiyatli uzatildi! 📤"}
 
 
 @router.get("/payouts")
