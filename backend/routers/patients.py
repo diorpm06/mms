@@ -885,9 +885,33 @@ def update_patient(
         if not new_services:
             raise HTTPException(status_code=400, detail="Kamida bitta xizmat bo'lishi kerak")
 
-        db.query(PatientService).filter(PatientService.patient_id == p.id).delete()
+        # Ilgari bu yerda hamma xizmat yozuvi O'CHIRILIB, qaytadan
+        # yaratilardi. Ikki jiddiy muammo bor edi:
+        #   1) Kurs yozuviga "keldi" tashrifi bog'langan bo'lsa (prepaid_from_id),
+        #      o'chirish tashqi kalitni buzardi va server 500 xato berardi —
+        #      ya'ni bugun kelgan bemorga yangi xizmat qo'shib bo'lmasdi.
+        #   2) O'chirilib qayta yaratilganda used_count nolga tushardi,
+        #      ya'ni bemorning kurs bo'yicha o'tgan kunlari yo'qolardi.
+        # Endi mavjud yozuv O'RNIDA yangilanadi.
+        mavjud = db.query(PatientService).filter(
+            PatientService.patient_id == p.id).all()
+
+        # Qaysi yozuvlarga tashrif bog'langan — ularni o'chirib bo'lmaydi
+        bogliq_idlar: set[int] = set()
+        if mavjud:
+            bogliq_idlar = {
+                r[0] for r in db.query(Patient.prepaid_from_id)
+                .filter(Patient.prepaid_from_id.in_([x.id for x in mavjud]))
+                .distinct().all() if r[0]
+            }
+
+        xizmat_boyicha: dict[int, list] = {}
+        for x in mavjud:
+            xizmat_boyicha.setdefault(x.service_id, []).append(x)
+
         raw_total = 0
         first_sid = None
+        saqlanadi: set[int] = set()
         for it in new_services:
             svc = db.query(Service).filter(Service.id == it["service_id"]).first()
             if not svc:
@@ -898,12 +922,43 @@ def update_patient(
             raw_total += line
             first_sid = first_sid or svc.id
             _kursmi = bool(it.get("is_course", False))
-            db.add(PatientService(
-                patient_id=p.id, service_id=svc.id,
-                quantity=qty, unit_price=int(unit), total_price=line,
-                is_course=_kursmi,
-                course_days=(it.get("course_days") or None) if _kursmi else None,
-            ))
+            _kunlar = (it.get("course_days") or None) if _kursmi else None
+
+            qator = next(
+                (x for x in xizmat_boyicha.get(svc.id, []) if x.id not in saqlanadi),
+                None,
+            )
+            if qator is not None:
+                qator.quantity = qty
+                qator.unit_price = int(unit)
+                qator.total_price = line
+                qator.is_course = _kursmi
+                qator.course_days = _kunlar
+                # Kun soni kamaytirilsa, berilgan seans undan oshib ketmasin
+                if int(qator.used_count or 0) > qty:
+                    qator.used_count = qty
+                saqlanadi.add(qator.id)
+            else:
+                db.add(PatientService(
+                    patient_id=p.id, service_id=svc.id,
+                    quantity=qty, unit_price=int(unit), total_price=line,
+                    is_course=_kursmi, course_days=_kunlar,
+                ))
+
+        # Ro'yxatdan chiqarilgan eski yozuvlar
+        for x in mavjud:
+            if x.id in saqlanadi:
+                continue
+            if x.id in bogliq_idlar:
+                nomi = db.query(Service.name).filter(
+                    Service.id == x.service_id).scalar() or "Xizmat"
+                raise HTTPException(
+                    status_code=400,
+                    detail=(f"\"{nomi}\" xizmatini ro'yxatdan olib tashlab "
+                            f"bo'lmaydi: bu xizmat bo'yicha allaqachon tashrif "
+                            f"qayd etilgan. Avval o'sha tashrifni bekor qiling."),
+                )
+            db.delete(x)
 
         p.service_id = first_sid
         # Chegirma xizmatlar jamidan oshmasin
