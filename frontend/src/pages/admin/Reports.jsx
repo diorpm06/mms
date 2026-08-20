@@ -25,6 +25,8 @@ export default function AdminReports() {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [serviceSearch, setServiceSearch] = useState('')
+  const [serviceDeptFilter, setServiceDeptFilter] = useState('all')
   const { chartAxis, chartGrid, chartGold, tooltipStyle } = useTheme()
   const toast = useToastStore((s) => s.add)
 
@@ -249,38 +251,142 @@ export default function AdminReports() {
 
       </div>
 
-      {/* Full Services Breakdown Table */}
-      <div className="card">
-        <h3 className="accent-value mb-4 font-bold text-sm uppercase tracking-wide">Barcha Xizmatlar Tushumi Ro'yxati</h3>
-        {services.length === 0 ? (
-          <p className="text-muted text-sm italic py-4 text-center">Ma'lumot topilmadi</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border text-gold font-bold text-left bg-surface-2">
-                  <th className="p-3">#</th>
-                  <th className="p-3">Xizmat Nomi</th>
-                  <th className="p-3 text-center">Mijozlar Soni</th>
-                  <th className="p-3 text-right">Jami Tushum</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {services.map((s, i) => (
-                  <tr key={i} className="hover:bg-surface-hover font-semibold">
-                    <td className="p-3 text-muted font-mono">#{i + 1}</td>
-                    <td className="p-3 text-body font-bold">{s.name}</td>
-                    <td className="p-3 text-center">
-                      <span className="badge badge-info">{s.count} nafar</span>
-                    </td>
-                    <td className="p-3 text-right font-mono font-bold text-emerald">{formatMoney(s.total)}</td>
-                  </tr>
+      {/* Full Services Breakdown Table — Grouped by Department with Search & Filters */}
+      {(() => {
+        const rawDepts = report.services_breakdown || []
+        const deptsList = rawDepts.map((d) => d.department || d.name).filter(Boolean)
+
+        const filteredDepts = rawDepts
+          .filter((d) => {
+            const deptName = d.department || d.name || ''
+            if (serviceDeptFilter !== 'all' && deptName !== serviceDeptFilter) return false
+            return true
+          })
+          .map((d) => {
+            const q = serviceSearch.toLowerCase()
+            const matchingSubServices = (d.services || []).filter((s) =>
+              !q || (s.service_name || s.name || '').toLowerCase().includes(q) || (d.department || d.name || '').toLowerCase().includes(q)
+            )
+
+            const finalSubServices = d.services && d.services.length > 0
+              ? matchingSubServices
+              : (!q || (d.name || '').toLowerCase().includes(q) ? [{ service_name: d.name, count: d.count, total: d.total }] : [])
+
+            return {
+              ...d,
+              filteredServices: finalSubServices,
+            }
+          })
+          .filter((d) => d.filteredServices.length > 0)
+
+        return (
+          <div className="card space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border/50 pb-3">
+              <div>
+                <h3 className="accent-value font-bold text-sm uppercase tracking-wide">
+                  🏢 Bo'limlar va Xizmatlar Tushumi (Tartiblangan)
+                </h3>
+                <p className="text-muted text-[11px]">
+                  Har bir bo'lim (Fizioterapiya, Laboratoriya, UZI, Ineksiya...) va uning ichidagi xizmatlar saralangan holatda
+                </p>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative min-w-[240px]">
+                <input
+                  type="text"
+                  placeholder="🔎 Xizmat yoki bo'lim nomi..."
+                  value={serviceSearch}
+                  onChange={(e) => setServiceSearch(e.target.value)}
+                  className="input-field text-xs py-1.5 pl-8 pr-8 w-full"
+                />
+                <span className="absolute left-2.5 top-2 text-muted text-xs">🔎</span>
+                {serviceSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setServiceSearch('')}
+                    className="absolute right-2.5 top-1.5 text-muted hover:text-rose-400 text-xs font-bold"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Department Filter Chips */}
+            {deptsList.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5 p-2 bg-surface-2/80 rounded-xl border border-border">
+                <span className="text-xs font-bold text-muted px-2">Bo'lim bo'yicha:</span>
+                {['all', ...deptsList].map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => setServiceDeptFilter(b)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      serviceDeptFilter === b
+                        ? 'bg-gold text-slate-950 shadow-md font-black'
+                        : 'bg-surface-1 text-muted hover:text-body hover:bg-surface-2 border border-border/40'
+                    }`}
+                  >
+                    {b === 'all' ? 'Barchasi' : b}
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
+
+            {filteredDepts.length === 0 ? (
+              <p className="text-muted text-sm italic py-6 text-center">Xizmatlar topilmadi</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-gold font-bold text-left bg-surface-2">
+                      <th className="p-2.5">Bo'lim / Xizmat Nomi</th>
+                      <th className="p-2.5 text-center">Mijozlar Soni</th>
+                      <th className="p-2.5 text-right">Jami Tushum</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredDepts.map((d) => (
+                      <Fragment key={d.department || d.name}>
+                        {/* Department Header Row */}
+                        <tr className="bg-surface-2/90 font-black border-t-2 border-gold/30">
+                          <td className="p-2.5 text-gold font-extrabold flex items-center gap-2 text-xs">
+                            <span className="text-sm">🏢</span>
+                            <span>{d.department || d.name}</span>
+                          </td>
+                          <td className="p-2.5 text-center font-mono">
+                            <span className="badge badge-info font-bold">{d.count} nafar</span>
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-black text-emerald text-xs">
+                            {formatMoney(d.total)}
+                          </td>
+                        </tr>
+
+                        {/* Nested Sub-Services Rows */}
+                        {d.filteredServices.map((s, idx) => (
+                          <tr key={`${d.department || d.name}-${s.service_name || s.name}-${idx}`} className="hover:bg-surface-hover font-semibold">
+                            <td className="p-2.5 pl-8 text-body flex items-center gap-2">
+                              <span className="text-muted text-[10px] font-mono">•</span>
+                              <span>{s.service_name || s.name}</span>
+                            </td>
+                            <td className="p-2.5 text-center font-mono text-muted">
+                              {s.count} nafar
+                            </td>
+                            <td className="p-2.5 text-right font-mono text-emerald font-bold">
+                              {formatMoney(s.total)}
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        )
+      })()}
 
       {/* Berilgan chegirmalar — sababi bilan */}
       {(report.discounts || []).length > 0 && (

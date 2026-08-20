@@ -304,6 +304,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
         )
 
     dept_map = {}
+    detailed_services_list = []
     for r in services_breakdown:
         s_name = r[0] or ""
         s_cat = r[1] or ""
@@ -313,12 +314,33 @@ def get_report(db: Session, start: date, end: date) -> dict:
 
         dept = _extract_department_name(s_name, s_cat, s_cab)
         if dept not in dept_map:
-            dept_map[dept] = {"name": dept, "count": 0, "total": 0}
+            dept_map[dept] = {
+                "department": dept,
+                "name": dept,
+                "count": 0,
+                "total": 0,
+                "services": [],
+            }
         dept_map[dept]["count"] += cnt
         dept_map[dept]["total"] += tot
+        dept_map[dept]["services"].append({
+            "service_name": s_name,
+            "name": s_name,
+            "count": cnt,
+            "total": tot,
+            "department": dept,
+        })
+        detailed_services_list.append({
+            "name": s_name,
+            "count": cnt,
+            "total": tot,
+            "department": dept,
+        })
 
     formatted_services = list(dept_map.values())
     formatted_services.sort(key=lambda x: x["total"], reverse=True)
+    for d in formatted_services:
+        d["services"].sort(key=lambda s: s["total"], reverse=True)
 
     if start == end:
         paper_shift_s = s - timedelta(hours=16)
