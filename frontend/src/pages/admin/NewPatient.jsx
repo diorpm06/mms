@@ -63,10 +63,11 @@ export default function NewPatient({ homePath = '/admin' }) {
   const [createdPatient, setCreatedPatient] = useState(null)
   const [expandedCat, setExpandedCat] = useState(null) // accordion
   const [splitSecond, setSplitSecond] = useState('card') // 'card' | 'qr'
-  // Chegirma qaysi xizmatdan olinishi — MAJBURIY tanlanadi.
-  // Ilgari standarti 'auto' edi va jimgina 1-xizmatga qo'llanardi;
-  // natijada chegirma noto'g'ri bo'limga tushib qolardi.
-  const [discountTargetServiceId, setDiscountTargetServiceId] = useState('')
+  // Chegirma qaysi xizmat(lar)dan olinishi — MAJBURIY belgilanadi.
+  // Ilgari faqat BITTA xizmat tanlanardi va chegirma o'sha xizmat narxidan
+  // oshib ketsa ortiqcha qismi yo'qolib, bemor ko'proq to'lardi. Endi bir
+  // nechta xizmat belgilanadi, chegirma ular orasida bo'linadi.
+  const [discountTargetIds, setDiscountTargetIds] = useState([])
   const [newRefModal, setNewRefModal] = useState(false)
   const [newRefForm, setNewRefForm] = useState({ full_name: '', phone: '' })
   const [savingRef, setSavingRef] = useState(false)
@@ -356,6 +357,22 @@ export default function NewPatient({ homePath = '/admin' }) {
   }
   const finalPrice = Math.max(0, totalBasePrice - computedDiscount)
 
+  // Chegirma belgilangan xizmatlar
+  const tanlangan = selectedServices.filter((s) => s.service_id)
+  const qatorNarxi = (s) => (Number(s.price) || 0) * (Number(s.quantity) || 1)
+  const nishonSummasi = tanlangan
+    .filter((s) => discountTargetIds.includes(String(s.service_id)))
+    .reduce((acc, s) => acc + qatorNarxi(s), 0)
+  // Chegirma belgilangan xizmatlar narxidan oshmasligi kerak
+  const nishonYetarli = nishonSummasi >= computedDiscount
+
+  const toggleDiscountTarget = (sid) => {
+    const k = String(sid)
+    setDiscountTargetIds((oldin) =>
+      oldin.includes(k) ? oldin.filter((x) => x !== k) : [...oldin, k]
+    )
+  }
+
   // Filter services by search query
   const filteredServices = services.filter((s) => {
     if (!serviceQuery.trim()) return true
@@ -422,19 +439,31 @@ export default function NewPatient({ homePath = '/admin' }) {
     // Chegirma bir nechta xizmat bo'lganda qaysi biriga tegishli ekani
     // aniq ko'rsatilishi shart — aks holda noto'g'ri bo'limga tushadi.
     const tanlanganXizmatlar = selectedServices.filter((x) => x.service_id)
-    if (computedDiscount > 0 && tanlanganXizmatlar.length > 1 && !discountTargetServiceId) {
-      toast("Chegirma qaysi xizmatdan olinishini tanlang", 'error')
-      return
+    const is100Percent = totalBasePrice > 0 && computedDiscount >= totalBasePrice
+
+    if (computedDiscount > 0 && tanlanganXizmatlar.length > 1) {
+      if (!is100Percent && discountTargetIds.length === 0) {
+        toast("Chegirma qaysi xizmat(lar)dan olinishini belgilang", 'error')
+        return
+      }
+      if (!is100Percent && !nishonYetarli) {
+        toast(
+          `Chegirma ${formatMoney(computedDiscount)}, belgilangan xizmatlar esa ` +
+          `${formatMoney(nishonSummasi)}. Yana xizmat belgilang.`,
+          'error'
+        )
+        return
+      }
     }
 
     if (computedDiscount > 0 && totalBasePrice > 0) {
       const pct = Math.round((computedDiscount / totalBasePrice) * 100)
       if (finalPrice <= 0) {
         if (!window.confirm(
-          `DIQQAT: chegirma butun summani qopladi.\n\n` +
+          `DIQQAT: chegirma 100% (butun summani qopladi).\n\n` +
           `Xizmatlar: ${formatMoney(totalBasePrice)}\n` +
           `Chegirma: -${formatMoney(computedDiscount)} (${pct}%)\n` +
-          `To'lanadigan: 0 so'm\n\n` +
+          `To'lanadigan: 0 so'm (Barcha xizmatlar 100% tekin)\n\n` +
           `Bemor bepul qabul qilinsinmi?`
         )) return
       } else if (pct >= 50) {
@@ -491,7 +520,9 @@ export default function NewPatient({ homePath = '/admin' }) {
       qr_amount: qrAmt,
       discount_amount: computedDiscount,
       discount_reason: computedDiscount > 0 ? form.discount_reason || 'Chegirma' : null,
-      discount_target_service_id: discountTargetServiceId ? Number(discountTargetServiceId) : null,
+      discount_target_service_ids: is100Percent
+        ? validServices.map((s) => Number(s.service_id))
+        : discountTargetIds.map(Number),
       services: validServices.map((s) => ({
         service_id: +s.service_id,
         provider_id: s.provider_id ? +s.provider_id : null,
@@ -1268,7 +1299,7 @@ export default function NewPatient({ homePath = '/admin' }) {
         <div className="border border-border rounded-xl p-3.5 bg-surface-2/20 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">🏷️ Chegirma / Aksiya</span>
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 flex-wrap">
               {['none', 'percent', 'amount'].map((t) => (
                 <button
                   key={t}
@@ -1281,6 +1312,28 @@ export default function NewPatient({ homePath = '/admin' }) {
                   {t === 'none' ? 'Chegirmasiz' : t === 'percent' ? 'Foiz (%)' : 'Summa (so\'m)'}
                 </button>
               ))}
+
+              <button
+                type="button"
+                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all border ${
+                  form.discount_type === 'percent' && String(form.discount_value) === '100'
+                    ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/30'
+                    : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
+                }`}
+                onClick={() => {
+                  setForm({
+                    ...form,
+                    discount_type: 'percent',
+                    discount_value: '100',
+                    discount_reason: form.discount_reason || '100% Bepul Qabul',
+                  })
+                  const tanlangan = selectedServices.filter((s) => s.service_id)
+                  setDiscountTargetIds(tanlangan.map((s) => String(s.service_id)))
+                }}
+                title="Barcha tanlangan xizmatlarga 100% bepul chegirma berish"
+              >
+                💯 100% Bepul (Tekin)
+              </button>
             </div>
           </div>
 
@@ -1313,32 +1366,85 @@ export default function NewPatient({ homePath = '/admin' }) {
                 </div>
               </div>
 
-              {/* Chegirma aynan qaysi xizmatga qo'llansin */}
-              {selectedServices.filter((s) => s.service_id).length > 1 && (
-                <div className="p-3 rounded-xl bg-cyan-950/50 border border-cyan-500/40 space-y-1.5">
-                  <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                    🎯 Chegirma qaysi xizmatdan ayirilsin? <span className="text-rose-400">*</span>
-                  </label>
-                  <select
-                    value={discountTargetServiceId}
-                    onChange={(e) => setDiscountTargetServiceId(e.target.value)}
-                    className="w-full input-field text-xs font-bold text-cyan-200 bg-surface border-cyan-500/50 cursor-pointer"
-                  >
-                    <option value="">— Tanlang (majburiy) —</option>
-                    {selectedServices.filter((s) => s.service_id).map((s) => {
+              {/* Chegirma qaysi xizmat(lar)dan ayirilsin — bir nechtasi belgilanadi */}
+              {tanlangan.length > 1 && (
+                <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/40 space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <label className="text-xs font-bold text-cyan-700 dark:text-cyan-300 flex items-center gap-1.5">
+                      🎯 Chegirma qaysi xizmatlardan ayirilsin? <span className="text-rose-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-500/30"
+                      onClick={() =>
+                        setDiscountTargetIds(
+                          discountTargetIds.length === tanlangan.length
+                            ? []
+                            : tanlangan.map((s) => String(s.service_id))
+                        )
+                      }
+                    >
+                      {discountTargetIds.length === tanlangan.length ? 'Belgilashni bekor qilish' : 'Hammasini belgilash'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    {tanlangan.map((s, idx) => {
                       const svcObj = services.find((x) => String(x.id) === String(s.service_id))
                       if (!svcObj) return null
-                      const price = (Number(s.price) || svcObj.price) * (Number(s.quantity) || 1)
+                      const narx = qatorNarxi(s)
+                      const belgilangan = discountTargetIds.includes(String(s.service_id))
                       return (
-                        <option key={svcObj.id} value={svcObj.id}>
-                          {svcObj.name} ({formatMoney(price)})
-                        </option>
+                        <button
+                          key={`${s.service_id}-${idx}`}
+                          type="button"
+                          onClick={() => toggleDiscountTarget(s.service_id)}
+                          className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border text-xs font-bold transition-all ${
+                            belgilangan
+                              ? 'bg-cyan-600 border-cyan-700 text-white shadow-sm'
+                              : 'bg-surface-2 border-border text-body hover:border-cyan-500/50'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2 text-left">
+                            <span className={`h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center text-[10px] ${
+                              belgilangan ? 'bg-white border-white text-cyan-700' : 'border-muted'
+                            }`}>
+                              {belgilangan ? '✓' : ''}
+                            </span>
+                            <span>{svcObj.name}</span>
+                          </span>
+                          <span className="font-mono shrink-0">{formatMoney(narx)}</span>
+                        </button>
                       )
                     })}
-                  </select>
-                  <p className="text-[10px] text-cyan-400 font-medium">
-                    💡 Tanlash majburiy. Har bir xizmat o'z bo'limi bo'yicha alohida yozuv bo'ladi —
-                    chegirma qaysi biriga tegishli ekani aniq bo'lishi kerak.
+                  </div>
+
+                  {/* Yetadimi — darhol ko'rinadi */}
+                  <div className={`text-[11px] font-bold rounded-lg px-2.5 py-2 ${
+                    discountTargetIds.length === 0
+                      ? 'bg-surface-2 text-muted'
+                      : nishonYetarli
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                  }`}>
+                    {discountTargetIds.length === 0 ? (
+                      <>Kamida bitta xizmat belgilang</>
+                    ) : (
+                      <>
+                        Belgilangan: {formatMoney(nishonSummasi)} &nbsp;•&nbsp;
+                        Chegirma: {formatMoney(computedDiscount)}
+                        {nishonYetarli ? (
+                          <> &nbsp;•&nbsp; yetadi ✓</>
+                        ) : (
+                          <> &nbsp;•&nbsp; {formatMoney(computedDiscount - nishonSummasi)} yetmayapti — yana xizmat belgilang</>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <p className="text-[10px] text-cyan-700/80 dark:text-cyan-400 font-medium">
+                    💡 Har bir xizmat o'z bo'limi bo'yicha alohida yozuv bo'ladi. Chegirma
+                    belgilangan xizmatlar orasida narx ulushiga qarab bo'linadi.
                   </p>
                 </div>
               )}

@@ -11,6 +11,7 @@ from database import get_db
 from models.patient import Patient
 from models.provider import Provider, ProviderService
 from models.service import Service
+from models.transaction import Transaction
 from models.user import User
 
 router = APIRouter(prefix="/api/queue", tags=["queue"])
@@ -371,6 +372,38 @@ def get_doctor_queue(
     is_paused = DOCTOR_PAUSE_STATE.get(pause_key, False)
     is_shift_closed = DOCTOR_SHIFT_CLOSED_STATE.get(pause_key, False)
 
+    today_kpi_earned = 0
+    today_gross_revenue = 0
+    kpi_breakdown = []
+    if provider:
+        today_txs = (
+            db.query(Transaction)
+            .options(joinedload(Transaction.patient).joinedload(Patient.service))
+            .filter(
+                Transaction.provider_id == provider.id,
+                Transaction.is_cancelled == False,
+                Transaction.created_at >= start,
+                Transaction.created_at <= end,
+            )
+            .order_by(Transaction.created_at.desc())
+            .all()
+        )
+        for t in today_txs:
+            p_obj = t.patient
+            earned = int(t.provider_amount or 0)
+            today_kpi_earned += earned
+            today_gross_revenue += int(t.total_amount or 0)
+            if p_obj:
+                kpi_breakdown.append({
+                    "patient_id": p_obj.id,
+                    "patient_name": f"{p_obj.first_name} {p_obj.last_name}".strip(),
+                    "ticket_number": p_obj.ticket_number or f"A-{p_obj.id:03d}",
+                    "service_name": p_obj.service.name if p_obj.service else "Xizmat",
+                    "total_amount": int(t.total_amount or 0),
+                    "provider_amount": earned,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                })
+
     return {
         "user_id": user.id,
         "doctor_name": provider.full_name if provider else user.full_name,
@@ -384,6 +417,11 @@ def get_doctor_queue(
             "skipped": skipped_today,
             "waiting": len(waiting_list),
             "total_today": len(patients),
+            "today_kpi_earned": today_kpi_earned,
+            "today_gross_revenue": today_gross_revenue,
+            "current_balance": int(provider.balance or 0) if provider else 0,
+            "kpi_percentage": int(provider.percentage or 0) if provider else 0,
+            "kpi_breakdown": kpi_breakdown,
         },
         "current_patient": current_patient,
         "waiting_list": waiting_list,

@@ -1,24 +1,42 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Printer, RefreshCw, FileText } from 'lucide-react'
 import { api } from '../../utils/api'
 import { useToastStore } from '../../store/toastStore'
 import { PageHeader, Icons } from '../../components/UIKit'
+import { playNotificationSound } from '../../utils/sound'
 
 export default function AdminReportQueue() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
   const toast = useToastStore((s) => s.add)
+  const prevCountRef = useRef(null)
 
-  const load = () => {
-    setLoading(true)
+  const load = (silent = false) => {
+    if (!silent) setLoading(true)
     api('/report-submissions/pending')
-      .then((res) => setItems(res || []))
-      .catch((e) => toast(e.message || 'Yuklashda xatolik', 'error'))
-      .finally(() => setLoading(false))
+      .then((res) => {
+        const newItems = res || []
+        if (prevCountRef.current !== null && newItems.length > prevCountRef.current) {
+          playNotificationSound('doctor_submit')
+          toast('🔔 Shifokor yangi shablon natijasini yubordi!')
+        }
+        prevCountRef.current = newItems.length
+        setItems(newItems)
+      })
+      .catch((e) => {
+        if (!silent) toast(e.message || 'Yuklashda xatolik', 'error')
+      })
+      .finally(() => {
+        if (!silent) setLoading(false)
+      })
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    const interval = setInterval(() => load(true), 4000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleViewPdf = async (report) => {
     setBusyId(report.id)

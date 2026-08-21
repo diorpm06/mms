@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 import re
@@ -263,7 +263,13 @@ class PatientCreate(BaseModel):
     qr_amount: Optional[int] = Field(default=0, ge=0)
     discount_amount: Optional[int] = Field(default=0, ge=0)
     discount_reason: Optional[str] = None
+    # Chegirma qaysi xizmat(lar)dan ayirilsin.
+    # Ilgari faqat BITTA xizmat tanlanardi va chegirma o'sha xizmat narxidan
+    # oshib ketsa, ortiqcha qismi yo'qolib, bemor ko'proq to'lardi.
+    # Endi bir nechta xizmat belgilanadi va chegirma ular orasida ulushga
+    # qarab bo'linadi. Eski (bitta) maydon moslik uchun qoldirilgan.
     discount_target_service_id: Optional[int] = None
+    discount_target_service_ids: Optional[List[int]] = None
     custom_date: Optional[date] = None
     is_paper_entry: Optional[bool] = False
     confirm_duplicate: Optional[bool] = False

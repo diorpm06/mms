@@ -92,6 +92,19 @@ export default function Layout({ role }) {
     sessionStorage.setItem(scrollKey, String(el.scrollTop))
   }
 
+  const [unreadChatCount, setUnreadChatCount] = useState(0)
+
+  useEffect(() => {
+    const fetchUnread = () => {
+      api('/chat/unread-count')
+        .then((res) => setUnreadChatCount(res?.unread || 0))
+        .catch(() => {})
+    }
+    fetchUnread()
+    const interval = setInterval(fetchUnread, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
   const SidebarContent = () => (
     <div className="sidebar flex h-full w-64 flex-col p-4">
       <div
@@ -155,10 +168,16 @@ export default function Layout({ role }) {
         <button
           type="button"
           onClick={() => setChatOpen(!chatOpen)}
-          className="btn-gold flex-1 py-2 text-xs font-bold flex items-center justify-center gap-1 shadow-md"
-          title="Klinika Chat"
+          className="btn-gold flex-1 py-2 text-xs font-bold flex items-center justify-center gap-1 shadow-md relative"
+          title="Klinika Telegram Chat"
         >
-          <MessageSquare className="h-4 w-4" /> Chat
+          <MessageSquare className="h-4 w-4" />
+          <span>Chat</span>
+          {unreadChatCount > 0 && (
+            <span className="badge badge-danger text-[10px] font-mono font-black px-1.5 py-0.2 rounded-full animate-bounce">
+              {unreadChatCount}
+            </span>
+          )}
         </button>
         <button
           type="button"
@@ -213,6 +232,19 @@ export default function Layout({ role }) {
           </button>
           <span className="font-extrabold text-sm text-gold">{BRAND.name}</span>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setChatOpen(!chatOpen)}
+              className="p-2 rounded-xl text-cyan-400 hover:bg-cyan-500/10 relative"
+              title="Klinika Chat"
+            >
+              <MessageSquare className="h-5 w-5" />
+              {unreadChatCount > 0 && (
+                <span className="absolute -top-1 -right-1 badge badge-danger text-[9px] font-mono font-black px-1.5 py-0.2 rounded-full">
+                  {unreadChatCount}
+                </span>
+              )}
+            </button>
             <NotificationBell />
             <button type="button" onClick={handleLogout} className="text-rose-400 p-1">
               <LogOut className="h-5 w-5" />
@@ -229,6 +261,20 @@ export default function Layout({ role }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setChatOpen(!chatOpen)}
+              className="btn-outline py-1 px-3 text-xs font-bold flex items-center gap-1.5 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 relative"
+              title="Klinika Telegram Chat"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span>Telegram Chat</span>
+              {unreadChatCount > 0 && (
+                <span className="badge badge-danger text-[9px] font-mono font-black px-1.5 py-0.2 rounded-full">
+                  {unreadChatCount}
+                </span>
+              )}
+            </button>
             <NotificationBell />
           </div>
         </header>

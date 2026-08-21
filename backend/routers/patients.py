@@ -331,12 +331,52 @@ def today_patients(db: Session = Depends(get_db), _: User = Depends(require_doct
     return [_patient_row(p) for p in patients]
 
 
+def _build_patient_search_query(q_builder, raw_search: str):
+    search_str = raw_search.strip()
+    if not search_str:
+        return q_builder
+
+    term = f"%{search_str}%"
+
+    full_name_1 = func.concat(Patient.first_name, " ", Patient.last_name)
+    full_name_2 = func.concat(Patient.last_name, " ", Patient.first_name)
+
+    conditions = [
+        Patient.first_name.ilike(term),
+        Patient.last_name.ilike(term),
+        Patient.phone.ilike(term),
+        Patient.ticket_number.ilike(term),
+        Patient.address.ilike(term),
+        full_name_1.ilike(term),
+        full_name_2.ilike(term),
+    ]
+
+    words = [w for w in search_str.split() if len(w) > 1]
+    if len(words) > 1:
+        word_conditions = []
+        for w in words:
+            wt = f"%{w}%"
+            fn2 = func.concat(Patient.first_name, " ", Patient.last_name)
+            word_conditions.append(
+                or_(
+                    Patient.first_name.ilike(wt),
+                    Patient.last_name.ilike(wt),
+                    Patient.phone.ilike(wt),
+                    Patient.ticket_number.ilike(wt),
+                    fn2.ilike(wt),
+                )
+            )
+        conditions.append(and_(*word_conditions))
+
+    return q_builder.filter(or_(*conditions))
+
+
 @router.get("")
 def search_patients(
     search: str = "",
     include_cancelled: bool = False,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin_or_ceo),
+    _: User = Depends(require_doctor_or_admin_or_ceo),
 ):
     q = db.query(Patient).options(
         joinedload(Patient.referrer),
@@ -347,47 +387,42 @@ def search_patients(
     if not include_cancelled:
         q = q.filter(Patient.is_cancelled == False)
     if search.strip():
-        term = f"%{search.strip()}%"
-        q = q.filter(
-            or_(
-                Patient.first_name.ilike(term),
-                Patient.last_name.ilike(term),
-                Patient.phone.ilike(term),
-            )
-        )
-    patients = q.order_by(Patient.created_at.desc()).limit(100).all()
+        q = _build_patient_search_query(q, search)
+
+    patients = q.order_by(Patient.created_at.desc()).limit(150).all()
     return [_patient_row(p) for p in patients]
+
+
+@router.get("/search")
+def search_patients_alias(
+    q: str = "",
+    search: str = "",
+    db: Session = Depends(get_db),
+    _: User = Depends(require_doctor_or_admin_or_ceo),
+):
+    term = (q or search).strip()
+    return search_patients(search=term, include_cancelled=True, db=db, _=_)
 
 
 @router.get("/autocomplete")
 def autocomplete_patients(
     q: str = "",
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin_or_ceo),
+    _: User = Depends(require_doctor_or_admin_or_ceo),
 ):
     query_str = q.strip()
     if not query_str or len(query_str) < 2:
         return []
 
-    term = f"%{query_str}%"
-    filters = [
-        Patient.first_name.ilike(term),
-        Patient.last_name.ilike(term),
-        Patient.phone.ilike(term),
-        Patient.address.ilike(term),
-    ]
+    q_builder = db.query(Patient).filter(Patient.is_cancelled == False)
+    q_builder = _build_patient_search_query(q_builder, query_str)
 
-    # If query is a 4-digit birth year (e.g. 1995)
     if query_str.isdigit() and len(query_str) == 4:
         from sqlalchemy import extract
-        filters.append(extract("year", Patient.birth_date) == int(query_str))
+        q_builder = q_builder.filter(extract("year", Patient.birth_date) == int(query_str))
 
     patients = (
-        db.query(Patient)
-        .filter(
-            Patient.is_cancelled == False,
-            or_(*filters),
-        )
+        q_builder
         .order_by(Patient.created_at.desc())
         .limit(60)
         .all()
@@ -619,6 +654,42 @@ async def create_patient(
     _allocated_discount = 0
     _allocated_cash = 0
 
+    # ── Chegirma qaysi xizmatlardan ayirilishi ─────────────────────────
+    # Ilgari faqat BITTA xizmat tanlanardi. Chegirma o'sha xizmat narxidan
+    # katta bo'lsa (masalan 20,000 lik xizmatga 100,000 chegirma), ortiqcha
+    # qismi hech qayerga tushmasdan yo'qolardi — natijada bemordan ekranda
+    # ko'rsatilgandan ko'proq pul olinardi. Endi bir nechta xizmat
+    # belgilanadi va chegirma ular orasida narx ulushiga qarab bo'linadi.
+    nishon_idlar = set(data.discount_target_service_ids or [])
+    if not nishon_idlar and data.discount_target_service_id:
+        nishon_idlar = {data.discount_target_service_id}
+
+    # 100% chegirma bo'lsa yoki chegirma xizmatlari ko'rsatilmassa — barcha tanlangan xizmatlarga taqsimlanadi
+    if not nishon_idlar or (total_raw_price > 0 and discount_total >= total_raw_price):
+        nishon_idlar = {it["service_id"] for it in items_detail}
+
+    # Belgilangan xizmatlarning guruh bo'yicha summasi
+    _nishon_summa: dict[int, int] = {}
+    for _gi, (_k, _d) in enumerate(_groups):
+        s = sum(it["price"] for it in _d["items"]
+                if it["service_id"] in nishon_idlar)
+        if s > 0:
+            _nishon_summa[_gi] = s
+    _jami_nishon = sum(_nishon_summa.values())
+    _oxirgi_nishon = max(_nishon_summa) if _nishon_summa else None
+
+    # Belgilangan xizmatlar narxidan ortiq chegirma berib bo'lmaydi —
+    # aks holda ortiqcha qism jimgina yo'qolardi.
+    if discount_total > 0 and _jami_nishon > 0 and discount_total > _jami_nishon:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Chegirma ({discount_total:,} so'm) belgilangan xizmatlar "
+                f"summasidan ({_jami_nishon:,} so'm) katta. Yana xizmat "
+                f"belgilang yoki chegirmani kamaytiring."
+            ),
+        )
+
     for _gidx, (dep_key, dep_data) in enumerate(_groups):
         _is_last_group = _gidx == len(_groups) - 1
         group_items = dep_data["items"]
@@ -652,16 +723,20 @@ async def create_patient(
             initial_queue_status = "yakunlandi"
 
         group_raw_price = sum(it["price"] for it in group_items)
-        target_sid = data.discount_target_service_id
 
         if total_raw_price > 0 and discount_total > 0:
-            if target_sid:
-                group_has_target = any(it["service_id"] == target_sid for it in group_items)
-                if group_has_target:
-                    rem_disc = max(0, discount_total - _allocated_discount)
-                    group_discount = min(rem_disc, group_raw_price)
-                else:
+            if _jami_nishon > 0:
+                # Belgilangan xizmatlar bor: chegirma ular orasida ulushga
+                # qarab bo'linadi. Oxirgi guruhga qoldiq beriladi, shunda
+                # yaxlitlash sababli bir necha so'm yo'qolmaydi.
+                nishon = _nishon_summa.get(_gidx, 0)
+                if nishon <= 0:
                     group_discount = 0
+                elif _gidx == _oxirgi_nishon:
+                    group_discount = max(0, discount_total - _allocated_discount)
+                else:
+                    group_discount = discount_total * nishon // _jami_nishon
+                group_discount = min(group_discount, nishon)
             else:
                 if _gidx == 0:
                     group_discount = min(discount_total, group_raw_price)

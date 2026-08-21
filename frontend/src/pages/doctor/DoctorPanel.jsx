@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../utils/api'
+import { playNotificationSound } from '../../utils/sound'
 import { useAuthStore } from '../../store/authStore'
 import { useNavigate, Link } from 'react-router-dom'
 import {
@@ -180,6 +181,49 @@ export default function DoctorPanel() {
   const [printableRecord, setPrintableRecord] = useState(null)
   const [medForm, setMedForm] = useState({ diagnosis: '', complaints: '', prescription: '' })
 
+  // Doctor KPI & Patient History Search Modals
+  const [kpiModal, setKpiModal] = useState(false)
+  const [historySearchModal, setHistorySearchModal] = useState(false)
+  const [historyQuery, setHistoryQuery] = useState('')
+  const [historyResults, setHistoryResults] = useState([])
+  const [searchingHistory, setSearchingHistory] = useState(false)
+  const [selectedHistoryPatient, setSelectedHistoryPatient] = useState(null)
+  const [patientVisits, setPatientVisits] = useState([])
+  const [loadingVisits, setLoadingVisits] = useState(false)
+
+  // Audio Sound Notifications
+  const prevWaitingCountRef = useRef(null)
+
+  const handleSearchPatientHistory = async (q) => {
+    setHistoryQuery(q)
+    if (!q || q.trim().length < 2) {
+      setHistoryResults([])
+      return
+    }
+    setSearchingHistory(true)
+    try {
+      const res = await api(`/patients/search?q=${encodeURIComponent(q.trim())}`)
+      setHistoryResults(res || [])
+    } catch (_) {
+      setHistoryResults([])
+    } finally {
+      setSearchingHistory(false)
+    }
+  }
+
+  const handleOpenPatientVisits = async (p) => {
+    setSelectedHistoryPatient(p)
+    setLoadingVisits(true)
+    try {
+      const res = await api(`/patients/${p.id}/visits`)
+      setPatientVisits(res || [])
+    } catch (_) {
+      setPatientVisits([])
+    } finally {
+      setLoadingVisits(false)
+    }
+  }
+
   // Fetch Providers list for CEO/Admin selection
   const fetchProviders = async () => {
     try {
@@ -218,6 +262,16 @@ export default function DoctorPanel() {
   useEffect(() => {
     fetchDrafts()
   }, [])
+
+  useEffect(() => {
+    if (data?.stats?.waiting !== undefined) {
+      if (prevWaitingCountRef.current !== null && data.stats.waiting > prevWaitingCountRef.current) {
+        playNotificationSound('patient_added')
+        showToast('🔔 Yangi bemor navbatga qo\'shildi!')
+      }
+      prevWaitingCountRef.current = data.stats.waiting
+    }
+  }, [data?.stats?.waiting])
 
   useEffect(() => {
     if (!isManagement || selectedProviderId) {
@@ -651,6 +705,17 @@ export default function DoctorPanel() {
         icon={<Stethoscope className="h-6 w-6 text-gold" />}
       >
         <div className="flex flex-wrap items-center gap-2">
+          {/* Patient History Search Button */}
+          <Btn
+            variant="outline"
+            size="sm"
+            icon={<Search className="h-4 w-4 text-cyan-400" />}
+            onClick={() => setHistorySearchModal(true)}
+            className="font-bold border-cyan-500/40 hover:bg-cyan-500/10 text-cyan-400"
+          >
+            🔍 Bemorlar Tarixini Izlash
+          </Btn>
+
           {/* Work Shift Close / Open Button */}
           <Btn
             variant={data?.is_shift_closed ? 'success' : 'danger'}
@@ -691,34 +756,74 @@ export default function DoctorPanel() {
         </div>
       )}
 
-      {/* ── TOP KPI STATS ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card p-4 border-emerald-500/30 bg-emerald-500/5">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 block mb-1">
+      {/* ── TOP RICH KPI STATS ── */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        {/* KPI EARNINGS CARD */}
+        <div 
+          onClick={() => setKpiModal(true)} 
+          className="card p-3.5 border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500 transition-all cursor-pointer group shadow-sm flex flex-col justify-between"
+          title="Bugungi ishlangan KPI ulush pullarini ko'rish uchun bosing"
+        >
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+              💵 Bugungi KPI Pulim
+            </span>
+            <span className="badge badge-emerald text-[10px] font-extrabold px-1.5 py-0.5">
+              {stats?.kpi_percentage || 0}% KPI
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-xl font-black font-mono text-emerald-400">
+              {(stats?.today_kpi_earned || 0).toLocaleString()} <span className="text-xs font-normal">so'm</span>
+            </span>
+            <span className="text-[10px] font-bold text-emerald-400/80 group-hover:underline flex items-center gap-0.5">
+              Batafsil ➔
+            </span>
+          </div>
+        </div>
+
+        {/* GROSS REVENUE CARD */}
+        <div className="card p-3.5 border-cyan-500/30 bg-cyan-500/5 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-400 block mb-1">
+            💰 Bugungi Umumiy Tushum
+          </span>
+          <span className="text-xl font-black font-mono text-cyan-400">
+            {(stats?.today_gross_revenue || 0).toLocaleString()} <span className="text-xs font-normal">so'm</span>
+          </span>
+        </div>
+
+        {/* ACCUMULATED BALANCE CARD */}
+        <div className="card p-3.5 border-gold/40 bg-gold/5 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-gold block mb-1">
+            🏦 Joriy Balansim
+          </span>
+          <span className="text-xl font-black font-mono text-gold">
+            {(stats?.current_balance || 0).toLocaleString()} <span className="text-xs font-normal">so'm</span>
+          </span>
+        </div>
+
+        {/* COMPLETED COUNT */}
+        <div className="card p-3.5 border-emerald-500/20 bg-surface-2 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block mb-1">
             ✓ Yakunlangan Qabullar
           </span>
-          <span className="text-2xl font-black font-mono text-emerald-400">{stats?.completed || 0} ta</span>
+          <span className="text-xl font-black font-mono text-emerald-400">{stats?.completed || 0} ta</span>
         </div>
 
-        <div className="card p-4 border-gold/30 bg-gold/5">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-gold block mb-1">
+        {/* WAITING COUNT */}
+        <div className="card p-3.5 border-amber-500/20 bg-surface-2 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block mb-1">
             ⏳ Navbatda Kutayotganlar
           </span>
-          <span className="text-2xl font-black font-mono text-gold">{stats?.waiting || 0} ta</span>
+          <span className="text-xl font-black font-mono text-amber-400">{stats?.waiting || 0} ta</span>
         </div>
 
-        <div className="card p-4 border-rose-500/30 bg-rose-500/5">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-400 block mb-1">
-            ⏭ O'tkazib Yuborilgan
-          </span>
-          <span className="text-2xl font-black font-mono text-rose-400">{stats?.skipped || 0} ta</span>
-        </div>
-
-        <div className="card p-4 border-cyan-500/30 bg-cyan-500/5">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-400 block mb-1">
+        {/* TOTAL TODAY COUNT */}
+        <div className="card p-3.5 border-purple-500/20 bg-surface-2 col-span-2 md:col-span-1 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block mb-1">
             👥 Bugungi Jami Bemorlar
           </span>
-          <span className="text-2xl font-black font-mono text-cyan-400">{stats?.total_today || 0} ta</span>
+          <span className="text-xl font-black font-mono text-purple-400">{stats?.total_today || 0} ta</span>
         </div>
       </div>
 
@@ -1259,6 +1364,209 @@ export default function DoctorPanel() {
               {consuming ? "Saqlanmoqda..." : "✓ Ishlatishni Tasdiqlash"}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* ── MODAL 4: DOCTOR KPI EARNINGS BREAKDOWN ── */}
+      <Modal
+        open={kpiModal}
+        onClose={() => setKpiModal(false)}
+        title={`💵 Bugungi Ishlangan KPI Pullari — [ Dr. ${doctor_name || 'Shifokor'} ]`}
+        size="lg"
+      >
+        <div className="space-y-4 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-surface-2 rounded-2xl border border-emerald-500/30">
+            <div>
+              <span className="text-[10px] font-bold text-muted block">Bugungi Jami KPI Ulushi:</span>
+              <span className="text-lg font-black font-mono text-emerald-400">
+                {(stats?.today_kpi_earned || 0).toLocaleString()} so'm
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-muted block">Joriy Balans (Yig'ilgan):</span>
+              <span className="text-lg font-black font-mono text-gold">
+                {(stats?.current_balance || 0).toLocaleString()} so'm
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-muted block">KPI Stavka:</span>
+              <span className="badge badge-emerald text-xs font-black font-mono mt-1">
+                {stats?.kpi_percentage || 0}% Ulush
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-extrabold text-xs text-body mb-2 flex items-center justify-between">
+              <span>📋 Bugungi Bemordan Kelgan KPI Pullari Taqsimoti:</span>
+              <span className="text-[11px] text-muted font-bold">Jami {stats?.kpi_breakdown?.length || 0} ta tranzaksiya</span>
+            </h4>
+
+            {(!stats?.kpi_breakdown || stats.kpi_breakdown.length === 0) ? (
+              <EmptyState icon="💵" message="Bugun hali KPI hisoblangan tranzaksiyalar yo'q" />
+            ) : (
+              <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                {stats.kpi_breakdown.map((item, idx) => (
+                  <div key={idx} className="p-3 rounded-xl bg-surface-2 border border-border flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="badge badge-gold font-mono text-[10px] font-black">{item.ticket_number}</span>
+                        <span className="font-extrabold text-xs text-body truncate">{item.patient_name}</span>
+                      </div>
+                      <p className="text-[11px] text-muted font-medium mt-1">
+                        🩺 {item.service_name} • Jami to'lov: <strong className="text-body font-mono font-bold">{item.total_amount.toLocaleString()} so'm</strong>
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-black font-mono text-emerald-400">
+                        + {item.provider_amount.toLocaleString()} so'm
+                      </span>
+                      <p className="text-[10px] text-muted font-mono">
+                        {item.created_at ? item.created_at.split('T')[1]?.substring(0, 5) : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-border flex justify-end">
+            <Btn variant="ghost" icon={<X className="h-4 w-4" />} onClick={() => setKpiModal(false)}>
+              Yopish
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── MODAL 5: PATIENT HISTORY SEARCH & TIMELINE ── */}
+      <Modal
+        open={historySearchModal}
+        onClose={() => {
+          setHistorySearchModal(false)
+          setSelectedHistoryPatient(null)
+        }}
+        title="🔍 Bemorlar Tarixini Izlash va Tashriflar Arxivi"
+        size="xl"
+      >
+        <div className="space-y-4 text-xs">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted" />
+            <input
+              type="text"
+              className="input-field pl-10 text-xs font-bold"
+              placeholder="Bemor ismi, familiyasi yoki telefon raqami bo'yicha izlang..."
+              value={historyQuery}
+              onChange={(e) => handleSearchPatientHistory(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          {selectedHistoryPatient ? (
+            /* Selected Patient Visits Timeline */
+            <div className="space-y-3">
+              <div className="p-3 bg-surface-2 rounded-xl border border-cyan-500/40 flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-black text-cyan-400 flex items-center gap-2">
+                    👤 {selectedHistoryPatient.first_name} {selectedHistoryPatient.last_name}
+                  </h4>
+                  <p className="text-xs text-muted font-semibold mt-0.5">
+                    📱 {selectedHistoryPatient.phone || "Telefon yo'q"} • 📅 Tug'ilgan sana: {selectedHistoryPatient.birth_date || "Ko'rsatilmadi"}
+                  </p>
+                </div>
+                <Btn
+                  variant="outline"
+                  size="xs"
+                  icon={<ArrowLeft className="h-3.5 w-3.5" />}
+                  onClick={() => setSelectedHistoryPatient(null)}
+                >
+                  ← Qidiruvga Qaytish
+                </Btn>
+              </div>
+
+              <div>
+                <h5 className="font-extrabold text-xs text-body mb-2">📜 Bemorning Barcha Tashriflari Tarixi:</h5>
+                {loadingVisits ? (
+                  <div className="py-8 text-center text-muted font-bold">Tashriflar tarixi yuklanmoqda...</div>
+                ) : patientVisits.length === 0 ? (
+                  <EmptyState icon="📜" message="Ushbu bemorning ilgarigi tashriflari topilmadi" />
+                ) : (
+                  <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
+                    {patientVisits.map((v, vIdx) => (
+                      <div key={v.id || vIdx} className="p-3.5 rounded-2xl bg-surface-2 border border-border space-y-2">
+                        <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="badge badge-gold font-mono font-bold text-[10px]">
+                              📅 {v.created_at ? v.created_at.split('T')[0] : '—'} ({v.created_at ? v.created_at.split('T')[1]?.substring(0, 5) : ''})
+                            </span>
+                            <span className="font-extrabold text-xs text-body">
+                              🩺 {v.service_name || "Tibbiy Xizmat"}
+                            </span>
+                          </div>
+                          <span className="font-mono font-extrabold text-emerald-400 text-xs">
+                            {v.payment_amount?.toLocaleString()} so'm ({v.payment_type})
+                          </span>
+                        </div>
+
+                        {/* Medical Details */}
+                        {v.diagnosis && (
+                          <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20 text-amber-300 text-xs font-semibold">
+                            <strong className="text-amber-400 font-extrabold">Qo'yilgan Tashxis (Diagnos):</strong> {v.diagnosis}
+                          </div>
+                        )}
+
+                        {v.complaints && (
+                          <div className="text-xs text-muted">
+                            <strong className="text-body font-bold">Shikoyatlar:</strong> {v.complaints}
+                          </div>
+                        )}
+
+                        {v.prescription && (
+                          <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-300 text-xs font-mono font-medium">
+                            <strong className="text-emerald-400 font-sans font-bold">Tayinlangan Retsept:</strong> {v.prescription}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Search Results List */
+            <div>
+              {searchingHistory ? (
+                <div className="py-8 text-center text-muted font-bold">Qidirilmoqda...</div>
+              ) : historyResults.length === 0 ? (
+                historyQuery.length >= 2 ? (
+                  <EmptyState icon="🔍" message="Bemorlar topilmadi" />
+                ) : (
+                  <p className="text-center text-muted italic py-6">Izlash uchun kamida 2 ta harf kiriting...</p>
+                )
+              ) : (
+                <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                  {historyResults.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => handleOpenPatientVisits(p)}
+                      className="p-3 rounded-xl bg-surface-2 border border-border hover:border-gold/50 cursor-pointer flex items-center justify-between gap-3 transition-all"
+                    >
+                      <div>
+                        <h4 className="font-extrabold text-xs text-body">{p.first_name} {p.last_name}</h4>
+                        <p className="text-[11px] text-muted font-semibold mt-0.5">
+                          📱 {p.phone || "Telefon yo'q"} • 🏠 {p.address || "Manzil ko'rsatilmadi"}
+                        </p>
+                      </div>
+                      <Btn variant="gold" size="xs" icon={<FileText className="h-3.5 w-3.5" />}>
+                        Tashriflar Tarixi ➔
+                      </Btn>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>
