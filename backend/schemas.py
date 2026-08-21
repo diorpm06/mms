@@ -268,6 +268,17 @@ class PatientCreate(BaseModel):
     is_paper_entry: Optional[bool] = False
     confirm_duplicate: Optional[bool] = False
 
+    @field_validator("referrer_id", "provider_id", "service_id", mode="before")
+    @classmethod
+    def sanitize_id_zero(cls, v):
+        if v == 0 or v == "0" or v == "" or v is None:
+            return None
+        try:
+            val = int(v)
+            return val if val > 0 else None
+        except Exception:
+            return None
+
     @field_validator("birth_date")
     @classmethod
     def validate_birth_date(cls, v: date) -> date:

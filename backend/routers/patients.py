@@ -155,6 +155,17 @@ class PatientUpdate(BaseModel):
     discount_reason: str | None = None
     reason: str = Field(min_length=3)
 
+    @field_validator("referrer_id", "provider_id", "service_id", mode="before")
+    @classmethod
+    def sanitize_id_zero(cls, v):
+        if v == 0 or v == "0" or v == "" or v is None:
+            return None
+        try:
+            val = int(v)
+            return val if val > 0 else None
+        except Exception:
+            return None
+
     @field_validator("payment_type")
     @classmethod
     def validate_payment_type(cls, v):
@@ -860,10 +871,10 @@ def update_patient(
     # tahrirlashda esa yo'q edi: mavjud bo'lmagan yo'naltiruvchi bazani
     # "foreign key" xatosi bilan yiqitardi, shifokor esa jimgina yozilib,
     # bemor yo'q doktorga biriktirilardi.
-    if data.referrer_id:
+    if data.referrer_id is not None:
         if not db.query(Referrer).filter(Referrer.id == data.referrer_id).first():
             raise HTTPException(status_code=400, detail="Yo'naltiruvchi topilmadi")
-    if data.provider_id:
+    if data.provider_id is not None:
         if not db.query(Provider).filter(Provider.id == data.provider_id).first():
             raise HTTPException(status_code=400, detail="Shifokor topilmadi")
 

@@ -188,7 +188,7 @@ export default function TodayPatients() {
           birth_date: editForm.birth_date || null,
           phone: editForm.phone?.trim() || null,
           address: editForm.address?.trim() || null,
-          referrer_id: editForm.referrer_id ? Number(editForm.referrer_id) : null,
+          referrer_id: (editForm.referrer_id && Number(editForm.referrer_id) > 0) ? Number(editForm.referrer_id) : null,
           payment_type: editForm.payment_type,
           discount_amount: discAmt,
           discount_reason: editForm.discount_reason?.trim() || null,
