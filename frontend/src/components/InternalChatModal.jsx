@@ -92,7 +92,8 @@ export default function InternalChatModal({ open, onClose }) {
           content: input.trim(),
         }),
       })
-      playNotificationSound('chat_send')
+      // Yuboruvchida ovoz chalinmaydi — u xabarni o'zi yozgan, ogohlantirish
+      // kerak emas. Ovoz faqat QABUL QILUVCHIDA chalinadi.
       setInput('')
       loadMessages()
       loadChannels()
