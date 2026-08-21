@@ -664,9 +664,10 @@ async def create_patient(
     if not nishon_idlar and data.discount_target_service_id:
         nishon_idlar = {data.discount_target_service_id}
 
-    # 100% chegirma bo'lsa yoki chegirma xizmatlari ko'rsatilmassa — barcha tanlangan xizmatlarga taqsimlanadi
+    # Xizmat belgilanmagan bo'lsa yoki chegirma butun summani qoplasa —
+    # hamma xizmatga taqsimlanadi (bunda tanlashning ma'nosi qolmaydi).
     if not nishon_idlar or (total_raw_price > 0 and discount_total >= total_raw_price):
-        nishon_idlar = {it["service_id"] for it in items_detail}
+        nishon_idlar = {it["service_id"] for it in service_items}
 
     # Belgilangan xizmatlarning guruh bo'yicha summasi
     _nishon_summa: dict[int, int] = {}
@@ -957,10 +958,23 @@ def update_patient(
     updates = data.model_dump(exclude_unset=True, exclude={"reason"})
     new_services = updates.pop("services", None)
 
+    # Bu ustunlar bazada BO'SH BO'LMASLIGI shart (NOT NULL). Tahrirlash
+    # oynasi to'ldirilmagan maydonni `null` qilib yuboradi — natijada
+    # saqlash "serverda xatolik" bilan yiqilardi. Eng ko'p uchragan holat:
+    # familiyasi yo'q bemorga (masalan "Rustamboy") yo'naltiruvchi qo'shish.
+    # Bo'sh qiymat NULL emas, bo'sh satr bo'lib saqlanadi.
+    for maydon in ("first_name", "last_name", "phone", "address"):
+        if maydon in updates and updates[maydon] is None:
+            updates[maydon] = ""
+
     # Tahrirlashda ham ism-familiya bosh harf bilan saqlanadi
     for nom_maydoni in ("first_name", "last_name"):
-        if updates.get(nom_maydoni):
-            updates[nom_maydoni] = ism_tuzat(updates[nom_maydoni])
+        if nom_maydoni in updates:
+            updates[nom_maydoni] = ism_tuzat(updates[nom_maydoni]) or ""
+
+    # Ismsiz bemor bo'lmaydi (familiya bo'lmasligi mumkin)
+    if "first_name" in updates and not updates["first_name"]:
+        raise HTTPException(status_code=400, detail="Ism bo'sh bo'lishi mumkin emas")
 
     for k, v in updates.items():
         setattr(p, k, v)

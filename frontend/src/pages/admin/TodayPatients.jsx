@@ -184,10 +184,13 @@ export default function TodayPatients() {
         method: 'PUT',
         body: JSON.stringify({
           first_name: editForm.first_name.trim(),
-          last_name: editForm.last_name?.trim() || null,
+          // Bu maydonlar bazada bo'sh bo'lishi mumkin, lekin NULL emas.
+          // Ilgari null yuborilardi va familiyasi yo'q bemorni saqlashda
+          // server xato berardi.
+          last_name: editForm.last_name?.trim() || '',
           birth_date: editForm.birth_date || null,
-          phone: editForm.phone?.trim() || null,
-          address: editForm.address?.trim() || null,
+          phone: editForm.phone?.trim() || '',
+          address: editForm.address?.trim() || '',
           referrer_id: (editForm.referrer_id && Number(editForm.referrer_id) > 0) ? Number(editForm.referrer_id) : null,
           payment_type: editForm.payment_type,
           discount_amount: discAmt,
