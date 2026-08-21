@@ -62,6 +62,7 @@ const AdminReports = safeLazy(() => import('./pages/admin/Reports'))
 const TvQueueDisplay = safeLazy(() => import('./pages/TvQueueDisplay'))
 const DoctorPanel = safeLazy(() => import('./pages/doctor/DoctorPanel'))
 const DoctorResults = safeLazy(() => import('./pages/doctor/MyResults'))
+const DoctorProfile = safeLazy(() => import('./pages/doctor/MyProfile'))
 const Courses = safeLazy(() => import('./pages/admin/Courses'))
 const Appointments = safeLazy(() => import('./pages/admin/Appointments'))
 const Inventory = safeLazy(() => import('./pages/admin/Inventory'))
@@ -135,6 +136,7 @@ function AppRoutes() {
         <Route path="/doctor" element={<DoctorLayout />}>
           <Route index element={<DoctorPanel />} />
           <Route path="natijalar" element={<DoctorResults />} />
+          <Route path="profil" element={<DoctorProfile />} />
         </Route>
         <Route path="/ceo" element={<CeoLayout />}>
           <Route index element={<CeoDashboard />} />

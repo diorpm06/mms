@@ -183,7 +183,7 @@ export default function DoctorPanel() {
   const [medForm, setMedForm] = useState({ diagnosis: '', complaints: '', prescription: '' })
 
   // Doctor KPI & Patient History Search Modals
-  const [kpiModal, setKpiModal] = useState(false)
+  // KPI oynasi olib tashlandi — pul ma'lumotlari "Profilim" bo'limida
   const [historySearchModal, setHistorySearchModal] = useState(false)
   const [historyQuery, setHistoryQuery] = useState('')
   const [historyResults, setHistoryResults] = useState([])
@@ -758,52 +758,11 @@ export default function DoctorPanel() {
         </div>
       )}
 
-      {/* ── TOP RICH KPI STATS ── */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        {/* KPI EARNINGS CARD */}
-        <div 
-          onClick={() => setKpiModal(true)} 
-          className="card p-3.5 border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500 transition-all cursor-pointer group shadow-sm flex flex-col justify-between"
-          title="Bugungi ishlangan KPI ulush pullarini ko'rish uchun bosing"
-        >
-          <div className="flex items-center justify-between gap-1 mb-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-              💵 Bugungi KPI Pulim
-            </span>
-            <span className="badge badge-emerald text-[10px] font-extrabold px-1.5 py-0.5">
-              {stats?.kpi_percentage || 0}% KPI
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-xl font-black font-mono text-emerald-400">
-              {(stats?.today_kpi_earned || 0).toLocaleString()} <span className="text-xs font-normal">so'm</span>
-            </span>
-            <span className="text-[10px] font-bold text-emerald-400/80 group-hover:underline flex items-center gap-0.5">
-              Batafsil ➔
-            </span>
-          </div>
-        </div>
-
-        {/* GROSS REVENUE CARD */}
-        <div className="card p-3.5 border-cyan-500/30 bg-cyan-500/5 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-400 block mb-1">
-            💰 Bugungi Umumiy Tushum
-          </span>
-          <span className="text-xl font-black font-mono text-cyan-400">
-            {(stats?.today_gross_revenue || 0).toLocaleString()} <span className="text-xs font-normal">so'm</span>
-          </span>
-        </div>
-
-        {/* ACCUMULATED BALANCE CARD */}
-        <div className="card p-3.5 border-gold/40 bg-gold/5 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-gold block mb-1">
-            🏦 Joriy Balansim
-          </span>
-          <span className="text-xl font-black font-mono text-gold">
-            {(stats?.current_balance || 0).toLocaleString()} <span className="text-xs font-normal">so'm</span>
-          </span>
-        </div>
-
+      {/* ── NAVBAT KO'RSATKICHLARI ──
+          KPI, tushum va balans kartochkalari bu yerdan olib tashlandi —
+          ular endi "Profilim" bo'limida. Bemor qabul paytida ekranga
+          qarasa pul raqamlari ko'rinib qolmasligi uchun. */}
+      <div className="grid grid-cols-3 gap-3">
         {/* COMPLETED COUNT */}
         <div className="card p-3.5 border-emerald-500/20 bg-surface-2 shadow-sm flex flex-col justify-between">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block mb-1">
@@ -821,7 +780,7 @@ export default function DoctorPanel() {
         </div>
 
         {/* TOTAL TODAY COUNT */}
-        <div className="card p-3.5 border-purple-500/20 bg-surface-2 col-span-2 md:col-span-1 shadow-sm flex flex-col justify-between">
+        <div className="card p-3.5 border-purple-500/20 bg-surface-2 shadow-sm flex flex-col justify-between">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block mb-1">
             👥 Bugungi Jami Bemorlar
           </span>
@@ -1365,78 +1324,6 @@ export default function DoctorPanel() {
             >
               {consuming ? "Saqlanmoqda..." : "✓ Ishlatishni Tasdiqlash"}
             </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ── MODAL 4: DOCTOR KPI EARNINGS BREAKDOWN ── */}
-      <Modal
-        open={kpiModal}
-        onClose={() => setKpiModal(false)}
-        title={`💵 Bugungi Ishlangan KPI Pullari — [ Dr. ${doctor_name || 'Shifokor'} ]`}
-        size="lg"
-      >
-        <div className="space-y-4 text-xs">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-surface-2 rounded-2xl border border-emerald-500/30">
-            <div>
-              <span className="text-[10px] font-bold text-muted block">Bugungi Jami KPI Ulushi:</span>
-              <span className="text-lg font-black font-mono text-emerald-400">
-                {(stats?.today_kpi_earned || 0).toLocaleString()} so'm
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-muted block">Joriy Balans (Yig'ilgan):</span>
-              <span className="text-lg font-black font-mono text-gold">
-                {(stats?.current_balance || 0).toLocaleString()} so'm
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-muted block">KPI Stavka:</span>
-              <span className="badge badge-emerald text-xs font-black font-mono mt-1">
-                {stats?.kpi_percentage || 0}% Ulush
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-extrabold text-xs text-body mb-2 flex items-center justify-between">
-              <span>📋 Bugungi Bemordan Kelgan KPI Pullari Taqsimoti:</span>
-              <span className="text-[11px] text-muted font-bold">Jami {stats?.kpi_breakdown?.length || 0} ta tranzaksiya</span>
-            </h4>
-
-            {(!stats?.kpi_breakdown || stats.kpi_breakdown.length === 0) ? (
-              <EmptyState icon="💵" message="Bugun hali KPI hisoblangan tranzaksiyalar yo'q" />
-            ) : (
-              <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-                {stats.kpi_breakdown.map((item, idx) => (
-                  <div key={idx} className="p-3 rounded-xl bg-surface-2 border border-border flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="badge badge-gold font-mono text-[10px] font-black">{item.ticket_number}</span>
-                        <span className="font-extrabold text-xs text-body truncate">{item.patient_name}</span>
-                      </div>
-                      <p className="text-[11px] text-muted font-medium mt-1">
-                        🩺 {item.service_name} • Jami to'lov: <strong className="text-body font-mono font-bold">{item.total_amount.toLocaleString()} so'm</strong>
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-sm font-black font-mono text-emerald-400">
-                        + {item.provider_amount.toLocaleString()} so'm
-                      </span>
-                      <p className="text-[10px] text-muted font-mono">
-                        {item.created_at ? item.created_at.split('T')[1]?.substring(0, 5) : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="pt-2 border-t border-border flex justify-end">
-            <Btn variant="ghost" icon={<X className="h-4 w-4" />} onClick={() => setKpiModal(false)}>
-              Yopish
-            </Btn>
           </div>
         </div>
       </Modal>

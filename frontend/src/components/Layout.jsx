@@ -48,10 +48,13 @@ const ADMIN_LINKS = [
   { to: '/admin/catalog',       label: "Ma'lumotnomalar",       icon: '📚' },
 ]
 
+// TV Navbat Ekrani shifokor menyusidan olib tashlandi — u kutish zali
+// uchun mo'ljallangan, shifokorga kerak emas. Pul ko'rsatkichlari esa
+// panel tepasidan "Profilim" bo'limiga ko'chirildi.
 const DOCTOR_LINKS = [
   { to: '/doctor',              label: 'Doctor Paneli',         icon: '🩺', end: true },
   { to: '/doctor/natijalar',    label: 'Natijalarim',           icon: '📋' },
-  { to: '/tv',                  label: 'TV Navbat Ekrani',      icon: '📺', external: true },
+  { to: '/doctor/profil',       label: 'Profilim',              icon: '👤' },
 ]
 
 
