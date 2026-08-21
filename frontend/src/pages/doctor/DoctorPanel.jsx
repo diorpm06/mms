@@ -106,6 +106,7 @@ export default function DoctorPanel() {
         method: 'POST',
         body: JSON.stringify({ ids: selectedDrafts }),
       })
+      playNotificationSound('doctor_submit')
       showToast(res.message || `${soni} ta natija yuborildi`)
       fetchDrafts()
     } catch (e) {
@@ -682,6 +683,7 @@ export default function DoctorPanel() {
                       method: 'POST',
                       body: JSON.stringify({ ids: [previewDraft.id] }),
                     })
+                    playNotificationSound('doctor_submit')
                     showToast(res.message || 'Yuborildi')
                     fetchDrafts()
                   } catch (e) {

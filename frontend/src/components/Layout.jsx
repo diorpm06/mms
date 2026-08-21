@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { Moon, Sun, LogOut, Menu, X, MessageSquare } from 'lucide-react'
 import { api } from '../utils/api'
+import { playNotificationSound, chatOvoziEndiginaChalindi } from '../utils/sound'
 import { useTheme } from '../hooks/useTheme'
 import NotificationBell from './NotificationBell'
 import InternalChatModal from './InternalChatModal'
@@ -93,11 +94,28 @@ export default function Layout({ role }) {
   }
 
   const [unreadChatCount, setUnreadChatCount] = useState(0)
+  const oldingiOqilmagan = useRef(null)
 
   useEffect(() => {
     const fetchUnread = () => {
       api('/chat/unread-count')
-        .then((res) => setUnreadChatCount(res?.unread || 0))
+        .then((res) => {
+          const soni = res?.unread || 0
+          // Chat YOPIQ bo'lsa ham yangi xabar kelganini eshittiramiz.
+          // Chat ochiq bo'lsa-yu, xabar BOSHQA suhbatga kelsa — chat
+          // oynasi uni sezmaydi, shuning uchun bu yerda chalinadi.
+          // Ochiq suhbatga kelgan xabarni chat oynasining o'zi chaladi;
+          // ikki marta chalinmasligi uchun oxirgi ovoz vaqti tekshiriladi.
+          if (
+            oldingiOqilmagan.current !== null &&
+            soni > oldingiOqilmagan.current &&
+            !chatOvoziEndiginaChalindi()
+          ) {
+            playNotificationSound('chat_receive')
+          }
+          oldingiOqilmagan.current = soni
+          setUnreadChatCount(soni)
+        })
         .catch(() => {})
     }
     fetchUnread()
