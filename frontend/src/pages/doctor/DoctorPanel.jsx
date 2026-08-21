@@ -61,7 +61,29 @@ export default function DoctorPanel() {
 
   // Doctors list for CEO/Admin selection
   const [providers, setProviders] = useState([])
-  const [selectedProviderId, setSelectedProviderId] = useState(null)
+  // Tanlangan shifokor sahifa yangilanganda ham eslab qolinadi. Ilgari u
+  // faqat komponent holatida turardi: CEO/Admin shifokorni tanlab ishlab
+  // turganda F5 bossa yoki sahifa qayta yuklansa, yana ro'yxat ekraniga
+  // qaytib ketardi. sessionStorage — faqat shu ilova oynasi uchun, ya'ni
+  // boshqa qurilma yoki yangi oynaga o'tmaydi.
+  const [selectedProviderId, setSelectedProviderId] = useState(() => {
+    try {
+      const saqlangan = sessionStorage.getItem('doctor-panel-provider')
+      return saqlangan ? Number(saqlangan) : null
+    } catch (_) {
+      return null
+    }
+  })
+
+  const shifokorniTanla = (id) => {
+    setSelectedProviderId(id)
+    try {
+      if (id) sessionStorage.setItem('doctor-panel-provider', String(id))
+      else sessionStorage.removeItem('doctor-panel-provider')
+    } catch (_) {
+      /* xotira ishlamasa ham panel ishlashda davom etadi */
+    }
+  }
   const [doctorSearch, setDoctorSearch] = useState('')
   const [liveQueueData, setLiveQueueData] = useState([])
 
@@ -496,7 +518,7 @@ export default function DoctorPanel() {
                 <div
                   key={prov.id}
                   className="card hover:border-gold/50 transition-all cursor-pointer flex flex-col justify-between p-5 space-y-4 group border-border shadow-md"
-                  onClick={() => setSelectedProviderId(prov.id)}
+                  onClick={() => shifokorniTanla(prov.id)}
                 >
                   <div>
                     {/* Header */}
@@ -548,7 +570,7 @@ export default function DoctorPanel() {
                     icon={Icons.user}
                     onClick={(e) => {
                       e.stopPropagation()
-                      setSelectedProviderId(prov.id)
+                      shifokorniTanla(prov.id)
                     }}
                     className="font-extrabold"
                   >
@@ -598,7 +620,7 @@ export default function DoctorPanel() {
               variant="outline"
               size="xs"
               icon={<ArrowLeft className="h-4 w-4" />}
-              onClick={() => setSelectedProviderId(null)}
+              onClick={() => shifokorniTanla(null)}
             >
               ← Shifokorlar Ro'yxatiga Qaytish
             </Btn>
@@ -612,7 +634,7 @@ export default function DoctorPanel() {
             <select
               className="input-field text-xs py-1.5 font-bold text-gold bg-surface-1 border-gold/40 max-w-[260px] rounded-xl shadow-sm"
               value={selectedProviderId || providers[0]?.id || ''}
-              onChange={(e) => setSelectedProviderId(+e.target.value)}
+              onChange={(e) => shifokorniTanla(+e.target.value)}
             >
               {(providers || []).map((p) => {
                 const displayName = p.full_name?.startsWith('Dr.') ? p.full_name : `Dr. ${p.full_name}`

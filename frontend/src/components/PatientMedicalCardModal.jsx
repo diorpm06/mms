@@ -5,6 +5,7 @@ import { formatMoney, formatDate } from '../utils/format'
 import ReRegisterPatientModal from './ReRegisterPatientModal'
 import PaymentTicketModal from './PaymentTicketModal'
 import LabResultsModal from './LabResultsModal'
+import PayUnpaidServicesModal from './PayUnpaidServicesModal'
 import { BRAND } from '../config/brand'
 
 export default function PatientMedicalCardModal({ patient, onClose }) {
@@ -13,6 +14,7 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
   const [activeTab, setActiveTab] = useState('ehr') // 'ehr' | 'visits'
   const [showReRegister, setShowReRegister] = useState(false)
   const [showLab, setShowLab] = useState(false)
+  const [showPayUnpaid, setShowPayUnpaid] = useState(false)
   const [newTicketPatient, setNewTicketPatient] = useState(null)
 
   const [ticketModalData, setTicketModalData] = useState(null)
@@ -406,7 +408,15 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
             Kartochka avtomatik saqlangan • <b>{BRAND.name}</b>
           </div>
 
-          <div className="flex gap-2 w-full sm:w-auto">
+          <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowPayUnpaid(true)}
+              className="px-4 py-2.5 rounded-xl bg-gold/20 border border-gold/40 text-gold font-black text-xs hover:bg-gold/30 flex items-center gap-1.5"
+            >
+              💳 Xizmatlar uchun to'lov (Chek)
+            </button>
+
             <button
               type="button"
               onClick={onClose}
@@ -426,6 +436,18 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
           </div>
         </div>
       </div>
+
+      {showPayUnpaid && (
+        <PayUnpaidServicesModal
+          open={showPayUnpaid}
+          patient={patient}
+          onClose={() => setShowPayUnpaid(false)}
+          onSuccess={() => {
+            setShowPayUnpaid(false)
+            fetchHistory()
+          }}
+        />
+      )}
 
       {showLab && (
         <LabResultsModal patient={patient} onClose={() => setShowLab(false)} />

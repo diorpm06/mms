@@ -2,7 +2,7 @@ import Modal from './Modal'
 import { formatMoney } from '../utils/format'
 import { Bed, UserCheck, Stethoscope, FileText, Calendar, CreditCard, PlusCircle, DollarSign, ShieldAlert } from 'lucide-react'
 
-export default function InpatientDetailsModal({ inpatient, onClose, onAddItem, onPay }) {
+export default function InpatientDetailsModal({ inpatient, onClose, onAddItem, onPay, onExtend }) {
   if (!inpatient) return null
 
   const items = inpatient.items || []
@@ -29,7 +29,16 @@ export default function InpatientDetailsModal({ inpatient, onClose, onAddItem, o
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {onExtend && (
+              <button
+                type="button"
+                onClick={onExtend}
+                className="btn-outline border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-xs py-1.5 px-3 font-bold flex items-center gap-1.5"
+              >
+                <Calendar className="h-4 w-4" /> 📅 Kun uzaytirish
+              </button>
+            )}
             {onAddItem && (
               <button
                 type="button"

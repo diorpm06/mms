@@ -6,6 +6,7 @@ import { useToastStore } from '../../store/toastStore'
 import PaymentTicketModal from '../../components/PaymentTicketModal'
 import PatientMedicalCardModal from '../../components/PatientMedicalCardModal'
 import ReRegisterPatientModal from '../../components/ReRegisterPatientModal'
+import PayUnpaidServicesModal from '../../components/PayUnpaidServicesModal'
 import { Btn, Icons, PageHeader, THead, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
 import ActionMenu from '../../components/ActionMenu'
 
@@ -55,6 +56,7 @@ export default function TodayPatients() {
   }
   const [ehrPatient, setEhrPatient] = useState(null)
   const [reRegisterPatient, setReRegisterPatient] = useState(null)
+  const [payUnpaidPatient, setPayUnpaidPatient] = useState(null)
   const [reissuingId, setReissuingId] = useState(null)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -662,6 +664,12 @@ export default function TodayPatients() {
                               variant: 'gold',
                               onClick: () => chekniBirlashtiribOch(p),
                             },
+                            {
+                              label: "💳 Xizmatlar uchun to'lov (Chek chiqarish)",
+                              icon: Icons.cash,
+                              variant: 'gold',
+                              onClick: () => setPayUnpaidPatient(p),
+                            },
                             p.queue_status !== 'qabulda' && p.queue_status !== 'yakunlandi' ? {
                               label: 'Xonaga chaqirish',
                               icon: Icons.bell,
@@ -1116,6 +1124,17 @@ export default function TodayPatients() {
             </div>
           </div>
         </div>
+      )}
+      {payUnpaidPatient && (
+        <PayUnpaidServicesModal
+          open={Boolean(payUnpaidPatient)}
+          patient={payUnpaidPatient}
+          onClose={() => setPayUnpaidPatient(null)}
+          onSuccess={() => {
+            setPayUnpaidPatient(null)
+            loadPatients()
+          }}
+        />
       )}
     </div>
   )

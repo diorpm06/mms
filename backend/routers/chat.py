@@ -172,9 +172,64 @@ def get_messages(
             "content": m.content,
             "created_at": m.created_at.isoformat(),
             "is_read": m.is_read,
+            "is_edited": getattr(m, 'is_edited', False) or False,
         }
         for m in messages
     ]
+
+
+class EditMessageBody(BaseModel):
+    content: str
+
+
+@router.put("/messages/{message_id}")
+def edit_message(
+    message_id: int,
+    body: EditMessageBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Xabarni tahrirlash (faqat o'zi yuborgan foydalanuvchi yoki CEO/Admin)."""
+    msg = db.query(ChatMessage).filter(ChatMessage.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Xabar topilmadi")
+
+    if msg.sender_id != current_user.id and current_user.role not in ["ceo", "admin"]:
+        raise HTTPException(status_code=403, detail="Faqat o'z xabaringizni tahrirlashingiz mumkin")
+
+    if not body.content or not body.content.strip():
+        raise HTTPException(status_code=400, detail="Xabar matni bo'sh bo'lishi mumkin emas")
+
+    msg.content = body.content.strip()
+    if hasattr(msg, 'is_edited'):
+        msg.is_edited = True
+    db.commit()
+    db.refresh(msg)
+    return {
+        "success": True,
+        "id": msg.id,
+        "content": msg.content,
+        "is_edited": True,
+    }
+
+
+@router.delete("/messages/{message_id}")
+def delete_message(
+    message_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Xabarni o'chirish. Bazadan ochirilgach ikkala tomondan ham avto yoqoladi."""
+    msg = db.query(ChatMessage).filter(ChatMessage.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Xabar topilmadi")
+
+    if msg.sender_id != current_user.id and current_user.role not in ["ceo", "admin"]:
+        raise HTTPException(status_code=403, detail="Faqat o'z xabaringizni o'chirishingiz mumkin")
+
+    db.delete(msg)
+    db.commit()
+    return {"success": True, "id": message_id}
 
 
 @router.post("/send")
@@ -204,6 +259,7 @@ def send_message(
         "content": msg.content,
         "created_at": msg.created_at.isoformat(),
         "is_read": msg.is_read,
+        "is_edited": False,
     }
 
 

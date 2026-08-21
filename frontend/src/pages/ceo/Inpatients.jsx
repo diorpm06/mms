@@ -42,6 +42,8 @@ export default function CeoInpatients() {
   const [dischargeModal, setDischargeModal] = useState(null)
   const [payModal, setPayModal] = useState(null)
   const [itemModal, setItemModal] = useState(null)
+  const [extendModal, setExtendModal] = useState(null)
+  const [extendDaysCount, setExtendDaysCount] = useState(1)
   const [selectedReceipt, setSelectedReceipt] = useState(null)
   const [viewPatientModal, setViewPatientModal] = useState(null)
 
@@ -405,6 +407,22 @@ export default function CeoInpatients() {
     }
   }
 
+  // Extend Inpatient Stay Duration (+ Days)
+  const handleExtendStay = async () => {
+    if (!extendModal || !extendDaysCount || +extendDaysCount <= 0) return
+    try {
+      await api(`/inpatients/${extendModal.id}/extend`, {
+        method: 'POST',
+        body: JSON.stringify({ additional_days: +extendDaysCount }),
+      })
+      toast(`Bemorning statsionar muddati +${extendDaysCount} kunga uzaytirildi!`)
+      setExtendModal(null)
+      loadData()
+    } catch (e) {
+      toast(e.message, 'error')
+    }
+  }
+
   // Cancel Inpatient Stay
   const handleCancelInpatient = async (id) => {
     const defaultReason = 'Sinov bemorini o\'chirish / Test'
@@ -595,6 +613,14 @@ export default function CeoInpatients() {
                         onClick: () => {
                           setItemForm({ item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false })
                           setItemModal(i)
+                        },
+                      },
+                      {
+                        label: '📅 Kun uzaytirish (+Kun qo\'shish)',
+                        variant: 'amber',
+                        onClick: () => {
+                          setExtendDaysCount(1)
+                          setExtendModal(i)
                         },
                       },
                       {
@@ -1641,8 +1667,100 @@ export default function CeoInpatients() {
             setPayForm({ amount: '', payment_type: 'cash', payment_stage: 'interim', days_count: 1, cash_amount: '', card_amount: '', click_amount: '', qr_amount: '' })
             setPayModal(p)
           }}
+          onExtend={() => {
+            const p = viewPatientModal
+            setViewPatientModal(null)
+            setExtendDaysCount(1)
+            setExtendModal(p)
+          }}
         />
       )}
+
+      {/* MODAL 6: EXTEND STAY (KUN UZAYTIRISH / KUN QO'SHISH) */}
+      <Modal open={!!extendModal} onClose={() => setExtendModal(null)} title="📅 Statsionar Muddatini Uzaytirish (Kun Qo'shish)">
+        {extendModal && (
+          <div className="space-y-4 pt-2 text-xs">
+            <div className="p-3.5 bg-amber-950/30 border border-amber-500/40 rounded-2xl space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-gold text-sm">{extendModal.first_name} {extendModal.last_name}</span>
+                <span className="badge badge-gold font-mono">{extendModal.room_number}/{extendModal.bed_number}</span>
+              </div>
+              <p className="text-muted text-xs">
+                Hozirgi muddat: <strong className="text-foreground">{extendModal.days || 1} kun</strong> (Reja: <strong className="text-cyan-300">{extendModal.planned_days || extendModal.days || 1} kun</strong>)
+              </p>
+              <p className="text-muted text-xs">
+                Kunlik koyka narxi: <strong className="text-gold font-mono">{formatMoney(extendModal.daily_rate)} / kun</strong>
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="form-label font-bold text-foreground">
+                Qancha kun qo'shmoqchisiz? (+ kun) *
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="1"
+                  max="180"
+                  className="input-field text-lg font-mono font-black text-amber-400 w-32 text-center"
+                  value={extendDaysCount}
+                  onChange={(e) => setExtendDaysCount(Math.max(1, +e.target.value || 1))}
+                  autoFocus
+                />
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 5, 7].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setExtendDaysCount(num)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                        extendDaysCount === num
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 font-black scale-105'
+                          : 'bg-surface-2 border-border text-muted hover:text-body'
+                      }`}
+                    >
+                      +{num} kun
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Calculations Preview */}
+            <div className="p-3.5 bg-surface-2/60 border border-border rounded-2xl space-y-1.5 font-mono">
+              <div className="flex justify-between text-muted">
+                <span>Eski reja muddat:</span>
+                <span>{extendModal.planned_days || extendModal.days || 1} kun</span>
+              </div>
+              <div className="flex justify-between text-amber-300 font-bold">
+                <span>Yangi reja muddat:</span>
+                <span>{(extendModal.planned_days || extendModal.days || 1) + (+extendDaysCount || 0)} kun</span>
+              </div>
+              <div className="flex justify-between pt-1.5 border-t border-border/60 text-foreground font-black text-sm">
+                <span>Qo'shimcha Palata Narxi:</span>
+                <span className="text-emerald-400">+{formatMoney(extendModal.daily_rate * (+extendDaysCount || 0))}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                className="btn-outline flex-1 py-2.5"
+                onClick={() => setExtendModal(null)}
+              >
+                Bekor qilish
+              </button>
+              <button
+                type="button"
+                className="btn-gold flex-1 py-2.5 font-black text-xs uppercase"
+                onClick={handleExtendStay}
+              >
+                ✓ Muddatni Uzaytirish (+{extendDaysCount} kun)
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

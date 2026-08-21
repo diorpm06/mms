@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Send, X, Search, ArrowLeft, Maximize2, Minimize2, CheckCheck, Users } from 'lucide-react'
+import { Send, X, Search, ArrowLeft, Maximize2, Minimize2, CheckCheck, Users, Pencil, Trash2, Edit3 } from 'lucide-react'
 import { api } from '../utils/api'
 import { useAuthStore } from '../store/authStore'
 import { playNotificationSound } from '../utils/sound'
@@ -16,8 +16,9 @@ export default function InternalChatModal({ open, onClose }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [editingMsg, setEditingMsg] = useState(null)
 
-  // Size modes: 'compact' (small) | 'standard' (medium) | 'large' (large) | 'fullscreen' (full screen)
+  // Size modes: 'compact' (420px) | 'standard' (720px) | 'large' (920px) | 'fullscreen'
   const [sizeMode, setSizeMode] = useState('standard')
 
   const messagesEndRef = useRef(null)
@@ -56,10 +57,9 @@ export default function InternalChatModal({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return
-    // Suhbat almashganda hisoblagich tozalanadi. Aks holda oldingi
-    // suhbatning xabar soni qolib, yangi suhbatda xabar ko'proq bo'lsa
-    // "yangi xabar keldi" ovozi bekorga chalinardi.
     prevMsgCountRef.current = null
+    setEditingMsg(null)
+    setInput('')
     loadChannels()
     if (selectedChannel) {
       loadMessages()
@@ -79,26 +79,54 @@ export default function InternalChatModal({ open, onClose }) {
     }
   }, [messages, open, selectedChannel])
 
+  const handleStartEdit = (m) => {
+    setEditingMsg(m)
+    setInput(m.content)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMsg(null)
+    setInput('')
+  }
+
+  const handleDeleteMessage = async (msgId) => {
+    if (!window.confirm("Ushbu xabar ikkala tomondan ham o'chirilsinmi?")) return
+    try {
+      await api(`/chat/messages/${msgId}`, { method: 'DELETE' })
+      setMessages((prev) => prev.filter((m) => m.id !== msgId))
+      loadMessages()
+      loadChannels()
+    } catch (e) {
+      alert(e.message || "Xabarni o'chirishda xatolik")
+    }
+  }
+
   const handleSend = async (e) => {
     e.preventDefault()
     if (!input.trim() || sending || !selectedChannel) return
     setSending(true)
     try {
-      const recipientId = selectedChannel.id === 'group' ? null : Number(selectedChannel.id)
-      await api('/chat/send', {
-        method: 'POST',
-        body: JSON.stringify({
-          recipient_id: recipientId,
-          content: input.trim(),
-        }),
-      })
-      // Yuboruvchida ovoz chalinmaydi — u xabarni o'zi yozgan, ogohlantirish
-      // kerak emas. Ovoz faqat QABUL QILUVCHIDA chalinadi.
+      if (editingMsg) {
+        await api(`/chat/messages/${editingMsg.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ content: input.trim() }),
+        })
+        setEditingMsg(null)
+      } else {
+        const recipientId = selectedChannel.id === 'group' ? null : Number(selectedChannel.id)
+        await api('/chat/send', {
+          method: 'POST',
+          body: JSON.stringify({
+            recipient_id: recipientId,
+            content: input.trim(),
+          }),
+        })
+      }
       setInput('')
       loadMessages()
       loadChannels()
     } catch (e) {
-      alert(e.message || 'Xabar yuborishda xatolik')
+      alert(e.message || 'Xatolik yuz berdi')
     } finally {
       setSending(false)
     }
@@ -120,7 +148,7 @@ export default function InternalChatModal({ open, onClose }) {
     return <span className="px-2 py-0.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 text-[10px] font-black">📢 Guruh</span>
   }
 
-  // Oyna hajmi rejimlari — kengliklar talabdagi aniq o'lchamlarda
+  // Oyna hajmi rejimlari
   let containerSizeClass = 'w-full max-w-[720px] h-[580px] bottom-4 right-4 sm:bottom-6 sm:right-6'
   if (sizeMode === 'compact') {
     containerSizeClass = 'w-full max-w-[420px] h-[480px] bottom-4 right-4'
@@ -144,12 +172,16 @@ export default function InternalChatModal({ open, onClose }) {
         <div className="flex items-center gap-2.5 min-w-0">
           {selectedChannel ? (
             <button
-              onClick={() => setSelectedChannel(null)}
+              onClick={() => {
+                setSelectedChannel(null)
+                setEditingMsg(null)
+                setInput('')
+              }}
               className="p-1.5 rounded-xl bg-surface border border-border hover:bg-gold/10 hover:border-gold/50 text-gold transition-all flex items-center gap-1 shrink-0 font-bold text-xs"
-              title="Boshqa profilni tanlash"
+              title="Profillar ro'yxatiga qaytish"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Boshqa profilni tanlash</span>
+              <span className="hidden sm:inline">Profillar</span>
             </button>
           ) : (
             <div className="p-2 rounded-xl bg-gold/10 text-gold border border-gold/30 shrink-0">
@@ -183,14 +215,13 @@ export default function InternalChatModal({ open, onClose }) {
 
         {/* WINDOW SIZE MODE SELECTOR & CLOSE BUTTON */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Quick Size Switcher */}
           <div className="hidden sm:flex items-center bg-surface p-1 rounded-xl border border-border gap-1">
             <button
               onClick={() => setSizeMode('compact')}
               className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold transition-all ${
                 sizeMode === 'compact' ? 'bg-gold text-surface-dark shadow' : 'text-muted hover:text-body'
               }`}
-              title="Kichik oyna (Compact)"
+              title="Kichik oyna (Compact: 420px)"
             >
               📱 Kichik
             </button>
@@ -199,7 +230,7 @@ export default function InternalChatModal({ open, onClose }) {
               className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold transition-all ${
                 sizeMode === 'standard' ? 'bg-gold text-surface-dark shadow' : 'text-muted hover:text-body'
               }`}
-              title="O'rtacha oyna (Standard)"
+              title="O'rtacha oyna (Standard: 720px)"
             >
               💻 O'rtacha
             </button>
@@ -208,7 +239,7 @@ export default function InternalChatModal({ open, onClose }) {
               className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold transition-all ${
                 sizeMode === 'large' ? 'bg-gold text-surface-dark shadow' : 'text-muted hover:text-body'
               }`}
-              title="Katta oyna (Large)"
+              title="Katta oyna (Large: 920px)"
             >
               🖥️ Katta
             </button>
@@ -270,12 +301,11 @@ export default function InternalChatModal({ open, onClose }) {
                   return (
                     <div
                       key={c.id}
-                      // loadMessages() bu yerda chaqirilardi, lekin u hali
-                      // ESKI selectedChannel ni ko'rardi (React holatni
-                      // darhol yangilamaydi) — ya'ni oldingi suhbat
-                      // xabarlarini tortib olardi. Xabarlarni quyidagi
-                      // useEffect o'zi yuklaydi.
-                      onClick={() => setSelectedChannel(c)}
+                      onClick={() => {
+                        setSelectedChannel(c)
+                        setEditingMsg(null)
+                        setInput('')
+                      }}
                       className={`p-3 rounded-2xl cursor-pointer transition-all border flex items-center justify-between gap-3 group shadow-sm ${
                         isSelected
                           ? 'bg-gold/15 border-gold/50 text-gold shadow-md'
@@ -306,11 +336,9 @@ export default function InternalChatModal({ open, onClose }) {
                             {getRoleBadge(c.role)}
                           </div>
 
-                          {/* Mutaxassislik / bo'lim — har doim ko'rinadi */}
                           <p className="text-[10px] text-muted truncate mt-0.5 font-medium">
                             {c.specialization || 'Xodim profili'}
                           </p>
-                          {/* Oxirgi xabar namunasi — alohida qatorda */}
                           <p className="text-[11px] truncate mt-0.5 font-medium">
                             {c.last_message && c.last_message !== "Xabarlar yo'q" ? (
                               <span className="text-body font-semibold">💬 {c.last_message}</span>
@@ -332,9 +360,6 @@ export default function InternalChatModal({ open, onClose }) {
                             {c.unread_count} yangi
                           </span>
                         )}
-                        {/* Ilgari bu faqat sichqoncha ustiga borganda
-                            ko'rinardi — sensorli ekranda "hover" bo'lmagani
-                            uchun tugma umuman chiqmasdi. Endi doim turadi. */}
                         <span className="text-[10px] text-gold font-bold whitespace-nowrap">
                           Yozish 💬 ➔
                         </span>
@@ -381,7 +406,11 @@ export default function InternalChatModal({ open, onClose }) {
 
               {/* Back to Profiles Button (Always visible on chat view) */}
               <button
-                onClick={() => setSelectedChannel(null)}
+                onClick={() => {
+                  setSelectedChannel(null)
+                  setEditingMsg(null)
+                  setInput('')
+                }}
                 className="px-3 py-1.5 rounded-xl bg-gold/10 border border-gold/30 text-gold hover:bg-gold/20 text-xs font-bold transition-all flex items-center gap-1.5"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
@@ -398,8 +427,9 @@ export default function InternalChatModal({ open, onClose }) {
               ) : (
                 messages.map((m) => {
                   const isMe = m.sender_id === userId
+                  const canManage = isMe || role === 'ceo' || role === 'admin'
                   return (
-                    <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                    <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group`}>
                       <div className="flex items-center gap-1.5 mb-1 px-1">
                         <span className="text-[10px] font-bold text-muted">
                           {m.sender_name}
@@ -407,20 +437,63 @@ export default function InternalChatModal({ open, onClose }) {
                         {getRoleBadge(m.sender_role)}
                       </div>
 
-                      <div
-                        className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-sm ${
-                          isMe
-                            ? 'bg-gradient-to-r from-gold to-amber-600 text-surface-dark font-bold rounded-br-none'
-                            : 'bg-surface border border-border text-body rounded-bl-none font-semibold'
-                        }`}
-                      >
-                        {m.content}
+                      <div className="flex items-center gap-1.5 max-w-[85%] group">
+                        {!isMe && canManage && (
+                          <div className="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            {isMe && (
+                              <button
+                                onClick={() => handleStartEdit(m)}
+                                className="p-1 rounded-lg bg-gold/10 hover:bg-gold/20 text-gold transition-all"
+                                title="Tahrirlash"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteMessage(m.id)}
+                              className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all"
+                              title="O'chirish (Ikkala tomondan ham yo'qoladi)"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+
+                        <div
+                          className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-sm ${
+                            isMe
+                              ? 'bg-gradient-to-r from-gold to-amber-600 text-surface-dark font-bold rounded-br-none'
+                              : 'bg-surface border border-border text-body rounded-bl-none font-semibold'
+                          }`}
+                        >
+                          {m.content}
+                        </div>
+
+                        {isMe && canManage && (
+                          <div className="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <button
+                              onClick={() => handleStartEdit(m)}
+                              className="p-1 rounded-lg bg-gold/10 hover:bg-gold/20 text-gold transition-all"
+                              title="Tahrirlash"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMessage(m.id)}
+                              className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all"
+                              title="O'chirish (Ikkala tomondan ham yo'qoladi)"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-1 mt-1 px-1 font-mono text-[9px] text-muted">
+                      <div className="flex items-center gap-1.5 mt-1 px-1 font-mono text-[9px] text-muted">
                         <span>
                           {m.created_at ? new Date(m.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
+                        {m.is_edited && <span className="text-[9px] text-gold italic font-sans">(tahrirlandi)</span>}
                         {isMe && <CheckCheck className="h-3 w-3 text-gold" />}
                       </div>
                     </div>
@@ -430,6 +503,23 @@ export default function InternalChatModal({ open, onClose }) {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Editing Bar Alert */}
+            {editingMsg && (
+              <div className="px-3 py-1.5 bg-gold/15 border-t border-gold/30 flex items-center justify-between text-xs text-gold font-bold">
+                <div className="flex items-center gap-2 truncate">
+                  <Edit3 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Xabarni tahrirlash: "{editingMsg.content}"</span>
+                </div>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-1 hover:bg-gold/20 rounded-lg transition-all shrink-0 ml-2"
+                  title="Tahrirlashni bekor qilish"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
             {/* Message Input Box */}
             <form
               onSubmit={handleSend}
@@ -438,7 +528,11 @@ export default function InternalChatModal({ open, onClose }) {
               <input
                 type="text"
                 className="input-field flex-1 text-xs py-2.5 font-semibold bg-surface-2"
-                placeholder={`${selectedChannel.name}ga xabar yozing...`}
+                placeholder={
+                  editingMsg
+                    ? 'Yangi tahrir matnini kiriting...'
+                    : `${selectedChannel.name}ga xabar yozing...`
+                }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 autoFocus
@@ -447,11 +541,11 @@ export default function InternalChatModal({ open, onClose }) {
                 type="submit"
                 variant="gold"
                 size="sm"
-                icon={<Send className="h-4 w-4" />}
+                icon={editingMsg ? <Pencil className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                 disabled={sending || !input.trim()}
                 loading={sending}
               >
-                Yuborish
+                {editingMsg ? 'Saqlash' : 'Yuborish'}
               </Btn>
             </form>
           </div>

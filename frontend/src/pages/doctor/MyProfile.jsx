@@ -62,22 +62,13 @@ export default function MyProfile() {
         <p className="text-muted text-sm">Yuklanmoqda...</p>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="card p-4 border-emerald-500/40 bg-emerald-500/5">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500 dark:text-emerald-400 block mb-1">
                 💵 Bugungi KPI pulim
               </span>
               <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
                 {formatMoney(stats?.today_kpi_earned || 0)}
-              </span>
-            </div>
-
-            <div className="card p-4 border-cyan-500/30 bg-cyan-500/5">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 block mb-1">
-                💰 Bugungi umumiy tushum
-              </span>
-              <span className="text-2xl font-black font-mono text-cyan-600 dark:text-cyan-400">
-                {formatMoney(stats?.today_gross_revenue || 0)}
               </span>
             </div>
 

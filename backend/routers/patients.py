@@ -1420,3 +1420,200 @@ def delete_patient(
     db.commit()
     return {"message": f"Bemor {p.first_name} {p.last_name} va uning barcha bog'liq qabullari ({len(related_patients)} ta xizmat) bazadan to'liq o'chirildi"}
 
+
+class PayUnpaidServicesBody(BaseModel):
+    patient_ids: list[int]
+    payment_type: str
+    cash_amount: Optional[int] = 0
+    card_amount: Optional[int] = 0
+    click_amount: Optional[int] = 0
+    qr_amount: Optional[int] = 0
+
+
+@router.get("/{patient_id}/unpaid-services")
+def get_unpaid_services(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Bemorning barcha nasiya/to'lanmagan xizmatlari ro'yxatini qaytaradi."""
+    target_patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not target_patient:
+        raise HTTPException(status_code=404, detail="Bemor topilmadi")
+
+    q = db.query(Patient).options(joinedload(Patient.service), joinedload(Patient.provider)).filter(
+        Patient.is_cancelled == False,
+        Patient.payment_type.in_(["later", "keyinroq", "nasiya", "qarz"]),
+    )
+    if target_patient.phone and len(target_patient.phone.strip()) > 3:
+        q = q.filter(
+            or_(
+                Patient.id == target_patient.id,
+                Patient.phone == target_patient.phone,
+            )
+        )
+    else:
+        q = q.filter(
+            or_(
+                Patient.id == target_patient.id,
+                and_(
+                    Patient.first_name == target_patient.first_name,
+                    Patient.last_name == target_patient.last_name,
+                ),
+            )
+        )
+
+    unpaid = q.order_by(Patient.created_at.desc()).all()
+    res = []
+    for p in unpaid:
+        svc_name = p.service.name if p.service else "Tibbiy Xizmat"
+        svc_cat = p.service.category if p.service else "Umumiy"
+        prov_name = p.provider.full_name if p.provider else "Shifokor"
+        res.append({
+            "id": p.id,
+            "first_name": p.first_name,
+            "last_name": p.last_name,
+            "phone": p.phone,
+            "service_id": p.service_id,
+            "service_name": svc_name,
+            "category": svc_cat,
+            "provider_name": prov_name,
+            "amount": p.payment_amount or 0,
+            "registered_at": p.created_at.isoformat() if p.created_at else None,
+            "payment_type": p.payment_type,
+        })
+    return res
+
+
+@router.post("/{patient_id}/pay-services")
+def pay_unpaid_services(
+    patient_id: int,
+    body: PayUnpaidServicesBody,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    """
+    Nasiya/kechiktirilgan xizmatlar uchun to'lovni bugungi sana bilan qabul qilish,
+    to'lov kuni (BUGUN) UZI va xizmatlar hisobotlarida to'liq ko'rinishini ta'minlash hamda chek berish.
+    """
+    if not body.patient_ids:
+        raise HTTPException(status_code=400, detail="Kamida bitta to'lanadigan xizmatni tanlang")
+
+    ptype = body.payment_type.lower()
+    ruxsat = ("cash", "card", "click", "qr", "naqd", "karta", "payme", "split", "aralash")
+    if ptype not in ruxsat:
+        raise HTTPException(status_code=400, detail="Noto'g'ri to'lov turi")
+
+    target_patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not target_patient:
+        raise HTTPException(status_code=404, detail="Bemor topilmadi")
+
+    selected_records = (
+        db.query(Patient)
+        .options(joinedload(Patient.service), joinedload(Patient.provider))
+        .filter(Patient.id.in_(body.patient_ids), Patient.is_cancelled == False)
+        .all()
+    )
+
+    if not selected_records:
+        raise HTTPException(status_code=404, detail="Tanlangan xizmat yozuvlari topilmadi")
+
+    total_amount = sum(p.payment_amount or 0 for p in selected_records)
+    now = datetime.now()
+
+    _allocated_cash = 0
+    paid_details = []
+
+    for idx, p in enumerate(selected_records):
+        p_price = p.payment_amount or 0
+        p_cash = 0
+        p_card = 0
+        p_click = 0
+        p_qr = 0
+
+        if ptype in ("cash", "naqd"):
+            p_cash = p_price
+        elif ptype in ("click", "payme"):
+            p_click = p_price
+        elif ptype == "qr":
+            p_qr = p_price
+        elif ptype in ("split", "aralash"):
+            ratio = (p_price / total_amount) if total_amount > 0 else 1.0
+            if idx == len(selected_records) - 1:
+                p_cash = max(0, (body.cash_amount or 0) - _allocated_cash)
+            else:
+                p_cash = int(round(((body.cash_amount or 0) * ratio) / 100) * 100)
+            p_cash = min(p_cash, p_price)
+            _allocated_cash += p_cash
+
+            noncash = max(0, p_price - p_cash)
+            req_click = body.click_amount or 0
+            req_qr = body.qr_amount or 0
+            req_noncash = (body.card_amount or 0) + req_click + req_qr
+            if req_noncash > 0 and (req_click or req_qr):
+                p_click = int(noncash * req_click / req_noncash)
+                p_qr = int(noncash * req_qr / req_noncash)
+                p_card = max(0, noncash - p_click - p_qr)
+            else:
+                p_card = noncash
+        else:
+            p_card = p_price
+
+        # Update created_at timestamp to TODAY (Payment Date)
+        p.payment_type = ptype
+        p.cash_amount = p_cash
+        p.card_amount = p_card
+        p.click_amount = p_click
+        p.qr_amount = p_qr
+        p.created_at = now
+        p.updated_at = now
+
+        # To'lovni ro'yxatga olishdagi bilan BIR XIL yo'l bilan yozamiz.
+        #
+        # Ilgari bu yerda Transaction qo'lda yaratilardi va ikki jiddiy
+        # xatosi bor edi:
+        #   1) `amount=` va `created_by=` maydonlari Transaction'da umuman
+        #      yo'q — har bir to'lov 500 xato bilan yiqilardi;
+        #   2) center_amount / provider_amount / referrer_amount
+        #      to'ldirilmasdi, ya'ni shifokor va yo'naltiruvchi ulushi
+        #      hisoblanmay qolardi, kassa balansi ham oshmasdi.
+        #
+        # process_payment shularning hammasini bajaradi: ulushlarni bo'ladi,
+        # balanslarni yangilaydi va kassa daftariga yozadi.
+        process_payment(db, p)
+
+        paid_details.append({
+            "id": p.id,
+            "service_name": p.service.name if p.service else "Tibbiy Xizmat",
+            "category": p.service.category if p.service else "Umumiy",
+            "price": p_price,
+            "provider_name": p.provider.full_name if p.provider else "Shifokor",
+        })
+
+    db.commit()
+
+    ip, ua = get_client_info(request)
+    log_audit(
+        db,
+        user_id=user.id,
+        user_role=user.role,
+        action_type="PAY_UNPAID_SERVICES",
+        table_name="Patient",
+        record_id=target_patient.id,
+        detail_message=f"Bemor {target_patient.first_name} {target_patient.last_name} nasiya xizmatlari to'landi ({total_amount:,} so'm)",
+        ip_address=ip,
+        device_info=ua,
+    )
+
+    return {
+        "success": True,
+        "message": "To'lov muvaffaqiyatli qabul qilindi hamda bugungi hisobotlarga yozildi!",
+        "patient_name": f"{target_patient.first_name} {target_patient.last_name}".strip(),
+        "ticket_number": target_patient.ticket_number or f"A-{target_patient.id:03d}",
+        "payment_date": now.strftime("%d.%m.%Y %H:%M"),
+        "payment_type": ptype,
+        "total_amount": total_amount,
+        "services": paid_details,
+    }
+

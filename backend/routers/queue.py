@@ -3,13 +3,14 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session, joinedload
 
 from auth_utils import get_current_user, require_admin_or_ceo, require_doctor_or_admin_or_ceo
 from database import get_db
 from models.patient import Patient
 from models.provider import Provider, ProviderService
+from models.payout import Payout
 from models.service import Service
 from models.transaction import Transaction
 from models.user import User
@@ -404,6 +405,9 @@ def get_doctor_queue(
                     "created_at": t.created_at.isoformat() if t.created_at else None,
                 })
 
+    # Return provider's active balance (which holds today's accumulated KPI)
+    current_balance = int(provider.balance or 0) if provider else 0
+
     return {
         "user_id": user.id,
         "doctor_name": provider.full_name if provider else user.full_name,
@@ -419,7 +423,7 @@ def get_doctor_queue(
             "total_today": len(patients),
             "today_kpi_earned": today_kpi_earned,
             "today_gross_revenue": today_gross_revenue,
-            "current_balance": int(provider.balance or 0) if provider else 0,
+            "current_balance": current_balance,
             "kpi_percentage": int(provider.percentage or 0) if provider else 0,
             "kpi_breakdown": kpi_breakdown,
         },

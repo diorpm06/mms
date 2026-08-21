@@ -35,10 +35,18 @@ def _hisob_oralig(inp: Inpatient, bugun: date) -> tuple[date, date] | None:
 
 
 def sync_inpatient_accruals(db: Session, inpatient_id: int | None = None) -> int:
-    """Yetishmayotgan kunlik haqlarni yozadi. Yozilgan qatorlar sonini qaytaradi.
+    """Shifokor haqini yozadi. Yozilgan qatorlar sonini qaytaradi.
 
-    inpatient_id berilsa faqat o'sha bemor (chiqarilgan bo'lsa ham) hisoblanadi,
-    aks holda hozir yotganlarning hammasi.
+    DIQQAT — 2026-08-21 dan boshlab bu funksiya FAQAT bemor CHIQARILGANDA
+    chaqiriladi. Ilgari u ro'yxat yoki hisobot ochilganda ham ishlardi va
+    yotgan bemorning har kuni uchun shifokor balansiga pul qo'shib borardi
+    — bemor hali bir tiyin to'lamagan bo'lsa ham. Natijada to'lanmagan pul
+    shifokor hisobida turardi.
+
+    Chiqarishda barcha yotgan kunlar bir yo'la yoziladi (chiqish kuni ham
+    to'liq kun hisoblanadi).
+
+    inpatient_id berilsa faqat o'sha bemor hisoblanadi.
     """
     bugun = date.today()
 
@@ -132,8 +140,12 @@ def reverse_inpatient_accruals(db: Session, inpatient_id: int) -> int:
 
 
 def provider_inpatient_summary(db: Session) -> list[dict]:
-    """Har bir statsionar xizmat ko'rsatuvchi bo'yicha yig'ma hisobot."""
-    sync_inpatient_accruals(db)
+    """Har bir statsionar xizmat ko'rsatuvchi bo'yicha yig'ma hisobot.
+
+    Hisobot faqat O'QIYDI. Ilgari shu yerda sync_inpatient_accruals
+    chaqirilardi va hisobotni ochishning o'zi shifokor balansini
+    oshirib yuborardi.
+    """
 
     shifokorlar = (
         db.query(Provider)
@@ -203,8 +215,10 @@ def provider_inpatient_summary(db: Session) -> list[dict]:
 
 
 def provider_accrual_detail(db: Session, provider_id: int, limit: int = 200) -> list[dict]:
-    """Bitta shifokorning kunma-kun haqlari (eng yangisi birinchi)."""
-    sync_inpatient_accruals(db)
+    """Bitta shifokorning kunma-kun haqlari (eng yangisi birinchi).
+
+    Faqat O'QIYDI — ro'yxatni ochish balansga ta'sir qilmaydi.
+    """
 
     qatorlar = (
         db.query(InpatientProviderAccrual, Inpatient)

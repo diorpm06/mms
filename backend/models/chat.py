@@ -12,6 +12,7 @@ class ChatMessage(Base):
     recipient_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True) # None = Public Clinic Room
     content: Mapped[str] = mapped_column(String(1000))
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_edited: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     sender = relationship("User", foreign_keys=[sender_id])

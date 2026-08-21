@@ -197,6 +197,9 @@ def run_migrations():
                 except Exception as e:
                     logger.warning(f"queue_tickets migration warning: {e}")
 
+                # chat_messages.is_edited quyidagi UMUMIY ro'yxatga ko'chirildi —
+                # u yerda SQLite ham, Postgres ham qo'llab-quvvatlanadi.
+
                 # Referrers
                 try:
                     result = conn.execute(text("PRAGMA table_info(referrers)")).fetchall()
@@ -394,6 +397,11 @@ def run_migrations():
         # Kursning navbatdagi tashrifi qaysi to'lovdan kelgani
         "ALTER TABLE patients ADD COLUMN prepaid_from_id INTEGER",
         "CREATE INDEX IF NOT EXISTS ix_patients_prepaid_from ON patients (prepaid_from_id)",
+        # Chat xabari tahrirlanganmi. DIQQAT: bu ustun ilgari faqat SQLite
+        # bo'limiga (PRAGMA table_info bilan) qo'shilgan edi — Postgres'da
+        # yaratilmasdi va model uni talab qilgani uchun chat butunlay
+        # ishlamay qolardi. Shu sababli umumiy ro'yxatga ko'chirildi.
+        "ALTER TABLE chat_messages ADD COLUMN is_edited BOOLEAN DEFAULT FALSE",
     ):
         try:
             with engine.connect() as conn:

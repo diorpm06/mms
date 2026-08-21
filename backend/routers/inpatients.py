@@ -155,6 +155,11 @@ class CancelBody(BaseModel):
     reason: str = Field(min_length=3)
 
 
+class InpatientExtendBody(BaseModel):
+    additional_days: int | None = Field(default=None, ge=1, le=180)
+    new_planned_days: int | None = Field(default=None, ge=1, le=180)
+
+
 # -------------------------------------------------------------------------
 # SERIALIZATION & HELPERS
 # -------------------------------------------------------------------------
@@ -323,6 +328,11 @@ def _clean_diagnosis(diagnosis: str | None) -> str | None:
         return diagnosis
     left = diagnosis.split(marker, 1)[0].strip()
     return left or None
+
+
+def _update_planned_days(diagnosis: str | None, new_days: int) -> str:
+    clean = _clean_diagnosis(diagnosis) or ""
+    return f"{clean} #plan_days={new_days}".strip()
 
 
 # -------------------------------------------------------------------------
@@ -641,10 +651,10 @@ def list_inpatients(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_or_ceo),
 ):
-    # Yotgan bemorlarning yetishmayotgan kunlik haqlari shu yerda to'ldiriladi —
-    # Vercel'da doimiy jadval (cron) yo'q, shu sababli hisob so'ralganda yuritiladi.
-    sync_inpatient_accruals(db)
-
+    # DIQQAT: bu yerda ilgari sync_inpatient_accruals(db) chaqirilardi va
+    # ro'yxat har ochilganda yotgan bemorlarning kunlik haqi shifokor
+    # balansiga qo'shilib borardi — bemor bir tiyin to'lamagan bo'lsa ham.
+    # Endi haq faqat CHIQARISHDA, to'lov qilinganda yoziladi.
     q = db.query(Inpatient).options(
         joinedload(Inpatient.doctor),
         joinedload(Inpatient.referrer),
@@ -813,8 +823,8 @@ def admit(
     )
     db.commit()
 
-    # Yotgan birinchi kun uchun haq darhol yozilsin
-    sync_inpatient_accruals(db, inp.id)
+    # Yotqizishda shifokorga haq YOZILMAYDI. Bemor hali to'lamagan —
+    # ulush chiqarish kuni, to'lov qilinganda qo'shiladi.
     return {"id": inp.id}
 
 
@@ -1030,6 +1040,53 @@ def discharge(
         "paid_before": paid_total,
         "final_paid": paid_total + amount,
     }
+
+
+@router.post("/{inpatient_id}/extend")
+def extend_stay(
+    inpatient_id: int,
+    body: InpatientExtendBody,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    inp = _qulflab_ol(db, inpatient_id)
+    if not inp or inp.status != "yotmoqda":
+        raise HTTPException(status_code=400, detail="Bemor topilmadi yoki yotgan holatda emas")
+
+    current_planned = _extract_planned_days(inp.diagnosis) or _calc_days(inp)
+
+    if body.new_planned_days:
+        target_days = body.new_planned_days
+    elif body.additional_days:
+        target_days = current_planned + body.additional_days
+    else:
+        raise HTTPException(status_code=400, detail="Qo'shimcha kunlar yoki yangi kunlar soni kiritilmadi")
+
+    if target_days <= 0 or target_days > 365:
+        raise HTTPException(status_code=400, detail="Yangi kunlar soni noto'g'ri (1 dan 365 gacha)")
+
+    inp.diagnosis = _update_planned_days(inp.diagnosis, target_days)
+
+    ip, device = get_client_info(request)
+    log_audit(
+        db, user_id=user.id, user_role=user.role, action_type="EXTEND_STAY",
+        table_name="inpatients", record_id=inp.id,
+        new_data={"old_planned_days": current_planned, "new_planned_days": target_days},
+        ip_address=ip, device_info=device,
+    )
+    db.commit()
+
+    added_count = target_days - current_planned
+    msg = (
+        f"🛏 Statsionar bemor kuni uzaytirildi (+{added_count} kun)\n"
+        f"👤 {inp.first_name} {inp.last_name}\n"
+        f"📅 Yangi muddat: {target_days} kun\n"
+        f"💰 Kunlik narxi: {inp.daily_rate:,} so'm"
+    ).replace(",", " ")
+    _telegram_yubor(msg)
+
+    return _serialize_inp(inp)
 
 
 @router.post("/{inpatient_id}/daily-payment")
