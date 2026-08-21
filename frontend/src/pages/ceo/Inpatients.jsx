@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../utils/api'
-import { formatMoney } from '../../utils/format'
+import { formatMoney, formatWithCommas, parseDigits } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import { useAuthStore } from '../../store/authStore'
 import Modal from '../../components/Modal'
@@ -77,9 +77,10 @@ export default function CeoInpatients() {
   })
 
   const [itemForm, setItemForm] = useState({
-    item_type: 'service', // service | material
+    item_type: 'service', // service | material | qolda (ro'yxatsiz)
     service_id: '',
     material_id: '',
+    name: '',
     quantity: 1,
     unit_price: '',
     is_included_in_tariff: false,
@@ -296,15 +297,29 @@ export default function CeoInpatients() {
   // Submit Extra Item (Service or Material)
   const handleAddItem = async () => {
     if (!itemModal) return
+    const qolda = itemForm.item_type === 'qolda'
+    if (qolda) {
+      if (!(itemForm.name || '').trim()) {
+        toast('Nomini yozing', 'error')
+        return
+      }
+      if (!itemForm.is_included_in_tariff && !(+itemForm.unit_price > 0)) {
+        toast('Narxini kiriting', 'error')
+        return
+      }
+    }
     try {
       await api(`/inpatients/${itemModal.id}/items`, {
         method: 'POST',
         body: JSON.stringify({
-          item_type: itemForm.item_type,
-          service_id: itemForm.service_id ? +itemForm.service_id : undefined,
-          material_id: itemForm.material_id ? +itemForm.material_id : undefined,
+          // Qo'lda kiritilgani baribir "material" turida saqlanadi,
+          // faqat ro'yxatga bog'lanmaydi.
+          item_type: qolda ? 'material' : itemForm.item_type,
+          service_id: (!qolda && itemForm.service_id) ? +itemForm.service_id : undefined,
+          material_id: (!qolda && itemForm.material_id) ? +itemForm.material_id : undefined,
+          name: qolda ? itemForm.name.trim() : undefined,
           quantity: +itemForm.quantity || 1,
-          unit_price: itemForm.unit_price ? +itemForm.unit_price : undefined,
+          unit_price: itemForm.unit_price !== '' ? +itemForm.unit_price : undefined,
           is_included_in_tariff: itemForm.is_included_in_tariff,
         }),
       })
@@ -395,7 +410,24 @@ export default function CeoInpatients() {
           qr_amount: dischargeForm.payment_type === 'split' && dischargeForm.qr_amount ? +dischargeForm.qr_amount : undefined,
         }),
       })
-      toast(`Chiqarildi (Выписка): ${formatMoney(res.amount)}`)
+      // Rejadan oldin chiqib ketsa, oldindan olingan ortiqcha pul
+      // qaytariladi va kassadan harajat sifatida chiqadi. Kassir buni
+      // ko'rishi shart — aks holda pulni bermay qolib ketishi mumkin.
+      if (res.refunded > 0) {
+        toast(
+          `Chiqarildi. DIQQAT: bemorga ${formatMoney(res.refunded)} qaytarilishi kerak ` +
+          `(rejadan oldin chiqdi). Summa bugungi harajatga yozildi.`,
+        )
+        window.alert(
+          `↩️ BEMORGA QAYTARILADI: ${formatMoney(res.refunded)}\n\n` +
+          `Bemor rejadan oldin chiqdi. Faqat ${res.days} kun uchun hisoblandi ` +
+          `(${formatMoney(res.grand_total)}).\n` +
+          `Oldindan to'langan: ${formatMoney(res.paid_before)}\n\n` +
+          `Ortiqcha summa kassadan chiqarildi va bugungi harajatlarga yozildi.`
+        )
+      } else {
+        toast(`Chiqarildi (Выписка): ${formatMoney(res.amount)}`)
+      }
       setDischargeModal(null)
       loadData()
 
@@ -1270,7 +1302,53 @@ export default function CeoInpatients() {
               >
                 💉 Dori / Material
               </button>
+              {/* Ro'yxatda yo'q narsani admin o'zi yozib, narxini ham
+                  o'zi qo'yadi. Ilgari faqat tayyor ro'yxatdan tanlash
+                  mumkin edi — ro'yxatda bo'lmagan dori yoki xizmat
+                  hisobga umuman kirmasdi. */}
+              <button
+                type="button"
+                className={itemForm.item_type === 'qolda' ? 'btn-gold flex-1 text-xs' : 'btn-outline flex-1 text-xs'}
+                onClick={() => setItemForm({
+                  ...itemForm, item_type: 'qolda',
+                  service_id: '', material_id: '', name: '', unit_price: '',
+                })}
+              >
+                ✍️ Qo'lda kiritish
+              </button>
             </div>
+
+            {itemForm.item_type === 'qolda' && (
+              <div className="space-y-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/40">
+                <div>
+                  <label className="text-[11px] text-muted block mb-1 font-bold">
+                    Nomi <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    className="input-field text-xs"
+                    placeholder="Masalan: Bint, Shprits 5ml, Maxsus muolaja..."
+                    value={itemForm.name || ''}
+                    onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted block mb-1 font-bold">
+                    Birlik narxi (so'm) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    className="input-field text-xs font-mono font-bold"
+                    placeholder="15,000"
+                    value={formatWithCommas(itemForm.unit_price)}
+                    onChange={(e) => setItemForm({
+                      ...itemForm, unit_price: parseDigits(e.target.value),
+                    })}
+                  />
+                </div>
+                <p className="text-[10px] text-amber-700 dark:text-amber-300 font-medium">
+                  💡 Bu yozuv ro'yxatga saqlanmaydi — faqat shu bemor hisobiga qo'shiladi.
+                </p>
+              </div>
+            )}
 
             {itemForm.item_type === 'service' && (
               <select

@@ -281,21 +281,11 @@ export default function Layout({ role }) {
             <span className="text-gold font-mono uppercase tracking-wider">{effectiveRole === 'ceo' ? 'Rahbar' : effectiveRole} Paneli</span>
           </div>
 
+          {/* Chat tugmasi bu yerdan olib tashlandi — u yon panelning
+              pastida allaqachon bor edi va ikkitasi ortiqcha edi.
+              Telefon ko'rinishida yon panel yopiq turgani uchun u yerdagi
+              tugma qoldirilgan. */}
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setChatOpen(!chatOpen)}
-              className="btn-outline py-1 px-3 text-xs font-bold flex items-center gap-1.5 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 relative"
-              title="Klinika Telegram Chat"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              <span>Telegram Chat</span>
-              {unreadChatCount > 0 && (
-                <span className="badge badge-danger text-[9px] font-mono font-black px-1.5 py-0.2 rounded-full">
-                  {unreadChatCount}
-                </span>
-              )}
-            </button>
             <NotificationBell />
           </div>
         </header>

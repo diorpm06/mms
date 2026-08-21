@@ -82,6 +82,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
         refresh_token=create_refresh_token(token_data),
         role=user.role,
         full_name=user.full_name,
+        user_id=user.id,
     )
 
 
@@ -99,6 +100,7 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
         refresh_token=create_refresh_token(token_data),
         role=user.role,
         full_name=user.full_name,
+        user_id=user.id,
     )
 
 

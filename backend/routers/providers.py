@@ -1,13 +1,16 @@
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth_utils import hash_password, require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
 from database import get_db
 from models.expense import Expense
 from models.provider import Provider, ProviderService
+from models.referrer import Referrer
+from models.transaction import Transaction
 from models.user import User
 from schemas import ProviderCreate, ProviderOut, ProviderUpdate
 from services.finance import payout_recipient_balance
@@ -17,6 +20,48 @@ router = APIRouter(prefix="/api/providers", tags=["providers"])
 
 class PayoutBody(BaseModel):
     source: str | None = None
+
+
+def _yonaltirish_xulosasi(db: Session, referrer_ids: list[int]) -> dict:
+    """Yo'naltiruvchi yozuvlari bo'yicha: bugungi, umumiy va balans.
+
+    Bir odam ham shifokor, ham yo'naltiruvchi bo'lganda uning
+    yo'naltirishdan tushgan puli shifokorlik ulushidan alohida
+    ko'rsatilishi kerak — ikkalasi turli ish uchun to'lanadi.
+    """
+    idlar = [i for i in set(referrer_ids or []) if i]
+    if not idlar:
+        return {}
+
+    bugun_boshi = datetime.combine(date.today(), datetime.min.time())
+    bugun_oxiri = datetime.combine(date.today(), datetime.max.time())
+
+    jami = dict(
+        db.query(Transaction.referrer_id, func.coalesce(
+            func.sum(Transaction.referrer_amount), 0))
+        .filter(Transaction.referrer_id.in_(idlar),
+                Transaction.is_cancelled == False)  # noqa: E712
+        .group_by(Transaction.referrer_id).all()
+    )
+    bugun = dict(
+        db.query(Transaction.referrer_id, func.coalesce(
+            func.sum(Transaction.referrer_amount), 0))
+        .filter(Transaction.referrer_id.in_(idlar),
+                Transaction.is_cancelled == False,  # noqa: E712
+                Transaction.created_at >= bugun_boshi,
+                Transaction.created_at <= bugun_oxiri)
+        .group_by(Transaction.referrer_id).all()
+    )
+
+    natija = {}
+    for r in db.query(Referrer).filter(Referrer.id.in_(idlar)).all():
+        natija[r.id] = {
+            "name": r.full_name,
+            "today": int(bugun.get(r.id) or 0),
+            "total": int(jami.get(r.id) or 0),
+            "balance": int(r.balance or 0),
+        }
+    return natija
 
 
 @router.get("", response_model=list[ProviderOut])
@@ -43,6 +88,12 @@ def list_providers(
     from services.earnings_daily import providers_summary
     xulosa = providers_summary(db, providers)
 
+    # Bir odam ham shifokor, ham yo'naltiruvchi bo'lishi mumkin
+    # ("Dr.Ozoda" va "Ozoda Medsestra"). Bog'langan bo'lsa, uning
+    # yo'naltirishdan tushgan puli ALOHIDA ko'rsatiladi.
+    yon_xulosa = _yonaltirish_xulosasi(
+        db, [p.referrer_id for p in providers if p.referrer_id])
+
     res = []
     for p in providers:
         item = ProviderOut.model_validate(p)
@@ -51,6 +102,13 @@ def list_providers(
         x = xulosa.get(p.id) or {}
         item.today_earned = x.get("today", 0)
         item.total_earned = x.get("total_earned", 0)
+
+        y = yon_xulosa.get(p.referrer_id) if p.referrer_id else None
+        if y:
+            item.referrer_name = y["name"]
+            item.referral_today = y["today"]
+            item.referral_total = y["total"]
+            item.referral_balance = y["balance"]
         res.append(item)
 
     return res
@@ -136,6 +194,30 @@ def update_provider(
     password = update_dict.pop("password", None)
     service_ids = update_dict.pop("service_ids", None)
 
+    # Yo'naltiruvchi yozuviga bog'lash / bog'lanishni uzish
+    if "referrer_id" in update_dict:
+        rid = update_dict["referrer_id"]
+        if not rid:
+            update_dict["referrer_id"] = None
+        else:
+            ref = db.query(Referrer).filter(Referrer.id == rid).first()
+            if not ref:
+                raise HTTPException(status_code=400, detail="Yo'naltiruvchi topilmadi")
+            # Bitta yo'naltiruvchi yozuvi ikki shifokorga biriktirilmasin —
+            # aks holda uning puli ikki joyda ko'rinib, ikki marta
+            # to'lanib ketishi mumkin.
+            band = (
+                db.query(Provider)
+                .filter(Provider.referrer_id == rid, Provider.id != p.id)
+                .first()
+            )
+            if band:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(f"\"{ref.full_name}\" allaqachon "
+                            f"\"{band.full_name}\" ga biriktirilgan"),
+                )
+
     for k, v in update_dict.items():
         setattr(p, k, v)
     db.commit()
@@ -178,6 +260,13 @@ def update_provider(
     res = ProviderOut.model_validate(p)
     res.username = linked_user.username if linked_user else None
     res.service_ids = [s.id for s in p.services] if p.services else []
+    if p.referrer_id:
+        y = _yonaltirish_xulosasi(db, [p.referrer_id]).get(p.referrer_id)
+        if y:
+            res.referrer_name = y["name"]
+            res.referral_today = y["today"]
+            res.referral_total = y["total"]
+            res.referral_balance = y["balance"]
     return res
 
 

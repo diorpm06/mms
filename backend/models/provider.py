@@ -28,6 +28,15 @@ class Provider(Base):
     is_inpatient_provider: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     inpatient_daily_rate: Mapped[int] = mapped_column(Integer, default=50000, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Ayni shifokorning YO'NALTIRUVCHI sifatidagi yozuvi.
+    #
+    # Bir odam ham xizmat ko'rsatishi, ham bemor yo'naltirishi mumkin —
+    # masalan "Dr.Ozoda" (shifokor) va "Ozoda Medsestra" (yo'naltiruvchi)
+    # bitta odam. Ikki yozuv turli oqimlarda ishlatilgani uchun birlashtirib
+    # yuborilmaydi, faqat bog'lanadi. Shu bog'lanish tufayli shifokor
+    # profilida yo'naltirishdan tushgan puli ham alohida ko'rsatiladi.
+    referrer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("referrers.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     services = relationship("Service", secondary="provider_services", lazy="selectin")

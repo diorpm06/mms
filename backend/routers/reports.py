@@ -287,7 +287,7 @@ def export_report_pdf(
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin_or_ceo),
+    user: User = Depends(require_admin_or_ceo),
 ):
     if type == "referrers":
         from services.export import export_referrers_pdf
@@ -304,6 +304,7 @@ def export_report_pdf(
 
     from services.export import export_pdf
     report = _resolve_report(db, type, date_param, year, month, from_date, to_date)
+    report = _pdf_uchun_tozala(report, user.role, type)
     content = export_pdf(report)
     return Response(
         content,
@@ -327,6 +328,36 @@ def export_referrers_pdf_route(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=Yonaltiruvchilar_Hisobot_{from_date}_{to_date}.pdf"},
     )
+
+
+def _pdf_uchun_tozala(report: dict, rol: str, tur: str) -> dict:
+    """PDF ga chiqmasligi kerak bo'lgan ichki ma'lumotni olib tashlaydi.
+
+    Ikki muammo bor edi:
+
+    1) Admin "PDF Yuklab Olish" / "Chop Etish" bosganda CEO darajasidagi
+       to'liq hisobot ishlatilardi. Ekranda admin uchun foizlar va ichki
+       taqsimot ataylab yashiringan (admin_daily_report), PDF da esa
+       shifokorlarning KPI ulushlari ochiq chiqib ketardi.
+
+    2) "SHIFOKORLAR KPI ULUSHLARI (10 KUNLIK / DAVRIY)" jadvali nomidan
+       ko'rinib turibdiki davriy hisobot uchun. Lekin u KUNLIK hisobotga
+       ham tushib qolgan edi.
+    """
+    toza = dict(report)
+
+    # Kunlik hisobotda KPI jadvali umuman bo'lmaydi — u davriy hisobot uchun
+    if tur in ("daily", "custom"):
+        toza.pop("providers_breakdown", None)
+
+    # Adminga shifokorlar ulushi va ichki moliya ko'rsatilmaydi
+    if rol != "ceo":
+        for maydon in ("providers_breakdown", "referrers_breakdown",
+                       "provider_share", "center_share", "net_profit",
+                       "current_balance", "advances", "salaries"):
+            toza.pop(maydon, None)
+
+    return toza
 
 
 def _resolve_report(db, type, date_param, year, month, from_date, to_date):

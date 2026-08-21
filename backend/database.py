@@ -361,6 +361,20 @@ def run_migrations():
         except Exception as e:
             logger.warning(f"inpatient_payments / patient_services migration warning: {e}")
 
+    # providers table migrations (SQLite & PostgreSQL)
+    for stmt in (
+        "ALTER TABLE providers ADD COLUMN referrer_id INTEGER",
+    ):
+        try:
+            with engine.connect() as conn:
+                try:
+                    conn.execute(text(stmt))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            logger.warning(f"providers migration warning: {e}")
+
     # inpatient_items table migrations (SQLite & PostgreSQL)
     for stmt in (
         "ALTER TABLE inpatient_items ADD COLUMN is_included_in_tariff BOOLEAN DEFAULT FALSE",
@@ -402,6 +416,10 @@ def run_migrations():
         # yaratilmasdi va model uni talab qilgani uchun chat butunlay
         # ishlamay qolardi. Shu sababli umumiy ro'yxatga ko'chirildi.
         "ALTER TABLE chat_messages ADD COLUMN is_edited BOOLEAN DEFAULT FALSE",
+        # Shifokorning yo'naltiruvchi sifatidagi yozuvi bilan bog'lanishi
+        # ("Dr.Ozoda" <-> "Ozoda Medsestra" bitta odam)
+        "ALTER TABLE providers ADD COLUMN referrer_id INTEGER",
+        "CREATE INDEX IF NOT EXISTS ix_providers_referrer ON providers (referrer_id)",
     ):
         try:
             with engine.connect() as conn:

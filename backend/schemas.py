@@ -19,6 +19,11 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     role: str
     full_name: str
+    # Foydalanuvchi raqami. Ilgari yuborilmasdi va brauzerda doim null
+    # bo'lib qolardi — natijada chatda "bu xabarni men yozdimmi" degan
+    # tekshiruv hech qachon to'g'ri ishlamasdi: o'z xabaring begona
+    # tomonda ko'rinardi va o'zing yozgan xabarga ham ovoz chalinardi.
+    user_id: int | None = None
 
 
 class UserOut(BaseModel):
@@ -182,6 +187,9 @@ class ProviderUpdate(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     service_ids: Optional[list[int]] = None
+    # Yo'naltiruvchi yozuviga bog'lash. 0 yoki bo'sh yuborilsa bog'lanish
+    # uziladi (shu sababli qiymat "berilganmi" degani muhim).
+    referrer_id: Optional[int] = None
 
 
 class ProviderOut(BaseModel):
@@ -201,6 +209,13 @@ class ProviderOut(BaseModel):
     # raqam, bu ikkalasi esa qancha ishlaganini ko'rsatadi
     today_earned: Optional[int] = 0
     total_earned: Optional[int] = 0
+    # Shu shifokorning yo'naltiruvchi sifatidagi yozuvi (bir odam ikki rolda)
+    referrer_id: Optional[int] = None
+    referrer_name: Optional[str] = None
+    # Yo'naltirishdan tushgan puli — shifokorlik KPI sidan ALOHIDA ko'rsatiladi
+    referral_today: Optional[int] = 0
+    referral_total: Optional[int] = 0
+    referral_balance: Optional[int] = 0
 
     class Config:
         from_attributes = True

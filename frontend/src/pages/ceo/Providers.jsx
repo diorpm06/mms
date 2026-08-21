@@ -18,6 +18,8 @@ const emptyForm = {
   full_name: '', specialization: '', phone: '+998', percentage: '', fixed_salary: '',
   username: '', password: '', service_ids: [],
   is_inpatient_provider: false, inpatient_daily_rate: String(STATSIONAR_STANDART),
+  // Shu shifokorning yo'naltiruvchi sifatidagi yozuvi (bir odam ikki rolda)
+  referrer_id: '',
 }
 
 const formatDoctorServicesSummary = (serviceIds, allServices) => {
@@ -188,6 +190,7 @@ export default function CeoProviders() {
   const [inpDetail, setInpDetail] = useState(null)   // {provider, rows}
   const [inpDetailOpen, setInpDetailOpen] = useState(false)
   const [allServices, setAllServices] = useState([])
+  const [allReferrers, setAllReferrers] = useState([])
   const [modal, setModal] = useState(false)
   const [edit, setEdit] = useState(null)
   const [form, setForm] = useState(emptyForm)
@@ -227,6 +230,8 @@ export default function CeoProviders() {
   const load = () => {
     api('/providers?active_only=false').then(setItems)
     api('/services/all').then((s) => setAllServices(s || [])).catch(() => {})
+    // Shifokorni yo'naltiruvchi yozuviga bog'lash uchun ro'yxat
+    api('/referrers').then((r) => setAllReferrers(r || [])).catch(() => {})
     // Berilgan avanslar — avval bu ma'lumot bu bo'limda umuman ko'rinmasdi
     api('/providers/advance-summaries').then((a) => setAdvances(a || {})).catch(() => setAdvances({}))
     api('/inpatients/provider-earnings').then((r) => setInpEarnings(r || [])).catch(() => setInpEarnings([]))
@@ -292,6 +297,7 @@ export default function CeoProviders() {
       service_ids: p.service_ids || [],
       is_inpatient_provider: !!p.is_inpatient_provider,
       inpatient_daily_rate: String(p.inpatient_daily_rate ?? STATSIONAR_STANDART),
+      referrer_id: p.referrer_id ? String(p.referrer_id) : '',
     })
     setModal(true)
   }
@@ -308,6 +314,8 @@ export default function CeoProviders() {
         is_inpatient_provider: !!form.is_inpatient_provider,
         inpatient_daily_rate: form.inpatient_daily_rate !== '' && form.inpatient_daily_rate !== null
           ? parseInt(form.inpatient_daily_rate, 10) : STATSIONAR_STANDART,
+        // Bo'sh bo'lsa null yuboriladi — bog'lanish uziladi
+        referrer_id: form.referrer_id ? parseInt(form.referrer_id, 10) : null,
       }
       if (body.is_inpatient_provider && !(body.inpatient_daily_rate > 0)) {
         toast("Statsionar kunlik haqi 0 dan katta bo'lishi kerak", 'error')
@@ -637,7 +645,7 @@ export default function CeoProviders() {
         /* ── TABLE VIEW FOR DOCTORS ── */
         <div className="card overflow-x-auto p-0 border-cyan-500/20 shadow-lg">
           <table className="w-full text-xs">
-            <THead cols={['Shifokor', 'Mutaxassislik', 'Bajaradigan Xizmatlari', 'Telefon / Login', 'Oylik / KPI Stavka', 'Status', 'Bugun', 'Jami ishlagan', 'Balans', 'Avans olgan', 'Qoladi / Qarzi', 'Harakatlar']} />
+            <THead cols={['Shifokor', 'Mutaxassislik', 'Bajaradigan Xizmatlari', 'Telefon / Login', 'Oylik / KPI Stavka', 'Status', 'Bugun', 'Jami ishlagan', 'Yo\'naltirishdan', 'Balans', 'Avans olgan', 'Qoladi / Qarzi', 'Harakatlar']} />
             <tbody className="divide-y divide-border font-semibold">
               {items.length === 0 ? (
                 <tr><td colSpan={8} className="py-8"><EmptyState icon="🩺" message="Hali shifokor qo'shilmagan" action={<Btn variant="cyan" icon={Icons.plus} onClick={handleOpenAdd}>Qo'shish</Btn>} /></td></tr>
@@ -689,6 +697,28 @@ export default function CeoProviders() {
                       >
                         {formatMoney(p.total_earned)}
                       </button>
+                    </td>
+                    {/* Yo'naltirishdan tushgan puli — shifokorlik ulushidan
+                        alohida. Bir odam ikki rolda bo'lsa shu ustunda
+                        ko'rinadi ("Dr.Ozoda" <-> "Ozoda Medsestra"). */}
+                    <td className="p-3">
+                      {p.referrer_name ? (
+                        <div>
+                          <div className="font-mono font-black text-teal-600 dark:text-teal-300 text-sm">
+                            {formatMoney(p.referral_balance || 0)}
+                          </div>
+                          <div className="text-[10px] text-muted font-semibold truncate max-w-[130px]">
+                            {p.referrer_name}
+                            {p.referral_today > 0 && (
+                              <span className="text-teal-600 dark:text-teal-400 font-bold">
+                                {' '}· bugun +{formatMoney(p.referral_today)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted text-xs">—</span>
+                      )}
                     </td>
                     <td className="p-3 font-black font-mono text-emerald text-sm">{formatMoney(p.balance)}</td>
                     <td className="p-3 font-mono font-bold text-amber-400 text-sm">
@@ -779,6 +809,36 @@ export default function CeoProviders() {
               <input className="input-field text-xs font-mono font-bold" type="number" placeholder="0"
                 value={form.percentage || ''} onChange={(e) => setForm({ ...form, percentage: e.target.value })} />
             </div>
+          </div>
+
+          {/* Yo'naltiruvchi yozuviga bog'lash.
+              Bir odam ham xizmat ko'rsatib, ham bemor yo'naltirishi mumkin —
+              masalan "Dr.Ozoda" va "Ozoda Medsestra" bitta odam. Ikki yozuv
+              turli oqimlarda ishlatilgani uchun birlashtirilmaydi, bog'lanadi. */}
+          <div className={`p-3 rounded-xl border space-y-2 transition-colors ${
+            form.referrer_id ? 'bg-teal-500/10 border-teal-500/40' : 'bg-surface-2 border-border'
+          }`}>
+            <span className="font-bold text-teal-600 dark:text-teal-300 text-xs uppercase tracking-wider block">
+              🤝 Yo'naltiruvchi sifatidagi yozuvi
+            </span>
+            <p className="text-[11px] text-muted font-semibold">
+              Shu shifokor bemor yo'naltirsa ham pul olsa, uning yo'naltiruvchi
+              yozuvini shu yerda biriktiring. Shunda ikkala daromadi profilida
+              alohida ko'rinadi.
+            </p>
+            <select
+              className="input-field text-xs font-bold"
+              value={form.referrer_id}
+              onChange={(e) => setForm({ ...form, referrer_id: e.target.value })}
+            >
+              <option value="">— Bog'lanmagan —</option>
+              {(allReferrers || []).map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.full_name}
+                  {r.balance ? ` — balans ${formatMoney(r.balance)}` : ''}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Statsionar xizmat ko'rsatuvchi */}

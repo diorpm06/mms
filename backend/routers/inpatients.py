@@ -13,9 +13,11 @@ from models.patient import Patient
 from models.service import Service
 from models.user import User
 from services.audit import get_client_info, log_audit
+from models.expense import Expense
 from services.finance import (
     cancel_inpatient_payments,
     cancel_patient_payment,
+    process_expense,
     process_inpatient_payment,
 )
 from services.ism import ism_tuzat
@@ -842,8 +844,28 @@ def add_inpatient_item(
     if not inp or inp.status != "yotmoqda":
         raise HTTPException(status_code=400, detail="Bemor topilmadi yoki aktiv emas")
 
-    item_name = body.name or ""
+    item_name = (body.name or "").strip()
     unit_price = body.unit_price or 0
+
+    # Ro'yxatdan tanlanmagan bo'lsa — admin nomini va narxini o'zi yozadi.
+    # Nomsiz yozuv hisobda "" bo'lib qolib, nima uchun pul olinganini
+    # keyinchalik aniqlab bo'lmasdi.
+    if not body.service_id and not body.material_id:
+        if not item_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Nomini yozing (ro'yxatdan tanlanmagan bo'lsa nomi shart)",
+            )
+        if body.unit_price is None and not body.is_included_in_tariff:
+            raise HTTPException(
+                status_code=400,
+                detail="Narxini kiriting",
+            )
+        # Faqat birinchi harf katta qilinadi. ism_tuzat() bu yerda
+        # yaramaydi — u odam ismlari uchun va har bir so'zni bosh
+        # harf qiladi: "bint va shprits" -> "Bint Va Shprits".
+        item_name = " ".join(item_name.split())
+        item_name = item_name[0].upper() + item_name[1:]
 
     if body.item_type == "service" and body.service_id:
         svc = db.query(Service).filter(Service.id == body.service_id).first()
@@ -994,6 +1016,29 @@ def discharge(
     remaining_due = max(0, grand_total - paid_total)
     amount = body.amount if body.amount is not None else remaining_due
 
+    # Rejadan OLDIN chiqib ketsa, oldindan to'langan pul ortiqcha qoladi.
+    # Yakuniy hisob faqat HAQIQATDA yotgan kunlar bo'yicha chiqadi, ya'ni
+    # rejaga qarab olingan pulning qolgani bemorga qaytarilishi kerak.
+    #
+    # Ilgari bu summa `max(0, ...)` ichida yo'qolib ketardi: chiqish chekida
+    # ham, kassa hisobotida ham ko'rinmasdi va pul klinikada qolgandek
+    # turardi. Endi u chiqish kunidagi HARAJAT sifatida yoziladi va
+    # kassadan chiqariladi.
+    qaytariladi = max(0, paid_total - grand_total)
+    if qaytariladi > 0:
+        izoh = (
+            f"[MANBA: Naqt kassa] Statsionar ortiqcha to'lov qaytarildi: "
+            f"{inp.first_name} {inp.last_name} — rejadan oldin chiqdi "
+            f"({days} kun yotdi)"
+        )
+        process_expense(db, qaytariladi, izoh)
+        db.add(Expense(
+            description=izoh,
+            amount=qaytariladi,
+            category="Qaytarish",
+            created_by=user.id,
+        ))
+
     if amount > 0:
         process_inpatient_payment(
             db, inp, amount, body.payment_type, days,
@@ -1016,7 +1061,8 @@ def discharge(
     log_audit(
         db, user_id=user.id, user_role=user.role, action_type="DISCHARGE",
         table_name="inpatients", record_id=inp.id,
-        new_data={"grand_total": grand_total, "paid_total": paid_total + amount},
+        new_data={"grand_total": grand_total, "paid_total": paid_total + amount,
+                  "refunded": qaytariladi},
         ip_address=ip, device_info=device,
     )
     db.commit()
@@ -1031,6 +1077,10 @@ def discharge(
         f"📅 Kun: {days}\n"
         f"💰 Yakuniy to'lov: {amount:,} so'm"
     ).replace(",", " ")
+    if qaytariladi > 0:
+        msg += (
+            f"\n↩️ Qaytarildi: {qaytariladi:,} so'm (rejadan oldin chiqdi)"
+        ).replace(",", " ")
     _telegram_yubor(msg)
 
     return {
@@ -1038,7 +1088,9 @@ def discharge(
         "days": days,
         "grand_total": grand_total,
         "paid_before": paid_total,
-        "final_paid": paid_total + amount,
+        # Ortiqcha to'lov qaytarilgan bo'lsa, yakuniy summadan ayiriladi
+        "final_paid": paid_total + amount - qaytariladi,
+        "refunded": qaytariladi,
     }
 
 

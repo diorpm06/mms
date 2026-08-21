@@ -408,6 +408,33 @@ def get_doctor_queue(
     # Return provider's active balance (which holds today's accumulated KPI)
     current_balance = int(provider.balance or 0) if provider else 0
 
+    # Bir odam ham shifokor, ham yo'naltiruvchi bo'lishi mumkin
+    # ("Dr.Ozoda" va "Ozoda Medsestra"). Yo'naltirishdan tushgan puli
+    # shifokorlik ulushidan ALOHIDA ko'rsatiladi — ular turli ish uchun.
+    referral = {"name": None, "today": 0, "total": 0, "balance": 0}
+    if provider is not None and getattr(provider, "referrer_id", None):
+        from models.referrer import Referrer
+
+        ref = db.query(Referrer).filter(
+            Referrer.id == provider.referrer_id).first()
+        if ref:
+            bugun_boshi = datetime.combine(date.today(), datetime.min.time())
+            bugun_oxiri = datetime.combine(date.today(), datetime.max.time())
+            referral = {
+                "name": ref.full_name,
+                "today": int(db.query(func.coalesce(
+                    func.sum(Transaction.referrer_amount), 0)).filter(
+                    Transaction.referrer_id == ref.id,
+                    Transaction.is_cancelled == False,  # noqa: E712
+                    Transaction.created_at >= bugun_boshi,
+                    Transaction.created_at <= bugun_oxiri).scalar() or 0),
+                "total": int(db.query(func.coalesce(
+                    func.sum(Transaction.referrer_amount), 0)).filter(
+                    Transaction.referrer_id == ref.id,
+                    Transaction.is_cancelled == False).scalar() or 0),  # noqa: E712
+                "balance": int(ref.balance or 0),
+            }
+
     return {
         "user_id": user.id,
         "doctor_name": provider.full_name if provider else user.full_name,
@@ -426,6 +453,11 @@ def get_doctor_queue(
             "current_balance": current_balance,
             "kpi_percentage": int(provider.percentage or 0) if provider else 0,
             "kpi_breakdown": kpi_breakdown,
+            # Yo'naltirishdan tushgan puli (bog'langan bo'lsa)
+            "referrer_name": referral["name"],
+            "referral_today": referral["today"],
+            "referral_total": referral["total"],
+            "referral_balance": referral["balance"],
         },
         "current_patient": current_patient,
         "waiting_list": waiting_list,
