@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session, joinedload
 
 from auth_utils import require_admin_or_ceo, require_ceo
@@ -80,16 +80,37 @@ class InpatientCreate(BaseModel):
     click_amount: int | None = Field(default=None, ge=0)
     qr_amount: int | None = Field(default=None, ge=0)
 
+    @field_validator("patient_id", "tariff_id", "doctor_id", "referrer_id", mode="before")
+    @classmethod
+    def sanitize_id_zero(cls, v):
+        if v == 0 or v == "0" or v == "" or v is None:
+            return None
+        try:
+            val = int(v)
+            return val if val > 0 else None
+        except Exception:
+            return None
+
 
 class InpatientItemCreate(BaseModel):
     item_type: str = Field(pattern="^(service|material)$")
     service_id: int | None = None
     material_id: int | None = None
     name: str | None = None
-    # Adashib nol ortiqcha bosilsa ushlansin — ilgari chegara umuman yo'q edi
     quantity: int = Field(default=1, ge=1, le=1000)
     unit_price: int | None = Field(default=None, ge=0, le=50_000_000)
     is_included_in_tariff: bool = False
+
+    @field_validator("service_id", "material_id", mode="before")
+    @classmethod
+    def sanitize_item_id_zero(cls, v):
+        if v == 0 or v == "0" or v == "" or v is None:
+            return None
+        try:
+            val = int(v)
+            return val if val > 0 else None
+        except Exception:
+            return None
 
 
 class PaymentCreate(BaseModel):
