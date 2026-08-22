@@ -26,7 +26,13 @@ export default function TvManagerDashboard({ defaultTab = 'live' }) {
 
   const fetchLiveQueue = () => {
     api('/queue/live')
-      .then((data) => setQueueLive(data || { calling: [], waiting_count: 0 }))
+      .then((data) => {
+        setQueueLive(data || { calling: [], waiting_count: 0 })
+        if (data?.ticker_text) {
+          setTickerText(data.ticker_text)
+          localStorage.setItem('tv_ticker_text', data.ticker_text)
+        }
+      })
       .catch(() => {})
   }
 
@@ -55,15 +61,20 @@ export default function TvManagerDashboard({ defaultTab = 'live' }) {
     }
   }
 
-  const handleSaveTicker = (e) => {
+  const handleSaveTicker = async (e) => {
     if (e) e.preventDefault()
+    if (!tickerText || !tickerText.trim()) return
     setSavingTicker(true)
     try {
       localStorage.setItem('tv_ticker_text', tickerText)
+      const res = await api('/queue/ticker', {
+        method: 'POST',
+        body: JSON.stringify({ ticker_text: tickerText.trim() }),
+      })
       window.dispatchEvent(new Event('ticker_text_updated'))
-      toast("✓ TV Ekrani pastki yuguruvchi xabari saqlandi va uzatildi! 📢")
+      toast(res.message || "✓ TV Ekrani pastki yuguruvchi xabari saqlandi va barcha TV ekranlarga uzatildi! 📢")
     } catch (err) {
-      toast("Xatolik yuz berdi", "error")
+      toast(err.message || "Xatolik yuz berdi", "error")
     } finally {
       setSavingTicker(false)
     }

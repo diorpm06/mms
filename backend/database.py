@@ -439,6 +439,13 @@ def run_migrations():
         # ("Dr.Ozoda" <-> "Ozoda Medsestra" bitta odam)
         "ALTER TABLE providers ADD COLUMN referrer_id INTEGER",
         "CREATE INDEX IF NOT EXISTS ix_providers_referrer ON providers (referrer_id)",
+        # Umumiy sozlamalar (kalit/qiymat). Hozircha TV yuguruvchi satri
+        # matni shu yerda saqlanadi — u barcha nusxalarga bir xil
+        # ko'rinishi kerak, shuning uchun jarayon xotirasida bo'lmaydi.
+        ("CREATE TABLE IF NOT EXISTS app_settings ("
+         "key VARCHAR(100) PRIMARY KEY, "
+         "value TEXT, "
+         "updated_at TIMESTAMP)"),
     ):
         try:
             with engine.connect() as conn:
@@ -468,6 +475,65 @@ def run_migrations():
             logger.warning(f"providers inpatient backfill warning: {e}")
 
     seed_commission_rules()
+    seed_default_providers()
+
+
+def seed_default_providers():
+    """Ozonaterapiya va Ineksiya bo'limlari uchun standart provayderlar mavjudligini ta'minlaydi."""
+    from sqlalchemy import or_
+    from sqlalchemy.orm import Session as _S
+
+    try:
+        from models.provider import Provider
+    except Exception as e:
+        logger.warning(f"provider seed import warning: {e}")
+        return
+
+    db = _S(bind=engine)
+    try:
+        # 1. Ozonaterapiya xonasi
+        ozon_prov = db.query(Provider).filter(
+            or_(
+                Provider.specialization.ilike("%ozon%"),
+                Provider.full_name.ilike("%ozon%")
+            )
+        ).first()
+        if not ozon_prov:
+            db.add(Provider(
+                full_name="Ozonaterapiya Xonasi",
+                specialization="Ozonaterapiya",
+                phone="+998000000001",
+                percentage=0,
+                is_active=True
+            ))
+            logger.info("Default Ozonaterapiya Xonasi provider yaratildi")
+
+        # 2. Ineksiya va Muolaja xonasi
+        ineks_prov = db.query(Provider).filter(
+            or_(
+                Provider.specialization.ilike("%ineks%"),
+                Provider.specialization.ilike("%ukol%"),
+                Provider.specialization.ilike("%muolaj%"),
+                Provider.full_name.ilike("%ineks%"),
+                Provider.full_name.ilike("%muolaj%")
+            )
+        ).first()
+        if not ineks_prov:
+            db.add(Provider(
+                full_name="Ineksiya va Muolaja Xonasi",
+                specialization="Ineksiya",
+                phone="+998000000002",
+                percentage=0,
+                is_active=True
+            ))
+            logger.info("Default Ineksiya va Muolaja Xonasi provider yaratildi")
+
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"provider seed warning: {e}")
+    finally:
+        db.close()
 
     # Ko'p so'raladigan ustunlarga indeks — SQLite va PostgreSQL'da bir xil sintaksis
     try:

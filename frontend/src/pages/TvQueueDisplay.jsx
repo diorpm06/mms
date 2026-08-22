@@ -383,6 +383,11 @@ export default function TvQueueDisplay() {
 
         setData(safeData)
 
+        if (result?.ticker_text) {
+          setTickerText(result.ticker_text)
+          localStorage.setItem('tv_ticker_text', result.ticker_text)
+        }
+
         const currentWaitingIds = new Set((safeData.waiting).map((w) => w.id))
 
         // Detect newly called or re-called patients

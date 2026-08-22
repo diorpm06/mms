@@ -607,6 +607,21 @@ export default function TodayPatients() {
                       <div className="font-mono text-xs">
                         <span className="font-extrabold text-gold block">{formatMoney(p.payment_amount)}</span>
                         <span className="text-[10px] text-muted block font-semibold">{paymentLabel(p.payment_type)}</span>
+                        {p.payment_type === 'split' && (
+                          <span className="block text-[10px] text-muted font-bold">
+                            {[
+                              (p.cash_amount || 0) > 0 && `${formatMoney(p.cash_amount)} N`,
+                              (p.card_amount || 0) > 0 && `${formatMoney(p.card_amount)} K`,
+                              (p.click_amount || 0) > 0 && `${formatMoney(p.click_amount)} Cl`,
+                              (p.qr_amount || 0) > 0 && `${formatMoney(p.qr_amount)} QR`,
+                            ].filter(Boolean).join(' + ')}
+                          </span>
+                        )}
+                        {p.discount_amount > 0 && (
+                          <span className="block text-[9px] text-amber font-bold">
+                            🏷️ chegirma −{formatMoney(p.discount_amount)}
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -618,26 +633,7 @@ export default function TodayPatients() {
                           <span className="text-[10px] text-muted block font-semibold">🚪 {p.cabinet}</span>
                         )}
                       </div>
-                          (p.card_amount || 0) > 0 && `${formatMoney(p.card_amount)} K`,
-                          (p.click_amount || 0) > 0 && `${formatMoney(p.click_amount)} Cl`,
-                          (p.qr_amount || 0) > 0 && `${formatMoney(p.qr_amount)} QR`,
-                        ].filter(Boolean).join(' + ')}
-                      </span>
-                    )}
-                    {p.discount_amount > 0 && (
-                      <span className="block text-[9px] text-amber font-bold">
-                        🏷️ chegirma −{formatMoney(p.discount_amount)}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Kabinet & Holat */}
-                  <td className="p-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-xs text-amber">{p.cabinet || '—'}</span>
-                      <StatusBadge status={p.queue_status} />
-                    </div>
-                  </td>
+                    </td>
 
                   {/* Fast Action Button + 3 Dots Menu */}
                   <td className="p-2 text-right align-middle">
@@ -720,7 +716,8 @@ export default function TodayPatients() {
                     )}
                   </td>
                 </tr>
-              ))
+              ))}
+              </>
             )}
           </tbody>
         </table>

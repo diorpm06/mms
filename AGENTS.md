@@ -6,7 +6,7 @@ yozib boriladi.
 
 **Ishni boshlashdan oldin shu faylni o'qing. Ish tugagach shu faylni yangilang.**
 
-Oxirgi yangilanish: 2026-08-16
+Oxirgi yangilanish: 2026-08-22 (Antigravity AI)
 
 ---
 
@@ -140,7 +140,24 @@ aks holda tizim yo'qdan pul yaratadi.
 
 ---
 
-## 4. Bajarilgan ishlar (2026-08-15 / 16)
+## 4. Bajarilgan ishlar (2026-08-22 — Antigravity AI)
+
+### Ozonaterapiya va Ineksiya bo'limi navbatini boshqarish (`DoctorPanel.jsx`)
+- `backend/database.py` ga `seed_default_providers()` qo'shildi: `Ozonaterapiya Xonasi` va `Ineksiya va Muolaja Xonasi` provayderlari bazada yo'q bo'lsa avtomatik yaratiladi.
+- `backend/routers/queue.py` da `get_doctor_queue` va `doctor_call_next` endpointlarida provayder mutaxassisligi bo'yicha mos bemorlarni izlash mantiqiga `ozon`, `ineks`, `ukol`, `sistem`, `tomchi`, `muolaj` kalit so'zlari qo'shildi. Endi Admin Ozonaterapiya yoki Ineksiya xonasini tanlaganda ushbu xizmatlar bo'yicha kelgan barcha bemorlar navbatda to'g'ri chiqadi va chaqiriladi.
+- `frontend/src/pages/doctor/DoctorPanel.jsx` da Ozon (`🧪`) va Ineksiya (`💉`) uchun kartochkalar va ikonkalar qo'shildi, muolaja xonalari uchun ombordan shpris/sistema/ozon to'plami sarflash (`Package`) hamda qayta chaqirish tugmalari ta'minlandi.
+
+### TV Ekrani Pastki Yuguruvchi Satri (Marquee Ticker) Real-vaqt Sinxronizatsiyasi
+- `backend/routers/queue.py` da `CURRENT_TICKER_TEXT` va `POST /api/queue/ticker` routeri yaratildi, `/api/queue/live` javobiga `"ticker_text"` qo'shildi.
+- `frontend/src/pages/TvManagerDashboard.jsx` da matn saqlanganda `POST /api/queue/ticker` orqali markaziy serverga yoziladi.
+- `frontend/src/pages/TvQueueDisplay.jsx` (/tv) har 3 soniyada jonli navbatni yangilaganda serverdagi eng oxirgi `ticker_text` ni oladi va klinikadagi BARCHA TV ekranlarda matnni real-vaqt rejimida avtomatik yangilaydi.
+
+### Sintaksis va Build Tuzatishlari
+- `frontend/src/pages/admin/TodayPatients.jsx` faylidagi yopilmagan React fragment (`</>`) va sintaksis xatolari to'liq tuzatildi (`vite build` 100% muvaffaqiyatli).
+
+---
+
+## 4.1. Ilgari bajarilgan ishlar (2026-08-15 / 16)
 
 ### Moliyaviy mantiq
 - Komissiya qoidalari koddan bazaga ko'chirildi (yuqoriga qarang)

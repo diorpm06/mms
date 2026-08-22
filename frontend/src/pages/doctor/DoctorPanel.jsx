@@ -522,7 +522,16 @@ export default function DoctorPanel() {
               const provPatients = (liveQueueData || []).filter((p) => p.provider_id === prov.id && !p.is_cancelled)
               const waitingCount = provPatients.filter((p) => p.queue_status === 'kutmoqda').length
               const doneCount = provPatients.filter((p) => p.queue_status === 'yakunlandi').length
-              const displayName = prov.full_name?.startsWith('Dr.') ? prov.full_name : `Dr. ${prov.full_name}`
+              const isDr = prov.full_name?.startsWith('Dr.') || prov.full_name?.startsWith('Xona') || prov.full_name?.includes('xonasi') || prov.full_name?.includes('Xonasi')
+              const displayName = isDr ? prov.full_name : `Dr. ${prov.full_name}`
+              
+              const specLower = (prov.specialization || '').toLowerCase()
+              let cardIcon = '🩺'
+              if (specLower.includes('ozon')) cardIcon = '🧪'
+              else if (specLower.includes('ineks') || specLower.includes('ukol') || specLower.includes('muolaj')) cardIcon = '💉'
+              else if (specLower.includes('fizio')) cardIcon = '⚡'
+              else if (specLower.includes('uzi')) cardIcon = '📡'
+              else if (specLower.includes('lab')) cardIcon = '🔬'
 
               return (
                 <div
@@ -537,7 +546,7 @@ export default function DoctorPanel() {
                         <div
                           className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg flex-shrink-0 bg-gold/15 text-gold border border-gold/30"
                         >
-                          🩺
+                          {cardIcon}
                         </div>
                         <div>
                           <h3 className="font-extrabold text-base text-body group-hover:text-gold transition-colors">
@@ -906,12 +915,37 @@ export default function DoctorPanel() {
             </div>
 
             {/* Joriy bemor amallari.
-                Lab / UZI bemorida tashxis-retsept, laboratoriya javoblari va
-                ombor tugmalari ko'rsatilmaydi — u yerda faqat natija blankasi
-                to'ldiriladi. Ilgari hamma tugma har doim chiqib, ekran
-                chalkash bo'lardi. */}
+                Fizioterapiya uchun faqat ombordan material, qayta chaqirish, yakunlash va o'tkazish.
+                Lab / UZI bemorida natija blankasi, qolgan vrachlarda esa tashxis-retsept ham chiqadi. */}
             <div className="flex flex-col gap-2">
-              {joriyShablonKat ? (
+              {((specialization || '').toLowerCase().match(/(fizio|физио|ozon|озон|ineks|инъек|ukol|muolaj)/i)) ? (
+                <>
+                  <Btn
+                    variant="amber"
+                    size="md"
+                    icon={<Package className="h-4 w-4" />}
+                    onClick={() => {
+                      fetchInventory()
+                      setInventoryModal(true)
+                    }}
+                    className="w-full font-extrabold shadow-sm"
+                  >
+                    💊 Ombordan material
+                  </Btn>
+
+                  <Btn
+                    variant="warning"
+                    size="sm"
+                    icon={<Volume2 className="h-4 w-4" />}
+                    loading={actionLoading}
+                    disabled={data?.is_shift_closed || is_paused}
+                    onClick={handleRecallCurrent}
+                    className="w-full font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
+                  >
+                    🔊 Qayta Chaqirish
+                  </Btn>
+                </>
+              ) : joriyShablonKat ? (
                 <Btn
                   variant="gold"
                   size="md"
@@ -1250,71 +1284,122 @@ export default function DoctorPanel() {
         open={inventoryModal}
         onClose={() => setInventoryModal(false)}
         title="💊 Material yoki Dori Ishlatish (Omborxona)"
-        size="md"
+        size="xl"
       >
-        <div className="space-y-4 text-xs">
+        <div className="space-y-5 text-xs p-1">
           {/* Search Inventory */}
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted" />
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted" />
             <input
-              className="input-field pl-9 text-xs font-semibold"
-              placeholder="Material yoki dori nomini izlang..."
+              className="input-field pl-10 text-sm font-semibold py-2.5 rounded-xl"
+              placeholder="Material yoki dori nomini izlang (masalan: spirt, shpris, paxta, gel)..."
               value={invSearch}
               onChange={(e) => setInvSearch(e.target.value)}
             />
           </div>
 
           {/* List of items */}
-          <div className="max-h-60 overflow-y-auto space-y-2 p-2 bg-surface-2 rounded-xl border border-border">
+          <div className="max-h-72 overflow-y-auto space-y-2 p-3 bg-surface-2 rounded-2xl border border-border">
             {inventoryLoading ? (
-              <p className="text-center text-muted font-bold py-4">Yuklanmoqda...</p>
+              <p className="text-center text-muted font-bold py-6">Yuklanmoqda...</p>
             ) : inventoryItems.filter(i => i.name.toLowerCase().includes(invSearch.toLowerCase())).length === 0 ? (
-              <p className="text-center text-muted font-bold py-4">Materiallar topilmadi</p>
+              <p className="text-center text-muted font-bold py-6">Materiallar topilmadi</p>
             ) : (
-              inventoryItems
-                .filter(i => i.name.toLowerCase().includes(invSearch.toLowerCase()))
-                .map((item) => {
-                  const isSelected = selectedInvItem?.id === item.id
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => setSelectedInvItem(item)}
-                      className={`p-2.5 rounded-lg cursor-pointer flex items-center justify-between border transition-all ${
-                        isSelected
-                          ? 'border-gold bg-gold/10 font-bold'
-                          : 'border-border/60 hover:bg-surface-1'
-                      }`}
-                    >
-                      <div>
-                        <h5 className="font-extrabold text-body">{item.name}</h5>
-                        <p className="text-[10px] text-muted">Mavjud qoldiq: <strong className="text-emerald">{item.quantity} {item.unit}</strong></p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {inventoryItems
+                  .filter(i => i.name.toLowerCase().includes(invSearch.toLowerCase()))
+                  .map((item) => {
+                    const isSelected = selectedInvItem?.id === item.id
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedInvItem(item)}
+                        className={`p-3 rounded-xl cursor-pointer flex items-center justify-between border transition-all ${
+                          isSelected
+                            ? 'border-gold bg-gold/15 font-bold shadow-md ring-1 ring-gold/40'
+                            : 'border-border/60 bg-surface-1 hover:bg-surface hover:border-gold/30'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <h5 className="font-extrabold text-body text-xs truncate">{item.name}</h5>
+                          <p className="text-[11px] text-muted font-semibold mt-0.5">
+                            Qoldiq: <strong className="text-emerald-400 font-mono">{item.quantity} {item.unit}</strong>
+                          </p>
+                        </div>
+                        {isSelected && <span className="badge badge-gold text-[10px] shrink-0 font-extrabold">Tanlandi ✓</span>}
                       </div>
-                      {isSelected && <span className="badge badge-gold text-[10px]">Tanlandi ✓</span>}
-                    </div>
-                  )
-                })
+                    )
+                  })}
+              </div>
             )}
           </div>
 
           {selectedInvItem && (
-            <div className="p-3 bg-surface-2 rounded-xl border border-gold/40 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-gold text-xs block">Ishlatiladigan miqdor:</span>
+            <div className="p-4 bg-surface-2 rounded-2xl border border-gold/40 space-y-4 shadow-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <span className="font-extrabold text-gold text-sm block">
+                    {selectedInvItem.name}
+                  </span>
+                  <span className="text-[11px] text-muted font-semibold">
+                    Omborda bor: <strong className="text-emerald-400 font-mono">{selectedInvItem.quantity} {selectedInvItem.unit}</strong>
+                  </span>
+                </div>
+
+                {/* + and - Quantity Control */}
                 <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-muted mr-1">Hajm:</span>
+                  <button
+                    type="button"
+                    onClick={() => setConsumeAmount((v) => String(Math.max(1, (Number(v) || 1) - 1)))}
+                    className="w-9 h-9 rounded-xl bg-surface-1 hover:bg-rose-500/20 text-rose-400 border border-border flex items-center justify-center text-lg font-black transition-all active:scale-95 shadow-sm"
+                    title="Kamaytirish (-1)"
+                  >
+                    -
+                  </button>
                   <input
                     type="number"
                     min="1"
-                    className="input-field text-sm font-mono font-bold w-24 py-1"
+                    className="input-field text-base font-mono font-black text-center w-20 py-1.5 bg-surface-1 border-gold/50 rounded-xl"
                     value={consumeAmount}
                     onChange={(e) => setConsumeAmount(e.target.value)}
                   />
-                  <span className="text-xs font-bold text-muted">{selectedInvItem.unit}</span>
+                  <button
+                    type="button"
+                    onClick={() => setConsumeAmount((v) => String((Number(v) || 0) + 1))}
+                    className="w-9 h-9 rounded-xl bg-surface-1 hover:bg-emerald-500/20 text-emerald-400 border border-border flex items-center justify-center text-lg font-black transition-all active:scale-95 shadow-sm"
+                    title="Oshirish (+1)"
+                  >
+                    +
+                  </button>
+                  <span className="text-xs font-extrabold text-gold bg-gold/10 px-2.5 py-1.5 rounded-xl border border-gold/30">
+                    {selectedInvItem.unit}
+                  </span>
                 </div>
               </div>
 
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1.5 pt-1">
+                <span className="text-[11px] text-muted font-extrabold mr-1">Tezkor hajm:</span>
+                {[1, 2, 3, 5, 10].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setConsumeAmount(String(num))}
+                    className={`px-2.5 py-1 rounded-lg border text-xs font-extrabold transition-all ${
+                      Number(consumeAmount) === num
+                        ? 'bg-gold text-slate-950 border-gold shadow'
+                        : 'bg-surface-1 text-muted border-border hover:text-body hover:border-gold/40'
+                    }`}
+                  >
+                    {num} {selectedInvItem.unit}
+                  </button>
+                ))}
+              </div>
+
               {data?.current_patient && (
-                <div className="pt-2 border-t border-border/60 space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-slate-800 dark:text-body">
+                <div className="pt-3 border-t border-border/60 space-y-2">
+                  <label className="flex items-center gap-2.5 cursor-pointer text-xs font-extrabold text-slate-800 dark:text-body">
                     <input
                       type="checkbox"
                       checked={chargePatient}
@@ -1327,9 +1412,9 @@ export default function DoctorPanel() {
                   </label>
 
                   {chargePatient && selectedInvItem.unit_price > 0 && (
-                    <div className="flex items-center justify-between text-xs font-mono bg-surface-sunken p-2.5 rounded-xl border border-emerald-500/40 shadow-inner">
+                    <div className="flex items-center justify-between text-xs font-mono bg-surface-sunken p-3 rounded-xl border border-emerald-500/40 shadow-inner">
                       <span className="text-body font-sans font-extrabold">To'lov eslatmasi summasi:</span>
-                      <span className="text-emerald-400 font-black text-sm">
+                      <span className="text-emerald-400 font-black text-base">
                         {((selectedInvItem.unit_price || 0) * (Number(consumeAmount) || 1)).toLocaleString()} so'm
                       </span>
                     </div>

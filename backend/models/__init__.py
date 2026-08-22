@@ -18,6 +18,7 @@ from models.duty_log import DutyLog
 from models.inpatient import Inpatient, InpatientPayment
 from models.inpatient_tariff import InpatientTariff, InpatientTariffService, InpatientMaterial, InpatientItem, InpatientRoom, InpatientBed
 from models.inpatient_accrual import InpatientProviderAccrual
+from models.app_setting import AppSetting
 from models.banner import Banner
 from models.report_submission import ReportSubmission
 from models.print_job import PrintJob
@@ -31,4 +32,5 @@ __all__ = [
     "Inpatient", "InpatientPayment", "InpatientTariff", "InpatientTariffService", "InpatientMaterial", "InpatientItem", "InpatientRoom", "InpatientBed",
     "InpatientProviderAccrual",
     "Banner", "ReportSubmission", "PrintJob", "SavedReport", "PatientService",
+    "AppSetting",
 ]

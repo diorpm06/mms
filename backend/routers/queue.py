@@ -43,6 +43,53 @@ def _assert_patient_ownership(p: Patient, user: User) -> None:
 DOCTOR_PAUSE_STATE = {}
 DOCTOR_SHIFT_CLOSED_STATE = {}
 
+TICKER_KALITI = "tv_ticker_text"
+TICKER_STANDART = (
+    "🏥 \"MARJONA MED SERVIS\" KLINIKASIGA XUSH KELIBSIZ! • "
+    "SALOMATLIGINGIZ — BIZNING G'AMXO'RLIGIMIZ! • "
+    "ALOQA TELEFON: +998 55 604-44-24 • "
+    "MANZIL: HAZORASP SENTR • ISH VAQTI: Har kuni 08:00 dan 18:00 gacha"
+)
+
+
+def _ticker_oqi(db: Session) -> str:
+    """TV yuguruvchi satri matni — BAZADAN.
+
+    Ilgari u modul darajasidagi oddiy o'zgaruvchida turardi. Vercel'da
+    har bir nusxa o'z xotirasiga ega, shuning uchun admin yozgan matn
+    faqat bitta nusxada yangilanardi: TV ekran boshqa nusxaga tushsa
+    eski matnni ko'rardi va matn ekrandan ekranga sakrab turardi.
+    Nusxa qayta ishga tushishi bilan esa standart matnga qaytardi.
+    """
+    try:
+        from models.app_setting import AppSetting
+
+        qator = db.query(AppSetting).filter(
+            AppSetting.key == TICKER_KALITI).first()
+        if qator and (qator.value or "").strip():
+            return qator.value
+    except Exception:
+        # Jadval hali yaratilmagan bo'lsa ham TV ekran ishlashda davom etsin
+        db.rollback()
+    return TICKER_STANDART
+
+
+def _ticker_yoz(db: Session, matn: str) -> str:
+    from models.app_setting import AppSetting
+
+    qator = db.query(AppSetting).filter(
+        AppSetting.key == TICKER_KALITI).first()
+    if qator:
+        qator.value = matn
+    else:
+        db.add(AppSetting(key=TICKER_KALITI, value=matn))
+    db.commit()
+    return matn
+
+
+class TickerUpdateBody(BaseModel):
+    ticker_text: str
+
 
 class QueueStatusUpdate(BaseModel):
     queue_status: str  # kutmoqda, qabulda, yakunlandi, o'tkazib yuborildi, bekor
@@ -174,6 +221,7 @@ def get_live_queue(db: Session = Depends(get_db)):
 
     return {
         "timestamp": datetime.now().isoformat(),
+        "ticker_text": _ticker_oqi(db),
         "stats": {
             "total": len(patients),
             "calling": len(calling),
@@ -184,6 +232,19 @@ def get_live_queue(db: Session = Depends(get_db)):
         "waiting": waiting,
         "finished": finished[:8],
     }
+
+
+@router.post("/ticker")
+def update_queue_ticker(
+    data: TickerUpdateBody,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_doctor_or_admin_or_ceo),
+):
+    if not (data.ticker_text and data.ticker_text.strip()):
+        raise HTTPException(status_code=400, detail="Matn bo'sh bo'lishi mumkin emas")
+    matn = _ticker_yoz(db, data.ticker_text.strip())
+    return {"ticker_text": matn,
+            "message": "TV matni yangilandi va barcha ekranlarga uzatildi"}
 
 
 @router.get("/pending-payments")
@@ -352,6 +413,10 @@ def get_doctor_queue(
                 terms.extend(["uzi", "ultratovush"])
             elif "lab" in spec_clean or "analiz" in spec_clean:
                 terms.extend(["lab", "analiz", "tahlil"])
+            elif "ozon" in spec_clean:
+                terms.extend(["ozon", "ozonoterap", "ozonaterap"])
+            elif "ineks" in spec_clean or "ukol" in spec_clean or "muolaj" in spec_clean or "sistem" in spec_clean or "tomchi" in spec_clean:
+                terms.extend(["ineks", "ukol", "sistem", "tomchi", "muolaj", "injekt"])
             elif "pediatr" in spec_clean or "bosh" in spec_clean:
                 terms.extend(["pediatr", "bosh"])
             elif "lor" in spec_clean:
@@ -584,6 +649,10 @@ def doctor_call_next(
                 terms.extend(["uzi", "ultratovush"])
             elif "lab" in spec_clean or "analiz" in spec_clean:
                 terms.extend(["lab", "analiz", "tahlil"])
+            elif "ozon" in spec_clean:
+                terms.extend(["ozon", "ozonoterap", "ozonaterap"])
+            elif "ineks" in spec_clean or "ukol" in spec_clean or "muolaj" in spec_clean or "sistem" in spec_clean or "tomchi" in spec_clean:
+                terms.extend(["ineks", "ukol", "sistem", "tomchi", "muolaj", "injekt"])
             elif "pediatr" in spec_clean or "bosh" in spec_clean:
                 terms.extend(["pediatr", "bosh"])
             elif "lor" in spec_clean:
