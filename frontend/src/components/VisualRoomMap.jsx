@@ -118,8 +118,8 @@ export default function VisualRoomMap({ rooms: propRooms, activeInpatients, onAd
                           <>
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 font-extrabold border border-cyan-500/40">
                               {b.patient.planned_days
-                                ? `${b.patient.days || b.patient.days_count || 1}/${b.patient.planned_days} kun`
-                                : `${b.patient.days || b.patient.days_count || 1} kun`}
+                                ? `${b.patient.elapsed_days || b.patient.days || 1}/${b.patient.planned_days} kun`
+                                : `${b.patient.elapsed_days || b.patient.days || 1} kun`}
                             </span>
                             <ActionMenu
                               title="Amallar"
