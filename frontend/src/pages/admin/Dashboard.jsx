@@ -116,12 +116,12 @@ export default function AdminDashboard() {
                   <TrendingUp className="h-5 w-5" />
                 </div>
               </div>
-              {(data.paper_entry_total || data.paper_income || 0) > 0 && (
-                <div className="mt-3 pt-2 border-t border-emerald-500/20 flex items-center justify-between text-[10px] font-mono">
-                  <span className="text-muted">Navbatchilik:</span>
-                  <span className="font-bold text-amber-400">{formatMoney(data.paper_entry_total || data.paper_income || 0)}</span>
-                </div>
-              )}
+              <div className="mt-3 pt-2 border-t border-emerald-500/20 flex items-center justify-between text-[10px] font-mono">
+                <span className="text-muted">Navbatchilik:</span>
+                <span className="font-bold text-amber-400">
+                  {formatMoney(data.paper_entry_total || data.paper_income || 0)}
+                </span>
+              </div>
             </div>
 
             {/* Card 3: Naqd Tushum */}
