@@ -54,7 +54,7 @@ const ADMIN_LINKS = [
 const DOCTOR_LINKS = [
   { to: '/doctor',              label: 'Doctor Paneli',         icon: '🩺', end: true },
   { to: '/doctor/natijalar',    label: 'Natijalarim',           icon: '📋' },
-  { to: '/doctor/profil',       label: 'Profilim',              icon: '👤' },
+  { to: '/doctor/profil',       label: 'Hisobotlarim va Profilim', icon: '📊' },
 ]
 
 

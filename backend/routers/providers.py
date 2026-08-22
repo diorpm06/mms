@@ -114,6 +114,98 @@ def list_providers(
     return res
 
 
+@router.get("/my-10day-report")
+def my_10day_report(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_doctor_or_admin_or_ceo),
+):
+    """
+    Shifokorning shaxsiy 10 kunlik hisoboti:
+    Bugun, kecha va kunlik bemorlar ro'yxati hamda natijalari (UZI/Lab blankalari).
+    """
+    from datetime import timedelta
+    from models.patient import Patient
+    from models.report_submission import ReportSubmission
+    from models.service import Service
+    from services.earnings_daily import provider_daily
+
+    provider_id = user.provider_id
+    if not provider_id and user.role == "doctor":
+        prov = db.query(Provider).filter(Provider.full_name.ilike(f"%{user.full_name}%")).first()
+        if prov:
+            provider_id = prov.id
+
+    if not provider_id:
+        raise HTTPException(status_code=400, detail="Shifokor profiliga biriktirilmagan")
+
+    rep = provider_daily(db, provider_id, limit=10)
+    detailed_days = []
+
+    for d in (rep.get("days") or []):
+        try:
+            kun_date = datetime.strptime(d["date"], "%Y-%m-%d").date()
+        except Exception:
+            continue
+
+        tx_rows = (
+            db.query(Transaction, Patient)
+            .join(Patient, Patient.id == Transaction.patient_id)
+            .filter(
+                Transaction.provider_id == provider_id,
+                Transaction.is_cancelled == False,
+                func.date(Transaction.created_at) == kun_date,
+            )
+            .order_by(Transaction.created_at.desc())
+            .all()
+        )
+
+        pts = []
+        for t, p in tx_rows:
+            svc_name = p.service.name if p.service else "Xizmat"
+            sub = (
+                db.query(ReportSubmission)
+                .filter(ReportSubmission.patient_id == p.id)
+                .order_by(ReportSubmission.created_at.desc())
+                .first()
+            )
+
+            pts.append({
+                "patient_id": p.id,
+                "patient_name": f"{p.first_name} {p.last_name}".strip(),
+                "ticket_number": p.ticket_number or f"A-{p.id}",
+                "service_name": svc_name,
+                "created_at": t.created_at.strftime("%H:%M") if t.created_at else "",
+                "total_amount": t.total_amount or 0,
+                "provider_amount": t.provider_amount or 0,
+                "has_report": sub is not None,
+                "report_id": sub.id if sub else None,
+                "report_label": sub.template_label if sub else None,
+                "report_content": sub.filled_data if sub else None,
+            })
+
+        detailed_days.append({
+            "date": d["date"],
+            "patients_count": d["patients"],
+            "earned_amount": d["amount"],
+            "patients": pts,
+        })
+
+    today_str = date.today().isoformat()
+    yesterday_str = (date.today() - timedelta(days=1)).isoformat()
+
+    today_info = next((x for x in detailed_days if x["date"] == today_str), {"patients_count": 0, "earned_amount": 0, "patients": []})
+    yesterday_info = next((x for x in detailed_days if x["date"] == yesterday_str), {"patients_count": 0, "earned_amount": 0, "patients": []})
+
+    return {
+        "provider_id": provider_id,
+        "provider_name": rep.get("name"),
+        "balance": rep.get("balance", 0),
+        "today": today_info,
+        "yesterday": yesterday_info,
+        "days": detailed_days,
+    }
+
+
 @router.get("/{provider_id}/earnings-daily")
 def provider_earnings_daily(
     provider_id: int,

@@ -1,56 +1,58 @@
 import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Calendar, Users, DollarSign, Clock, FileText, ChevronDown, ChevronUp, Eye, X } from 'lucide-react'
 import { api } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
-import { EmptyState } from '../../components/UIKit'
+import { EmptyState, PageHeader } from '../../components/UIKit'
 
-/**
- * Shifokorning shaxsiy bo'limi.
- *
- * Ilgari KPI foizi, bugungi ishlangan pul va yig'ilgan balans Doctor
- * Panelning tepasida, navbat tugmalari bilan yonma-yon turardi — qabul
- * paytida bemor ekranga qarasa pul raqamlari ko'rinib qolardi. Endi ular
- * shu alohida bo'limga ko'chirildi.
- */
 export default function MyProfile() {
   const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [openDay, setOpenDay] = useState(null)
+  const [previewReport, setPreviewReport] = useState(null)
   const toast = useToastStore((s) => s.add)
 
-  const yukla = useCallback(async () => {
+  const loadReport = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api('/queue/doctor/my-queue')
+      const res = await api('/providers/my-10day-report')
       setData(res)
+      if (res?.days?.length > 0) {
+        setOpenDay(res.days[0].date) // Open today by default
+      }
     } catch (e) {
-      toast(e.message || 'Ma\'lumot yuklanmadi', 'error')
+      toast(e.message || 'Ma\'lumotlarni yuklashda xatolik', 'error')
     } finally {
       setLoading(false)
     }
   }, [toast])
 
   useEffect(() => {
-    yukla()
-  }, [yukla])
+    loadReport()
+  }, [loadReport])
 
-  const stats = data?.stats
-  const ism = data?.doctor_name || 'Shifokor'
-  const taqsimot = stats?.kpi_breakdown || []
+  const toggleDay = (dateStr) => {
+    setOpenDay((prev) => (prev === dateStr ? null : dateStr))
+  }
+
+  const today = data?.today || { patients_count: 0, earned_amount: 0, patients: [] }
+  const yesterday = data?.yesterday || { patients_count: 0, earned_amount: 0, patients: [] }
+  const days = data?.days || []
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto pb-10">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
         <div>
-          <h1 className="page-title mb-0.5">Profilim</h1>
-          <p className="text-muted text-xs">
-            Dr. {ism} — KPI ulushi, bugungi daromad va yig'ilgan balans
+          <h1 className="page-title mb-0.5">Shifokor Hisoboti va Profilim</h1>
+          <p className="text-muted text-xs font-semibold">
+            Dr. <strong className="text-gold">{data?.provider_name || 'Shifokor'}</strong> — Bugungi, kechagi va 10 kunlik shaxsiy ish hisoboti
           </p>
         </div>
         <button
           type="button"
-          className="px-3 py-2 rounded-xl bg-surface-2 hover:bg-white/10 border border-border text-body text-xs font-bold flex items-center gap-1.5 transition-all self-start"
-          onClick={yukla}
+          className="px-3.5 py-2 rounded-xl bg-surface-2 hover:bg-white/10 border border-border text-body text-xs font-bold flex items-center gap-1.5 transition-all self-start"
+          onClick={loadReport}
           disabled={loading}
         >
           <RefreshCw className={`h-3.5 w-3.5 text-gold ${loading ? 'animate-spin' : ''}`} />
@@ -58,94 +60,234 @@ export default function MyProfile() {
         </button>
       </div>
 
-      {!data && loading ? (
-        <p className="text-muted text-sm">Yuklanmoqda...</p>
+      {loading && !data ? (
+        <div className="p-12 text-center text-xs text-muted">Hisobot yuklanmoqda...</div>
       ) : (
         <>
+          {/* Top Quick Stats Summary Cards */}
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="card p-4 border-emerald-500/40 bg-emerald-500/5">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500 dark:text-emerald-400 block mb-1">
-                💵 Bugungi KPI pulim
-              </span>
-              <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                {formatMoney(stats?.today_kpi_earned || 0)}
-              </span>
-              <span className="text-[10px] text-muted font-semibold block mt-1">
-                Xizmat ko'rsatganingiz uchun
-              </span>
+            {/* Today */}
+            <div className="card p-4 border-emerald-500/40 bg-emerald-500/5 shadow-md space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-500">
+                  📅 BUGUN
+                </span>
+                <span className="badge badge-emerald text-[10px] font-bold">
+                  {today.patients_count} ta bemor
+                </span>
+              </div>
+              <p className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                {formatMoney(today.earned_amount)}
+              </p>
+              <p className="text-[10px] text-muted font-semibold">
+                Bugun qabul qilingan bemorlardan kelgan KPI ulushingiz
+              </p>
             </div>
 
-            <div className="card p-4 border-gold/40 bg-gold/5">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-gold block mb-1">
-                🏦 Joriy balansim
-              </span>
-              <span className="text-2xl font-black font-mono text-gold">
-                {formatMoney(stats?.current_balance || 0)}
-              </span>
+            {/* Yesterday */}
+            <div className="card p-4 border-cyan-500/40 bg-cyan-500/5 shadow-md space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-500">
+                  ⏮️ KECHA
+                </span>
+                <span className="badge badge-cyan text-[10px] font-bold">
+                  {yesterday.patients_count} ta bemor
+                </span>
+              </div>
+              <p className="text-2xl font-black font-mono text-cyan-600 dark:text-cyan-400">
+                {formatMoney(yesterday.earned_amount)}
+              </p>
+              <p className="text-[10px] text-muted font-semibold">
+                Kecha qabul qilingan bemorlardan kelgan KPI ulushingiz
+              </p>
             </div>
 
-            <div className="card p-4 border-purple-500/30 bg-purple-500/5">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600 dark:text-purple-400 block mb-1">
-                📊 KPI stavkam
-              </span>
-              <span className="text-2xl font-black font-mono text-purple-600 dark:text-purple-400">
-                {stats?.kpi_percentage || 0}%
-              </span>
+            {/* Balance */}
+            <div className="card p-4 border-gold/40 bg-gold/5 shadow-md space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-gold">
+                  🏦 JORIY BALANSIM
+                </span>
+                <span className="badge badge-gold text-[10px] font-bold">Kassadan</span>
+              </div>
+              <p className="text-2xl font-black font-mono text-gold">
+                {formatMoney(data?.balance || 0)}
+              </p>
+              <p className="text-[10px] text-muted font-semibold">
+                Kassadan yechib olinmagan qolgan hisobingiz
+              </p>
             </div>
           </div>
 
-
-
-          <div className="card">
-            <h3 className="font-extrabold text-sm text-body mb-1 flex flex-wrap items-center justify-between gap-2">
-              <span>📋 Bugungi bemorlardan kelgan KPI pullari</span>
-              <span className="text-[11px] text-muted font-bold">
-                {taqsimot.length} ta tranzaksiya
+          {/* 10-DAY BREAKDOWN SECTION */}
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-base text-foreground flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-gold" />
+                <span>Oxirgi 10 Kunlik Kunlik Hisobot va Bemorlar Ro'yxati</span>
+              </h3>
+              <span className="badge badge-muted text-xs font-bold">
+                Jami {days.length} kunlik ma'lumot
               </span>
-            </h3>
-            <p className="text-muted text-[11px] mb-3">
-              Har bir bemor to'lovidan sizga tegishli ulush.
-            </p>
+            </div>
 
-            {taqsimot.length === 0 ? (
-              <EmptyState icon="💵" message="Bugun hali KPI hisoblangan tranzaksiyalar yo'q" />
+            {days.length === 0 ? (
+              <EmptyState icon="📊" message="Oxirgi 10 kunda hali qabul qilingan bemorlar yo'q" />
             ) : (
-              <div className="space-y-2">
-                {taqsimot.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-xl bg-surface-2 border border-border flex items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="badge badge-gold font-mono text-[10px] font-black">
-                          {item.ticket_number}
-                        </span>
-                        <span className="font-extrabold text-xs text-body truncate">
-                          {item.patient_name}
-                        </span>
+              <div className="space-y-3">
+                {days.map((dayItem) => {
+                  const isOpen = openDay === dayItem.date
+                  const isTodayStr = dayItem.date === today.date
+                  const formattedDate = dayItem.date ? new Date(dayItem.date).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' }) : dayItem.date
+
+                  return (
+                    <div
+                      key={dayItem.date}
+                      className="card p-0 overflow-hidden border-border transition-all duration-200"
+                    >
+                      {/* Accordion Day Header */}
+                      <div
+                        onClick={() => toggleDay(dayItem.date)}
+                        className={`flex items-center justify-between p-4 cursor-pointer select-none transition-colors ${
+                          isOpen ? 'bg-gold/10 border-b border-border' : 'hover:bg-surface-2'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-surface-2 border border-border flex items-center justify-center text-muted font-bold text-xs">
+                            {isOpen ? <ChevronUp className="h-4 w-4 text-gold" /> : <ChevronDown className="h-4 w-4" />}
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-sm text-foreground flex items-center gap-2">
+                              <span>🗓️ {formattedDate}</span>
+                              {isTodayStr && (
+                                <span className="badge badge-emerald text-[10px] font-bold">BUGUN</span>
+                              )}
+                            </span>
+                            <span className="text-xs text-muted font-semibold block mt-0.5">
+                              {dayItem.patients_count} ta bemor qabul qilingan
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-sm font-black font-mono text-emerald-500">
+                            + {formatMoney(dayItem.earned_amount)}
+                          </span>
+                          <span className="text-[10px] text-muted font-bold block">Shifokor KPI ulushi</span>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-muted font-medium mt-1">
-                        🩺 {item.service_name} • Jami to'lov:{' '}
-                        <strong className="text-body font-mono font-bold">
-                          {formatMoney(item.total_amount)}
-                        </strong>
-                      </p>
+
+                      {/* Day Patients List Table */}
+                      {isOpen && (
+                        <div className="p-4 bg-surface-1 space-y-3">
+                          {dayItem.patients.length === 0 ? (
+                            <p className="text-xs text-muted italic text-center py-4">Bu kunda bemorlar to'lovi yo'q</p>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-border text-muted uppercase text-[10px] font-extrabold">
+                                    <th className="py-2.5 px-3">Talon</th>
+                                    <th className="py-2.5 px-3">Bemor Ism-Familiyasi</th>
+                                    <th className="py-2.5 px-3">Xizmat Nomi</th>
+                                    <th className="py-2.5 px-3">Vaqt</th>
+                                    <th className="py-2.5 px-3 text-right">Bemor To'lagan</th>
+                                    <th className="py-2.5 px-3 text-right">Shifokor Ulushi</th>
+                                    <th className="py-2.5 px-3 text-center">Shablon Natijasi</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/40 font-semibold">
+                                  {dayItem.patients.map((pt, idx) => (
+                                    <tr key={pt.patient_id || idx} className="hover:bg-white/[0.02]">
+                                      <td className="py-3 px-3">
+                                        <span className="badge badge-gold font-mono text-[10px] font-black">
+                                          {pt.ticket_number}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 px-3 font-extrabold text-foreground">
+                                        {pt.patient_name}
+                                      </td>
+                                      <td className="py-3 px-3 text-cyan">
+                                        🩺 {pt.service_name}
+                                      </td>
+                                      <td className="py-3 px-3 text-muted font-mono text-[11px]">
+                                        {pt.created_at || '—'}
+                                      </td>
+                                      <td className="py-3 px-3 text-right font-mono text-body font-bold">
+                                        {formatMoney(pt.total_amount)}
+                                      </td>
+                                      <td className="py-3 px-3 text-right font-mono text-emerald-500 font-extrabold">
+                                        + {formatMoney(pt.provider_amount)}
+                                      </td>
+                                      <td className="py-3 px-3 text-center">
+                                        {pt.has_report ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => setPreviewReport(pt)}
+                                            className="btn-cyan py-1 px-2.5 text-[10px] font-extrabold inline-flex items-center gap-1 shadow-sm"
+                                          >
+                                            <Eye className="h-3 w-3" /> Natijani Ko'rish
+                                          </button>
+                                        ) : (
+                                          <span className="text-muted text-[11px] italic">—</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">
-                        + {formatMoney(item.provider_amount)}
-                      </span>
-                      <p className="text-[10px] text-muted font-mono">
-                        {item.created_at ? item.created_at.split('T')[1]?.substring(0, 5) : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
         </>
+      )}
+
+      {/* PREVIEW REPORT MODAL */}
+      {previewReport && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="card max-w-3xl w-full p-6 relative animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div>
+                <h3 className="font-extrabold text-base text-gold flex items-center gap-2">
+                  <span>📄 {previewReport.report_label || 'Shablon Natijasi'}</span>
+                </h3>
+                <p className="text-xs text-muted font-bold mt-0.5">
+                  Bemor: <strong className="text-cyan">{previewReport.patient_name}</strong> ({previewReport.ticket_number})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewReport(null)}
+                className="p-1.5 rounded-xl text-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div
+              className="bg-white text-black rounded-xl p-5 text-[13px] leading-relaxed max-h-[70vh] overflow-y-auto shadow-inner"
+              style={{ fontFamily: "'Times New Roman', Cambria, serif" }}
+              dangerouslySetInnerHTML={{ __html: previewReport.report_content || '<p>Natija matni yo\'q</p>' }}
+            />
+
+            <div className="flex justify-end pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setPreviewReport(null)}
+                className="btn-gold py-2 px-5 text-xs font-black"
+              >
+                Yopish
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
