@@ -527,91 +527,97 @@ export default function TodayPatients() {
                 </td>
               </tr>
             ) : (
-              filteredPatients.map((p) => (
-                <tr
-                  key={p.id}
-                  className={p.is_cancelled ? 'row-cancelled' : 'hover:bg-white/[0.02] transition-colors'}
-                >
-                  {/* Talon & Vaqt */}
-                  <td className="p-2 text-center w-24">
-                    <span className="font-mono font-black text-cyan-300 text-xs tracking-wider inline-block bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-500/30">
-                      {p.ticket_number || (p.is_paper_entry ? '—' : `A-${p.id}`)}
-                    </span>
-                    <span className="text-[10px] text-muted font-mono block mt-0.5">
-                      {p.created_at ? (
-                        p.created_at.slice(0, 10) === new Date().toISOString().slice(0, 10)
-                          ? p.created_at.slice(11, 16)
-                          : `${p.created_at.slice(8, 10)}.${p.created_at.slice(5, 7)} ${p.created_at.slice(11, 16)}`
-                      ) : '—'}
-                    </span>
-                  </td>
+              <>
+                {/* 1. JONLI BEMORLAR RO'YXATI */}
+                {filteredPatients.filter((p) => !p.is_paper_entry).map((p) => (
+                  <tr
+                    key={p.id}
+                    className={p.is_cancelled ? 'row-cancelled' : 'hover:bg-white/[0.02] transition-colors'}
+                  >
+                    {/* Talon & Vaqt */}
+                    <td className="p-2 text-center w-24">
+                      <span className="font-mono font-black text-cyan-300 text-xs tracking-wider inline-block bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                        {p.ticket_number || `A-${p.id}`}
+                      </span>
+                      <span className="text-[10px] text-muted font-mono block mt-0.5">
+                        {p.created_at ? (
+                          p.created_at.slice(0, 10) === new Date().toISOString().slice(0, 10)
+                            ? p.created_at.slice(11, 16)
+                            : `${p.created_at.slice(8, 10)}.${p.created_at.slice(5, 7)} ${p.created_at.slice(11, 16)}`
+                        ) : '—'}
+                      </span>
+                    </td>
 
-                  {/* Bemor */}
-                  <td className="p-2">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-extrabold text-body text-xs">{p.first_name} {p.last_name}</span>
-                        {p.is_paper_entry ? (
-                          <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold">📄 Navbatchilik</span>
-                        ) : (
+                    {/* Bemor */}
+                    <td className="p-2">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-extrabold text-body text-xs">{p.first_name} {p.last_name}</span>
                           <span className="px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold">🟢 Jonli</span>
+                        </div>
+                        <span className="text-[10px] text-muted font-mono block">{p.phone || '—'}</span>
+                      </div>
+                    </td>
+
+                    {/* Xizmat & Shifokor */}
+                    <td className="p-2 max-w-[200px]">
+                      {(() => {
+                        const list = p.services || []
+                        if (list.length > 2) {
+                          const firstTwo = list.slice(0, 2)
+                          const remaining = list.length - 2
+                          const allNames = list.map((s) => `${s.service_name}${s.quantity > 1 ? ` (x${s.quantity})` : ''}`).join(', ')
+                          return (
+                            <div className="space-y-0.5" title={allNames}>
+                              {firstTwo.map((s, i) => (
+                                <span key={i} className="font-bold text-cyan text-xs block leading-tight truncate">
+                                  {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+                                </span>
+                              ))}
+                              <span className="inline-block mt-0.5 text-[10px] font-black text-gold bg-gold/10 border border-gold/30 px-1.5 py-0.5 rounded cursor-help">
+                                +{remaining} ta xizmat
+                              </span>
+                            </div>
+                          )
+                        }
+                        if (list.length > 1) {
+                          return (
+                            <div className="space-y-0.5">
+                              {list.map((s, i) => (
+                                <span key={i} className="font-bold text-cyan text-xs block leading-tight truncate">
+                                  {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
+                                </span>
+                              ))}
+                            </div>
+                          )
+                        }
+                        return (
+                          <span className="font-bold text-cyan text-xs block leading-tight truncate">
+                            {list[0]?.service_name || p.service_name}
+                          </span>
+                        )
+                      })()}
+                      <span className="text-[10px] text-muted font-semibold block truncate">
+                        👨‍⚕️ {p.provider_name || p.provider?.full_name || '—'}
+                      </span>
+                    </td>
+
+                    {/* Summa */}
+                    <td className="p-2">
+                      <div className="font-mono text-xs">
+                        <span className="font-extrabold text-gold block">{formatMoney(p.payment_amount)}</span>
+                        <span className="text-[10px] text-muted block font-semibold">{paymentLabel(p.payment_type)}</span>
+                      </div>
+                    </td>
+
+                    {/* Kabinet & Holat */}
+                    <td className="p-2">
+                      <div className="space-y-1">
+                        <StatusBadge status={p.queue_status} />
+                        {p.cabinet && (
+                          <span className="text-[10px] text-muted block font-semibold">🚪 {p.cabinet}</span>
                         )}
                       </div>
-                      <span className="text-[10px] text-muted font-mono block">{p.phone || '—'}</span>
-                    </div>
-                  </td>
-
-                  {/* Xizmat & Shifokor */}
-                  <td className="p-2 max-w-[200px]">
-                    {(() => {
-                      const list = p.services || []
-                      if (list.length > 2) {
-                        const firstTwo = list.slice(0, 2)
-                        const remaining = list.length - 2
-                        const allNames = list.map((s) => `${s.service_name}${s.quantity > 1 ? ` (x${s.quantity})` : ''}`).join(', ')
-                        return (
-                          <div className="space-y-0.5" title={allNames}>
-                            {firstTwo.map((s, i) => (
-                              <span key={i} className="font-bold text-cyan text-xs block leading-tight truncate">
-                                {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
-                              </span>
-                            ))}
-                            <span className="inline-block mt-0.5 text-[10px] font-black text-gold bg-gold/10 border border-gold/30 px-1.5 py-0.5 rounded cursor-help">
-                              +{remaining} ta xizmat
-                            </span>
-                          </div>
-                        )
-                      }
-                      if (list.length > 1) {
-                        return (
-                          <div className="space-y-0.5">
-                            {list.map((s, i) => (
-                              <span key={i} className="font-bold text-cyan text-xs block leading-tight truncate">
-                                {s.service_name}{s.quantity > 1 ? ` ×${s.quantity}` : ''}
-                              </span>
-                            ))}
-                          </div>
-                        )
-                      }
-                      return (
-                        <span className="font-bold text-cyan text-xs block leading-tight truncate">
-                          {list[0]?.service_name || p.service_name}
-                        </span>
-                      )
-                    })()}
-                    <span className="text-[10px] text-muted font-medium block truncate mt-0.5">{p.provider_name || '—'}</span>
-                  </td>
-
-                  {/* Summa */}
-                  <td className="p-2">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="font-mono font-black text-emerald text-xs">{formatMoney(p.payment_amount)}</span>
-                      <span className="badge badge-gold text-[9px] uppercase font-bold px-1 py-0">{paymentLabel(p.payment_type)}</span>
-                    </div>
-                    {p.payment_type === 'split' && (
-                      <span className="block text-[9px] text-cyan-400 font-bold font-mono">
-                        {[
-                          (p.cash_amount || 0) > 0 && `${formatMoney(p.cash_amount)} N`,
                           (p.card_amount || 0) > 0 && `${formatMoney(p.card_amount)} K`,
                           (p.click_amount || 0) > 0 && `${formatMoney(p.click_amount)} Cl`,
                           (p.qr_amount || 0) > 0 && `${formatMoney(p.qr_amount)} QR`,
