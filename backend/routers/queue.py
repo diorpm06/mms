@@ -295,7 +295,10 @@ def get_doctor_queue(
     """
     Get current queue dashboard data & history for logged-in Doctor.
     """
-    target_provider_id = provider_id or user.provider_id
+    if user.role == "doctor" and user.provider_id:
+        target_provider_id = user.provider_id
+    else:
+        target_provider_id = provider_id or user.provider_id
 
     # Auto-link user -> provider if user.role == 'doctor' and user.provider_id is None
     if not target_provider_id and user.role == "doctor":

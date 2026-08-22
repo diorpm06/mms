@@ -61,12 +61,8 @@ export default function DoctorPanel() {
 
   // Doctors list for CEO/Admin selection
   const [providers, setProviders] = useState([])
-  // Tanlangan shifokor sahifa yangilanganda ham eslab qolinadi. Ilgari u
-  // faqat komponent holatida turardi: CEO/Admin shifokorni tanlab ishlab
-  // turganda F5 bossa yoki sahifa qayta yuklansa, yana ro'yxat ekraniga
-  // qaytib ketardi. sessionStorage — faqat shu ilova oynasi uchun, ya'ni
-  // boshqa qurilma yoki yangi oynaga o'tmaydi.
   const [selectedProviderId, setSelectedProviderId] = useState(() => {
+    if (role === 'doctor') return null
     try {
       const saqlangan = sessionStorage.getItem('doctor-panel-provider')
       return saqlangan ? Number(saqlangan) : null
@@ -75,7 +71,17 @@ export default function DoctorPanel() {
     }
   })
 
+  useEffect(() => {
+    if (role === 'doctor') {
+      setSelectedProviderId(null)
+      try {
+        sessionStorage.removeItem('doctor-panel-provider')
+      } catch (_) {}
+    }
+  }, [role])
+
   const shifokorniTanla = (id) => {
+    if (role === 'doctor') return
     setSelectedProviderId(id)
     try {
       if (id) sessionStorage.setItem('doctor-panel-provider', String(id))
@@ -617,7 +623,7 @@ export default function DoctorPanel() {
       )}
 
       {/* CEO / ADMIN DOCTOR SELECTOR TOP BAR */}
-      {isManagement && providers.length > 0 && (
+      {isManagement && role !== 'doctor' && providers.length > 0 && (
         <div className="card p-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-gold/40 bg-surface-2 shadow-md">
           <div className="flex items-center gap-2">
             <Btn
