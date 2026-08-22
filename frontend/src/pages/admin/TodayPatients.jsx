@@ -535,7 +535,7 @@ export default function TodayPatients() {
                   {/* Talon & Vaqt */}
                   <td className="p-2 text-center w-24">
                     <span className="font-mono font-black text-cyan-300 text-xs tracking-wider inline-block bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-500/30">
-                      {p.ticket_number || `A-${p.id}`}
+                      {p.ticket_number || (p.is_paper_entry ? '—' : `A-${p.id}`)}
                     </span>
                     <span className="text-[10px] text-muted font-mono block mt-0.5">
                       {p.created_at ? (

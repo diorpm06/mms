@@ -24,23 +24,17 @@ function bugungiSana() {
 // Blankalar kirill va lotin alifbosida — ikkalasi ham tanilishi kerak
 const FIO_KALIT = /(ф\s*\.?\s*и\s*\.?\s*о|f\s*\.?\s*i\s*\.?\s*sh|f\s*\.?\s*i\s*\.?\s*o|бемор|bemorni)\s*\.?\s*:?\s*$/i
 const SANA_KALIT = /(дата|сана|sana|sanasi|топширган|topshirgan|tekshiruv\s+sanasi)[^:]{0,24}:?\s*$/i
+const TUGILGAN_YILI_KALIT = /(туғилган|тугилган|tug'ilgan|yoshi|ёши|возраст|рождения|birth|yili)/i
 
 function nimaUchun(oldingiMatn) {
   const oxiri = oldingiMatn.slice(-40)
   if (FIO_KALIT.test(oxiri)) return 'fio'
   if (SANA_KALIT.test(oxiri)) return 'sana'
+  if (TUGILGAN_YILI_KALIT.test(oxiri)) return 'birth'
   return null
 }
 
-// "______" larni o'sadigan katakchalarga almashtiradi.
-//
-// Ilgari bu yerda qat'iy kenglikdagi <input> ishlatilardi — uzun familiya
-// sig'masdi va yonidagi "Дата" surilmasdi. Endi contenteditable <span>:
-// u matn bilan birga kengayadi, qolgan matn esa o'z-o'zidan siljiydi.
-function katakchalarniQoy(container, bemorIsmi, qoyilgan) {
-  // Yorliq ("Ф.И.О:") va bo'sh joy ko'pincha boshqa-boshqa teglarda bo'ladi.
-  // Shuning uchun avval barcha matn tugunlarini tartib bilan yig'ib, har bir
-  // bo'sh joy uchun undan OLDINGI butun matnni bilib turamiz.
+function katakchalarniQoy(container, bemorIsmi, bemorTugilganYili, qoyilgan) {
   const tugunlar = []
   const yur = (node) => {
     if (node.nodeType === Node.TEXT_NODE) tugunlar.push(node)
@@ -66,20 +60,18 @@ function katakchalarniQoy(container, bemorIsmi, qoyilgan) {
       const span = document.createElement('span')
       span.className = 'mms-blank'
       span.setAttribute('data-blank', '1')
-      // FAQAT shu katakcha tahrirlanadi. Ilgari butun hujjat contentEditable
-      // edi: shifokor blankaning o'z matnini ham o'zgartirib yuborardi va
-      // katakchani o'chirib yuborsa u butunlay yo'q bo'lardi.
       span.contentEditable = 'true'
       span.setAttribute('spellcheck', 'false')
-      // Har bir tur (ism / sana) faqat BIR MARTA to'ldiriladi. Ba'zi
-      // blankalarda yorliq va bo'sh joy alohida qatorlarda turadi va
-      // ikkala qoida ham ishlab, ism ikki joyga yozilib qolardi.
+
       if (tur === 'fio' && bemorIsmi && !qoyilgan.fio) {
         span.textContent = bemorIsmi
         qoyilgan.fio = true
       } else if (tur === 'sana' && !qoyilgan.sana) {
         span.textContent = bugungiSana()
         qoyilgan.sana = true
+      } else if (tur === 'birth' && bemorTugilganYili && !qoyilgan.birth) {
+        span.textContent = bemorTugilganYili
+        qoyilgan.birth = true
       } else {
         span.textContent = ''
       }
@@ -103,8 +95,9 @@ function katakchalarniQoy(container, bemorIsmi, qoyilgan) {
 // u yerda "______" belgisi yo'q, shuning uchun alohida to'ldiriladi.
 const JADVAL_FIO = /^(ф\s*\.?\s*и\s*\.?\s*о|f\s*\.?\s*i\s*\.?\s*o)\b/i
 const JADVAL_SANA = /(дата|сана|sana|топширган\s*сана|topshirgan\s*sana|распечатки|исследования)/i
+const JADVAL_BIRTH = /(туғилган|тугилган|tug'ilgan|yoshi|ёши|возраст)/i
 
-function jadvalKataklariniToldir(container, bemorIsmi, qoyilgan) {
+function jadvalKataklariniToldir(container, bemorIsmi, bemorTugilganYili, qoyilgan) {
   container.querySelectorAll('tr').forEach((tr) => {
     const kataklar = Array.from(tr.children)
     if (kataklar.length < 2) return
@@ -119,6 +112,9 @@ function jadvalKataklariniToldir(container, bemorIsmi, qoyilgan) {
     } else if (JADVAL_SANA.test(sarlavha) && !qoyilgan.sana) {
       matn = bugungiSana()
       qoyilgan.sana = true
+    } else if (JADVAL_BIRTH.test(sarlavha) && bemorTugilganYili && !qoyilgan.birth) {
+      matn = bemorTugilganYili
+      qoyilgan.birth = true
     }
     if (!matn) return
 
@@ -162,20 +158,18 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
     if (view === 'fill' && template && fillRef.current) {
       fillRef.current.innerHTML = template.bodyHtml
       const fullName = `${patient.last_name || ''} ${patient.first_name || ''}`.trim()
-      // Ism va sana avtomat qo'yiladi — shifokor har safar qo'lda yozmasin
-      const qoyilgan = { fio: false, sana: false }
-      katakchalarniQoy(fillRef.current, fullName, qoyilgan)
-      jadvalKataklariniToldir(fillRef.current, fullName, qoyilgan)
+      const rawBirth = patient.birth_date ? String(patient.birth_date).trim() : ''
+      const birthStr = rawBirth.length >= 4 ? rawBirth.slice(0, 4) + '-yil' : rawBirth
+
+      const qoyilgan = { fio: false, sana: false, birth: false }
+      katakchalarniQoy(fillRef.current, fullName, birthStr, qoyilgan)
+      jadvalKataklariniToldir(fillRef.current, fullName, birthStr, qoyilgan)
     }
   }, [view, selectedKey])
 
   if (!patient) return null
 
   const openPicker = () => {
-    // Xizmatga shablon biriktirilgan bo'lsa o'sha ochiladi, lekin shifokor
-    // ro'yxatga qaytib boshqasini tanlay oladi. Ilgari biriktirilgan shablon
-    // bo'lsa ro'yxat umuman ko'rsatilmasdi — bemor bir necha tahlil topshirsa
-    // faqat bittasini to'ldirib bo'lardi.
     setSelectedKey(defaultTemplateKey || null)
     setView(defaultTemplateKey ? 'fill' : 'picker')
   }
@@ -190,11 +184,7 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
     if (!template || !fillRef.current) return
     setSubmitting(true)
     try {
-      // Hujjatni asl ko'rinishi bilan saqlaymiz. Nusxa olib ishlaymiz —
-      // shifokor ekranidagi hujjatga tegmasligi uchun.
       const nusxa = fillRef.current.cloneNode(true)
-      // To'ldirilgan katakchalar oddiy qalin matnga aylanadi — chop etilganda
-      // sariq fon va tag chiziq chiqmasligi uchun
       nusxa.querySelectorAll('[data-blank]').forEach((el) => {
         const qiymat = (el.textContent || '').trim()
         const kuchli = document.createElement('strong')
@@ -202,18 +192,22 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
         el.replaceWith(kuchli)
       })
       const filledHtml = nusxa.innerHTML
+      const fullName = `${patient.first_name || ''} ${patient.last_name || ''}`.trim()
+      const templateLabelWithPatient = `${template.name} — ${fullName}`
+
       await api('/report-submissions', {
         method: 'POST',
         body: JSON.stringify({
           patient_id: patient.id,
           service_id: serviceId || null,
           template_key: template.key,
-          template_label: template.name,
+          template_label: templateLabelWithPatient,
           category: template.category,
           content: filledHtml,
+          status: 'submitted',
         }),
       })
-      toast("✓ Natija saqlandi. Adminga yuborish uchun pastdagi \"To'ldirilgan natijalar\" bo'limidan foydalaning.")
+      toast(`✓ ${templateLabelWithPatient} natijasi adminga va bemor kartasiga saqlandi!`)
       setView('history')
       loadHistory()
     } catch (err) {

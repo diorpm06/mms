@@ -10,8 +10,9 @@ import { BRAND } from '../config/brand'
 
 export default function PatientMedicalCardModal({ patient, onClose }) {
   const [history, setHistory] = useState([])
+  const [reportSubmissions, setReportSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('ehr') // 'ehr' | 'visits'
+  const [activeTab, setActiveTab] = useState('ehr') // 'ehr' | 'visits' | 'reports'
   const [showReRegister, setShowReRegister] = useState(false)
   const [showLab, setShowLab] = useState(false)
   const [showPayUnpaid, setShowPayUnpaid] = useState(false)
@@ -26,6 +27,10 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
       .then((res) => setHistory(res || []))
       .catch((e) => console.error(e))
       .finally(() => setLoading(false))
+
+    api(`/report-submissions/patient/${patient.id}`)
+      .then((res) => setReportSubmissions(res || []))
+      .catch(() => setReportSubmissions([]))
   }
 
   useEffect(() => {
@@ -208,9 +213,59 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
               }`}
             >
               <Clock className="h-4 w-4" />
-              📜 Barcha Tashriflar va To'lovlar ({totalVisitsCount})
+              📜 Barcha Tashriflar ({totalVisitsCount})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('reports')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                activeTab === 'reports'
+                  ? 'bg-emerald text-white font-black shadow-md'
+                  : 'bg-surface-2 text-muted hover:text-body border border-border'
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              🩻 Shablon Natijalari (UZI/Lab) ({reportSubmissions.length})
             </button>
           </div>
+
+          {/* TAB 3: SHABLON NATIJALARI (UZI / LAB) */}
+          {activeTab === 'reports' && (
+            <div className="space-y-4 animate-in fade-in">
+              {reportSubmissions.length === 0 ? (
+                <div className="p-8 rounded-2xl card-2 text-center text-xs text-muted space-y-1">
+                  <p className="font-bold text-body">Hali to'ldirilgan shablon natijasi biriktirilmagan</p>
+                  <p>Shifokor UZI yoki laboratoriya blankasini to'ldirib saqlaganda avtomatik shu yerda ko'rinadi.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {reportSubmissions.map((r) => (
+                    <div key={r.id} className="card p-4 space-y-3 border-emerald-500/30 bg-surface shadow-md">
+                      <div className="flex items-center justify-between border-b border-border pb-2">
+                        <div>
+                          <p className="font-extrabold text-sm text-gold flex items-center gap-2">
+                            <span>{r.category === 'UZI' ? '🩻' : '🔬'} {r.template_label}</span>
+                          </p>
+                          <p className="text-xs text-muted mt-0.5 font-semibold">
+                            Shifokor: <strong className="text-body">{r.doctor_name || '—'}</strong>
+                          </p>
+                        </div>
+                        <span className="text-[11px] text-muted font-mono font-bold">
+                          {r.created_at ? new Date(r.created_at).toLocaleString('uz-UZ') : ''}
+                        </span>
+                      </div>
+                      <div
+                        className="bg-white text-black rounded-xl p-4 text-[12px] leading-relaxed max-h-96 overflow-y-auto shadow-inner"
+                        style={{ fontFamily: "'Times New Roman', Cambria, serif" }}
+                        dangerouslySetInnerHTML={{ __html: r.content }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* TAB 1: EHR MEDICAL DIAGNOSES & PRESCRIPTIONS */}
           {activeTab === 'ehr' && (

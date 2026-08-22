@@ -77,8 +77,8 @@ export default function AdminReportQueue() {
   return (
     <div className="max-w-3xl">
       <PageHeader
-        title="Shablonlar (Chop etishni kutayotgan)"
-        subtitle="Shifokorlar to'ldirgan UZI/Laboratoriya shablonlari — ko'rib chiqing, PDF sifatida yoki printerga yuboring"
+        title="📋 Shablon Natijalari"
+        subtitle="Shifokorlar to'ldirgan UZI va Laboratoriya shablon natijalari — ko'rish, PDF yuklab olish va printerga yuborish"
         icon={Icons.chart}
       >
         <button onClick={load} className="btn-outline py-2 px-3 text-xs flex items-center gap-1.5">

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -83,7 +83,12 @@ def delete_employee(
 
 
 @router.post("/{employee_id}/pay-salary")
-async def pay_salary(employee_id: int, db: Session = Depends(get_db), user: User = Depends(require_admin_or_ceo)):
+async def pay_salary(
+    employee_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
     summary = employee_payroll_summary(db, employee_id)
     log = pay_employee_salary(db, employee_id)
     emp = db.query(Employee).filter(Employee.id == employee_id).first()
@@ -98,7 +103,11 @@ async def pay_salary(employee_id: int, db: Session = Depends(get_db), user: User
         db.add(exp)
     db.commit()
     report = daily_report(db, datetime.now().date())
-    await send_telegram_message(
+    # Ilgari bu yerda `await` turardi — Telegram javob bermaguncha (yoki
+    # taym-aut bo'lguncha) kassir ekranda kutib turardi. Endi xabar javob
+    # yuborilgandan KEYIN, fon vazifasi sifatida ketadi.
+    background_tasks.add_task(
+        send_telegram_message,
         f"💼 Qo'lda maosh: {log.amount:,} so'm ({emp_name})".replace(",", " "),
         section="finance",
     )

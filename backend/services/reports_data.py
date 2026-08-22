@@ -53,6 +53,24 @@ def _infer_service_category(name: str, category: str, cabinet: str) -> str:
 
 
 
+# Qog'oz (navbatchilik) yozuvlari uchun ilgari 16 soatlik "oldingi smena"
+# oynasi ishlatilardi: kunlik hisobot KECHAGI soat 08:00 dan boshlab
+# qog'oz yozuvlarini ham o'ziga qo'shib olardi.
+#
+# Natijada bitta to'lov IKKI kunning hisobotida ham sanalardi. 17–21.08
+# oralig'ida tekshirilganda 38 ta yozuv, jami 730,000 so'm ikki marta
+# hisoblangani aniqlandi. Qog'oz yozuvlari amalda kunduzi (09:39, 11:20,
+# 16:17) kiritilgan — ya'ni oyna tungi smenani emas, oddiy kunduzgi
+# yozuvlarni ham tortib olgan.
+#
+# Orqaga sana qo'yish uchun `custom_date` mavjud: u yozuvning created_at
+# ini kerakli kunga qo'yadi, shuning uchun yozuv o'z kunida sanaladi va
+# qo'shimcha oyna keraksiz.
+#
+# 0 = oyna yo'q, har bir to'lov faqat O'Z kunida sanaladi.
+QOGOZ_SMENA_OYNASI = timedelta(0)
+
+
 def _day_range(d: date):
     start = datetime.combine(d, datetime.min.time())
     end = datetime.combine(d, datetime.max.time())
@@ -87,7 +105,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
     s, e = _period_range(start, end)
 
     if start == end:
-        paper_shift_s = s - timedelta(hours=16)
+        paper_shift_s = s - QOGOZ_SMENA_OYNASI
         txs = _active_tx_filter(
             db.query(Transaction).filter(
                 or_(
@@ -343,7 +361,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
         d["services"].sort(key=lambda s: s["total"], reverse=True)
 
     if start == end:
-        paper_shift_s = s - timedelta(hours=16)
+        paper_shift_s = s - QOGOZ_SMENA_OYNASI
         referrers_breakdown = (
             db.query(
                 Referrer.full_name,
@@ -391,7 +409,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
     from models.provider import Provider
 
     if start == end:
-        paper_shift_s = s - timedelta(hours=16)
+        paper_shift_s = s - QOGOZ_SMENA_OYNASI
         providers_breakdown = (
             db.query(
                 Provider.full_name,
@@ -833,7 +851,7 @@ def admin_dashboard_summary(db: Session, d: date) -> dict:
     harajat manbasi).
     """
     s, e = _day_range(d)
-    paper_shift_s = s - timedelta(hours=16)
+    paper_shift_s = s - QOGOZ_SMENA_OYNASI
 
     # 1-so'rov: kunlik tranzaksiyalar (tungi navbatchilik yozuvlari bilan)
     qatorlar = (
@@ -943,7 +961,7 @@ def dashboard_summary(db: Session, d: date) -> dict:
     CEO/Admin dashboard uchun yengil xulosa, shu jumladan tungi navbatchilik jurnali tushumlari.
     """
     s, e = _day_range(d)
-    paper_shift_s = s - timedelta(hours=16)
+    paper_shift_s = s - QOGOZ_SMENA_OYNASI
 
     paper_income = (
         db.query(func.coalesce(func.sum(Patient.payment_amount), 0))

@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_, and_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
 from database import get_db
@@ -318,6 +318,13 @@ def today_patients(db: Session = Depends(get_db), _: User = Depends(require_doct
             joinedload(Patient.provider),
             joinedload(Patient.service),
             joinedload(Patient.creator),
+            # _patient_row har bir xizmat qatorida ps.service.name ni o'qiydi.
+            # services_detail o'zi "selectin" bilan bitta so'rovda kelardi,
+            # lekin ichidagi service bog'lanishi kelmasdi — har bir YANGI
+            # xizmat turi uchun alohida SELECT ketardi (takrorlanganini
+            # SQLAlchemy o'z xotirasidan oladi). Katalogda xizmat turi
+            # ko'p bo'lgani sari bu qimmatlashadi.
+            selectinload(Patient.services_detail).joinedload(PatientService.service),
         )
         .filter(
             or_(
@@ -383,6 +390,8 @@ def search_patients(
         joinedload(Patient.provider),
         joinedload(Patient.service),
         joinedload(Patient.creator),
+        # Xizmat qatorlaridagi service ham bitta so'rovda kelsin
+        selectinload(Patient.services_detail).joinedload(PatientService.service),
     )
     if not include_cancelled:
         q = q.filter(Patient.is_cancelled == False)

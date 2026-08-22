@@ -94,60 +94,7 @@ export default function MyProfile() {
             </div>
           </div>
 
-          {/* Yo'naltirishdan tushgan pul — shifokorlik ulushidan ALOHIDA.
-              Faqat shifokorning yo'naltiruvchi yozuvi bog'langan bo'lsa
-              ko'rinadi ("Dr.Ozoda" <-> "Ozoda Medsestra"). */}
-          {stats?.referrer_name && (
-            <div className="card border-teal-500/40 bg-teal-500/5">
-              <h3 className="font-extrabold text-sm text-teal-700 dark:text-teal-300 mb-1 flex flex-wrap items-center gap-2">
-                🤝 Yo'naltirishdan tushgan pulim
-                <span className="badge badge-info text-[10px] font-mono">
-                  {stats.referrer_name}
-                </span>
-              </h3>
-              <p className="text-muted text-[11px] mb-3">
-                Siz yo'naltirgan bemorlardan tushgan ulush. Bu shifokorlik
-                puliga qo'shilmaydi — alohida hisoblanadi.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="p-3 rounded-xl bg-surface-2 border border-border">
-                  <span className="text-[10px] font-bold uppercase text-muted block mb-1">
-                    Bugun
-                  </span>
-                  <span className="text-xl font-black font-mono text-teal-600 dark:text-teal-300">
-                    {formatMoney(stats.referral_today || 0)}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-surface-2 border border-border">
-                  <span className="text-[10px] font-bold uppercase text-muted block mb-1">
-                    Butun davrda
-                  </span>
-                  <span className="text-xl font-black font-mono text-body">
-                    {formatMoney(stats.referral_total || 0)}
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                  <span className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300 block mb-1">
-                    Beriladigan
-                  </span>
-                  <span className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-                    {formatMoney(stats.referral_balance || 0)}
-                  </span>
-                </div>
-              </div>
 
-              <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-bold text-muted uppercase">
-                  Jami beriladigan (shifokorlik + yo'naltirish)
-                </span>
-                <span className="text-lg font-black font-mono text-gold">
-                  {formatMoney(
-                    (stats.current_balance || 0) + (stats.referral_balance || 0)
-                  )}
-                </span>
-              </div>
-            </div>
-          )}
 
           <div className="card">
             <h3 className="font-extrabold text-sm text-body mb-1 flex flex-wrap items-center justify-between gap-2">

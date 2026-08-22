@@ -18,6 +18,22 @@ from models.user import User
 router = APIRouter(prefix="/api/queue", tags=["queue"])
 
 
+def _navbatni_qulfla(db: Session, patient_id: int):
+    """Bemor qatorini QULFLAB o'qiydi (SELECT ... FOR UPDATE).
+
+    Navbat holatini bir vaqtda ikki joydan o'zgartirish mumkin: shifokor
+    o'z panelidan, admin esa "Bugungi bemorlar" ro'yxatidan. Qulfsiz
+    ikkalasi ham eski holatni ko'rib, biri ikkinchisining o'zgarishini
+    bosib ketardi.
+
+    SQLite FOR UPDATE ni qo'llab-quvvatlamaydi — u yerda oddiy o'qish.
+    """
+    q = db.query(Patient).filter(Patient.id == patient_id)
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        q = q.with_for_update()
+    return q.first()
+
+
 def _assert_patient_ownership(p: Patient, user: User) -> None:
     """Shifokor faqat o'ziga tayinlangan bemorni boshqara oladi; admin/ceo istalganini."""
     if user.role == "doctor" and p.provider_id and user.provider_id and p.provider_id != user.provider_id:
@@ -576,6 +592,19 @@ def doctor_call_next(
                 )
         query = query.filter(or_(*matching_conditions))
 
+    # Bir vaqtda ikki shifokor "Keyingisi" bossa, ikkalasi ham bitta
+    # bemorni tanlab olardi: SELECT ikkalasida ham o'sha qatorni qaytarardi
+    # va keyin ikkalasi ham uni "qabulda" qilib yozardi. Natijada bemor
+    # ikki xonaga chaqirilardi, TV ekranda esa bittasi yo'qolardi.
+    #
+    # FOR UPDATE SKIP LOCKED: birinchi shifokor qatorni qulflaydi, ikkinchisi
+    # uni KUTMASDAN o'tkazib yuboradi va keyingi bemorni oladi. Aynan
+    # navbat taqsimlash uchun mo'ljallangan usul.
+    #
+    # SQLite qulflashni qo'llab-quvvatlamaydi — u yerda oddiy o'qish.
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        query = query.with_for_update(skip_locked=True)
+
     next_patient = query.order_by(Patient.created_at.asc()).first()
 
     if not next_patient:
@@ -634,7 +663,7 @@ def recall_patient(
     db: Session = Depends(get_db),
     user: User = Depends(require_doctor_or_admin_or_ceo),
 ):
-    p = db.query(Patient).filter(Patient.id == patient_id).first()
+    p = _navbatni_qulfla(db, patient_id)
     if not p and user.role != "doctor":
         p = db.query(Patient).filter(Patient.is_cancelled == False, Patient.queue_status == "qabulda").order_by(Patient.updated_at.desc()).first()
     if not p:
@@ -656,7 +685,7 @@ def update_patient_queue_status(
     db: Session = Depends(get_db),
     user: User = Depends(require_doctor_or_admin_or_ceo),
 ):
-    p = db.query(Patient).filter(Patient.id == patient_id).first()
+    p = _navbatni_qulfla(db, patient_id)
     if not p:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
     if p.is_cancelled:
@@ -683,7 +712,7 @@ def complete_patient_visit(
     db: Session = Depends(get_db),
     user: User = Depends(require_doctor_or_admin_or_ceo),
 ):
-    p = db.query(Patient).filter(Patient.id == patient_id).first()
+    p = _navbatni_qulfla(db, patient_id)
     if not p:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
     _assert_patient_ownership(p, user)
@@ -702,7 +731,7 @@ def skip_patient_visit(
     db: Session = Depends(get_db),
     user: User = Depends(require_doctor_or_admin_or_ceo),
 ):
-    p = db.query(Patient).filter(Patient.id == patient_id).first()
+    p = _navbatni_qulfla(db, patient_id)
     if not p:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
     _assert_patient_ownership(p, user)
@@ -722,7 +751,7 @@ def call_patient(
     db: Session = Depends(get_db),
     user: User = Depends(require_doctor_or_admin_or_ceo),
 ):
-    p = db.query(Patient).filter(Patient.id == patient_id).first()
+    p = _navbatni_qulfla(db, patient_id)
     if not p:
         raise HTTPException(status_code=404, detail="Mijoz topilmadi")
     if p.is_cancelled:

@@ -23,8 +23,27 @@ try:
         # ulanishni tutadi, ammo SO'ROV PAYTIDA uzilganini tuta olmaydi —
         # o'shanda OS ning TCP taym-auti (Linuxda soatlab) kutilardi va
         # tizim osilib qolardi.
+        # POOL O'LCHAMI — ataylab KICHIK.
+        #
+        # Supabase'da max_connections = 60, shundan 3 tasi superuser uchun
+        # zaxira, ya'ni ilovaga 57 ta qoladi. Ustiga PostgREST, pg_cron,
+        # Supavisor va monitoring ham o'z ulanishlarini oladi.
+        #
+        # Vercel serverless: har bir nusxa (instance) O'Z poolini yuritadi.
+        # Ya'ni pool_size=20 + max_overflow=30 qo'yilsa, bitta nusxa 50
+        # ulanishgacha ochadi va IKKI nusxa ishga tushsa chegaradan oshib
+        # ketadi — natijada butun tizim "too many connections" bilan
+        # to'xtaydi. Nusxalar sonini biz boshqarmaymiz, Vercel yukka qarab
+        # o'zi ko'paytiradi.
+        #
+        # 5 + 5 = nusxa boshiga eng ko'pi 10 ta ulanish. Bu 5 ta nusxagacha
+        # xavfsiz sig'adi. pool_timeout: pool to'lsa so'rov 30 soniya
+        # navbatda kutadi, darhol xato bermaydi.
         engine = create_engine(
             db_url,
+            pool_size=5,
+            max_overflow=5,
+            pool_timeout=30,
             pool_pre_ping=True,      # bo'sh turgan o'lik ulanishni almashtiradi
             pool_recycle=120,        # 2 daqiqadan eski ulanish yangilanadi
             connect_args={

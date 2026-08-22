@@ -28,7 +28,9 @@ export default function PaymentReminderWidget() {
 
   useEffect(() => {
     fetchPending()
-    const interval = setInterval(fetchPending, 5000)
+    // Nasiya eslatmasi tez-tez o'zgarmaydi — 5 soniya o'rniga 15.
+    // Har bir ochiq panel daqiqasiga 12 ta so'rov yuborardi, endi 4 ta.
+    const interval = setInterval(fetchPending, 15000)
     return () => clearInterval(interval)
   }, [])
 

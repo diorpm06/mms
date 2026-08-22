@@ -300,11 +300,15 @@ export default function DoctorPanel() {
     if (!isManagement || selectedProviderId) {
       setLoading(true)
       fetchDoctorQueue()
-      const interval = setInterval(fetchDoctorQueue, 4000)
+      // Shifokorning o'z navbati — u yerda tezkorlik kerak, chunki
+      // bemor eshik oldida turadi. Shuning uchun 4 -> 6 soniya, undan
+      // ko'p oshirilmadi: navbat sekin yangilansa shifokor kutib qoladi.
+      const interval = setInterval(fetchDoctorQueue, 6000)
       return () => clearInterval(interval)
     } else {
       setLoading(false)
-      const interval = setInterval(fetchProviders, 5000)
+      // Shifokorlar TANLASH ekrani — bu yerda tezkorlik shart emas
+      const interval = setInterval(fetchProviders, 15000)
       return () => clearInterval(interval)
     }
   }, [selectedProviderId, isManagement])

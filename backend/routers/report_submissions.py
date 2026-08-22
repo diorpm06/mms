@@ -23,6 +23,7 @@ class ReportSubmissionCreate(BaseModel):
     template_label: str
     category: str
     content: str
+    status: Optional[str] = "submitted"
 
 
 def _row(r: ReportSubmission) -> dict:
@@ -55,6 +56,8 @@ def create_report_submission(
     if not patient:
         raise HTTPException(status_code=404, detail="Bemor topilmadi")
 
+    status = body.status or "submitted"
+    hozir = datetime.now()
     r = ReportSubmission(
         patient_id=body.patient_id,
         service_id=body.service_id,
@@ -64,9 +67,8 @@ def create_report_submission(
         filled_data=body.content,
         doctor_id=user.id,
         doctor_name=user.full_name,
-        # Saqlash va yuborish ajratilgan: shifokor avval to'ldirib saqlaydi
-        # (qoralama), keyin bir necha natijani birdaniga adminga yuboradi.
-        status="draft",
+        status=status,
+        submitted_at=hozir if status == "submitted" else None,
     )
     db.add(r)
     db.flush()

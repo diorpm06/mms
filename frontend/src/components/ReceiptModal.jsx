@@ -25,7 +25,7 @@ export default function ReceiptModal({ patient, onClose }) {
     if (root) root.style.display = ''
   }
 
-  const ticket = patient.ticket_number || `A-${patient.id}`
+  const ticket = patient.ticket_number || (patient.is_paper_entry ? '—' : `A-${patient.id}`)
   const createdDate = patient.created_at
     ? new Date(patient.created_at).toLocaleString('uz-UZ', {
         day: '2-digit',

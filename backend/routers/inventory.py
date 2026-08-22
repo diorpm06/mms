@@ -229,10 +229,16 @@ def consume_item(
             .first()
         )
 
+    # Birlik narxi HAR DOIM aniqlanadi. Ilgari u faqat `if
+    # body.charge_patient:` ichida hisoblanardi, lekin quyida audit
+    # yozuvida (`"unit_price": unit_p`) blokdan tashqarida ishlatilardi.
+    # Natijada material bemorga hisoblanmasdan sarflansa
+    # (charge_patient=False) UnboundLocalError chiqib, server 500 berardi.
+    unit_p = body.price_per_unit if body.price_per_unit is not None else item.unit_price
+
     # Calculate total charge if charging patient
     charged_amount = 0
     if body.charge_patient:
-        unit_p = body.price_per_unit if body.price_per_unit is not None else item.unit_price
         charged_amount = unit_p * body.amount
 
         if charged_amount > 0:

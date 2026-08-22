@@ -286,7 +286,7 @@ export default function TvManagerDashboard({ defaultTab = 'live' }) {
                   queueLive.calling.map((c) => (
                     <div key={c.id} className="card-2 p-3 flex items-center justify-between">
                       <div>
-                        <span className="font-mono font-black text-cyan text-sm block">{c.ticket_number || `A-${c.id}`}</span>
+                        <span className="font-mono font-black text-cyan text-sm block">{c.ticket_number || (c.is_paper_entry ? '—' : `A-${c.id}`)}</span>
                         <span className="text-xs font-bold text-body block">{c.first_name} {c.last_name}</span>
                         <span className="text-[10px] text-muted block">{c.service_name} • 🚪 {c.cabinet || '1-Xona'}</span>
                       </div>

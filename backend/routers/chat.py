@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from auth_utils import get_current_user
@@ -62,28 +62,52 @@ def get_chat_channels(db: Session = Depends(get_db), current_user: User = Depend
         .all()
     )
 
-    for u in other_users:
-        last_dm = (
-            db.query(ChatMessage)
-            .filter(
-                or_(
-                    and_(ChatMessage.sender_id == current_user.id, ChatMessage.recipient_id == u.id),
-                    and_(ChatMessage.sender_id == u.id, ChatMessage.recipient_id == current_user.id),
-                )
-            )
-            .order_by(ChatMessage.created_at.desc())
-            .first()
-        )
+    # Ilgari bu yerda HAR BIR xodim uchun ikkita alohida so'rov ketardi:
+    # oxirgi xabar va o'qilmaganlar soni. 10 ta xodimda 20 ta so'rov, va
+    # bu ro'yxat chat ochiq turganda har 2.5 soniyada qayta so'raladi.
+    #
+    # Endi ikkalasi ham BITTA so'rovdan olinadi.
 
-        unread_dm = (
-            db.query(ChatMessage)
-            .filter(
-                ChatMessage.sender_id == u.id,
-                ChatMessage.recipient_id == current_user.id,
-                ChatMessage.is_read == False,
-            )
-            .count()
+    # O'qilmaganlar — jo'natuvchi bo'yicha guruhlab
+    oqilmaganlar = dict(
+        db.query(ChatMessage.sender_id, func.count(ChatMessage.id))
+        .filter(
+            ChatMessage.recipient_id == current_user.id,
+            ChatMessage.is_read == False,  # noqa: E712
         )
+        .group_by(ChatMessage.sender_id)
+        .all()
+    )
+
+    # Har bir suhbatdagi oxirgi xabar. "Suhbatdosh" — men jo'natgan bo'lsam
+    # qabul qiluvchi, aks holda jo'natuvchi. MAX(id) oxirgisini beradi
+    # (id o'sib boradi, shuning uchun vaqt bo'yicha ham oxirgisi).
+    suhbatdosh = case(
+        (ChatMessage.sender_id == current_user.id, ChatMessage.recipient_id),
+        else_=ChatMessage.sender_id,
+    )
+    oxirgi_idlar = [
+        r[1] for r in db.query(suhbatdosh, func.max(ChatMessage.id))
+        .filter(
+            ChatMessage.recipient_id.isnot(None),
+            or_(
+                ChatMessage.sender_id == current_user.id,
+                ChatMessage.recipient_id == current_user.id,
+            ),
+        )
+        .group_by(suhbatdosh)
+        .all()
+    ]
+    oxirgi_xabarlar = {}
+    if oxirgi_idlar:
+        for m in db.query(ChatMessage).filter(
+                ChatMessage.id.in_(oxirgi_idlar)).all():
+            kim = m.recipient_id if m.sender_id == current_user.id else m.sender_id
+            oxirgi_xabarlar[kim] = m
+
+    for u in other_users:
+        last_dm = oxirgi_xabarlar.get(u.id)
+        unread_dm = int(oqilmaganlar.get(u.id, 0))
 
         spec = ""
         if u.role == "doctor" and u.provider:

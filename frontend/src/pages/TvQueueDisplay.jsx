@@ -232,17 +232,17 @@ export default function TvQueueDisplay() {
   // Audio / Call FIFO Queue Refs
   const callQueueRef = useRef([])
   const isProcessingCallRef = useRef(false)
+  // Ovoz javob qaytarmay qolsa navbatni majburan davom ettiruvchi taymer
+  const qorovulRef = useRef(null)
 
   // Process calls sequentially from FIFO queue
   const processCallQueue = () => {
-    if (callQueueRef.current.length === 0) {
-      isProcessingCallRef.current = false
-      return
-    }
-
-    if (isProcessingCallRef.current) {
-      return
-    }
+    // DIQQAT: qulf tekshiruvi BIRINCHI bo'lishi kerak. Ilgari avval
+    // "navbat bo'shmi" tekshirilardi va bo'sh bo'lsa qulf ochib
+    // yuborilardi — ovoz hali chalinayotgan paytda ham. Bu ikki
+    // chaqiruvning ustma-ust tushishiga yo'l ochardi.
+    if (isProcessingCallRef.current) return
+    if (callQueueRef.current.length === 0) return
 
     const nextCall = callQueueRef.current.shift()
     isProcessingCallRef.current = true
@@ -250,13 +250,27 @@ export default function TvQueueDisplay() {
 
     if (popupTimerRef.current) clearTimeout(popupTimerRef.current)
 
+    let tugadi = false
     const finishCall = () => {
+      if (tugadi) return          // ikki marta chaqirilmasin
+      tugadi = true
+      if (qorovulRef.current) {
+        clearTimeout(qorovulRef.current)
+        qorovulRef.current = null
+      }
       setActiveCallModal(null)
       setTimeout(() => {
         isProcessingCallRef.current = false
         processCallQueue()
       }, 400)
     }
+
+    // Qorovul taymer: ovoz tizimi javob qaytarmasa (brauzer bloklasa,
+    // ovoz fayli yuklanmasa yoki nutq sintezi osilib qolsa) qulf mangu
+    // yopiq qolib, TV ekran boshqa hech kimni chaqirmay qo'yardi.
+    // 12 soniyadan keyin majburan davom etamiz.
+    if (qorovulRef.current) clearTimeout(qorovulRef.current)
+    qorovulRef.current = setTimeout(finishCall, 12000)
 
     if (isAudioEnabledRef.current) {
       forcePlayAlertAudio(() => {
@@ -406,10 +420,14 @@ export default function TvQueueDisplay() {
     }
 
     fetchQueue()
-    const interval = setInterval(fetchQueue, 1500)
+    // 1.5 soniya juda tez edi: ikkita TV ekran daqiqasiga 80 marta
+    // so'rov yuborardi. Navbat shuncha tez o'zgarmaydi — 3 soniya
+    // yetarli va serverga tushadigan yuk ikki barobar kamayadi.
+    const interval = setInterval(fetchQueue, 3000)
     return () => {
       isMounted = false
       if (popupTimerRef.current) clearTimeout(popupTimerRef.current)
+      if (qorovulRef.current) clearTimeout(qorovulRef.current)
       clearInterval(interval)
     }
   }, [isAudioEnabled])
