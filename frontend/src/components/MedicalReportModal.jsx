@@ -1,5 +1,6 @@
 import { Printer, X, FileText, Stethoscope } from 'lucide-react'
 import { BRAND } from '../config/brand'
+import { birthYear } from '../utils/format'
 
 export default function MedicalReportModal({ patient, doctorName, specialization, onClose }) {
   if (!patient) return null
@@ -88,7 +89,7 @@ export default function MedicalReportModal({ patient, doctorName, specialization
               <span className="text-slate-700 uppercase tracking-wider font-bold block text-[10px]">BEMOR MA'LUMOTLARI</span>
               <p className="text-sm font-black text-slate-900 mt-0.5">{patient.first_name} {patient.last_name}</p>
               <p className="text-slate-600">📞 Tel: <strong>{patient.phone}</strong></p>
-              {patient.birth_date && <p className="text-slate-600">📅 Tug'ilgan sana: <strong>{new Date(patient.birth_date).toLocaleDateString('uz-UZ')}</strong></p>}
+              {patient.birth_date && <p className="text-slate-600">📅 Tug'ilgan yili: <strong>{birthYear(patient.birth_date)}</strong></p>}
             </div>
 
             <div>

@@ -129,6 +129,16 @@ class EditServiceItem(BaseModel):
     # qilinardi, 10^12 esa bazani "integer out of range" bilan yiqitardi.
     quantity: int = Field(default=1, ge=1, le=100)
     price: int | None = Field(default=None, ge=0, le=100_000_000)
+    # Kurs belgisi va jadvali. None = "aytilmagan" degani — bunda mavjud
+    # qiymat SAQLANADI.
+    #
+    # Ilgari bu maydonlar umuman yo'q edi va tahrirlashda is_course doim
+    # False ga tushardi. Natijada oddiygina to'lov turini naqddan kartaga
+    # o'zgartirish bemorni "Davolanishdagilar" ro'yxatidan butunlay
+    # chiqarib yuborardi: kurs kunlari sanalmay qolardi, ertasiga bemor
+    # kelganda tizim uni yangi bemor deb qayta to'lov so'rardi.
+    is_course: bool | None = None
+    course_days: str | None = Field(default=None, max_length=200)
 
 
 class PatientUpdate(BaseModel):
@@ -278,6 +288,11 @@ def _patient_row(p: Patient) -> dict:
                 # ro'yxatlarda qolgan kun ko'rsatiladi
                 "used_count": int(ps.used_count or 0),
                 "remaining": max(0, int(ps.quantity or 1) - int(ps.used_count or 0)),
+                # Kurs holati. Tahrirlash oynasi buni o'qib, saqlashda
+                # qaytarib yuboradi — aks holda oddiy tahrirlash kurs
+                # belgisini o'chirib yuborardi.
+                "is_course": bool(ps.is_course),
+                "course_days": ps.course_days,
             }
             for ps in (p.services_detail or [])
         ],
@@ -309,7 +324,6 @@ def today_patients(db: Session = Depends(get_db), _: User = Depends(require_doct
     today = date.today()
     start = datetime.combine(today, datetime.min.time())
     end = datetime.combine(today, datetime.max.time())
-    paper_start = datetime.combine(today - timedelta(days=1), datetime.min.time())
 
     patients = (
         db.query(Patient)
@@ -326,12 +340,12 @@ def today_patients(db: Session = Depends(get_db), _: User = Depends(require_doct
             # ko'p bo'lgani sari bu qimmatlashadi.
             selectinload(Patient.services_detail).joinedload(PatientService.service),
         )
-        .filter(
-            or_(
-                and_(Patient.created_at >= start, Patient.created_at <= end),
-                and_(Patient.is_paper_entry == True, Patient.created_at >= paper_start)
-            )
-        )
+        # Ilgari qog'oz yozuvlari kechadan buyon ko'rsatilardi: tungi smena
+        # qog'ozga yozilib ertalab kiritilgani uchun. Endi custom_date sanani
+        # o'z kuniga qo'yadi, shu sababli kechagi navbatchilik bugungi
+        # ro'yxatda ham turib olar va ekrandagi son kunlik hisobotdan farq
+        # qilardi. Har bir yozuv faqat o'z kunida ko'rinadi.
+        .filter(Patient.created_at >= start, Patient.created_at <= end)
         .order_by(Patient.created_at.desc())
         .all()
     )
@@ -1030,8 +1044,10 @@ def update_patient(
             line = int(unit) * qty
             raw_total += line
             first_sid = first_sid or svc.id
-            _kursmi = bool(it.get("is_course", False))
-            _kunlar = (it.get("course_days") or None) if _kursmi else None
+            # None = "aytilmagan": mavjud qiymat saqlanadi. Faqat ataylab
+            # true/false yuborilgandagina o'zgaradi.
+            _kurs_soralgan = it.get("is_course")
+            _kunlar_soralgan = it.get("course_days")
 
             qator = next(
                 (x for x in xizmat_boyicha.get(svc.id, []) if x.id not in saqlanadi),
@@ -1041,17 +1057,23 @@ def update_patient(
                 qator.quantity = qty
                 qator.unit_price = int(unit)
                 qator.total_price = line
-                qator.is_course = _kursmi
-                qator.course_days = _kunlar
+                if _kurs_soralgan is not None:
+                    qator.is_course = bool(_kurs_soralgan)
+                    qator.course_days = (
+                        (_kunlar_soralgan or None) if _kurs_soralgan else None)
+                elif _kunlar_soralgan is not None and qator.is_course:
+                    qator.course_days = _kunlar_soralgan or None
                 # Kun soni kamaytirilsa, berilgan seans undan oshib ketmasin
                 if int(qator.used_count or 0) > qty:
                     qator.used_count = qty
                 saqlanadi.add(qator.id)
             else:
+                yangi_kurs = bool(_kurs_soralgan)
                 db.add(PatientService(
                     patient_id=p.id, service_id=svc.id,
                     quantity=qty, unit_price=int(unit), total_price=line,
-                    is_course=_kursmi, course_days=_kunlar,
+                    is_course=yangi_kurs,
+                    course_days=(_kunlar_soralgan or None) if yangi_kurs else None,
                 ))
 
         # Ro'yxatdan chiqarilgan eski yozuvlar

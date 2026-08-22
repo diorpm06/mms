@@ -83,3 +83,19 @@ export function paymentLabel(type) {
   }
 }
 
+
+/**
+ * Tug'ilgan sanadan faqat YILNI qaytaradi.
+ *
+ * Klinikada bemorning aniq kuni va oyi so'ralmaydi — faqat yili yozib
+ * olinadi. Bazada esa `birth_date` to'liq sana ustuni, shuning uchun
+ * yil `1989-01-01` ko'rinishida saqlanadi. Ekranda, chekda va hujjatlarda
+ * o'sha "01-01" ko'rinib, chalkashtirardi: go'yo bemorning tug'ilgan kuni
+ * 1-yanvar bo'lgandek. Endi hamma joyda faqat yil chiqadi.
+ */
+export function birthYear(v) {
+  if (!v) return ''
+  const s = String(v).trim()
+  const m = s.match(/(\d{4})/)
+  return m ? m[1] : ''
+}

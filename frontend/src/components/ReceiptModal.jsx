@@ -1,5 +1,5 @@
 import { Printer, X, CheckCircle2, AlertTriangle } from 'lucide-react'
-import { formatMoney } from '../utils/format'
+import { formatMoney, birthYear } from '../utils/format'
 import { BRAND } from '../config/brand'
 import ReceiptHeader from './ReceiptHeader'
 
@@ -221,8 +221,8 @@ export default function ReceiptModal({ patient, onClose }) {
             </div>
             {patient.birth_date && (
               <div className="flex justify-between">
-                <span className="text-slate-700">Tug'ilgan sana:</span>
-                <span>{new Date(patient.birth_date).toLocaleDateString('uz-UZ')}</span>
+                <span className="text-slate-700">Tug'ilgan yili:</span>
+                <span>{birthYear(patient.birth_date)}</span>
               </div>
             )}
             {patient.address && (

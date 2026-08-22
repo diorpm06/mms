@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../utils/api'
-import { formatDate, formatMoney, paymentLabel } from '../../utils/format'
+import { formatDate, formatMoney, paymentLabel, birthYear } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import PageHeader from '../../components/PageHeader'
 import PatientMedicalCardModal from '../../components/PatientMedicalCardModal'
@@ -238,7 +238,7 @@ export default function Search({ homePath = '/admin' }) {
                 </div>
                 <div>
                   <span className="text-muted text-[10px] uppercase font-bold block">🗓️ Tug'ilgan Yili:</span>
-                  <strong className="font-mono font-bold text-body">{selected.birth_date ? String(selected.birth_date).slice(0, 10) : '—'}</strong>
+                  <strong className="font-mono font-bold text-body">{birthYear(selected.birth_date) || '—'}</strong>
                 </div>
                 <div>
                   <span className="text-muted text-[10px] uppercase font-bold block">🤝 Yo'naltiruvchi:</span>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../utils/api'
-import { formatMoney, formatWithCommas, parseDigits, ismTuzat } from '../../utils/format'
+import { formatMoney, formatWithCommas, parseDigits, ismTuzat, birthYear } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import { savePendingPatient } from '../../utils/offline'
 import PageHeader from '../../components/PageHeader'
@@ -34,18 +34,13 @@ function normalizeBirthDate(v) {
   return ''
 }
 
+// Klinikada faqat tug'ilgan YIL so'raladi — kuni va oyi kerak emas.
+// Bazada `birth_date` to'liq sana ustuni bo'lgani uchun yil
+// `1989-01-01` bo'lib saqlanadi, lekin ekranda faqat `1989` ko'rinadi.
 function toDisplayBirthDate(v) {
   const iso = normalizeBirthDate(v)
   if (!iso) return ''
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
-}
-
-function formatBirthDateInput(raw) {
-  const digits = String(raw || '').replace(/\D/g, '').slice(0, 8)
-  if (digits.length <= 2) return digits
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+  return iso.slice(0, 4)
 }
 
 export default function NewPatient({ homePath = '/admin' }) {
@@ -741,7 +736,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                 <span className="text-base">✓</span>
                 <div>
                   <p className="font-extrabold text-body text-xs">
-                    BAZADAN TOPILGAN BEMOR: {selectedExistingPatient.full_name} ({selectedExistingPatient.birth_date})
+                    BAZADAN TOPILGAN BEMOR: {selectedExistingPatient.full_name} ({birthYear(selectedExistingPatient.birth_date)}-yil)
                   </p>
                   <p className="text-[11px] text-emerald-200/80 font-normal">
                     Oxirgi tashrif: {selectedExistingPatient.last_visit} ({selectedExistingPatient.visit_count}-marta kelgan) — Qayta kiritish shart emas!
@@ -785,7 +780,7 @@ export default function NewPatient({ homePath = '/admin' }) {
                     <div>
                       <p className="font-bold text-body text-sm">{p.full_name}</p>
                       <p className="text-[11px] text-body mt-0.5">
-                        📅 {p.birth_date} | 📍 {p.address || "Manzil ko'rsatilmagan"} | 📞 {p.phone || '—'}
+                        📅 {birthYear(p.birth_date)}-yil | 📍 {p.address || "Manzil ko'rsatilmagan"} | 📞 {p.phone || '—'}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
@@ -802,14 +797,15 @@ export default function NewPatient({ homePath = '/admin' }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Tug'ilgan yili / sana *</label>
+              <label className="form-label">Tug'ilgan yili *</label>
               <input
-                className="input-field font-semibold"
-                placeholder="Masalan: 1995 *"
+                className="input-field font-semibold font-mono"
+                placeholder="Masalan: 1995"
                 inputMode="numeric"
-                maxLength={10}
+                maxLength={4}
                 value={form.birth_date}
-                onChange={(e) => handleSearchChange('birth_date', e.target.value)}
+                onChange={(e) => handleSearchChange(
+                  'birth_date', e.target.value.replace(/\D/g, '').slice(0, 4))}
                 required
               />
             </div>

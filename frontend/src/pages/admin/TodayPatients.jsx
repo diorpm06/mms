@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, downloadBlob } from '../../utils/api'
-import { formatMoney, paymentLabel } from '../../utils/format'
+import { formatMoney, paymentLabel, birthYear } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import PaymentTicketModal from '../../components/PaymentTicketModal'
 import PatientMedicalCardModal from '../../components/PatientMedicalCardModal'
@@ -81,7 +81,7 @@ export default function TodayPatients() {
     setEditForm({
       first_name: p.first_name || '',
       last_name: p.last_name || '',
-      birth_date: p.birth_date ? p.birth_date.slice(0, 10) : '',
+      birth_date: birthYear(p.birth_date),
       phone: p.phone || '+998',
       address: p.address || '',
       referrer_id: p.referrer_id || '',
@@ -102,6 +102,9 @@ export default function TodayPatients() {
         quantity: s.quantity || 1,
         price: s.unit_price ?? s.total_price,
         department_name: s.department_name || s.category || '',
+        // Kurs holati saqlanib qolishi uchun o'qib olinadi
+        is_course: Boolean(s.is_course),
+        course_days: s.course_days || null,
       }))
     )
     setAddServiceId('')
@@ -190,7 +193,11 @@ export default function TodayPatients() {
           // Ilgari null yuborilardi va familiyasi yo'q bemorni saqlashda
           // server xato berardi.
           last_name: editForm.last_name?.trim() || '',
-          birth_date: editForm.birth_date || null,
+          // Faqat yil kiritiladi; bazada to'liq sana ustuni bo'lgani uchun
+          // 1-yanvar qo'shiladi, lekin ekranda hech qayerda ko'rinmaydi.
+          birth_date: /^\d{4}$/.test(editForm.birth_date || '')
+            ? editForm.birth_date + '-01-01'
+            : (editForm.birth_date || null),
           phone: editForm.phone?.trim() || '',
           address: editForm.address?.trim() || '',
           referrer_id: (editForm.referrer_id && Number(editForm.referrer_id) > 0) ? Number(editForm.referrer_id) : null,
@@ -205,6 +212,12 @@ export default function TodayPatients() {
             service_id: s.service_id,
             quantity: s.quantity,
             price: Number(s.price) || 0,
+            // Kurs belgisi ham yuboriladi. Ilgari u yuborilmasdi va
+            // serverda har tahrirlashda false ga tushardi — to'lov turini
+            // o'zgartirish bemorni "Davolanishdagilar" dan chiqarib
+            // yuborardi.
+            is_course: Boolean(s.is_course),
+            course_days: s.course_days || null,
           })),
           reason: editForm.reason.trim(),
         }),
@@ -809,12 +822,17 @@ export default function TodayPatients() {
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-[11px] font-bold text-muted block mb-1">Tug'ilgan sanasi / yili</label>
+                  <label className="text-[11px] font-bold text-muted block mb-1">Tug'ilgan yili</label>
                   <input
-                    type="date"
-                    className="input-field text-xs font-bold"
+                    className="input-field text-xs font-bold font-mono"
+                    placeholder="1995"
+                    inputMode="numeric"
+                    maxLength={4}
                     value={editForm.birth_date}
-                    onChange={(e) => setEditForm({ ...editForm, birth_date: e.target.value })}
+                    onChange={(e) => setEditForm({
+                      ...editForm,
+                      birth_date: e.target.value.replace(/\D/g, '').slice(0, 4),
+                    })}
                   />
                 </div>
                 <div>
@@ -854,6 +872,28 @@ export default function TodayPatients() {
                           📁 {s.department_name || s.category}
                         </div>
                       )}
+                      {/* Kurs belgisi ko'rinib tursin va shu yerdan
+                          o'zgartirilsin — ilgari u yashirin edi va
+                          tahrirlashda jimgina o'chib ketardi. */}
+                      <label className="flex items-center gap-1.5 mt-1 cursor-pointer w-fit">
+                        <input
+                          type="checkbox"
+                          className="rounded accent-purple-500"
+                          checked={Boolean(s.is_course)}
+                          onChange={(ev) => setEditServices((prev) =>
+                            prev.map((x, idx) => idx === i
+                              ? { ...x, is_course: ev.target.checked }
+                              : x))}
+                        />
+                        <span className={`text-[10px] font-bold ${
+                          s.is_course
+                            ? 'text-purple-600 dark:text-purple-300'
+                            : 'text-muted'
+                        }`}>
+                          🔁 Kurs (ko'p kunlik)
+                          {s.is_course && s.course_days ? ` — ${s.course_days}-kunlar` : ''}
+                        </span>
+                      </label>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <input
