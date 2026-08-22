@@ -152,8 +152,8 @@ aks holda tizim yo'qdan pul yaratadi.
 - `frontend/src/pages/TvManagerDashboard.jsx` da matn saqlanganda `POST /api/queue/ticker` orqali markaziy serverga yoziladi.
 - `frontend/src/pages/TvQueueDisplay.jsx` (/tv) har 3 soniyada jonli navbatni yangilaganda serverdagi eng oxirgi `ticker_text` ni oladi va klinikadagi BARCHA TV ekranlarda matnni real-vaqt rejimida avtomatik yangilaydi.
 
-### Sintaksis va Build Tuzatishlari
-- `frontend/src/pages/admin/TodayPatients.jsx` faylidagi yopilmagan React fragment (`</>`) va sintaksis xatolari to'liq tuzatildi (`vite build` 100% muvaffaqiyatli).
+### PDF Kunlik Hisobot Chop Etish Tartibi (`backend/services/export.py`)
+- Admin paneldagi PDF hisobotda bo'limlar ketma-ketligi o'zgartirildi: **2. NAVBATCHILIK (QOG'OZ JURNALIDAN KIRITILGAN)** 2-o'ringa, **3. XARAJATLAR** esa 3-o'ringa ko'chirildi.
 
 ---
 

@@ -189,7 +189,49 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
     )
     elements.append(t_svc)
 
-    # Section 2: Expenses
+    # Section 2: Navbatchilik (qog'oz jurnalidan kiritilgan tushum)
+    #
+    # Ish vaqtidan tashqari qabul qilingan bemorlar. Yuqoridagi umumiy
+    # summaga allaqachon kirgan, lekin "qaysi xizmatdan qancha tushgan"
+    # alohida ko'rinishi kerak — shu bo'lim aynan shuning uchun.
+    paper_dept = report.get("paper_entry_departments") or []
+    paper_svc = report.get("paper_entry_services") or []
+    paper_count = int(report.get("paper_entry_count") or 0)
+    paper_total = int(report.get("paper_entry_total") or 0)
+
+    if paper_count > 0:
+        elements.append(Spacer(1, 10))
+        elements.append(bolim("NAVBATCHILIK (QOG'OZ JURNALIDAN KIRITILGAN)"))
+
+        # Faqat BO'LIM darajasi: "Ineksiya — 7 ta, 140 000".
+        # Har bir xizmatni alohida yozish hisobotni cho'zib yuborardi.
+        p_data = [["№", "Bo'lim nomi", "Soni", "Summa (so'm)"]]
+        for n, d in enumerate(paper_dept, start=1):
+            p_data.append([
+                str(n), d.get("department", ""),
+                str(d.get("count", 0)), _format_money(int(d.get("total") or 0)),
+            ])
+        p_data.append(["", "JAMI NAVBATCHILIK", str(paper_count),
+                       _format_money(paper_total)])
+
+        t_paper = Table(p_data, colWidths=[1.2 * cm, 10.3 * cm, 2.5 * cm, 5.0 * cm])
+        t_paper.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10.5),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (2, 0), (2, -1), "CENTER"),
+            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#fef3c7")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        elements.append(t_paper)
+
+    # Section 3: Expenses (Xarajatlar)
     elements.append(Spacer(1, 10))
     elements.append(bolim("XARAJATLAR"))
 
@@ -254,48 +296,6 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
         )
     )
     elements.append(t_exp)
-
-    # Section 3: Navbatchilik (qog'oz jurnalidan kiritilgan tushum)
-    #
-    # Ish vaqtidan tashqari qabul qilingan bemorlar. Yuqoridagi umumiy
-    # summaga allaqachon kirgan, lekin "qaysi xizmatdan qancha tushgan"
-    # alohida ko'rinishi kerak — shu bo'lim aynan shuning uchun.
-    paper_dept = report.get("paper_entry_departments") or []
-    paper_svc = report.get("paper_entry_services") or []
-    paper_count = int(report.get("paper_entry_count") or 0)
-    paper_total = int(report.get("paper_entry_total") or 0)
-
-    if paper_count > 0:
-        elements.append(Spacer(1, 10))
-        elements.append(bolim("NAVBATCHILIK (QOG'OZ JURNALIDAN KIRITILGAN)"))
-
-        # Faqat BO'LIM darajasi: "Ineksiya — 7 ta, 140 000".
-        # Har bir xizmatni alohida yozish hisobotni cho'zib yuborardi.
-        p_data = [["№", "Bo'lim nomi", "Soni", "Summa (so'm)"]]
-        for n, d in enumerate(paper_dept, start=1):
-            p_data.append([
-                str(n), d.get("department", ""),
-                str(d.get("count", 0)), _format_money(int(d.get("total") or 0)),
-            ])
-        p_data.append(["", "JAMI NAVBATCHILIK", str(paper_count),
-                       _format_money(paper_total)])
-
-        t_paper = Table(p_data, colWidths=[1.2 * cm, 10.3 * cm, 2.5 * cm, 5.0 * cm])
-        t_paper.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 10.5),
-            ("ALIGN", (0, 0), (0, -1), "CENTER"),
-            ("ALIGN", (2, 0), (2, -1), "CENTER"),
-            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
-            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#fef3c7")),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ]))
-        elements.append(t_paper)
 
     # Section: Consumed Materials Summary
     #
