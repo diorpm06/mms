@@ -72,13 +72,27 @@ def _format_patient_queue_item(p: Patient, public: bool = False) -> dict:
     if public and (p.last_name or "").strip():
         last_name_display = f"{p.last_name.strip()[0]}."
 
+    cab = None
+    if p.service and p.service.cabinet and p.service.cabinet.strip() not in ("-", "", "None"):
+        cab = p.service.cabinet.strip()
+    elif p.cabinet and p.cabinet.strip() not in ("-", "", "None"):
+        cab = p.cabinet.strip()
+    elif p.provider and getattr(p.provider, 'cabinet', None) and p.provider.cabinet and p.provider.cabinet.strip() not in ("-", "", "None"):
+        cab = p.provider.cabinet.strip()
+    elif p.service and "laborat" in (p.service.category or "").lower():
+        cab = "Laboratoriya"
+    elif p.provider and p.provider.specialization:
+        cab = p.provider.specialization
+    else:
+        cab = "1-Xona"
+
     item = {
         "id": p.id,
         "first_name": p.first_name,
         "last_name": last_name_display,
         "ticket_number": p.ticket_number or f"A-{p.id:03d}",
         "queue_status": p.queue_status or "kutmoqda",
-        "cabinet": p.cabinet or (f"{p.provider.specialization}" if p.provider else "Qabulxona"),
+        "cabinet": cab,
         "created_at": created_str,
         "updated_at": updated_str,
         "provider_id": p.provider_id,
