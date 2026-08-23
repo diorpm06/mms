@@ -4,5 +4,8 @@
   "rewrites": [
     { "source": "/:path+", "destination": "/api/index.py?__v_path=/:path*" },
     { "source": "/",       "destination": "/api/index.py?__v_path=/" }
+  ],
+  "crons": [
+    { "path": "/api/cron/run-daily", "schedule": "0 15 * * *" }
   ]
 }
