@@ -49,7 +49,11 @@ def job_daily_report():
     def _job(db: Session):
         d = date.today()
         rep = daily_report(db, d)
-        pdf_bytes = export_pdf(rep, title=f"Marjona Med — Kunlik Hisobot ({d.strftime('%d.%m.%Y')})")
+        # "Shifokorlar KPI ulushlari" jadvali faqat davriy (10 kunlik) hisobot
+        # uchun — kunlik PDF'da bo'lmasligi kerak (routers/reports.py dagi
+        # _pdf_uchun_tozala bilan bir xil qoida).
+        pdf_uchun = {k: v for k, v in rep.items() if k != "providers_breakdown"}
+        pdf_bytes = export_pdf(pdf_uchun, title=f"Marjona Med — Kunlik Hisobot ({d.strftime('%d.%m.%Y')})")
         d_str = d.isoformat()
 
         saved = db.query(SavedReport).filter(
