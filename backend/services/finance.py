@@ -10,6 +10,7 @@ from models.employee import Employee
 from models.patient import Patient
 from models.payout import Payout
 from models.provider import Provider
+from models.provider_advance import ProviderAdvance
 from models.referrer import Referrer
 from models.salary_log import SalaryLog
 from models.transaction import Transaction
@@ -244,15 +245,53 @@ def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None,
     return provider, referrer, referrer_amount, provider_amount, center_amount
 
 
+def _qarzni_qopla_va_qoldigini_qaytar(
+    db: Session, recipient_type: str, recipient_id: int, amount: int
+) -> int:
+    """Ishlab topilgan pulni avval qoplanmagan avans qarziga yo'naltiradi
+    (eng eskisidan boshlab), qolganini qaytaradi — o'sha qoldiq balansga
+    qo'shiladi. Ilgari ishlab topilgan pul qarzdan mustaqil to'g'ridan-
+    to'g'ri balansga qo'shilardi: shifokor/yo'naltiruvchi ham qarzdor,
+    ham "balansi bor" bo'lib ikkalasi alohida-alohida ko'rinardi, holbuki
+    avvalgi qarzi hali qoplanmagan edi."""
+    if amount <= 0 or not recipient_id:
+        return max(0, amount)
+    qarzlar = (
+        db.query(ProviderAdvance)
+        .filter(
+            ProviderAdvance.recipient_type == recipient_type,
+            ProviderAdvance.recipient_id == recipient_id,
+            ProviderAdvance.is_cancelled == False,  # noqa: E712
+            ProviderAdvance.is_settled == False,  # noqa: E712
+        )
+        .order_by(ProviderAdvance.created_at.asc())
+        .all()
+    )
+    qoldi = amount
+    for adv in qarzlar:
+        if qoldi <= 0:
+            break
+        deduct = min(qoldi, adv.remaining)
+        if deduct <= 0:
+            continue
+        adv.remaining -= deduct
+        qoldi -= deduct
+        if adv.remaining <= 0:
+            adv.remaining = 0
+            adv.is_settled = True
+            adv.settled_at = datetime.now()
+    return qoldi
+
+
 def process_payment(db: Session, patient: Patient) -> Transaction:
     provider, referrer, referrer_amount, provider_amount, center_amount = _split_amounts(
         patient.payment_amount, patient.referrer_id, patient.provider_id, db, service_id=patient.service_id
     )
 
     if referrer:
-        referrer.balance += referrer_amount
+        referrer.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "referrer", referrer.id, referrer_amount)
     if provider:
-        provider.balance += provider_amount
+        provider.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "provider", provider.id, provider_amount)
 
     bal = get_or_create_balance(db)
     bal.current_balance += center_amount
@@ -315,9 +354,9 @@ def reprice_patient_payment(db: Session, patient: Patient, tx: Transaction) -> T
         service_id=patient.service_id,
     )
     if referrer:
-        referrer.balance += referrer_amount
+        referrer.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "referrer", referrer.id, referrer_amount)
     if provider:
-        provider.balance += provider_amount
+        provider.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "provider", provider.id, provider_amount)
     bal.current_balance += center_amount
     bal.updated_at = datetime.now()
 
