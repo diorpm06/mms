@@ -4,6 +4,12 @@ import { api } from '../../utils/api'
 import { useToastStore } from '../../store/toastStore'
 import { PageHeader, Icons } from '../../components/UIKit'
 import { playNotificationSound } from '../../utils/sound'
+import { sarlavhaniTuzat } from '../../utils/reportTemplates'
+
+const HOLAT = {
+  submitted: { text: 'Chop etishni kutmoqda', cls: 'badge-gold' },
+  printed: { text: 'Chop etilgan', cls: 'badge-cyan' },
+}
 
 export default function AdminReportQueue() {
   const [items, setItems] = useState([])
@@ -14,14 +20,15 @@ export default function AdminReportQueue() {
 
   const load = (silent = false) => {
     if (!silent) setLoading(true)
-    api('/report-submissions/pending')
+    api('/report-submissions/recent')
       .then((res) => {
         const newItems = res || []
-        if (prevCountRef.current !== null && newItems.length > prevCountRef.current) {
+        const kutayotgan = newItems.filter((r) => r.status === 'submitted').length
+        if (prevCountRef.current !== null && kutayotgan > prevCountRef.current) {
           playNotificationSound('doctor_submit')
           toast('🔔 Shifokor yangi shablon natijasini yubordi!')
         }
-        prevCountRef.current = newItems.length
+        prevCountRef.current = kutayotgan
         setItems(newItems)
       })
       .catch((e) => {
@@ -51,34 +58,45 @@ export default function AdminReportQueue() {
     }
   }
 
-  const handleSendToPrinter = async (report) => {
+  // Fon-jarayondagi (agent kutadigan) plain-text chop etish o'rniga
+  // serverda tayyorlangan PDF (A4, bemor sarlavhasi bilan) brauzer
+  // orqali to'g'ridan-to'g'ri chop etishga yuboriladi — o'lchami va
+  // joylashuvi doim to'g'ri, alohida printer-agent shart emas.
+  const handlePrint = async (report) => {
     setBusyId(report.id)
     try {
-      const footer = `\n\n───────────────────────\nShifokor: ${report.doctor_name || ''}\nSana: ${report.created_at ? new Date(report.created_at).toLocaleString('uz-UZ') : ''}`
-      const plainContent = (report.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-      await api('/print-jobs', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: report.template_label,
-          content: plainContent + footer,
-          printer_type: 'a4',
-        }),
-      })
+      const blob = await api(`/report-submissions/${report.id}/pdf`)
+      const url = URL.createObjectURL(blob)
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      iframe.src = url
+      document.body.appendChild(iframe)
+      iframe.onload = () => {
+        iframe.contentWindow.focus()
+        iframe.contentWindow.print()
+        setTimeout(() => {
+          if (document.body.contains(iframe)) document.body.removeChild(iframe)
+          URL.revokeObjectURL(url)
+        }, 1500)
+      }
+
       await api(`/report-submissions/${report.id}/mark-printed`, { method: 'PATCH' })
-      toast('✓ Printerga yuborildi — bir necha soniyada chiqadi')
+      toast('✓ Chop etildi deb belgilandi')
       load()
     } catch (e) {
-      toast(e.message || 'Chop etishga yuborishda xatolik', 'error')
+      toast(e.message || 'Chop etishda xatolik', 'error')
     } finally {
       setBusyId(null)
     }
   }
 
+  const kutayotganSoni = items.filter((r) => r.status === 'submitted').length
+
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-4xl">
       <PageHeader
-        title="📋 Shablon Natijalari"
-        subtitle="Shifokorlar to'ldirgan UZI va Laboratoriya shablon natijalari — ko'rish, PDF yuklab olish va printerga yuborish"
+        title="Shablon Natijalari"
+        subtitle="Shifokorlar to'ldirgan UZI va Laboratoriya shablon natijalari — ko'rish va chop etish. Chop etilganlar ham ro'yxatda qoladi."
         icon={Icons.chart}
       >
         <button onClick={load} className="btn-outline py-2 px-3 text-xs flex items-center gap-1.5">
@@ -90,17 +108,25 @@ export default function AdminReportQueue() {
         <p className="text-xs text-muted italic text-center py-8">Yuklanmoqda...</p>
       ) : items.length === 0 ? (
         <div className="card p-8 text-center text-sm text-muted">
-          Hozircha chop etishni kutayotgan shablon yo'q.
+          Oxirgi kunlarda shablon natijasi yuborilmagan.
         </div>
       ) : (
         <div className="space-y-3">
+          {kutayotganSoni > 0 && (
+            <p className="text-xs text-muted font-bold">
+              {kutayotganSoni} ta chop etishni kutmoqda
+            </p>
+          )}
           {items.map((r) => (
             <div key={r.id} className="card p-4 space-y-2">
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <div>
-                  <p className="font-bold text-sm text-cyan">
-                    {r.category === 'UZI' ? '🩻' : '🔬'} {r.template_label}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm text-cyan">{r.template_label}</p>
+                    <span className={`badge ${HOLAT[r.status]?.cls || 'badge-muted'} text-[10px] font-bold`}>
+                      {HOLAT[r.status]?.text || r.status}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted">
                     Bemor: <strong className="text-body">{r.patient_name}</strong> · Shifokor: {r.doctor_name || '—'}
                   </p>
@@ -110,9 +136,9 @@ export default function AdminReportQueue() {
                 </span>
               </div>
               <div
-                className="bg-white text-black rounded-xl p-3 text-[11px] leading-relaxed max-h-32 overflow-y-auto"
+                className="mms-shablon bg-white text-black rounded-xl p-3 text-[11px] leading-relaxed max-h-32 overflow-y-auto overflow-x-auto"
                 style={{ fontFamily: "'Times New Roman', Cambria, serif" }}
-                dangerouslySetInnerHTML={{ __html: r.content }}
+                dangerouslySetInnerHTML={{ __html: sarlavhaniTuzat(r.content) }}
               />
               <div className="flex justify-end gap-2">
                 <button
@@ -125,12 +151,12 @@ export default function AdminReportQueue() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSendToPrinter(r)}
+                  onClick={() => handlePrint(r)}
                   disabled={busyId === r.id}
                   className="btn-gold py-2 px-4 text-xs font-black flex items-center gap-1.5 disabled:opacity-60"
                 >
                   <Printer className="h-3.5 w-3.5" />
-                  {busyId === r.id ? 'Yuborilmoqda...' : 'Printerga yuborish'}
+                  {busyId === r.id ? 'Ochilmoqda...' : r.status === 'printed' ? 'Qayta chop etish' : 'Chop etish'}
                 </button>
               </div>
             </div>

@@ -540,10 +540,11 @@ html.light {
 .mms-shablon {
   color: #000;
   background: #fff;
-  /* Word logotip va fon rasmlarini position:absolute bilan joylashtiradi.
-     Konteyner "relative" bo'lmasa ular sahifadan chiqib ketib ko'rinmaydi.
-     "z-index: 0" esa MAJBURIY: usiz manfiy z-index'li rasmlar shu blokdan
-     chiqib, modal oynaning orqasiga o'tib ketadi va umuman ko'rinmaydi. */
+  /* Word logotip va foto suratlar position:absolute bilan joylashtirilgan.
+     "position: relative" shart: usiz absolute rasmlar shu blokdan chiqib
+     ketadi. "z-index: 0" manfiy z-index'li rasmlar orqaga o'tib ko'rinmay
+     qolishining oldini oladi. Boshqa hech narsa cheklanmaydi — hujjat
+     asl faylidagi kabi, o'zgarishsiz ochiladi. */
   position: relative;
   z-index: 0;
   isolation: isolate;
@@ -567,38 +568,8 @@ html.light {
   margin: 0 0 4px;
   overflow-wrap: break-word;
 }
-/* Word rasmlarni sahifaga qo'yganda o'lchamini joylashuv bilan birga
-   beradi. Joylashuv bekor qilingani uchun rasm to'liq o'lchamida chiqib,
-   sarlavha yarim varaqni egallab qolardi — balandligini cheklaymiz. */
 .mms-shablon img {
   display: inline-block;
-  max-width: 100%;
-  max-height: 62px;
-  width: auto;
-  height: auto;
-  vertical-align: middle;
-}
-/* Word rasm va sarlavha bloklarini sahifadagi ANIQ NUQTAGA (position:absolute,
-   margin-left:890px) joylashtiradi. Bu koordinatalar Word varag'i uchun —
-   brauzerda logotip matn ustiga tushib qolardi, "Ф.И.О / Дата" bloki esa
-   o'ng chetga siqilib o'qib bo'lmasdi.
-   Shuning uchun joylashtirish bekor qilinadi va hamma narsa oddiy oqimda,
-   ketma-ket chiqadi. */
-.mms-shablon [style*="position"] {
-  position: static !important;
-  left: auto !important;
-  top: auto !important;
-  right: auto !important;
-  bottom: auto !important;
-  margin-left: 0 !important;
-  margin-top: 0 !important;
-  width: auto !important;
-  height: auto !important;
-  z-index: auto !important;
-}
-/* Rasm o'rovchi bo'sh spanlar qatorni buzmasin */
-.mms-shablon span:empty {
-  display: none;
 }
 
 /* To'ldiriladigan katakcha.

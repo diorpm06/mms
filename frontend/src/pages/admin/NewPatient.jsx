@@ -69,11 +69,12 @@ export default function NewPatient({ homePath = '/admin' }) {
 
   // Paper Journal Entry Mode
   const [isPaperMode, setIsPaperMode] = useState(false)
-  const [customDate, setCustomDate] = useState(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - 1)
-    return d.toISOString().split('T')[0]
-  })
+  // Kecha degan sana majburlab qo'yilgan edi — xodimlar buni bugungi
+  // kunduzgi navbatchilik uchun ham ishlatib, o'zgartirishni unutib
+  // qolishar, natijada bugungi bemorlar kechagi sanaga yozilib qolardi.
+  // Endi sukut bo'yicha bugun; kechagi tungi smenani ertalab kiritish
+  // kerak bo'lsa, xodim o'zi qo'lda bir kun orqaga o'zgartiradi.
+  const [customDate, setCustomDate] = useState(() => new Date().toISOString().split('T')[0])
 
   // Live Patient Search / Autocomplete Suggestions
   const [suggestions, setSuggestions] = useState([])

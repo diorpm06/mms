@@ -972,3 +972,38 @@ export function getTemplatesByCategory(category) {
   if (!category) return REPORT_TEMPLATES
   return REPORT_TEMPLATES.filter((t) => t.category === category)
 }
+
+// Word "sarlavha" qismidagi logotip va asbob surati position:absolute
+// bilan Word SAHIFASI koordinatalariga joylashtirilgan (masalan
+// margin-left:890px). Bu Word'ning "veb-sahifa sifatida saqlash"
+// eksportiga xos, brauzer bilan mos kelmaydigan tanilgan kamchilik —
+// koordinatalar CSS emas, Word'ning o'z tizimida hisoblangan, shuning
+// uchun brauzerda ochilganda tasodifiy joyga (ko'pincha matn ustiga)
+// tushib qoladi.
+//
+// Shuning uchun FAQAT shu ikkita bezak rasmi (logotip, asbob surati)
+// original joyidan chiqarib olinib, oddiy flexbox qatorga joylashtiriladi.
+// Qolgan BUTUN matn, jadval, natija maydonlari — hammasi tegilmaydi,
+// original tartibda qoladi.
+export function sarlavhaniTuzat(html) {
+  if (!html) return html
+  const konteyner = document.createElement('div')
+  konteyner.innerHTML = html
+
+  const rasmSpanlari = Array.from(konteyner.querySelectorAll('span[style*="position"]'))
+    .filter((el) => el.querySelector('img') && !(el.textContent || '').trim())
+
+  if (rasmSpanlari.length === 0) return html
+
+  const rasmlar = rasmSpanlari.map((el) => el.querySelector('img').outerHTML)
+  rasmSpanlari.forEach((el) => el.remove())
+
+  const [logotip, ...qolganlar] = rasmlar
+  const sarlavhaQator = `<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:8px;">
+    <div style="flex-shrink:0;">${logotip || ''}</div>
+    <div style="flex:1"></div>
+    ${qolganlar.length ? `<div style="flex-shrink:0; display:flex; gap:4px;">${qolganlar.join('')}</div>` : ''}
+  </div>`
+
+  return sarlavhaQator + konteyner.innerHTML
+}

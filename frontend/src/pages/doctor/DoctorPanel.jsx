@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../../utils/api'
 import { playNotificationSound } from '../../utils/sound'
 import { useAuthStore } from '../../store/authStore'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   UserCheck,
   PhoneOff,
@@ -22,7 +22,6 @@ import {
   CreditCard,
   History,
   Users,
-  X,
   FileText,
   Save,
   Search,
@@ -33,7 +32,6 @@ import {
   MinusCircle,
   TestTube,
   ClipboardList,
-  Send,
 } from 'lucide-react'
 import MedicalReportModal from '../../components/MedicalReportModal'
 import Modal from '../../components/Modal'
@@ -104,45 +102,6 @@ export default function DoctorPanel() {
 
   // Report Template Modal State (UZI/Lab shablonlari)
   const [templatePatient, setTemplatePatient] = useState(null)
-
-  // To'ldirilib saqlangan, lekin hali adminga yuborilmagan natijalar
-  const [drafts, setDrafts] = useState([])
-  const [selectedDrafts, setSelectedDrafts] = useState([])
-  const [sendingDrafts, setSendingDrafts] = useState(false)
-  const [previewDraft, setPreviewDraft] = useState(null)
-
-  const fetchDrafts = async () => {
-    try {
-      const res = await api('/report-submissions/my-drafts')
-      setDrafts(res || [])
-      setSelectedDrafts((res || []).map((d) => d.id))
-    } catch (_) {
-      setDrafts([])
-    }
-  }
-
-  const handleSendDrafts = async () => {
-    if (selectedDrafts.length === 0) {
-      showToast('Yuborish uchun kamida bitta natijani belgilang')
-      return
-    }
-    const soni = selectedDrafts.length
-    if (!window.confirm(`${soni} ta natija adminga yuborilsinmi?\n\nYuborilgandan keyin o'zgartirib bo'lmaydi.`)) return
-    setSendingDrafts(true)
-    try {
-      const res = await api('/report-submissions/submit', {
-        method: 'POST',
-        body: JSON.stringify({ ids: selectedDrafts }),
-      })
-      playNotificationSound('doctor_submit')
-      showToast(res.message || `${soni} ta natija yuborildi`)
-      fetchDrafts()
-    } catch (e) {
-      showToast(e.message || 'Yuborishda xatolik')
-    } finally {
-      setSendingDrafts(false)
-    }
-  }
 
   // Inventory Modal State
   const [inventoryModal, setInventoryModal] = useState(false)
@@ -287,10 +246,6 @@ export default function DoctorPanel() {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    fetchDrafts()
-  }, [])
 
   useEffect(() => {
     if (data?.stats?.waiting !== undefined) {
@@ -676,71 +631,6 @@ export default function DoctorPanel() {
         />
       )}
 
-      {/* ── SAQLANGAN NATIJANI KO'RISH ──────────────────────────────
-          Adminga yuborishdan oldin shifokor to'ldirganini tekshirib oladi. */}
-      {previewDraft && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start justify-center p-3 sm:p-6 overflow-y-auto">
-          <div className="card max-w-3xl w-full p-5 space-y-4 my-6">
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
-              <div className="min-w-0">
-                <h3 className="text-base font-black text-gold truncate">
-                  {previewDraft.template_label}
-                </h3>
-                <p className="text-xs text-muted font-bold mt-0.5">
-                  {previewDraft.ticket_number ? `${previewDraft.ticket_number} · ` : ''}
-                  {previewDraft.patient_name}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewDraft(null)}
-                className="p-2 rounded-xl text-muted hover:text-body shrink-0"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div
-              className="mms-shablon bg-white text-black rounded-xl p-5 text-[13px] leading-relaxed overflow-x-auto"
-              style={{ fontFamily: "'Times New Roman', Cambria, serif" }}
-              dangerouslySetInnerHTML={{ __html: previewDraft.content || '' }}
-            />
-
-            <div className="flex gap-2 pt-1">
-              <Btn variant="ghost" full icon={<X className="h-4 w-4" />} onClick={() => setPreviewDraft(null)}>
-                Yopish
-              </Btn>
-              <Btn
-                variant="gold"
-                full
-                icon={<Send className="h-4 w-4" />}
-                loading={sendingDrafts}
-                onClick={async () => {
-                  setSelectedDrafts([previewDraft.id])
-                  setPreviewDraft(null)
-                  setSendingDrafts(true)
-                  try {
-                    const res = await api('/report-submissions/submit', {
-                      method: 'POST',
-                      body: JSON.stringify({ ids: [previewDraft.id] }),
-                    })
-                    playNotificationSound('doctor_submit')
-                    showToast(res.message || 'Yuborildi')
-                    fetchDrafts()
-                  } catch (e) {
-                    showToast(e.message || 'Yuborishda xatolik')
-                  } finally {
-                    setSendingDrafts(false)
-                  }
-                }}
-              >
-                Shu natijani yuborish
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header Bar */}
       <PageHeader
         title={`${doctor_name || 'Shifokor'} Paneli`}
@@ -748,18 +638,39 @@ export default function DoctorPanel() {
         icon={<Stethoscope className="h-6 w-6 text-gold" />}
       >
         <div className="flex flex-wrap items-center gap-2">
-          {/* Patient History Search Button */}
+          {/* Utility actions — qidiruv va yangilash, asosiy amallardan ajratilgan */}
+          <div className="flex items-center gap-1.5 pr-2 mr-1 border-r border-border">
+            <Btn
+              variant="ghost"
+              size="sm"
+              icon={<Search className="h-4 w-4" />}
+              onClick={() => setHistorySearchModal(true)}
+              title="Bemorlar tarixini izlash"
+            >
+              Bemorlar Tarixi
+            </Btn>
+            <button
+              type="button"
+              onClick={fetchDoctorQueue}
+              title="Yangilash"
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-muted hover:text-body hover:bg-surface-2 transition-all"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Ish holati boshqaruvi — ikkalasi bir xil o'lcham, aniq ajralgan */}
           <Btn
-            variant="outline"
+            variant={is_paused ? 'amber' : 'outline'}
             size="sm"
-            icon={<Search className="h-4 w-4 text-cyan-400" />}
-            onClick={() => setHistorySearchModal(true)}
-            className="font-bold border-cyan-500/40 hover:bg-cyan-500/10 text-cyan-400"
+            icon={is_paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            loading={actionLoading}
+            onClick={handleTogglePause}
+            disabled={data?.is_shift_closed}
           >
-            🔍 Bemorlar Tarixini Izlash
+            {is_paused ? 'Qabulni Davom Ettirish' : 'Tanaffus'}
           </Btn>
 
-          {/* Work Shift Close / Open Button */}
           <Btn
             variant={data?.is_shift_closed ? 'success' : 'danger'}
             size="sm"
@@ -767,23 +678,7 @@ export default function DoctorPanel() {
             loading={actionLoading}
             onClick={handleToggleShift}
           >
-            {data?.is_shift_closed ? '🟢 Qabulni Ochish' : '🔴 Ish Kunini Yakunlash (Yopish)'}
-          </Btn>
-
-          {/* Pause Toggle Button */}
-          <Btn
-            variant={is_paused ? 'warning' : 'outline'}
-            size="sm"
-            icon={is_paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-            loading={actionLoading}
-            onClick={handleTogglePause}
-            disabled={data?.is_shift_closed}
-          >
-            {is_paused ? '▶ Qabulni Davom Ettirish' : '⏸ Tanaffus (Pauza)'}
-          </Btn>
-
-          <Btn variant="ghost" size="sm" icon={<RefreshCw className="h-4 w-4" />} onClick={fetchDoctorQueue}>
-            Yangilash
+            {data?.is_shift_closed ? 'Qabulni Ochish' : 'Ish Kunini Yakunlash'}
           </Btn>
         </div>
       </PageHeader>
@@ -805,51 +700,71 @@ export default function DoctorPanel() {
           qarasa pul raqamlari ko'rinib qolmasligi uchun. */}
       <div className="grid grid-cols-3 gap-3">
         {/* COMPLETED COUNT */}
-        <div className="card p-3.5 border-emerald-500/20 bg-surface-2 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block mb-1">
-            ✓ Yakunlangan Qabullar
-          </span>
-          <span className="text-xl font-black font-mono text-emerald-400">{stats?.completed || 0} ta</span>
+        <div className="card p-4 border-emerald-500/20 shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/12 border border-emerald-500/25 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block leading-tight">
+              Yakunlangan
+            </span>
+            <span className="text-xl font-black font-mono text-emerald-400 leading-tight">{stats?.completed || 0} ta</span>
+          </div>
         </div>
 
         {/* WAITING COUNT */}
-        <div className="card p-3.5 border-amber-500/20 bg-surface-2 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block mb-1">
-            ⏳ Navbatda Kutayotganlar
-          </span>
-          <span className="text-xl font-black font-mono text-amber-400">{stats?.waiting || 0} ta</span>
+        <div className="card p-4 border-amber-500/20 shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/12 border border-amber-500/25 flex items-center justify-center shrink-0">
+            <Clock className="h-5 w-5 text-amber-400" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block leading-tight">
+              Navbatda Kutmoqda
+            </span>
+            <span className="text-xl font-black font-mono text-amber-400 leading-tight">{stats?.waiting || 0} ta</span>
+          </div>
         </div>
 
         {/* TOTAL TODAY COUNT */}
-        <div className="card p-3.5 border-purple-500/20 bg-surface-2 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block mb-1">
-            👥 Bugungi Jami Bemorlar
-          </span>
-          <span className="text-xl font-black font-mono text-purple-400">{stats?.total_today || 0} ta</span>
+        <div className="card p-4 border-purple-500/20 shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-purple-500/12 border border-purple-500/25 flex items-center justify-center shrink-0">
+            <Users className="h-5 w-5 text-purple-400" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted block leading-tight">
+              Bugungi Jami
+            </span>
+            <span className="text-xl font-black font-mono text-purple-400 leading-tight">{stats?.total_today || 0} ta</span>
+          </div>
         </div>
       </div>
 
       {/* ── SHIFT CLOSED BANNER ── */}
       {data?.is_shift_closed && (
-        <div className="card p-5 bg-rose-500/10 border-rose-500/40 text-center space-y-2">
-          <h3 className="text-lg font-black text-rose-400 flex items-center justify-center gap-2">
-            🔒 Bugungi Ish Kuni Yakunlangan (Qabul Yopilgan)
-          </h3>
-          <p className="text-xs text-muted max-w-xl mx-auto font-medium">
-            Tizim yangi navbat chaqirishni to'xtatgan. Qayta bemor qabul qilish uchun yuqoridagi <strong>"🟢 Qabulni Ochish"</strong> tugmasini bosing.
-          </p>
+        <div className="card p-5 bg-rose-500/10 border-rose-500/40 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0">
+            <AlertCircle className="h-5 w-5 text-rose-400" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-rose-400">
+              Bugungi ish kuni yakunlangan — qabul yopilgan
+            </h3>
+            <p className="text-xs text-muted font-medium mt-0.5">
+              Tizim yangi navbat chaqirishni to'xtatgan. Qayta bemor qabul qilish uchun yuqoridagi <strong className="text-body">"Qabulni Ochish"</strong> tugmasini bosing.
+            </p>
+          </div>
         </div>
       )}
 
       {/* ── CURRENT PATIENT HERO SECTION ── */}
-      <div className="card p-6 border-gold/50 shadow-2xl relative overflow-hidden bg-gradient-to-br from-surface-1 via-surface-2 to-surface-1">
+      <div className="card p-6 border-gold/50 shadow-xl relative overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4 mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gold/20 border border-gold/40 flex items-center justify-center text-gold font-black text-xl shadow-inner">
-              🩺
+            <div className="w-11 h-11 rounded-2xl bg-gold/15 border border-gold/30 flex items-center justify-center shrink-0">
+              <Stethoscope className="h-5 w-5 text-gold" />
             </div>
             <div>
-              <h2 className="font-black text-lg text-foreground flex items-center gap-2">
+              <h2 className="font-black text-base text-foreground">
                 Hozirgi Qabuldagi Bemor
               </h2>
               <p className="text-xs text-muted font-medium">Xona: <strong className="text-gold">{cabinet || '1-Xona'}</strong></p>
@@ -860,16 +775,16 @@ export default function DoctorPanel() {
             {/* RE-CALL CURRENT PATIENT BUTTON */}
             {current_patient && (
               <Btn
-                variant="warning"
+                variant="amber"
                 size="md"
-                icon={<Volume2 className="h-5 w-5" />}
+                icon={<Volume2 className="h-4 w-4" />}
                 loading={actionLoading}
                 disabled={data?.is_shift_closed || is_paused}
                 onClick={handleRecallCurrent}
-                className="px-5 py-3 text-sm font-black shadow-lg bg-amber-500 hover:bg-amber-600 text-slate-950"
+                className="font-bold"
                 title="Hozirgi qabuldagi bemorni TV ekranda qayta chaqirish"
               >
-                🔊 Qayta Chaqirish
+                Qayta Chaqirish
               </Btn>
             )}
 
@@ -877,94 +792,87 @@ export default function DoctorPanel() {
             <Btn
               variant="gold"
               size="md"
-              icon={<Volume2 className="h-5 w-5" />}
+              icon={<Volume2 className="h-4 w-4" />}
               loading={actionLoading}
               disabled={data?.is_shift_closed || is_paused || (stats?.waiting === 0 && !current_patient)}
               onClick={handleCallNext}
-              className="px-6 py-3 text-sm font-black shadow-lg scale-105"
+              className="font-black shadow-md"
             >
-              📢 Keyingi Bemorni Chaqirish
+              Keyingi Bemorni Chaqirish
             </Btn>
           </div>
         </div>
 
         {current_patient ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             {/* Ticket & Name */}
-            <div className="md:col-span-2 space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="badge badge-gold font-mono font-black text-xl px-4 py-1.5 shadow-md">
+            <div className="lg:col-span-2 space-y-3">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="badge badge-gold font-mono font-black text-lg px-3.5 py-1 shadow-sm">
                   {current_patient.ticket_number}
                 </span>
-                <span className="badge badge-success text-xs font-bold animate-pulse">
-                  🟢 Hozir Xonada (Qabulda)
+                <span className="badge badge-success text-[11px] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Hozir xonada
                 </span>
               </div>
 
-              <h3 className="text-2xl font-black text-foreground tracking-tight">
+              <h3 className="text-2xl font-black text-foreground tracking-tight leading-tight">
                 {current_patient.first_name} {current_patient.last_name}
               </h3>
 
-              <div className="flex flex-wrap items-center gap-4 text-xs text-muted font-semibold">
-                <span className="flex items-center gap-1.5 text-body"><Phone className="h-3.5 w-3.5 text-cyan" /> {current_patient.phone}</span>
-                <span>•</span>
-                <span className="flex items-center gap-1.5 text-body"><Stethoscope className="h-3.5 w-3.5 text-gold" /> {current_patient.service_name}</span>
-                <span>•</span>
-                <span className="flex items-center gap-1.5 text-emerald-400 font-mono font-bold"><CreditCard className="h-3.5 w-3.5" /> {current_patient.payment_amount?.toLocaleString()} so'm</span>
+              {/* Qaysi xizmatga kelgani — shifokor uchun eng muhim ma'lumot,
+                  shuning uchun kichik matn emas, ko'zga tashlanadigan chip. */}
+              <div className="inline-flex items-center gap-2 bg-gold/12 border border-gold/30 rounded-xl px-3 py-1.5">
+                <Stethoscope className="h-4 w-4 text-gold shrink-0" />
+                <span className="text-sm font-black text-gold">{current_patient.service_name}</span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted font-semibold">
+                <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-cyan shrink-0" /> {current_patient.phone}</span>
+                <span className="flex items-center gap-1.5 text-emerald-400 font-mono font-bold"><CreditCard className="h-3.5 w-3.5 shrink-0" /> {current_patient.payment_amount?.toLocaleString()} so'm</span>
               </div>
             </div>
 
             {/* Joriy bemor amallari.
-                Fizioterapiya uchun faqat ombordan material, qayta chaqirish, yakunlash va o'tkazish.
-                Lab / UZI bemorida natija blankasi, qolgan vrachlarda esa tashxis-retsept ham chiqadi. */}
-            <div className="flex flex-col gap-2">
+                Fizioterapiya uchun faqat ombordan material va qayta chaqirish.
+                Lab / UZI bemorida natija blankasi, qolgan vrachlarda esa tashxis-retsept
+                va laboratoriya javoblari. Ikkitadan ko'p amal bo'lsa 2 ustunli setka
+                bilan chiqadi — ilgari to'liq kenglikda vertikal ustunda sig'mas edi. */}
+            <div className="lg:col-span-3 flex flex-col justify-between gap-4 lg:border-l lg:border-border lg:pl-6">
               {((specialization || '').toLowerCase().match(/(fizio|физио|ozon|озон|ineks|инъек|ukol|muolaj)/i)) ? (
-                <>
-                  <Btn
-                    variant="amber"
-                    size="md"
-                    icon={<Package className="h-4 w-4" />}
-                    onClick={() => {
-                      fetchInventory()
-                      setInventoryModal(true)
-                    }}
-                    className="w-full font-extrabold shadow-sm"
-                  >
-                    💊 Ombordan material
-                  </Btn>
-
-                  <Btn
-                    variant="warning"
-                    size="sm"
-                    icon={<Volume2 className="h-4 w-4" />}
-                    loading={actionLoading}
-                    disabled={data?.is_shift_closed || is_paused}
-                    onClick={handleRecallCurrent}
-                    className="w-full font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
-                  >
-                    🔊 Qayta Chaqirish
-                  </Btn>
-                </>
+                <Btn
+                  variant="amber"
+                  size="md"
+                  icon={<Package className="h-4 w-4" />}
+                  onClick={() => {
+                    fetchInventory()
+                    setInventoryModal(true)
+                  }}
+                  className="w-full font-extrabold justify-center"
+                >
+                  Ombordan material yozish
+                </Btn>
               ) : joriyShablonKat ? (
                 <Btn
                   variant="gold"
                   size="md"
                   icon={<ClipboardList className="h-4 w-4" />}
                   onClick={() => setTemplatePatient(current_patient)}
-                  className="w-full font-black"
+                  className="w-full font-black justify-center"
                 >
-                  📋 Natija blankasini to'ldirish
+                  Natija blankasini to'ldirish
                 </Btn>
               ) : (
-                <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Btn
                     variant="cyan"
-                    size="md"
+                    size="sm"
                     icon={<FileText className="h-4 w-4" />}
                     onClick={() => openMedicalRecord(current_patient)}
-                    className="w-full font-bold"
+                    className="w-full font-bold justify-center"
                   >
-                    📝 Tashxis va retsept
+                    Tashxis / Retsept
                   </Btn>
 
                   <Btn
@@ -972,9 +880,9 @@ export default function DoctorPanel() {
                     size="sm"
                     icon={<TestTube className="h-4 w-4" />}
                     onClick={() => setLabPatient(current_patient)}
-                    className="w-full font-bold"
+                    className="w-full font-bold justify-center"
                   >
-                    🧪 Laboratoriya javoblari
+                    Lab javoblari
                   </Btn>
 
                   <Btn
@@ -985,28 +893,28 @@ export default function DoctorPanel() {
                       fetchInventory()
                       setInventoryModal(true)
                     }}
-                    className="w-full font-bold"
+                    className="w-full font-bold justify-center"
                   >
-                    💊 Ombordan material
+                    Material
                   </Btn>
-                </>
+                </div>
               )}
 
-              <div className="flex gap-2 pt-1.5 mt-1 border-t border-border/60">
+              <div className="flex gap-2.5 pt-3 border-t border-border/60">
                 <Btn
                   variant="success"
-                  size="sm"
+                  size="md"
                   icon={<UserCheck className="h-4 w-4" />}
                   loading={actionLoading}
                   onClick={handleCompleteCurrent}
-                  className="flex-1 font-bold"
+                  className="flex-1 font-black justify-center"
                 >
-                  ✓ Yakunlash
+                  Qabulni Yakunlash
                 </Btn>
 
                 <Btn
                   variant="outline"
-                  size="sm"
+                  size="md"
                   icon={<PhoneOff className="h-4 w-4" />}
                   loading={actionLoading}
                   onClick={handleSkipCurrent}
@@ -1020,53 +928,16 @@ export default function DoctorPanel() {
           </div>
         ) : (
           <div className="py-10 text-center space-y-3">
-            <div className="text-4xl">🩺</div>
+            <div className="w-14 h-14 rounded-2xl bg-surface-2 border border-border flex items-center justify-center mx-auto">
+              <Stethoscope className="h-6 w-6 text-muted" />
+            </div>
             <p className="text-muted font-bold text-sm">Hozir xonada bemor yo'q</p>
             <p className="text-xs text-muted max-w-md mx-auto">
-              Navbatdagi bemorni xonaga chaqirish uchun yuqoridagi <strong>"📢 Keyingi Bemorni Chaqirish"</strong> tugmasini bosing.
+              Navbatdagi bemorni xonaga chaqirish uchun yuqoridagi <strong className="text-body">"Keyingi Bemorni Chaqirish"</strong> tugmasini bosing.
             </p>
           </div>
         )}
       </div>
-
-      {/* ── YUBORILMAGAN NATIJALAR (ixcham) ──────────────────────────
-          To'liq ro'yxat, ko'rish va o'chirish "Natijalarim" sahifasida.
-          Bu yerda faqat eslatma turadi — panel tartibli qolishi uchun. */}
-      {drafts.length > 0 && (
-        <div className="card p-3.5 flex flex-wrap items-center justify-between gap-3 border-gold/40 bg-gold/[0.05]">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <ClipboardList className="h-5 w-5 text-gold shrink-0" />
-            <div className="min-w-0">
-              <p className="font-extrabold text-sm text-body">
-                {drafts.length} ta natija adminga yuborilmagan
-              </p>
-              <p className="text-[11px] text-muted font-semibold truncate">
-                {drafts.slice(0, 3).map((d) => d.patient_name).join(', ')}
-                {drafts.length > 3 ? ` va yana ${drafts.length - 3} ta` : ''}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link to="/doctor/natijalar" className="text-xs font-bold text-cyan hover:underline">
-              Ro'yxatni ochish
-            </Link>
-            <Btn
-              variant="gold"
-              size="sm"
-              icon={<Send className="h-4 w-4" />}
-              loading={sendingDrafts}
-              onClick={() => {
-                setSelectedDrafts(drafts.map((d) => d.id))
-                handleSendDrafts()
-              }}
-              className="font-black"
-            >
-              Hammasini yuborish
-            </Btn>
-          </div>
-        </div>
-      )}
 
       {/* ── QUEUE LIST TABS (WAITING / HISTORY) ── */}
       <div className="card p-0 overflow-hidden border-border">
@@ -1106,17 +977,16 @@ export default function DoctorPanel() {
             ) : (
               <div className="divide-y divide-border/40">
                 {(waiting_list || []).map((p, idx) => (
-                  <div key={p.id} className="py-3 flex flex-wrap items-center justify-between gap-3 hover:bg-white/[0.02] px-2 rounded-xl transition-colors">
+                  <div key={p.id} className="py-3 flex flex-wrap items-center justify-between gap-3 hover:bg-surface-2 px-2.5 rounded-xl transition-colors">
                     <div className="flex items-center gap-3">
                       <span className="font-mono font-extrabold text-gold text-sm w-16">
                         {p.ticket_number}
                       </span>
                       <div>
                         <h4 className="font-extrabold text-sm text-body">{p.first_name} {p.last_name}</h4>
-                        <p className="text-xs text-muted flex items-center gap-2">
-                          <span>📞 {p.phone}</span>
-                          <span>•</span>
-                          <span className="text-cyan font-semibold">🩺 {p.service_name}</span>
+                        <p className="text-xs text-muted flex items-center gap-2.5">
+                          <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {p.phone}</span>
+                          <span className="flex items-center gap-1 text-cyan font-semibold"><Stethoscope className="h-3 w-3" /> {p.service_name}</span>
                         </p>
                       </div>
                     </div>
@@ -1152,24 +1022,23 @@ export default function DoctorPanel() {
             ) : (
               <div className="divide-y divide-border/40">
                 {(history_list || []).map((p) => (
-                  <div key={p.id} className="py-3 flex flex-wrap items-center justify-between gap-3 hover:bg-white/[0.02] px-2 rounded-xl transition-colors">
+                  <div key={p.id} className="py-3 flex flex-wrap items-center justify-between gap-3 hover:bg-surface-2 px-2.5 rounded-xl transition-colors">
                     <div className="flex items-center gap-3">
                       <span className="font-mono font-extrabold text-muted text-xs w-16">
                         {p.ticket_number}
                       </span>
                       <div>
                         <h4 className="font-extrabold text-sm text-body">{p.first_name} {p.last_name}</h4>
-                        <p className="text-xs text-muted flex items-center gap-2">
-                          <span>🩺 {p.service_name}</span>
-                          <span>•</span>
-                          <span>🕒 {p.updated_at ? p.updated_at.split('T')[1]?.substring(0, 5) : '—'}</span>
+                        <p className="text-xs text-muted flex items-center gap-2.5">
+                          <span className="flex items-center gap-1"><Stethoscope className="h-3 w-3" /> {p.service_name}</span>
+                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {p.updated_at ? p.updated_at.split('T')[1]?.substring(0, 5) : '—'}</span>
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <span className={`badge text-xs font-bold ${p.queue_status === 'yakunlandi' ? 'badge-success' : 'badge-danger'}`}>
-                        {p.queue_status === 'yakunlandi' ? '✓ Qabul qilindi' : '⏭ O\'tkazib yuborildi'}
+                        {p.queue_status === 'yakunlandi' ? 'Qabul qilindi' : "O'tkazib yuborildi"}
                       </span>
 
                       {/* O'tkazib yuborilgan bemor keyin kelib qolsa, shifokor
@@ -1271,11 +1140,7 @@ export default function DoctorPanel() {
           category={guessTemplateCategory(templatePatient.service_category, templatePatient.service_name)}
           defaultTemplateKey={templatePatient.template_key}
           serviceId={templatePatient.service_id}
-          onClose={() => {
-            setTemplatePatient(null)
-            // Saqlangan natija pastdagi ro'yxatda darrov ko'rinsin
-            fetchDrafts()
-          }}
+          onClose={() => setTemplatePatient(null)}
         />
       )}
 

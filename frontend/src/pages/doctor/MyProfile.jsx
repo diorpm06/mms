@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw, Calendar, Users, DollarSign, Clock, FileText, ChevronDown, ChevronUp, Eye, X } from 'lucide-react'
+import { RefreshCw, Calendar, CalendarClock, Wallet, ChevronDown, ChevronUp, Eye, X, Stethoscope, FileText } from 'lucide-react'
 import { api } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
-import { EmptyState, PageHeader } from '../../components/UIKit'
+import { Btn, EmptyState, PageHeader } from '../../components/UIKit'
 
 export default function MyProfile() {
   const [data, setData] = useState(null)
@@ -42,23 +42,15 @@ export default function MyProfile() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
-        <div>
-          <h1 className="page-title mb-0.5">Shifokor Hisoboti va Profilim</h1>
-          <p className="text-muted text-xs font-semibold">
-            Dr. <strong className="text-gold">{data?.provider_name || 'Shifokor'}</strong> — Bugungi, kechagi va 10 kunlik shaxsiy ish hisoboti
-          </p>
-        </div>
-        <button
-          type="button"
-          className="px-3.5 py-2 rounded-xl bg-surface-2 hover:bg-white/10 border border-border text-body text-xs font-bold flex items-center gap-1.5 transition-all self-start"
-          onClick={loadReport}
-          disabled={loading}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 text-gold ${loading ? 'animate-spin' : ''}`} />
-          <span>Yangilash</span>
-        </button>
-      </div>
+      <PageHeader
+        title="Profilim va Hisobotim"
+        subtitle={`Dr. ${data?.provider_name || 'Shifokor'} — bugungi, kechagi va 10 kunlik shaxsiy ish hisoboti`}
+        icon={<Stethoscope className="h-6 w-6 text-gold" />}
+      >
+        <Btn variant="ghost" size="sm" icon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />} onClick={loadReport} disabled={loading}>
+          Yangilash
+        </Btn>
+      </PageHeader>
 
       {loading && !data ? (
         <div className="p-12 text-center text-xs text-muted">Hisobot yuklanmoqda...</div>
@@ -67,11 +59,16 @@ export default function MyProfile() {
           {/* Top Quick Stats Summary Cards */}
           <div className="grid gap-4 sm:grid-cols-3">
             {/* Today */}
-            <div className="card p-4 border-emerald-500/40 bg-emerald-500/5 shadow-md space-y-2">
+            <div className="card p-4 border-emerald-500/25 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-500">
-                  📅 BUGUN
-                </span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/12 border border-emerald-500/25 flex items-center justify-center shrink-0">
+                    <Calendar className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-500">
+                    Bugun
+                  </span>
+                </div>
                 <span className="badge badge-emerald text-[10px] font-bold">
                   {today.patients_count} ta bemor
                 </span>
@@ -85,11 +82,16 @@ export default function MyProfile() {
             </div>
 
             {/* Yesterday */}
-            <div className="card p-4 border-cyan-500/40 bg-cyan-500/5 shadow-md space-y-2">
+            <div className="card p-4 border-cyan-500/25 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-500">
-                  ⏮️ KECHA
-                </span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/12 border border-cyan-500/25 flex items-center justify-center shrink-0">
+                    <CalendarClock className="h-4 w-4 text-cyan-500" />
+                  </div>
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-500">
+                    Kecha
+                  </span>
+                </div>
                 <span className="badge badge-cyan text-[10px] font-bold">
                   {yesterday.patients_count} ta bemor
                 </span>
@@ -103,11 +105,16 @@ export default function MyProfile() {
             </div>
 
             {/* Balance */}
-            <div className="card p-4 border-gold/40 bg-gold/5 shadow-md space-y-2">
+            <div className="card p-4 border-gold/30 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-gold">
-                  🏦 JORIY BALANSIM
-                </span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-gold/12 border border-gold/25 flex items-center justify-center shrink-0">
+                    <Wallet className="h-4 w-4 text-gold" />
+                  </div>
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-gold">
+                    Joriy Balansim
+                  </span>
+                </div>
                 <span className="badge badge-gold text-[10px] font-bold">Kassadan</span>
               </div>
               <p className="text-2xl font-black font-mono text-gold">
@@ -158,7 +165,7 @@ export default function MyProfile() {
                           </div>
                           <div>
                             <span className="font-extrabold text-sm text-foreground flex items-center gap-2">
-                              <span>🗓️ {formattedDate}</span>
+                              <span>{formattedDate}</span>
                               {isTodayStr && (
                                 <span className="badge badge-emerald text-[10px] font-bold">BUGUN</span>
                               )}
@@ -208,7 +215,9 @@ export default function MyProfile() {
                                         {pt.patient_name}
                                       </td>
                                       <td className="py-3 px-3 text-cyan">
-                                        🩺 {pt.service_name}
+                                        <span className="inline-flex items-center gap-1.5">
+                                          <Stethoscope className="h-3.5 w-3.5" /> {pt.service_name}
+                                        </span>
                                       </td>
                                       <td className="py-3 px-3 text-muted font-mono text-[11px]">
                                         {pt.created_at || '—'}
@@ -256,7 +265,8 @@ export default function MyProfile() {
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
                 <h3 className="font-extrabold text-base text-gold flex items-center gap-2">
-                  <span>📄 {previewReport.report_label || 'Shablon Natijasi'}</span>
+                  <FileText className="h-4 w-4" />
+                  <span>{previewReport.report_label || 'Shablon Natijasi'}</span>
                 </h3>
                 <p className="text-xs text-muted font-bold mt-0.5">
                   Bemor: <strong className="text-cyan">{previewReport.patient_name}</strong> ({previewReport.ticket_number})

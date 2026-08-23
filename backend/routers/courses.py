@@ -352,6 +352,27 @@ def use_session(
     kun_oxiri = datetime.combine(date.today(), datetime.max.time())
     yaratilgan = []
 
+    # RO'YXATGA OLINGAN KUNMI? Bemor bugun to'lab yozilgan bo'lsa, u
+    # allaqachon bugungi ro'yxatda va TV ekranida turibdi. "Keldi" bosilganda
+    # yana bitta 0 so'mlik qator ochilsa, ismi ikki marta chiqadi va kunlik
+    # hisobotdagi bemor soni oshib ketadi. Shuning uchun o'sha kuni yangi
+    # qator ochilmaydi — mavjud qatorning o'zi ishlatiladi, faqat kun sanaladi.
+    bugun = date.today()
+    royxat_kuni = asl.created_at.date() if asl.created_at else None
+    royxat_kunimi = royxat_kuni == bugun
+
+    # Bir kunda ikki marta bosilishidan himoya. Keyingi kunlarda buni
+    # yuqoridagi "bor" tekshiruvi ushlaydi (0 so'mlik qator bo'yicha), lekin
+    # ro'yxatga olingan kuni bunday qator yaratilmaydi. O'sha kuni faqat
+    # 1-kun berilishi mumkin, ya'ni kun raqami 1 dan boshqa bo'lsa —
+    # "Keldi" allaqachon bosilgan.
+    if royxat_kunimi and bugungi_kun != 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Bu bemor bugun allaqachon qabul qilingan. "
+                   "Bir kunda bir marta bosiladi.",
+        )
+
     for x in qoldi_bor:
         svc = db.query(Service).filter(Service.id == x["service_id"]).first()
         # Tashrifni shu xizmatning to'lov yozuviga bog'laymiz
@@ -359,6 +380,17 @@ def use_session(
             [ps for ps in g["_rows"] if ps.service_id == x["service_id"]],
             key=lambda ps: int(ps.quantity or 1),
         )
+
+        if royxat_kunimi:
+            mavjud = db.query(Patient).filter(
+                Patient.id == nishon.patient_id).first()
+            if mavjud is not None and not mavjud.is_cancelled:
+                nishon.used_count = int(nishon.used_count or 0) + 1
+                yaratilgan.append((
+                    mavjud, x,
+                    mavjud.ticket_number or "A-%03d" % mavjud.id))
+                continue
+
         prefiks = get_queue_prefix_letter(svc)
         ticket = _keyingi_raqam(db, prefiks, bugun_boshi, kun_oxiri)
 
@@ -473,8 +505,39 @@ def undo_session(
         )
         .all()
     )
+
+    # Ro'yxatga olingan kuni alohida 0 so'mlik qator ochilmaydi (ismi ikki
+    # marta chiqmasligi uchun) — o'sha kuni bekor qiladigan tashrif ham yo'q,
+    # faqat sanalgan kunni qaytarish kerak.
     if not tashriflar:
-        raise HTTPException(status_code=400, detail="Bugun bu kurs bo'yicha tashrif yo'q")
+        asl = db.query(Patient).filter(Patient.id == g["patient_id"]).first()
+        bugun_yozilgan = (
+            asl is not None and asl.created_at is not None
+            and asl.created_at.date() == date.today()
+        )
+        sanalgan = [ps for ps in g["_rows"] if int(ps.used_count or 0) > 0]
+        if not bugun_yozilgan or not sanalgan:
+            raise HTTPException(status_code=400,
+                                detail="Bugun bu kurs bo'yicha tashrif yo'q")
+        for ps in sanalgan:
+            ps.used_count = max(0, int(ps.used_count or 0) - 1)
+        ip, ua = get_client_info(request)
+        log_audit(
+            db, user_id=user.id, user_role=user.role,
+            action_type="COURSE_VISIT_UNDO",
+            table_name="patient_services", record_id=g["_rows"][0].id,
+            new_data={"patient": g["patient_name"],
+                      "izoh": "ro'yxatga olingan kun qaytarildi"},
+            ip_address=ip, device_info=ua,
+        )
+        db.commit()
+        kurs_qolgan = max(
+            (x["remaining"] for x in g["services"] if x["_oldindan"]),
+            default=0)
+        return {
+            "message": "%d ta tashrif bekor qilindi" % len(sanalgan),
+            "remaining": kurs_qolgan + 1,
+        }
 
     for t in tashriflar:
         ps = db.query(PatientService).filter(PatientService.id == t.prepaid_from_id).first()
