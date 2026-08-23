@@ -1304,8 +1304,15 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         # Check Advances for Referrer
         total_advance_remaining = advance_remaining_map.get(("referrer", r.id), 0)
 
+        # DIQQAT: avans qarzi endi HAR BIR TO'LOVDA real vaqtda avtomatik
+        # qoplanadi (services/finance.py) — shu davr ulushi allaqachon
+        # joriy total_advance_remaining ichida hisobga olingan. Shuning
+        # uchun bu yerda yana bir marta ayirib bo'lmaydi (ikki marta
+        # ayirish "Qolgan Qarz"ni haqiqiysidan kamroq ko'rsatib
+        # qo'yardi). "Sof To'lanadigan" — bu davrning gipotetik hisobi
+        # emas, balansning HOZIRGI haqiqiy qiymati.
         advance_deducted = min(total_comm, total_advance_remaining)
-        net_payable = max(0, total_comm - advance_deducted)
+        net_payable = r.balance
 
         daily_svc_map = {}
         daily_dept_map = {}
@@ -1464,8 +1471,12 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         # Check Advances for Provider
         total_advance_remaining = advance_remaining_map.get(("provider", pr.id), 0)
 
+        # Xuddi yo'naltiruvchidagi kabi — qarz endi real vaqtda avtomatik
+        # qoplanadi, shu davr ulushi joriy total_advance_remaining'da
+        # allaqachon hisobga olingan. "Sof To'lanadigan" balansning
+        # hozirgi haqiqiy qiymati, gipotetik hisob emas.
         advance_deducted = min(total_prov_share, total_advance_remaining)
-        net_payable = max(0, total_prov_share - advance_deducted)
+        net_payable = pr.balance
 
         prov_map[pr.id] = {
             "provider_id": pr.id,

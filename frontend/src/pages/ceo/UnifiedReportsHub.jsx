@@ -1157,11 +1157,11 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     const grandGross = payouts.reduce((acc, r) => acc + (r.gross_total || 0), 0)
     const grandEarned = payouts.reduce((acc, r) => acc + (r.earned_commission || 0), 0)
     const grandNet = payouts.reduce((acc, r) => acc + (r.net_payable || 0), 0)
-    // Shu davr ulushi hisobga olingandan keyin ham qolib ketadigan qarz —
-    // ilgari bu raqam hech qayerda ko'rsatilmasdi
-    const grandRemaining = payouts.reduce(
-      (acc, r) => acc + Math.max(0, (r.advance_remaining || 0) - (r.advance_deducted || 0)), 0
-    )
+    // Qarz endi har bir to'lovda real vaqtda avtomatik qoplanadi
+    // (backend/services/finance.py) — advance_remaining allaqachon
+    // JORIY, real qiymat. Shu yerda yana ayirib bo'lmaydi, aks holda
+    // ikki marta ayirilib, qarz haqiqiysidan kamroq ko'rinib qolardi.
+    const grandRemaining = payouts.reduce((acc, r) => acc + (r.advance_remaining || 0), 0)
 
     return (
       <div className="card p-6 space-y-4 transition-all duration-300">
@@ -1215,8 +1215,8 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                         <td className="p-2.5 text-right font-mono text-muted">{formatMoney(r.gross_total)}</td>
                         <td className="p-2.5 text-right font-mono text-gold font-bold">{formatMoney(r.earned_commission)}</td>
                         <td className="p-2.5 text-right font-mono text-rose-400">{r.advance_deducted > 0 ? `-${formatMoney(r.advance_deducted)}` : '0'}</td>
-                        <td className="p-2.5 text-right font-mono font-bold" style={{ color: (r.advance_remaining - r.advance_deducted) > 0 ? '#f87171' : undefined }}>
-                          {(r.advance_remaining - r.advance_deducted) > 0 ? formatMoney(r.advance_remaining - r.advance_deducted) : '—'}
+                        <td className="p-2.5 text-right font-mono font-bold" style={{ color: r.advance_remaining > 0 ? '#f87171' : undefined }}>
+                          {r.advance_remaining > 0 ? formatMoney(r.advance_remaining) : '—'}
                         </td>
                         <td className="p-2.5 text-right font-mono text-emerald font-black">{formatMoney(r.net_payable)}</td>
                         <td className="p-2.5 text-center">
