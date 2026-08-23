@@ -742,6 +742,7 @@ export default function CeoReferrers() {
                     <th className="p-2.5 text-right w-28">Bugun</th>
                     <th className="p-2.5 text-right w-32">Jami ishlagan</th>
                     <th className="p-2.5 text-right w-32">To'lanadigan Balans</th>
+                    <th className="p-2.5 text-right w-28">Avans Qarzi</th>
                     <th className="p-2.5 text-center w-16">Amallar</th>
                   </tr>
                 </thead>
@@ -794,6 +795,14 @@ export default function CeoReferrers() {
 
                       <td className="p-2.5 text-right font-mono font-black accent-value text-sm">
                         {formatMoney(r.balance)}
+                      </td>
+
+                      <td className="p-2.5 text-right font-mono font-bold text-sm">
+                        {r.advance_debt > 0 ? (
+                          <span className="text-rose-400">{formatMoney(r.advance_debt)}</span>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
                       </td>
 
                       <td className="p-2.5 text-center">

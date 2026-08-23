@@ -51,12 +51,28 @@ def list_referrers(
     from services.earnings_daily import referrers_summary
     xulosa = referrers_summary(db, referrers)
 
+    # Hali qoplanmagan avans qarzi — balans (ishlab topgani) bilan
+    # aralashtirilmaydi, alohida ko'rsatiladi
+    from models.provider_advance import ProviderAdvance
+    from sqlalchemy import func as _func
+    qarzlar = dict(
+        db.query(ProviderAdvance.recipient_id, _func.sum(ProviderAdvance.remaining))
+        .filter(
+            ProviderAdvance.recipient_type == "referrer",
+            ProviderAdvance.is_cancelled == False,  # noqa: E712
+            ProviderAdvance.is_settled == False,  # noqa: E712
+        )
+        .group_by(ProviderAdvance.recipient_id)
+        .all()
+    )
+
     res = []
     for r in referrers:
         item = ReferrerOut.model_validate(r)
         x = xulosa.get(r.id) or {}
         item.today_earned = x.get("today", 0)
         item.total_earned = x.get("total_earned", 0)
+        item.advance_debt = int(qarzlar.get(r.id) or 0)
         res.append(item)
     return res
 

@@ -90,6 +90,24 @@ export default function CeoAdvances() {
     }
   }
 
+  const handleCancel = async (a) => {
+    const reason = prompt(
+      `"${a.recipient_name}" ga berilgan ${formatMoney(a.amount)} so'mlik avans bekor qilinsinmi?\n\nKassaga ${formatMoney(a.remaining)} so'm qaytariladi. Sababini yozing:`,
+      'Adashib kiritilgan'
+    )
+    if (reason === null) return
+    try {
+      const res = await api(`/advances/${a.id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      })
+      toast(res.message)
+      load()
+    } catch (e) {
+      toast(e.message, 'error')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -159,14 +177,25 @@ export default function CeoAdvances() {
                     </td>
                     <td className="td-cell">
                       {!a.is_settled && (
-                        <Btn
-                          variant="outline"
-                          size="xs"
-                          icon={Icons.check}
-                          onClick={() => handleSettle(a.id, a.remaining)}
-                        >
-                          Qoplash
-                        </Btn>
+                        <div className="flex items-center gap-1.5">
+                          <Btn
+                            variant="outline"
+                            size="xs"
+                            icon={Icons.check}
+                            onClick={() => handleSettle(a.id, a.remaining)}
+                          >
+                            Qoplash
+                          </Btn>
+                          <Btn
+                            variant="outline"
+                            size="xs"
+                            icon={Icons.cancel}
+                            onClick={() => handleCancel(a)}
+                            className="text-rose-400 border-rose-500/40 hover:bg-rose-500/10"
+                          >
+                            Bekor qilish
+                          </Btn>
+                        </div>
                       )}
                     </td>
                   </tr>

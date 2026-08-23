@@ -149,6 +149,9 @@ class ReferrerOut(BaseModel):
     # Balansdan alohida: qancha ishlagani (tranzaksiyalardan)
     today_earned: Optional[int] = 0
     total_earned: Optional[int] = 0
+    # Hali qoplanmagan avans qarzi — balansdan (ishlab topgani) alohida,
+    # aks holda bu ikkisini birlashtirib ko'rsatadigan joy yo'q edi
+    advance_debt: Optional[int] = 0
 
     class Config:
         from_attributes = True

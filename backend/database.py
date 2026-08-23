@@ -446,6 +446,15 @@ def run_migrations():
          "key VARCHAR(100) PRIMARY KEY, "
          "value TEXT, "
          "updated_at TIMESTAMP)"),
+        # Avansni bekor qilish imkoni (ilgari umuman yo'q edi)
+        "ALTER TABLE provider_advances ADD COLUMN is_cancelled BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE provider_advances ADD COLUMN cancelled_at TIMESTAMP",
+        "ALTER TABLE provider_advances ADD COLUMN cancelled_by INTEGER",
+        "ALTER TABLE provider_advances ADD COLUMN cancel_reason TEXT",
+        # Avans bilan birga yaratilgan harajat yozuvini bog'laydi — bekor
+        # qilinganda o'sha harajat ham (kassaga ikkinchi marta tegmasdan)
+        # bekor deb belgilanadi
+        "ALTER TABLE provider_advances ADD COLUMN expense_id INTEGER",
     ):
         try:
             with engine.connect() as conn:
