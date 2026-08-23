@@ -6,6 +6,6 @@
     { "source": "/",       "destination": "/api/index.py?__v_path=/" }
   ],
   "crons": [
-    { "path": "/api/cron/run-daily", "schedule": "0 15 * * *" }
+    { "path": "/api/cron/run-daily", "schedule": "0 12 * * *" }
   ]
 }

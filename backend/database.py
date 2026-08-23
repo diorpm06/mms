@@ -455,6 +455,9 @@ def run_migrations():
         # qilinganda o'sha harajat ham (kassaga ikkinchi marta tegmasdan)
         # bekor deb belgilanadi
         "ALTER TABLE provider_advances ADD COLUMN expense_id INTEGER",
+        # Kunlik hisobot yangilanganda Telegram'dagi eski xabarni o'chirib,
+        # yangisini yuborish uchun avval yuborilgan xabarlar ro'yxati (JSON)
+        "ALTER TABLE saved_reports ADD COLUMN telegram_messages TEXT",
     ):
         try:
             with engine.connect() as conn:

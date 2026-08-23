@@ -44,7 +44,7 @@ def _oy_oxirgi_kunimi(d: date) -> bool:
 
 @router.get("/run-daily")
 def cron_run_daily(authorization: str | None = Header(default=None)):
-    """Vercel har kuni bir marta (15:00 UTC = 20:00 Toshkent) chaqiradi.
+    """Vercel har kuni bir marta (12:00 UTC = 17:00 Toshkent) chaqiradi.
     Shu ichida qaysi hisobotlar aynan bugun yuborilishi kerakligini
     o'zi hal qiladi — xuddi ilgari APScheduler har biri uchun alohida
     jadval bilan qilgani kabi."""

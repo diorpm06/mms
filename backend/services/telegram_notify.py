@@ -93,11 +93,17 @@ async def send_telegram_message(text: str, section: str = "system"):
         logger.error("Telegram xabar xato: %s", e)
 
 
-async def send_telegram_document(document_bytes: bytes, filename: str, caption: str = "", section: str = "reports"):
+async def send_telegram_document(
+    document_bytes: bytes, filename: str, caption: str = "", section: str = "reports"
+) -> list[dict]:
+    """Hujjatni Telegram'ga yuboradi. Har bir yuborilgan xabar uchun
+    {"chat_id":.., "message_id":..} qaytaradi — keyin shu xabarni
+    o'chirib, yangisini yuborish (hisobotni yangilash) uchun kerak."""
+    yuborilganlar: list[dict] = []
     chat_ids = _target_chat_ids()
     if not settings.BOT_TOKEN:
         logger.warning("Telegram sozlanmagan")
-        return
+        return yuborilganlar
     url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/sendDocument"
     topic_key = TOPIC_MAP.get(section)
     topic_id = getattr(settings, topic_key, None) if topic_key else None
@@ -111,7 +117,7 @@ async def send_telegram_document(document_bytes: bytes, filename: str, caption: 
                 targets.append(linked)
         if not targets:
             logger.warning("Telegram target topilmadi: section=%s", section)
-            return
+            return yuborilganlar
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             for chat_id, thread_id in targets:
@@ -122,8 +128,29 @@ async def send_telegram_document(document_bytes: bytes, filename: str, caption: 
                 resp = await client.post(url, data=data, files=files)
                 if resp.status_code >= 400:
                     logger.error("Telegram document yuborilmadi (%s): %s", resp.status_code, resp.text[:300])
+                else:
+                    try:
+                        mid = resp.json()["result"]["message_id"]
+                        yuborilganlar.append({"chat_id": chat_id, "message_id": mid})
+                    except Exception:
+                        pass
     except Exception as e:
         logger.error("Telegram document xato: %s", e)
+    return yuborilganlar
+
+
+async def delete_telegram_message(chat_id: str, message_id: int) -> None:
+    """Avval yuborilgan xabarni o'chiradi (hisobot yangilanganda eskisini
+    olib tashlash uchun). Xabar allaqachon o'chirilgan yoki 48 soatdan
+    o'tib ketgan bo'lsa ham — bu jim xato, yangi xabar baribir yuboriladi."""
+    if not settings.BOT_TOKEN:
+        return
+    url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/deleteMessage"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(url, json={"chat_id": chat_id, "message_id": message_id})
+    except Exception as e:
+        logger.warning("Telegram xabarni o'chirish xato: %s", e)
 
 
 def send_telegram_background(text: str, section: str = "system") -> None:

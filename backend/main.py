@@ -194,6 +194,31 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+# Kunlik hisobot soat 17:00'da Telegram'ga birinchi marta yuborilgach,
+# shundan keyin bemor/to'lov/xarajat kiritilsa — eski xabarni o'chirib,
+# yangi sonlar bilan qayta yuboradi (services/scheduler.py).
+_HISOBOTGA_TASIR_QILUVCHI_YONALISHLAR = (
+    "/api/patients", "/api/queue", "/api/courses", "/api/inpatients",
+    "/api/cash", "/api/expenses",
+)
+
+
+@app.middleware("http")
+async def kunlik_hisobotni_yangilash(request: Request, call_next):
+    response = await call_next(request)
+    try:
+        if (
+            request.method in ("POST", "PUT", "PATCH", "DELETE")
+            and 200 <= response.status_code < 300
+            and request.url.path.startswith(_HISOBOTGA_TASIR_QILUVCHI_YONALISHLAR)
+        ):
+            from services.scheduler import resend_daily_report_background
+            resend_daily_report_background()
+    except Exception as e:
+        logger.error(f"Hisobotni yangilash trigger xatosi: {e}")
+    return response
+
+
 # ── Routerlar ─────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(services.router)

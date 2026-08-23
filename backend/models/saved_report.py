@@ -18,4 +18,7 @@ class SavedReport(Base):
     title: Mapped[str] = mapped_column(String(255))
     pdf_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     json_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Telegram'ga yuborilgan xabarlarning [{"chat_id":.., "message_id":..}] ro'yxati (JSON) —
+    # kunlik hisobot yangilanganda eskisini o'chirib, o'rniga yangisini yuborish uchun.
+    telegram_messages: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

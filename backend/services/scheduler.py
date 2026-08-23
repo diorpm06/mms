@@ -26,7 +26,7 @@ def _run_async(coro):
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    loop.run_until_complete(coro)
+    return loop.run_until_complete(coro)
 
 
 def _with_db(fn):
@@ -41,46 +41,101 @@ def _with_db(fn):
         db.close()
 
 
-def job_daily_report():
+def _yubor_kunlik_hisobot(db: Session, d: date) -> None:
+    """Kunlik hisobotni tuzadi, saqlaydi va Telegram'ga yuboradi. Agar shu
+    kun uchun avval yuborilgan xabar(lar) bo'lsa — avval o'shalarni
+    o'chiradi, keyin yangi sonlar bilan qayta yuboradi (hisobotni
+    yangilash: soat 17:00'dan keyin yana bemor/to'lov kiritilsa)."""
     import json
     from models.saved_report import SavedReport
     from services.export import export_pdf
+    from services.telegram_notify import delete_telegram_message
+
+    d_str = d.isoformat()
+    rep = daily_report(db, d)
+    # "Shifokorlar KPI ulushlari" jadvali faqat davriy (10 kunlik) hisobot
+    # uchun — kunlik PDF'da bo'lmasligi kerak (routers/reports.py dagi
+    # _pdf_uchun_tozala bilan bir xil qoida).
+    pdf_uchun = {k: v for k, v in rep.items() if k != "providers_breakdown"}
+    pdf_bytes = export_pdf(pdf_uchun, title=f"Marjona Med — Kunlik Hisobot ({d.strftime('%d.%m.%Y')})")
+
+    saved = db.query(SavedReport).filter(
+        SavedReport.report_type == "daily",
+        SavedReport.period_start == d_str,
+    ).first()
+
+    eski_xabarlar = []
+    if saved and saved.telegram_messages:
+        try:
+            eski_xabarlar = json.loads(saved.telegram_messages)
+        except Exception:
+            eski_xabarlar = []
+    for x in eski_xabarlar:
+        _run_async(delete_telegram_message(x["chat_id"], x["message_id"]))
+
+    msg = format_daily_message(db, d)
+    filename = f"Kunlik_Hisobot_{d.strftime('%d.%m.%Y')}.pdf"
+    yangi_xabarlar = _run_async(send_telegram_document(pdf_bytes, filename, caption=msg, section="reports"))
+
+    if not saved:
+        saved = SavedReport(
+            report_type="daily",
+            period_start=d_str,
+            period_end=d_str,
+            title=f"Kunlik Hisobot — {d.strftime('%d.%m.%Y')}",
+            pdf_data=pdf_bytes,
+            json_data=json.dumps(rep, default=str),
+            telegram_messages=json.dumps(yangi_xabarlar),
+        )
+        db.add(saved)
+    else:
+        saved.pdf_data = pdf_bytes
+        saved.json_data = json.dumps(rep, default=str)
+        saved.telegram_messages = json.dumps(yangi_xabarlar)
+        saved.created_at = datetime.now()
+
+
+def job_daily_report():
+    def _job(db: Session):
+        _yubor_kunlik_hisobot(db, date.today())
+
+    _with_db(_job)
+
+
+def resend_daily_report_if_sent() -> None:
+    """Bugungi kunlik hisobot Telegram'ga avvalroq (soat 17:00'dagi
+    birinchi yuborishda) yuborilgan bo'lsa, keyin yangi bemor/to'lov/
+    xarajat kiritilganda hisobotni avtomatik yangilaydi. Hali birinchi
+    marta yuborilmagan bo'lsa — hech narsa qilmaydi (muddatidan oldin
+    yubormaydi, buni faqat soat 17:00'dagi jadval qiladi)."""
+    from models.saved_report import SavedReport
 
     def _job(db: Session):
         d = date.today()
-        rep = daily_report(db, d)
-        # "Shifokorlar KPI ulushlari" jadvali faqat davriy (10 kunlik) hisobot
-        # uchun — kunlik PDF'da bo'lmasligi kerak (routers/reports.py dagi
-        # _pdf_uchun_tozala bilan bir xil qoida).
-        pdf_uchun = {k: v for k, v in rep.items() if k != "providers_breakdown"}
-        pdf_bytes = export_pdf(pdf_uchun, title=f"Marjona Med — Kunlik Hisobot ({d.strftime('%d.%m.%Y')})")
         d_str = d.isoformat()
-
         saved = db.query(SavedReport).filter(
             SavedReport.report_type == "daily",
             SavedReport.period_start == d_str,
         ).first()
-
-        if not saved:
-            saved = SavedReport(
-                report_type="daily",
-                period_start=d_str,
-                period_end=d_str,
-                title=f"Kunlik Hisobot — {d.strftime('%d.%m.%Y')}",
-                pdf_data=pdf_bytes,
-                json_data=json.dumps(rep, default=str),
-            )
-            db.add(saved)
-        else:
-            saved.pdf_data = pdf_bytes
-            saved.json_data = json.dumps(rep, default=str)
-            saved.created_at = datetime.now()
-
-        msg = format_daily_message(db)
-        filename = f"Kunlik_Hisobot_{d.strftime('%d.%m.%Y')}.pdf"
-        _run_async(send_telegram_document(pdf_bytes, filename, caption=msg, section="reports"))
+        if not saved or not saved.telegram_messages:
+            return
+        _yubor_kunlik_hisobot(db, d)
 
     _with_db(_job)
+
+
+def resend_daily_report_background() -> None:
+    """`resend_daily_report_if_sent`ni alohida oqimda ishga tushiradi —
+    bemor/to'lov so'rovi Telegram javobini kutib turmasin."""
+    import threading
+
+    def _worker():
+        try:
+            resend_daily_report_if_sent()
+        except Exception as e:
+            logger.warning("Kunlik hisobotni yangilash xatosi: %s", e)
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 def job_weekly_report():
