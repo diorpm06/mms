@@ -288,8 +288,8 @@ export default function CeoReferrers() {
             .header p { margin: 4px 0 0; font-size: 12px; font-weight: bold; }
             .info-grid { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 12px; }
             .info-box { border: 1px solid #000; padding: 8px 12px; border-radius: 6px; width: 48%; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px; }
-            th, td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px; table-layout: fixed; }
+            th, td { border: 1px solid #000; padding: 6px 8px; text-align: left; word-wrap: break-word; overflow-wrap: break-word; }
             th { background: #f0f0f0; font-weight: bold; }
             .text-right { text-align: right; }
             .summary { margin-top: 16px; border: 2px solid #000; padding: 12px; border-radius: 8px; background: #fafafa; }
@@ -491,9 +491,9 @@ export default function CeoReferrers() {
             .header h2 { margin: 3px 0 0; font-size: 14px; font-weight: 800; color: #1e293b; text-transform: uppercase; }
             .header p { margin: 3px 0 0; font-size: 12px; font-weight: bold; color: #475569; }
             .sec-title { font-size: 13px; font-weight: 900; text-transform: uppercase; color: #0f172a; margin-top: 15px; margin-bottom: 6px; border-bottom: 2px solid #0f172a; padding-bottom: 3px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px; }
-            th { border: 1px solid #64748b; padding: 5px 7px; background: #f8fafc; font-weight: 900; text-align: left; }
-            td { border: 1px solid #cbd5e1; padding: 5px 7px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px; table-layout: fixed; }
+            th { border: 1px solid #64748b; padding: 5px 7px; background: #f8fafc; font-weight: 900; text-align: left; word-wrap: break-word; overflow-wrap: break-word; }
+            td { border: 1px solid #cbd5e1; padding: 5px 7px; word-wrap: break-word; overflow-wrap: break-word; }
             .summary-box { border: 2px solid #0f172a; background: #f8fafc; padding: 12px; margin-top: 10px; margin-bottom: 16px; border-radius: 4px; }
             .sum-line { font-size: 12.5px; font-weight: 900; margin-bottom: 4px; display: flex; justify-content: space-between; }
             .signatures { display: flex; justify-content: space-between; margin-top: 30px; font-size: 11.5px; }
@@ -730,70 +730,70 @@ export default function CeoReferrers() {
           {!items ? <TableSkeleton /> : (
             <div className="card overflow-x-auto p-0 border border-gold/20 shadow-lg">
               <table className="w-full text-xs border-collapse">
-                <thead className="bg-surface-2 border-b border-border text-[11px] font-extrabold uppercase tracking-wider text-muted">
+                <thead className="bg-surface-2 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="p-2.5 text-center w-12">#</th>
-                    <th className="p-2.5 text-left min-w-[180px]">Yo'naltiruvchi Ismi</th>
-                    <th className="p-2.5 text-left w-28">Telefon</th>
-                    <th className="p-2.5 text-center w-24">🧪 Lab (%)</th>
-                    <th className="p-2.5 text-center w-24">⚡ Fizio (%)</th>
-                    <th className="p-2.5 text-center w-24">🖥️ UZI</th>
-                    <th className="p-2.5 text-center w-28">🧪 Ozonaterapiya</th>
-                    <th className="p-2.5 text-right w-28">Bugun</th>
-                    <th className="p-2.5 text-right w-32">Jami ishlagan</th>
-                    <th className="p-2.5 text-right w-32">To'lanadigan Balans</th>
-                    <th className="p-2.5 text-right w-28">Avans Qarzi</th>
-                    <th className="p-2.5 text-center w-16">Amallar</th>
+                    <th className="p-1.5 text-center w-8">#</th>
+                    <th className="p-1.5 text-left min-w-[120px]">Yo'naltiruvchi</th>
+                    <th className="p-1.5 text-left w-20">Telefon</th>
+                    <th className="p-1.5 text-center w-14">Lab%</th>
+                    <th className="p-1.5 text-center w-14">Fizio%</th>
+                    <th className="p-1.5 text-center w-16">UZI</th>
+                    <th className="p-1.5 text-center w-16">Ozon</th>
+                    <th className="p-1.5 text-right w-20">Bugun</th>
+                    <th className="p-1.5 text-right w-24">Jami</th>
+                    <th className="p-1.5 text-right w-24">Balans</th>
+                    <th className="p-1.5 text-right w-24">Avans Qarzi</th>
+                    <th className="p-1.5 text-center w-10">•••</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-semibold">
                   {items.map((r, idx) => (
                     <tr key={r.id} className="hover:bg-surface-hover transition-colors whitespace-nowrap">
-                      <td className="p-2.5 text-center text-muted font-mono font-bold">#{idx + 1}</td>
-                      <td className="p-2.5 text-left font-extrabold text-body text-sm">{r.full_name}</td>
-                      <td className="p-2.5 text-left text-muted font-mono text-xs">{r.phone || '—'}</td>
-                      
-                      <td className="p-2.5 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-mono font-extrabold border border-amber-500/30 text-xs">
+                      <td className="p-1.5 text-center text-muted font-mono font-bold text-[11px]">{idx + 1}</td>
+                      <td className="p-1.5 text-left font-extrabold text-body text-xs truncate max-w-[140px]" title={r.full_name}>{r.full_name}</td>
+                      <td className="p-1.5 text-left text-muted font-mono text-[10px]">{r.phone || '—'}</td>
+
+                      <td className="p-1.5 text-center">
+                        <span className="inline-block px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono font-extrabold border border-amber-500/30 text-[10px]">
                           {r.lab_percent ?? 22}%
                         </span>
                       </td>
 
-                      <td className="p-2.5 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-mono font-extrabold border border-emerald-500/30 text-xs">
+                      <td className="p-1.5 text-center">
+                        <span className="inline-block px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-extrabold border border-emerald-500/30 text-[10px]">
                           {r.fizio_percent ?? 20}%
                         </span>
                       </td>
 
-                      <td className="p-2.5 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 font-mono font-extrabold border border-cyan-500/30 text-xs">
+                      <td className="p-1.5 text-center">
+                        <span className="inline-block px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-300 font-mono font-extrabold border border-cyan-500/30 text-[10px]">
                           {formatMoney(r.uzi_sum ?? 15000)}
                         </span>
                       </td>
 
-                      <td className="p-2.5 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-300 font-mono font-extrabold border border-violet-500/30 text-xs">
+                      <td className="p-1.5 text-center">
+                        <span className="inline-block px-1 py-0.5 rounded bg-violet-500/10 text-violet-300 font-mono font-extrabold border border-violet-500/30 text-[10px]">
                           {formatMoney(r.ozon_sum ?? 10000)}
                         </span>
                       </td>
 
-                      <td className="p-2.5 text-right font-mono font-bold text-gold text-sm">
+                      <td className="p-1.5 text-right font-mono font-bold text-gold text-xs">
                         {r.today_earned > 0 ? `+${formatMoney(r.today_earned)}` : '—'}
                       </td>
 
                       {/* Jami — bosilsa qaysi kuni qancha kelgani ochiladi */}
-                      <td className="p-2.5 text-right">
+                      <td className="p-1.5 text-right">
                         <button
                           type="button"
                           onClick={() => setKunlik({ kind: 'referrers', id: r.id, name: r.full_name })}
-                          className="font-mono font-black text-cyan text-sm hover:underline"
+                          className="font-mono font-black text-cyan text-xs hover:underline"
                           title="Kunma-kun ko'rish"
                         >
                           {formatMoney(r.total_earned)}
                         </button>
                       </td>
 
-                      <td className="p-2.5 text-right font-mono font-black accent-value text-sm">
+                      <td className="p-1.5 text-right font-mono font-black accent-value text-xs">
                         {formatMoney(r.balance)}
                       </td>
 
