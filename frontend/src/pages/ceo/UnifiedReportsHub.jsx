@@ -1157,6 +1157,11 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     const grandGross = payouts.reduce((acc, r) => acc + (r.gross_total || 0), 0)
     const grandEarned = payouts.reduce((acc, r) => acc + (r.earned_commission || 0), 0)
     const grandNet = payouts.reduce((acc, r) => acc + (r.net_payable || 0), 0)
+    // Shu davr ulushi hisobga olingandan keyin ham qolib ketadigan qarz —
+    // ilgari bu raqam hech qayerda ko'rsatilmasdi
+    const grandRemaining = payouts.reduce(
+      (acc, r) => acc + Math.max(0, (r.advance_remaining || 0) - (r.advance_deducted || 0)), 0
+    )
 
     return (
       <div className="card p-6 space-y-4 transition-all duration-300">
@@ -1197,10 +1202,10 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
           <div className="space-y-4 animate-fadeIn">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <THead cols={['#', 'Yo\'naltiruvchi F.I.Sh', 'Bemorlar', 'Jami Tushum', 'Ishlangan Ulush', 'Avans (-)', 'Sof To\'lanadigan', 'Bemorlar Ro\'yxati']} />
+                <THead cols={['#', 'Yo\'naltiruvchi F.I.Sh', 'Bemorlar', 'Jami Tushum', 'Ishlangan Ulush', 'Avans (-)', 'Qolgan Qarz', 'Sof To\'lanadigan', 'Bemorlar Ro\'yxati']} />
                 <tbody className="divide-y divide-border">
                   {payouts.length === 0 ? (
-                    <tr><td colSpan={8} className="py-6 text-center text-muted italic">Ushbu davrda yo'naltiruvchilar ma'lumoti yo'q</td></tr>
+                    <tr><td colSpan={9} className="py-6 text-center text-muted italic">Ushbu davrda yo'naltiruvchilar ma'lumoti yo'q</td></tr>
                   ) : payouts.map((r, i) => (
                     <>
                       <tr key={r.referrer_id} className="hover:bg-surface-hover font-semibold">
@@ -1210,6 +1215,9 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                         <td className="p-2.5 text-right font-mono text-muted">{formatMoney(r.gross_total)}</td>
                         <td className="p-2.5 text-right font-mono text-gold font-bold">{formatMoney(r.earned_commission)}</td>
                         <td className="p-2.5 text-right font-mono text-rose-400">{r.advance_deducted > 0 ? `-${formatMoney(r.advance_deducted)}` : '0'}</td>
+                        <td className="p-2.5 text-right font-mono font-bold" style={{ color: (r.advance_remaining - r.advance_deducted) > 0 ? '#f87171' : undefined }}>
+                          {(r.advance_remaining - r.advance_deducted) > 0 ? formatMoney(r.advance_remaining - r.advance_deducted) : '—'}
+                        </td>
                         <td className="p-2.5 text-right font-mono text-emerald font-black">{formatMoney(r.net_payable)}</td>
                         <td className="p-2.5 text-center">
                           <button
@@ -1225,7 +1233,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                       {/* Expandable Patient List for each Referrer */}
                       {expandedRefId === r.referrer_id && (
                         <tr key={`exp-${r.referrer_id}`} className="bg-surface-1/60">
-                          <td colSpan={8} className="p-4">
+                          <td colSpan={9} className="p-4">
                             <div className="card p-3 border-cyan/30 space-y-2">
                               <h4 className="text-xs font-black text-cyan uppercase flex items-center justify-between">
                                 <span>📋 {r.name} yuborgan bemorlar ro'yxati</span>
@@ -1278,6 +1286,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                       <td className="p-3 text-right font-mono text-muted">{formatMoney(grandGross)}</td>
                       <td className="p-3 text-right font-mono text-gold">{formatMoney(grandEarned)}</td>
                       <td className="p-3"></td>
+                      <td className="p-3 text-right font-mono text-rose-400">{grandRemaining > 0 ? formatMoney(grandRemaining) : '—'}</td>
                       <td className="p-3 text-right font-mono text-emerald font-black text-sm">{formatMoney(grandNet)}</td>
                       <td></td>
                     </tr>
