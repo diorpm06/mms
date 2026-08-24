@@ -60,6 +60,10 @@ class InpatientItem(CancelMixin, Base):
     unit_price: Mapped[int] = mapped_column(Integer, default=0)
     total_price: Mapped[int] = mapped_column(Integer, default=0)
     is_included_in_tariff: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Narxi chekda ko'rsatiladi (haqiqiy summa bilan), lekin bemor hisobi/
+    # balansiga (Jami Hisob, Qoldiq) qo'shilmaydi — masalan klinika o'z
+    # hisobidan berilgan dori-material sarfini yozib qo'yish uchun.
+    is_no_charge: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 

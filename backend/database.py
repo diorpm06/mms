@@ -458,6 +458,9 @@ def run_migrations():
         # Kunlik hisobot yangilanganda Telegram'dagi eski xabarni o'chirib,
         # yangisini yuborish uchun avval yuborilgan xabarlar ro'yxati (JSON)
         "ALTER TABLE saved_reports ADD COLUMN telegram_messages TEXT",
+        # Statsionar qo'shimcha xizmat/material: chekda ko'rinadi, lekin
+        # bemor hisobiga (balansga) qo'shilmaydi
+        "ALTER TABLE inpatient_items ADD COLUMN is_no_charge BOOLEAN DEFAULT FALSE",
     ):
         try:
             with engine.connect() as conn:

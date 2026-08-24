@@ -166,6 +166,10 @@ export default function InpatientDetailsModal({ inpatient, onClose, onAddItem, o
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 whitespace-nowrap inline-block">
                             ✓ Tarif ichida (0 so'm)
                           </span>
+                        ) : it.is_no_charge ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30 whitespace-nowrap inline-block">
+                            Balansga qo'shilmaydi
+                          </span>
                         ) : (
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap inline-block">
                             Alohida to'lanadi

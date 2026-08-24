@@ -39,7 +39,7 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
   const items = inpatient.items || []
   const payments = inpatient.payments || []
 
-  const extraItemsTotal = inpatient.extra_items_total || items.filter(it => !it.is_included_in_tariff).reduce((sum, it) => sum + (it.total_price || 0), 0)
+  const extraItemsTotal = inpatient.extra_items_total || items.filter(it => !it.is_included_in_tariff && !it.is_no_charge).reduce((sum, it) => sum + (it.total_price || 0), 0)
   const grandTotal = inpatient.total_amount || (roomTotal + extraItemsTotal)
   const paidTotal = inpatient.paid_total || inpatient.total_paid || payments.reduce((sum, p) => sum + (p.amount || 0), 0)
   const balanceDue = inpatient.balance_due !== undefined ? inpatient.balance_due : Math.max(0, grandTotal - paidTotal)

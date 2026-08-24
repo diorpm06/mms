@@ -85,6 +85,7 @@ export default function CeoInpatients() {
     quantity: 1,
     unit_price: '',
     is_included_in_tariff: false,
+    is_no_charge: false,
   })
 
   // Initial extra services/materials during admission
@@ -322,6 +323,7 @@ export default function CeoInpatients() {
           quantity: +itemForm.quantity || 1,
           unit_price: itemForm.unit_price !== '' ? +itemForm.unit_price : undefined,
           is_included_in_tariff: itemForm.is_included_in_tariff,
+          is_no_charge: itemForm.is_no_charge,
         }),
       })
       toast('Qo\'shimcha xizmat/material biriktirildi')
@@ -359,6 +361,7 @@ export default function CeoInpatients() {
           quantity: +editingItem.quantity || 1,
           unit_price: +editingItem.unit_price || 0,
           is_included_in_tariff: editingItem.is_included_in_tariff,
+          is_no_charge: editingItem.is_no_charge,
         }),
       })
       toast('Yangilandi')
@@ -557,7 +560,7 @@ export default function CeoInpatients() {
         activeInpatients={active}
         onAdmitRoom={(room, bed) => handleOpenAdmitModal(room, bed)}
         onAddItem={(inp) => {
-          setItemForm({ item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false })
+          setItemForm({ item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false, is_no_charge: false })
           setItemModal(inp)
         }}
         onPay={(inp) => {
@@ -670,7 +673,7 @@ export default function CeoInpatients() {
                         label: '🧪 + Xizmat/Dori qo\'shish',
                         variant: 'default',
                         onClick: () => {
-                          setItemForm({ item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false })
+                          setItemForm({ item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false, is_no_charge: false })
                           setItemModal(i)
                         },
                       },
@@ -1458,6 +1461,11 @@ export default function CeoInpatients() {
               <span>Tarif ichiga kiritilgan (bepul / 0 so'm)</span>
             </label>
 
+            <label className="flex items-center gap-2 text-xs text-muted cursor-pointer" title="Narxi chekda ko'rinadi, lekin bemor hisobi/qoldig'iga qo'shilmaydi">
+              <input type="checkbox" checked={itemForm.is_no_charge} onChange={(e) => setItemForm({ ...itemForm, is_no_charge: e.target.checked })} className="accent-cyan-400 rounded" />
+              <span>Balansga qo'shilmaydi (faqat chekda ko'rinadi)</span>
+            </label>
+
             <button type="button" className="btn-gold w-full py-3 mt-2" onClick={handleAddItem}>
               Qo'shish
             </button>
@@ -1494,6 +1502,10 @@ export default function CeoInpatients() {
                             placeholder="Narxi"
                           />
                         </div>
+                        <label className="flex items-center gap-2 text-[11px] text-muted cursor-pointer" title="Narxi chekda ko'rinadi, lekin bemor hisobi/qoldig'iga qo'shilmaydi">
+                          <input type="checkbox" checked={editingItem.is_no_charge} onChange={(e) => setEditingItem({ ...editingItem, is_no_charge: e.target.checked })} className="accent-cyan-400 rounded" />
+                          <span>Balansga qo'shilmaydi (faqat chekda ko'rinadi)</span>
+                        </label>
                         <div className="flex justify-end gap-2 pt-0.5">
                           <button type="button" className="text-muted font-bold text-xs" onClick={() => setEditingItem(null)}>Bekor</button>
                           <button type="button" className="text-emerald-400 font-bold text-xs" onClick={() => handleUpdateItem(itemModal.id)}>Saqlash</button>
@@ -1505,6 +1517,7 @@ export default function CeoInpatients() {
                           <span className="font-bold">{it.name}</span>
                           <span className="text-muted ml-2">{it.quantity}x — {formatMoney(it.total_price)}</span>
                           {it.is_included_in_tariff && <span className="text-cyan-400 font-bold ml-2">(Tarifda)</span>}
+                          {it.is_no_charge && <span className="text-purple-400 font-bold ml-2">(Balansga qo'shilmaydi)</span>}
                         </div>
                         <div className="flex items-center gap-2">
                           <button
@@ -1516,6 +1529,7 @@ export default function CeoInpatients() {
                               quantity: it.quantity,
                               unit_price: it.unit_price,
                               is_included_in_tariff: it.is_included_in_tariff,
+                              is_no_charge: it.is_no_charge,
                             })}
                           >✎</button>
                           <button type="button" className="text-rose-400 font-bold" onClick={() => handleRemoveItem(itemModal.id, it.id)}>✕</button>
@@ -1809,7 +1823,7 @@ export default function CeoInpatients() {
           onAddItem={() => {
             const p = viewPatientModal
             setViewPatientModal(null)
-            setItemForm({ item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false })
+            setItemForm({ item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false, is_no_charge: false })
             setItemModal(p)
           }}
           onPay={() => {

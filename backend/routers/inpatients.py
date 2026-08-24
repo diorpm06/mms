@@ -102,6 +102,7 @@ class InpatientItemCreate(BaseModel):
     quantity: int = Field(default=1, ge=1, le=1000)
     unit_price: int | None = Field(default=None, ge=0, le=50_000_000)
     is_included_in_tariff: bool = False
+    is_no_charge: bool = False
 
     @field_validator("service_id", "material_id", mode="before")
     @classmethod
@@ -120,6 +121,7 @@ class InpatientItemUpdate(BaseModel):
     quantity: int | None = Field(default=None, ge=1, le=1000)
     unit_price: int | None = Field(default=None, ge=0, le=50_000_000)
     is_included_in_tariff: bool | None = None
+    is_no_charge: bool | None = None
 
 
 class PaymentCreate(BaseModel):
@@ -242,7 +244,7 @@ def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
 
     # Items (extra services & materials)
     active_items = [it for it in (i.items or []) if not getattr(it, "is_cancelled", False)]
-    extra_items_total = sum(it.total_price for it in active_items if not it.is_included_in_tariff)
+    extra_items_total = sum(it.total_price for it in active_items if not (it.is_included_in_tariff or it.is_no_charge))
     
     grand_total = room_total + extra_items_total
 
@@ -305,6 +307,7 @@ def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
                 "unit_price": it.unit_price,
                 "total_price": it.total_price,
                 "is_included_in_tariff": it.is_included_in_tariff,
+                "is_no_charge": it.is_no_charge,
             }
             for it in active_items
         ],
@@ -903,6 +906,7 @@ def add_inpatient_item(
         unit_price=unit_price,
         total_price=total_price,
         is_included_in_tariff=body.is_included_in_tariff,
+        is_no_charge=body.is_no_charge,
         created_by=user.id,
     )
     db.add(item)
@@ -936,6 +940,8 @@ def update_inpatient_item(
         item.unit_price = body.unit_price
     if body.is_included_in_tariff is not None:
         item.is_included_in_tariff = body.is_included_in_tariff
+    if body.is_no_charge is not None:
+        item.is_no_charge = body.is_no_charge
 
     item.total_price = 0 if item.is_included_in_tariff else item.unit_price * item.quantity
     db.commit()
@@ -1047,7 +1053,7 @@ def discharge(
     # Calculate grand total (room + extra items)
     room_total = days * inp.daily_rate
     active_items = [it for it in (inp.items or []) if not getattr(it, "is_cancelled", False)]
-    extra_items_total = sum(it.total_price for it in active_items if not it.is_included_in_tariff)
+    extra_items_total = sum(it.total_price for it in active_items if not (it.is_included_in_tariff or it.is_no_charge))
     grand_total = room_total + extra_items_total
 
     active_payments = [p for p in (inp.payments or []) if not getattr(p, "is_cancelled", False)]
