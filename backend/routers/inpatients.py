@@ -115,6 +115,13 @@ class InpatientItemCreate(BaseModel):
             return None
 
 
+class InpatientItemUpdate(BaseModel):
+    name: str | None = None
+    quantity: int | None = Field(default=None, ge=1, le=1000)
+    unit_price: int | None = Field(default=None, ge=0, le=50_000_000)
+    is_included_in_tariff: bool | None = None
+
+
 class PaymentCreate(BaseModel):
     amount: int = Field(gt=0, le=500_000_000)
     payment_type: str = "cash"
@@ -901,6 +908,38 @@ def add_inpatient_item(
     db.add(item)
     db.commit()
     return {"message": "Qo'shildi", "id": item.id, "total_price": total_price}
+
+
+@router.patch("/{inpatient_id}/items/{item_id}")
+def update_inpatient_item(
+    inpatient_id: int,
+    item_id: int,
+    body: InpatientItemUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    item = db.query(InpatientItem).filter(
+        InpatientItem.id == item_id, InpatientItem.inpatient_id == inpatient_id,
+        InpatientItem.is_cancelled == False,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Element topilmadi")
+
+    if body.name is not None:
+        cleaned = " ".join(body.name.strip().split())
+        if not cleaned:
+            raise HTTPException(status_code=400, detail="Nomini yozing")
+        item.name = cleaned[0].upper() + cleaned[1:]
+    if body.quantity is not None:
+        item.quantity = body.quantity
+    if body.unit_price is not None:
+        item.unit_price = body.unit_price
+    if body.is_included_in_tariff is not None:
+        item.is_included_in_tariff = body.is_included_in_tariff
+
+    item.total_price = 0 if item.is_included_in_tariff else item.unit_price * item.quantity
+    db.commit()
+    return {"message": "Yangilandi", "id": item.id, "total_price": item.total_price}
 
 
 @router.delete("/{inpatient_id}/items/{item_id}")

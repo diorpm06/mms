@@ -42,6 +42,7 @@ export default function CeoInpatients() {
   const [dischargeModal, setDischargeModal] = useState(null)
   const [payModal, setPayModal] = useState(null)
   const [itemModal, setItemModal] = useState(null)
+  const [editingItem, setEditingItem] = useState(null)
   const [extendModal, setExtendModal] = useState(null)
   const [extendDaysCount, setExtendDaysCount] = useState(1)
   const [selectedReceipt, setSelectedReceipt] = useState(null)
@@ -337,6 +338,32 @@ export default function CeoInpatients() {
     try {
       await api(`/inpatients/${inpatientId}/items/${itemId}`, { method: 'DELETE' })
       toast('O\'chirildi')
+      loadData()
+    } catch (e) {
+      toast(e.message, 'error')
+    }
+  }
+
+  // Edit Item (name / quantity / price)
+  const handleUpdateItem = async (inpatientId) => {
+    if (!editingItem) return
+    if (!(editingItem.name || '').trim()) {
+      toast('Nomini yozing', 'error')
+      return
+    }
+    try {
+      await api(`/inpatients/${inpatientId}/items/${editingItem.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: editingItem.name.trim(),
+          quantity: +editingItem.quantity || 1,
+          unit_price: +editingItem.unit_price || 0,
+          is_included_in_tariff: editingItem.is_included_in_tariff,
+        }),
+      })
+      toast('Yangilandi')
+      setEditingItem(null)
+      setItemModal(null)
       loadData()
     } catch (e) {
       toast(e.message, 'error')
@@ -1282,7 +1309,7 @@ export default function CeoInpatients() {
       </Modal>
 
       {/* MODAL 2: ATTACH EXTRA SERVICE OR MATERIAL */}
-      <Modal open={!!itemModal} onClose={() => setItemModal(null)} title="Qo'shimcha Xizmat yoki Material Biriktirish">
+      <Modal open={!!itemModal} onClose={() => { setItemModal(null); setEditingItem(null) }} title="Qo'shimcha Xizmat yoki Material Biriktirish">
         {itemModal && (
           <div className="space-y-3 pt-2">
             <p className="font-bold text-foreground">{itemModal.first_name} {itemModal.last_name} — Palata {itemModal.room_number}/{itemModal.bed_number}</p>
@@ -1441,14 +1468,60 @@ export default function CeoInpatients() {
                 <h4 className="text-xs font-bold text-gold mb-2">Biriktirilgan elementlar ({itemModal.items.length}):</h4>
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   {itemModal.items.map((it) => (
-                    <div key={it.id} className="flex justify-between items-center text-xs p-2 bg-surface rounded border border-border">
-                      <div>
-                        <span className="font-bold">{it.name}</span>
-                        <span className="text-muted ml-2">{it.quantity}x — {formatMoney(it.total_price)}</span>
-                        {it.is_included_in_tariff && <span className="text-cyan-400 font-bold ml-2">(Tarifda)</span>}
+                    editingItem && editingItem.id === it.id ? (
+                      <div key={it.id} className="p-2 bg-surface rounded border border-gold space-y-1.5">
+                        <input
+                          className="input-field text-xs py-1"
+                          value={editingItem.name}
+                          onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                          placeholder="Nomi"
+                        />
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <input
+                            className="input-field text-xs py-1"
+                            type="number"
+                            min={1}
+                            value={editingItem.quantity}
+                            onChange={(e) => setEditingItem({ ...editingItem, quantity: e.target.value })}
+                            placeholder="Soni"
+                          />
+                          <input
+                            className="input-field text-xs py-1"
+                            type="number"
+                            min={0}
+                            value={editingItem.unit_price}
+                            onChange={(e) => setEditingItem({ ...editingItem, unit_price: e.target.value })}
+                            placeholder="Narxi"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-0.5">
+                          <button type="button" className="text-muted font-bold text-xs" onClick={() => setEditingItem(null)}>Bekor</button>
+                          <button type="button" className="text-emerald-400 font-bold text-xs" onClick={() => handleUpdateItem(itemModal.id)}>Saqlash</button>
+                        </div>
                       </div>
-                      <button type="button" className="text-rose-400 font-bold" onClick={() => handleRemoveItem(itemModal.id, it.id)}>✕</button>
-                    </div>
+                    ) : (
+                      <div key={it.id} className="flex justify-between items-center text-xs p-2 bg-surface rounded border border-border">
+                        <div>
+                          <span className="font-bold">{it.name}</span>
+                          <span className="text-muted ml-2">{it.quantity}x — {formatMoney(it.total_price)}</span>
+                          {it.is_included_in_tariff && <span className="text-cyan-400 font-bold ml-2">(Tarifda)</span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-gold font-bold"
+                            onClick={() => setEditingItem({
+                              id: it.id,
+                              name: it.name,
+                              quantity: it.quantity,
+                              unit_price: it.unit_price,
+                              is_included_in_tariff: it.is_included_in_tariff,
+                            })}
+                          >✎</button>
+                          <button type="button" className="text-rose-400 font-bold" onClick={() => handleRemoveItem(itemModal.id, it.id)}>✕</button>
+                        </div>
+                      </div>
+                    )
                   ))}
                 </div>
               </div>

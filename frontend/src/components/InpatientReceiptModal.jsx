@@ -232,7 +232,8 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
               {items.map((it, idx) => (
                 <div key={idx} className="flex justify-between text-xs font-mono">
                   <span className="text-slate-900 dark:text-slate-100 font-medium">
-                    • {it.name} ({it.quantity}x)
+                    • {it.item_type === 'material' ? 'Dori-darmon: ' : 'Xizmat: '}
+                    {it.name} ({it.quantity}x)
                     {it.is_included_in_tariff && <span className="text-emerald-600 font-bold ml-1">(Tarifda)</span>}
                   </span>
                   <strong className="text-slate-900 dark:text-slate-100 font-bold font-mono">
