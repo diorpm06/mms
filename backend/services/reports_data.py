@@ -350,21 +350,27 @@ def get_report(db: Session, start: date, end: date) -> dict:
         dept_map[dept]["services"][s_name]["count"] += cnt
         dept_map[dept]["services"][s_name]["total"] += tot
 
-    # Statsionar xizmatlarni qo'shish
+    # Statsionar xizmatlarni qo'shish — FAQAT xizmatlar katalogidan
+    # tanlangan (service_id bor) elementlar. Qo'lda yozilgan nom (masalan
+    # "Kunlik to'lov", "Dori") haqiqiy bo'lim emas, shu sababli o'z nomi
+    # bilan soxta alohida "bo'lim" bo'lib chiqib ketmasin — ular statsionar
+    # umumiy tushumida (inpatient_income) allaqachon hisoblangan,
+    # bu yerda faqat aniq xizmat turiga (masalan "Ozonoterapiya") mos
+    # kelganlari qo'shiladi.
     for r in inp_svcs:
         i_name = r[0] or ""
         sid = r[1]
         cnt = int(r[2] or 0)
         tot = int(r[3] or 0)
 
-        s_cat = ""
-        s_cab = ""
-        if sid:
-            svc_obj = db.query(Service).filter(Service.id == sid).first()
-            if svc_obj:
-                i_name = svc_obj.name
-                s_cat = svc_obj.category or ""
-                s_cab = svc_obj.cabinet or ""
+        if not sid:
+            continue
+        svc_obj = db.query(Service).filter(Service.id == sid).first()
+        if not svc_obj:
+            continue
+        i_name = svc_obj.name
+        s_cat = svc_obj.category or ""
+        s_cab = svc_obj.cabinet or ""
 
         dept = _extract_department_name(i_name, s_cat, s_cab)
         if dept not in dept_map:
