@@ -280,85 +280,116 @@ def get_report(db: Session, start: date, end: date) -> dict:
         .scalar()
     )
 
-    if start == end:
-        services_breakdown = (
-            db.query(
-                Service.name,
-                Service.category,
-                Service.cabinet,
-                func.count(Patient.id).label("cnt"),
-                func.sum(Patient.payment_amount).label("total"),
-            )
-            .join(Patient, Patient.service_id == Service.id)
-            .filter(
-                Patient.created_at >= s,
-                Patient.created_at <= e,
-                or_(Patient.is_paper_entry == False, Patient.is_paper_entry.is_(None)),
-                Patient.is_cancelled == False,
-            )
-            .group_by(Service.id, Service.name, Service.category, Service.cabinet)
-            .order_by(func.sum(Patient.payment_amount).desc())
-            .all()
+    # ── XIZMATLAR VA BO'LIMLAR BO'YICHA TAQSIMOT (AMBULATOR + STATSIONAR) ──────
+    from models.patient_service import PatientService
+    from models.inpatient_tariff import InpatientItem
+
+    # 1. Ambulator xizmatlar
+    amb_svcs = (
+        db.query(
+            Service.name,
+            Service.category,
+            Service.cabinet,
+            func.sum(PatientService.quantity).label("cnt"),
+            func.sum(PatientService.total_price).label("total"),
         )
-    else:
-        services_breakdown = (
-            db.query(
-                Service.name,
-                Service.category,
-                Service.cabinet,
-                func.count(Patient.id).label("cnt"),
-                func.sum(Patient.payment_amount).label("total"),
-            )
-            .join(Patient, Patient.service_id == Service.id)
-            .filter(
-                Patient.created_at >= s,
-                Patient.created_at <= e,
-                or_(Patient.is_paper_entry == False, Patient.is_paper_entry.is_(None)),
-                Patient.is_cancelled == False,
-            )
-            .group_by(Service.id, Service.name, Service.category, Service.cabinet)
-            .order_by(func.sum(Patient.payment_amount).desc())
-            .all()
+        .join(PatientService, PatientService.service_id == Service.id)
+        .join(Patient, Patient.id == PatientService.patient_id)
+        .filter(
+            Patient.created_at >= s,
+            Patient.created_at <= e,
+            or_(Patient.is_paper_entry == False, Patient.is_paper_entry.is_(None)),
+            Patient.is_cancelled == False,
         )
+        .group_by(Service.id, Service.name, Service.category, Service.cabinet)
+        .all()
+    )
+
+    # 2. Statsionar qo'shimcha xizmatlar va materiallar
+    inp_svcs = (
+        db.query(
+            InpatientItem.name,
+            InpatientItem.service_id,
+            func.sum(InpatientItem.quantity).label("cnt"),
+            func.sum(InpatientItem.total_price).label("total"),
+        )
+        .join(Inpatient, Inpatient.id == InpatientItem.inpatient_id)
+        .filter(
+            Inpatient.is_cancelled == False,
+            InpatientItem.is_cancelled == False,
+            InpatientItem.total_price > 0,
+            or_(
+                and_(Inpatient.discharged_at >= s, Inpatient.discharged_at <= e),
+                and_(Inpatient.created_at >= s, Inpatient.created_at <= e),
+            )
+        )
+        .group_by(InpatientItem.name, InpatientItem.service_id)
+        .all()
+    )
 
     dept_map = {}
     detailed_services_list = []
-    for r in services_breakdown:
+
+    # Ambulator xizmatlarni qo'shish
+    for r in amb_svcs:
         s_name = r[0] or ""
         s_cat = r[1] or ""
         s_cab = r[2] or ""
-        cnt = r[3] or 0
+        cnt = int(r[3] or 0)
         tot = int(r[4] or 0)
 
         dept = _extract_department_name(s_name, s_cat, s_cab)
         if dept not in dept_map:
-            dept_map[dept] = {
-                "department": dept,
-                "name": dept,
-                "count": 0,
-                "total": 0,
-                "services": [],
-            }
+            dept_map[dept] = {"department": dept, "name": dept, "count": 0, "total": 0, "services": {}}
+        
         dept_map[dept]["count"] += cnt
         dept_map[dept]["total"] += tot
-        dept_map[dept]["services"].append({
-            "service_name": s_name,
-            "name": s_name,
-            "count": cnt,
-            "total": tot,
-            "department": dept,
-        })
-        detailed_services_list.append({
-            "name": s_name,
-            "count": cnt,
-            "total": tot,
-            "department": dept,
-        })
+        
+        if s_name not in dept_map[dept]["services"]:
+            dept_map[dept]["services"][s_name] = {"service_name": s_name, "name": s_name, "count": 0, "total": 0, "department": dept}
+        dept_map[dept]["services"][s_name]["count"] += cnt
+        dept_map[dept]["services"][s_name]["total"] += tot
 
-    formatted_services = list(dept_map.values())
+    # Statsionar xizmatlarni qo'shish
+    for r in inp_svcs:
+        i_name = r[0] or ""
+        sid = r[1]
+        cnt = int(r[2] or 0)
+        tot = int(r[3] or 0)
+
+        s_cat = ""
+        s_cab = ""
+        if sid:
+            svc_obj = db.query(Service).filter(Service.id == sid).first()
+            if svc_obj:
+                i_name = svc_obj.name
+                s_cat = svc_obj.category or ""
+                s_cab = svc_obj.cabinet or ""
+
+        dept = _extract_department_name(i_name, s_cat, s_cab)
+        if dept not in dept_map:
+            dept_map[dept] = {"department": dept, "name": dept, "count": 0, "total": 0, "services": {}}
+        
+        dept_map[dept]["count"] += cnt
+        dept_map[dept]["total"] += tot
+
+        if i_name not in dept_map[dept]["services"]:
+            dept_map[dept]["services"][i_name] = {"service_name": i_name, "name": i_name, "count": 0, "total": 0, "department": dept}
+        dept_map[dept]["services"][i_name]["count"] += cnt
+        dept_map[dept]["services"][i_name]["total"] += tot
+
+    formatted_services = []
+    for d_name, d_val in dept_map.items():
+        svc_list = list(d_val["services"].values())
+        svc_list.sort(key=lambda x: x["total"], reverse=True)
+        formatted_services.append({
+            "department": d_val["department"],
+            "name": d_val["name"],
+            "count": d_val["count"],
+            "total": d_val["total"],
+            "services": svc_list,
+        })
     formatted_services.sort(key=lambda x: x["total"], reverse=True)
-    for d in formatted_services:
-        d["services"].sort(key=lambda s: s["total"], reverse=True)
 
     if start == end:
         paper_shift_s = s - QOGOZ_SMENA_OYNASI
@@ -408,51 +439,31 @@ def get_report(db: Session, start: date, end: date) -> dict:
 
     from models.provider import Provider
 
-    if start == end:
-        paper_shift_s = s - QOGOZ_SMENA_OYNASI
-        providers_breakdown = (
-            db.query(
-                Provider.full_name,
-                Provider.specialization,
-                func.count(func.distinct(Transaction.patient_id)).label("cnt"),
-                func.sum(Transaction.provider_amount).label("total"),
-            )
-            .join(Transaction, Transaction.provider_id == Provider.id)
-            .filter(
-                or_(
-                    and_(Transaction.created_at >= s, Transaction.created_at <= e),
-                    and_(
-                        Transaction.created_at >= paper_shift_s,
-                        Transaction.created_at < s,
-                        Transaction.patient_id.in_(
-                            db.query(Patient.id).filter(Patient.is_paper_entry == True)
-                        ),
-                    ),
-                ),
-                Transaction.is_cancelled == False,
-            )
-            .group_by(Provider.id, Provider.full_name, Provider.specialization)
-            .order_by(func.sum(Transaction.provider_amount).desc())
-            .all()
+    # Providers breakdown: All active transactions in the date range
+    providers_query = (
+        db.query(
+            Provider.full_name,
+            Provider.specialization,
+            func.count(Transaction.id).label("cnt"),
+            func.sum(
+                case((Transaction.provider_amount > 0, Transaction.provider_amount), else_=Transaction.total_amount)
+            ).label("total"),
         )
-    else:
-        providers_breakdown = (
-            db.query(
-                Provider.full_name,
-                Provider.specialization,
-                func.count(func.distinct(Transaction.patient_id)).label("cnt"),
-                func.sum(Transaction.provider_amount).label("total"),
-            )
-            .join(Transaction, Transaction.provider_id == Provider.id)
-            .filter(
-                Transaction.created_at >= s,
-                Transaction.created_at <= e,
-                Transaction.is_cancelled == False,
-            )
-            .group_by(Provider.id, Provider.full_name, Provider.specialization)
-            .order_by(func.sum(Transaction.provider_amount).desc())
-            .all()
+        .join(Transaction, Transaction.provider_id == Provider.id)
+        .filter(
+            Transaction.created_at >= s,
+            Transaction.created_at <= e,
+            Transaction.is_cancelled == False,
         )
+        .group_by(Provider.id, Provider.full_name, Provider.specialization)
+        .order_by(
+            func.sum(
+                case((Transaction.provider_amount > 0, Transaction.provider_amount), else_=Transaction.total_amount)
+            ).desc()
+        )
+        .all()
+    )
+    providers_breakdown = providers_query
 
     duty_date = end if start == end else date.today()
 
