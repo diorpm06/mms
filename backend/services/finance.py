@@ -662,11 +662,108 @@ def process_inpatient_payment(
     click_amount: int | None = None,
     qr_amount: int | None = None,
 ) -> Transaction:
-    # Statsionarda yo'naltiruvchi komissiyasi yo'q, shifokor esa foiz emas —
-    # bemor yotgan har bir kun uchun qat'iy haq oladi. U haq alohida jadvalda
-    # (inpatient_provider_accruals) kunma-kun yoziladi, shu sababli to'lovning
-    # o'zi to'liq klinika hisobiga tushadi. Ilgari bu yerda shifokorga umumiy
-    # foiz ham berilib, bir ish uchun ikki marta to'lanish xavfi bor edi.
+    """Statsionarda to'lov qabul qilish va bo'limlar bo'yicha to'g'ri taqsimlash."""
+    # Active items (extra services & materials)
+    active_items = [it for it in (inpatient.items or []) if not getattr(it, "is_cancelled", False)]
+    extra_items = [it for it in active_items if not (it.is_included_in_tariff or it.is_no_charge)]
+    
+    extra_total = sum(it.total_price for it in extra_items)
+    
+    # If the payment covers extra services, split extra items to their respective providers
+    if extra_items and amount > 0 and amount >= extra_total:
+        room_amount = amount - extra_total
+        
+        # 1. Main Statsionar Transaction (Palata & Room daily rate)
+        if room_amount > 0 or not extra_items:
+            bal = get_or_create_balance(db)
+            bal.current_balance += room_amount
+            bal.updated_at = datetime.now()
+            log_balance_change(
+                db, room_amount, "income",
+                f"Yotgan #{inpatient.id} (Palata): {inpatient.first_name} {inpatient.last_name}",
+            )
+            
+            c_amt = min(cash_amount or 0, room_amount)
+            cd_amt = room_amount - c_amt
+            
+            tx_main = Transaction(
+                patient_id=None,
+                inpatient_id=inpatient.id,
+                total_amount=room_amount,
+                referrer_id=None,
+                referrer_amount=0,
+                provider_id=None,
+                provider_amount=0,
+                center_amount=room_amount,
+                payment_type=payment_type,
+                cash_amount=c_amt,
+                card_amount=cd_amt,
+                click_amount=0,
+                qr_amount=0,
+            )
+            db.add(tx_main)
+
+        # 2. Add individual transactions for each extra service/material
+        c_rem = max(0, (cash_amount or 0) - (room_amount if room_amount > 0 else 0))
+        for it in extra_items:
+            it_amt = it.total_price
+            if it_amt <= 0:
+                continue
+                
+            prov, ref, r_amt, p_amt, c_amt_calc = _split_amounts(
+                it_amt, inpatient.referrer_id, None, db, service_id=it.service_id
+            )
+            
+            # Match provider by service category or specialization if available
+            if not prov and it.service_id:
+                from models.service import Service
+                svc = db.query(Service).filter(Service.id == it.service_id).first()
+                if svc and svc.category:
+                    cat_name = main_category(svc.category).lower()
+                    if "ozon" in cat_name:
+                        prov = db.query(Provider).filter(Provider.specialization.ilike("%ozon%"), Provider.is_active == True).first()
+                    elif "uzi" in cat_name:
+                        prov = db.query(Provider).filter(Provider.specialization.ilike("%uzi%"), Provider.is_active == True).first()
+                    elif "labora" in cat_name or "tahlil" in cat_name:
+                        prov = db.query(Provider).filter(Provider.specialization.ilike("%labora%"), Provider.is_active == True).first()
+            
+            if prov and p_amt > 0:
+                prov.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "provider", prov.id, p_amt)
+            if ref and r_amt > 0:
+                ref.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "referrer", ref.id, r_amt)
+
+            bal = get_or_create_balance(db)
+            bal.current_balance += c_amt_calc
+            bal.updated_at = datetime.now()
+            log_balance_change(
+                db, c_amt_calc, "income",
+                f"Yotgan #{inpatient.id} ({it.name}): {inpatient.first_name} {inpatient.last_name}",
+            )
+
+            item_cash = min(c_rem, it_amt)
+            c_rem -= item_cash
+            item_card = it_amt - item_cash
+
+            tx_item = Transaction(
+                patient_id=None,
+                inpatient_id=inpatient.id,
+                total_amount=it_amt,
+                referrer_id=ref.id if ref else None,
+                referrer_amount=r_amt,
+                provider_id=prov.id if prov else None,
+                provider_amount=p_amt,
+                center_amount=c_amt_calc,
+                payment_type="cash" if item_cash == it_amt else ("card" if item_card == it_amt else "split"),
+                cash_amount=item_cash,
+                card_amount=item_card,
+                click_amount=0,
+                qr_amount=0,
+            )
+            db.add(tx_item)
+
+        return tx_main if (room_amount > 0 or not extra_items) else tx_item
+
+    # Fallback standard lump-sum handling
     referrer_amount = 0
     provider_amount = 0
     center_amount = amount
@@ -704,8 +801,6 @@ def process_inpatient_payment(
         total_amount=amount,
         referrer_id=None,
         referrer_amount=referrer_amount,
-        # Shifokor kim ekani hisobotda ko'rinib tursin, lekin ulushi 0 —
-        # uning haqi kunlik hisobda alohida yuritiladi.
         provider_id=inpatient.doctor_id,
         provider_amount=provider_amount,
         center_amount=center_amount,
