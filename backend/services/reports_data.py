@@ -350,32 +350,37 @@ def get_report(db: Session, start: date, end: date) -> dict:
         dept_map[dept]["services"][s_name]["count"] += cnt
         dept_map[dept]["services"][s_name]["total"] += tot
 
-    # Statsionar xizmatlarni qo'shish — FAQAT xizmatlar katalogidan
-    # tanlangan (service_id bor) elementlar. Qo'lda yozilgan nom (masalan
-    # "Kunlik to'lov", "Dori") haqiqiy bo'lim emas, shu sababli o'z nomi
-    # bilan soxta alohida "bo'lim" bo'lib chiqib ketmasin — ular statsionar
-    # umumiy tushumida (inpatient_income) allaqachon hisoblangan,
-    # bu yerda faqat aniq xizmat turiga (masalan "Ozonoterapiya") mos
-    # kelganlari qo'shiladi.
+    # Statsionar xizmatlarni qo'shish.
+    # 1) Xizmatlar katalogidan tanlangan (service_id bor) elementlar — o'z
+    #    haqiqiy bo'limiga (masalan "Ozonoterapiya").
+    # 2) Qo'lda yozilgan "Dori-darmon" xarajatlari — alohida "Dori-darmon"
+    #    bo'limiga (nomi solishtirilib aniqlanadi).
+    # 3) "Kunlik to'lov" kabi xona haqining o'zini takrorlaydigan yozuvlar —
+    #    bo'lim yaratmaydi, Statsionar qatorida (xona haqi bilan birga) qoladi.
+    KUNLIK_TOLOV_KALIT_SOZLAR = ("kunlik", "xona haqi", "palata")
+
     for r in inp_svcs:
         i_name = r[0] or ""
         sid = r[1]
         cnt = int(r[2] or 0)
         tot = int(r[3] or 0)
 
-        if not sid:
-            continue
-        svc_obj = db.query(Service).filter(Service.id == sid).first()
-        if not svc_obj:
-            continue
-        i_name = svc_obj.name
-        s_cat = svc_obj.category or ""
-        s_cab = svc_obj.cabinet or ""
+        if sid:
+            svc_obj = db.query(Service).filter(Service.id == sid).first()
+            if not svc_obj:
+                continue
+            i_name = svc_obj.name
+            s_cat = svc_obj.category or ""
+            s_cab = svc_obj.cabinet or ""
+            dept = _extract_department_name(i_name, s_cat, s_cab)
+        else:
+            if any(k in i_name.lower() for k in KUNLIK_TOLOV_KALIT_SOZLAR):
+                continue  # Statsionar qatorida qolaveradi
+            dept = "Dori-darmon"
 
-        dept = _extract_department_name(i_name, s_cat, s_cab)
         if dept not in dept_map:
             dept_map[dept] = {"department": dept, "name": dept, "count": 0, "total": 0, "services": {}}
-        
+
         dept_map[dept]["count"] += cnt
         dept_map[dept]["total"] += tot
 
@@ -383,6 +388,13 @@ def get_report(db: Session, start: date, end: date) -> dict:
             dept_map[dept]["services"][i_name] = {"service_name": i_name, "name": i_name, "count": 0, "total": 0, "department": dept}
         dept_map[dept]["services"][i_name]["count"] += cnt
         dept_map[dept]["services"][i_name]["total"] += tot
+
+        # Bu summa endi o'z bo'limida (masalan "Ozonoterapiya" yoki
+        # "Dori-darmon") sanaladi — statsionar umumiy to'lovi
+        # (inpatient_income) ichida ikkilanib qolmasin, o'sha yerdan
+        # ayiriladi. "Statsionar" qatorida faqat xona haqi + shu qatorda
+        # qoldirilgan yozuvlar (masalan "Kunlik to'lov") qoladi.
+        inpatient_income = int(inpatient_income or 0) - tot
 
     formatted_services = []
     for d_name, d_val in dept_map.items():
