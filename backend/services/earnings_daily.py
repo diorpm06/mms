@@ -44,7 +44,10 @@ def _kunlik(db: Session, ustun, filtr, chegara: int | None):
             "amount": int(r.summa or 0),
         }
         for r in q.all()
-        if int(r.summa or 0) != 0
+        # Pul emas, bemor soniga qarab filtrlanadi — oylik maosh oladigan
+        # (foizi 0%) shifokorning kuni pul nolga teng bo'lgani uchun
+        # yo'qolib qolmasin (masalan Dr. Yulduz).
+        if int(r.soni or 0) != 0
     ]
 
 

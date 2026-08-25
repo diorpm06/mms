@@ -230,13 +230,14 @@ export default function MyProfile() {
                                       </td>
                                       <td className="py-3 px-3 text-center">
                                         {pt.has_report ? (
-                                          <button
-                                            type="button"
+                                          <Btn
+                                            variant="cyan"
+                                            size="xs"
+                                            icon={<Eye className="h-3 w-3" />}
                                             onClick={() => setPreviewReport(pt)}
-                                            className="btn-cyan py-1 px-2.5 text-[10px] font-extrabold inline-flex items-center gap-1 shadow-sm"
                                           >
-                                            <Eye className="h-3 w-3" /> Natijani Ko'rish
-                                          </button>
+                                            Natijani Ko'rish
+                                          </Btn>
                                         ) : (
                                           <span className="text-muted text-[11px] italic">—</span>
                                         )}
@@ -275,7 +276,7 @@ export default function MyProfile() {
               <button
                 type="button"
                 onClick={() => setPreviewReport(null)}
-                className="p-1.5 rounded-xl text-muted hover:text-foreground"
+                className="btn-ghost rounded-lg p-1"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -288,13 +289,9 @@ export default function MyProfile() {
             />
 
             <div className="flex justify-end pt-2 border-t border-border">
-              <button
-                type="button"
-                onClick={() => setPreviewReport(null)}
-                className="btn-gold py-2 px-5 text-xs font-black"
-              >
+              <Btn variant="gold" size="md" onClick={() => setPreviewReport(null)}>
                 Yopish
-              </button>
+              </Btn>
             </div>
           </div>
         </div>

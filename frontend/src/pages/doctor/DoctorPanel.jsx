@@ -108,10 +108,34 @@ export default function DoctorPanel() {
   const [inventoryItems, setInventoryItems] = useState([])
   const [inventoryLoading, setInventoryLoading] = useState(false)
   const [invSearch, setInvSearch] = useState('')
-  const [selectedInvItem, setSelectedInvItem] = useState(null)
-  const [consumeAmount, setConsumeAmount] = useState('1')
+  // Bir nechta materialni bir vaqtda tanlash mumkin: itemId -> { item, amount }
+  const [selectedInvItems, setSelectedInvItems] = useState({})
   const [chargePatient, setChargePatient] = useState(true)
   const [consuming, setConsuming] = useState(false)
+
+  const toggleInvItem = (item) => {
+    setSelectedInvItems((prev) => {
+      const next = { ...prev }
+      if (next[item.id]) {
+        delete next[item.id]
+      } else {
+        next[item.id] = { item, amount: 1 }
+      }
+      return next
+    })
+  }
+
+  const changeInvItemAmount = (itemId, amount) => {
+    setSelectedInvItems((prev) => {
+      const entry = prev[itemId]
+      if (!entry) return prev
+      return { ...prev, [itemId]: { ...entry, amount: Math.max(1, Number(amount) || 1) } }
+    })
+  }
+
+  const selectedInvList = Object.values(selectedInvItems)
+  const selectedInvTotal = selectedInvList.reduce(
+    (sum, { item, amount }) => sum + (item.unit_price || 0) * amount, 0)
 
   const fetchInventory = async () => {
     setInventoryLoading(true)
@@ -126,33 +150,33 @@ export default function DoctorPanel() {
   }
 
   const handleConsumeInventory = async () => {
-    if (!selectedInvItem || !consumeAmount) return
-    const amt = Number(consumeAmount)
-    if (amt <= 0) return
+    if (!selectedInvList.length) return
     setConsuming(true)
     try {
       const curPatient = data?.current_patient
-      await api(`/inventory/${selectedInvItem.id}/consume`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amount: amt,
-          patient_id: curPatient?.id,
-          ticket_number: curPatient?.ticket_number,
-          patient_name: curPatient ? `${curPatient.first_name} ${curPatient.last_name}` : undefined,
-          charge_patient: curPatient ? chargePatient : false,
-          payment_type: 'later',
-          notes: `Shifokor ${curPatient ? `${curPatient.first_name} ${curPatient.last_name} (${curPatient.ticket_number})` : 'qabulida'} ishlatdi`,
-        }),
-      })
-      const unitP = selectedInvItem.unit_price || 0
-      const totalCharge = unitP * amt
-      if (curPatient && chargePatient && totalCharge > 0) {
-        showToast(`✓ ${selectedInvItem.name} (${amt} ${selectedInvItem.unit}) ishlatildi hamda ${curPatient.first_name} uchun ${totalCharge.toLocaleString()} so'm to'lov bildirishnomasi Admin panelga yuborildi!`)
-      } else {
-        showToast(`✓ ${selectedInvItem.name} dan ${amt} ${selectedInvItem.unit} ishlatildi`)
+      // Har bir tanlangan material uchun alohida so'rov — backend bitta
+      // materialni qabul qiladi, shuning uchun ketma-ket yuboriladi.
+      for (const { item, amount } of selectedInvList) {
+        await api(`/inventory/${item.id}/consume`, {
+          method: 'POST',
+          body: JSON.stringify({
+            amount,
+            patient_id: curPatient?.id,
+            ticket_number: curPatient?.ticket_number,
+            patient_name: curPatient ? `${curPatient.first_name} ${curPatient.last_name}` : undefined,
+            charge_patient: curPatient ? chargePatient : false,
+            payment_type: 'later',
+            notes: `Shifokor ${curPatient ? `${curPatient.first_name} ${curPatient.last_name} (${curPatient.ticket_number})` : 'qabulida'} ishlatdi`,
+          }),
+        })
       }
-      setSelectedInvItem(null)
-      setConsumeAmount('1')
+      const itemsLabel = selectedInvList.map(({ item, amount }) => `${item.name} (${amount} ${item.unit})`).join(', ')
+      if (curPatient && chargePatient && selectedInvTotal > 0) {
+        showToast(`✓ ${itemsLabel} ishlatildi hamda ${curPatient.first_name} uchun ${selectedInvTotal.toLocaleString()} so'm to'lov bildirishnomasi Admin panelga yuborildi!`)
+      } else {
+        showToast(`✓ ${itemsLabel} ishlatildi`)
+      }
+      setSelectedInvItems({})
       setInventoryModal(false)
       fetchInventory()
       fetchDoctorQueue()
@@ -850,6 +874,7 @@ export default function DoctorPanel() {
                     size="md"
                     icon={<Package className="h-4 w-4" />}
                     onClick={() => {
+                      setSelectedInvItems({})
                       fetchInventory()
                       setInventoryModal(true)
                     }}
@@ -894,6 +919,7 @@ export default function DoctorPanel() {
                       size="sm"
                       icon={<Package className="h-4 w-4" />}
                       onClick={() => {
+                        setSelectedInvItems({})
                         fetchInventory()
                         setInventoryModal(true)
                       }}
@@ -1183,24 +1209,33 @@ export default function DoctorPanel() {
                 {inventoryItems
                   .filter(i => i.name.toLowerCase().includes(invSearch.toLowerCase()))
                   .map((item) => {
-                    const isSelected = selectedInvItem?.id === item.id
+                    const isSelected = !!selectedInvItems[item.id]
                     return (
                       <div
                         key={item.id}
-                        onClick={() => setSelectedInvItem(item)}
+                        onClick={() => toggleInvItem(item)}
                         className={`p-3 rounded-xl cursor-pointer flex items-center justify-between border transition-all ${
                           isSelected
                             ? 'border-gold bg-gold/15 font-bold shadow-md ring-1 ring-gold/40'
                             : 'border-border/60 bg-surface-1 hover:bg-surface hover:border-gold/30'
                         }`}
                       >
-                        <div className="min-w-0 pr-2">
-                          <h5 className="font-extrabold text-body text-xs truncate">{item.name}</h5>
-                          <p className="text-[11px] text-muted font-semibold mt-0.5">
-                            Qoldiq: <strong className="text-emerald-400 font-mono">{item.quantity} {item.unit}</strong>
-                          </p>
+                        <div className="min-w-0 pr-2 flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleInvItem(item)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded border-border bg-surface text-gold focus:ring-gold w-4 h-4 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <h5 className="font-extrabold text-body text-xs truncate">{item.name}</h5>
+                            <p className="text-[11px] text-muted font-semibold mt-0.5">
+                              Qoldiq: <strong className="text-emerald-400 font-mono">{item.quantity} {item.unit}</strong>
+                            </p>
+                          </div>
                         </div>
-                        {isSelected && <span className="badge badge-gold text-[10px] shrink-0 font-extrabold">Tanlandi ✓</span>}
+                        {isSelected && <span className="badge badge-gold text-[10px] shrink-0 font-extrabold">✓</span>}
                       </div>
                     )
                   })}
@@ -1208,66 +1243,59 @@ export default function DoctorPanel() {
             )}
           </div>
 
-          {selectedInvItem && (
-            <div className="p-4 bg-surface-2 rounded-2xl border border-gold/40 space-y-4 shadow-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <span className="font-extrabold text-gold text-sm block">
-                    {selectedInvItem.name}
-                  </span>
-                  <span className="text-[11px] text-muted font-semibold">
-                    Omborda bor: <strong className="text-emerald-400 font-mono">{selectedInvItem.quantity} {selectedInvItem.unit}</strong>
-                  </span>
-                </div>
+          {selectedInvList.length > 0 && (
+            <div className="p-4 bg-surface-2 rounded-2xl border border-gold/40 space-y-3 shadow-md">
+              <span className="text-xs font-extrabold text-gold uppercase tracking-wider block">
+                🧾 Tanlangan Materiallar ({selectedInvList.length} ta)
+              </span>
 
-                {/* + and - Quantity Control */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-muted mr-1">Hajm:</span>
-                  <button
-                    type="button"
-                    onClick={() => setConsumeAmount((v) => String(Math.max(1, (Number(v) || 1) - 1)))}
-                    className="w-9 h-9 rounded-xl bg-surface-1 hover:bg-rose-500/20 text-rose-400 border border-border flex items-center justify-center text-lg font-black transition-all active:scale-95 shadow-sm"
-                    title="Kamaytirish (-1)"
-                  >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    min="1"
-                    className="input-field text-base font-mono font-black text-center w-20 py-1.5 bg-surface-1 border-gold/50 rounded-xl"
-                    value={consumeAmount}
-                    onChange={(e) => setConsumeAmount(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setConsumeAmount((v) => String((Number(v) || 0) + 1))}
-                    className="w-9 h-9 rounded-xl bg-surface-1 hover:bg-emerald-500/20 text-emerald-400 border border-border flex items-center justify-center text-lg font-black transition-all active:scale-95 shadow-sm"
-                    title="Oshirish (+1)"
-                  >
-                    +
-                  </button>
-                  <span className="text-xs font-extrabold text-gold bg-gold/10 px-2.5 py-1.5 rounded-xl border border-gold/30">
-                    {selectedInvItem.unit}
-                  </span>
-                </div>
-              </div>
+              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                {selectedInvList.map(({ item, amount }) => (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-1 border border-border">
+                    <div className="min-w-0 pr-2">
+                      <span className="font-extrabold text-body text-xs block truncate">{item.name}</span>
+                      <span className="text-[11px] text-muted font-mono">
+                        Qoldiq: {item.quantity} {item.unit}
+                      </span>
+                    </div>
 
-              {/* Quick Presets */}
-              <div className="flex items-center gap-1.5 pt-1">
-                <span className="text-[11px] text-muted font-extrabold mr-1">Tezkor hajm:</span>
-                {[1, 2, 3, 5, 10].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setConsumeAmount(String(num))}
-                    className={`px-2.5 py-1 rounded-lg border text-xs font-extrabold transition-all ${
-                      Number(consumeAmount) === num
-                        ? 'bg-gold text-slate-950 border-gold shadow'
-                        : 'bg-surface-1 text-muted border-border hover:text-body hover:border-gold/40'
-                    }`}
-                  >
-                    {num} {selectedInvItem.unit}
-                  </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => changeInvItemAmount(item.id, amount - 1)}
+                        className="w-7 h-7 rounded-lg bg-surface-2 hover:bg-rose-500/20 text-rose-400 border border-border flex items-center justify-center text-sm font-black transition-all active:scale-95"
+                        title="Kamaytirish (-1)"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        value={amount}
+                        onChange={(e) => changeInvItemAmount(item.id, e.target.value)}
+                        className="input-field text-xs font-mono font-black text-center w-14 py-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => changeInvItemAmount(item.id, amount + 1)}
+                        className="w-7 h-7 rounded-lg bg-surface-2 hover:bg-emerald-500/20 text-emerald-400 border border-border flex items-center justify-center text-sm font-black transition-all active:scale-95"
+                        title="Oshirish (+1)"
+                      >
+                        +
+                      </button>
+                      <span className="text-[11px] font-bold text-gold bg-gold/10 px-2 py-1 rounded-lg border border-gold/30 shrink-0">
+                        {item.unit}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleInvItem(item)}
+                        className="w-7 h-7 rounded-lg bg-surface-2 hover:bg-rose-500/20 text-rose-400 border border-border flex items-center justify-center shrink-0"
+                        title="Ro'yxatdan olib tashlash"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
 
@@ -1285,11 +1313,11 @@ export default function DoctorPanel() {
                     </span>
                   </label>
 
-                  {chargePatient && selectedInvItem.unit_price > 0 && (
+                  {chargePatient && selectedInvTotal > 0 && (
                     <div className="flex items-center justify-between text-xs font-mono bg-surface-sunken p-3 rounded-xl border border-emerald-500/40 shadow-inner">
-                      <span className="text-body font-sans font-extrabold">To'lov eslatmasi summasi:</span>
+                      <span className="text-body font-sans font-extrabold">To'lov eslatmasi summasi (jami):</span>
                       <span className="text-emerald-400 font-black text-base">
-                        {((selectedInvItem.unit_price || 0) * (Number(consumeAmount) || 1)).toLocaleString()} so'm
+                        {selectedInvTotal.toLocaleString()} so'm
                       </span>
                     </div>
                   )}
@@ -1309,11 +1337,11 @@ export default function DoctorPanel() {
 
             <button
               type="button"
-              disabled={!selectedInvItem || consuming || !consumeAmount || Number(consumeAmount) <= 0}
+              disabled={!selectedInvList.length || consuming}
               onClick={handleConsumeInventory}
               className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {consuming ? "Saqlanmoqda..." : "✓ Ishlatishni Tasdiqlash"}
+              {consuming ? "Saqlanmoqda..." : `✓ Ishlatishni Tasdiqlash (${selectedInvList.length} ta)`}
             </button>
           </div>
         </div>
