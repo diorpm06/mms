@@ -997,7 +997,7 @@ def dashboard_summary(db: Session, d: date) -> dict:
         .filter(
             Patient.is_paper_entry == True,
             Patient.created_at >= paper_shift_s,
-            Patient.created_at <= e,
+            Patient.created_at < s,
             Patient.is_cancelled == False,
         )
         .scalar()
@@ -1008,7 +1008,7 @@ def dashboard_summary(db: Session, d: date) -> dict:
         .filter(
             Patient.is_paper_entry == True,
             Patient.created_at >= paper_shift_s,
-            Patient.created_at <= e,
+            Patient.created_at < s,
             Patient.is_cancelled == False,
         )
         .scalar()
