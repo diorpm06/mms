@@ -29,6 +29,9 @@ export default function CeoPatients() {
   const [reRegisterPatient, setReRegisterPatient] = useState(null)
   const [newTicketPatient, setNewTicketPatient] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [referrers, setReferrers] = useState([])
+  const [allServices, setAllServices] = useState([])
+  const [addServiceId, setAddServiceId] = useState('')
   const toast = useToastStore((s) => s.add)
 
   const load = () => api('/patients?include_cancelled=true').then(setPatients)
@@ -62,11 +65,33 @@ export default function CeoPatients() {
     toast("Xizmat ro'yxatdan olib tashlandi. Saqlash tugmasini bosing.", 'info')
   }
 
+  const changeEditServiceQty = (i, q) => {
+    if (!edit || !edit.servicesList) return
+    const updated = edit.servicesList.map((s, idx) =>
+      idx === i ? { ...s, quantity: Math.max(1, Number(q) || 1) } : s)
+    const newTotal = updated.reduce((acc, s) => acc + (s.price || 0) * (s.quantity || 1), 0)
+    setEdit({ ...edit, servicesList: updated, payment_amount: newTotal })
+  }
+
+  const addServiceToEdit = (sid) => {
+    if (!sid || !edit) return
+    const svc = allServices.find((x) => String(x.id) === String(sid))
+    if (!svc) return
+    const updated = [
+      ...(edit.servicesList || []),
+      { service_id: svc.id, service_name: svc.name, price: svc.price, quantity: 1 },
+    ]
+    const newTotal = updated.reduce((acc, s) => acc + (s.price || 0) * (s.quantity || 1), 0)
+    setEdit({ ...edit, servicesList: updated, payment_amount: newTotal })
+    setAddServiceId('')
+  }
+
   const saveEdit = async () => {
     if (editReason.length < 3) { toast('Sabab kamida 3 harf', 'error'); return }
     try {
       const payload = {
         ...edit,
+        referrer_id: (edit.referrer_id && Number(edit.referrer_id) > 0) ? Number(edit.referrer_id) : null,
         reason: editReason,
         services: edit.servicesList ? edit.servicesList.map(s => ({
           service_id: s.service_id,
@@ -102,6 +127,25 @@ export default function CeoPatients() {
     setVisitId(p.id)
     const data = await api(`/patients/${p.id}/visits`)
     setVisits(data || [])
+  }
+
+  const openEditPatient = (p) => {
+    setEdit({
+      ...p,
+      referrer_id: p.referrer_id || '',
+      servicesList: (p.services && p.services.length)
+        ? p.services.map((s) => ({
+            service_id: s.service_id,
+            service_name: s.service_name || s.name,
+            price: s.unit_price ?? s.price ?? s.total_price ?? 0,
+            quantity: s.quantity || 1,
+          }))
+        : [{ service_id: p.service_id, service_name: p.service_name, price: p.payment_amount || 0, quantity: 1 }],
+    })
+    setEditReason('')
+    setAddServiceId('')
+    if (!referrers.length) api('/referrers').then(setReferrers).catch(() => {})
+    if (!allServices.length) api('/services').then(setAllServices).catch(() => {})
   }
 
   const [paymentTypeFilter, setPaymentTypeFilter] = useState('all') // 'all' | 'split' | 'click' | 'cash' | 'card' | 'later'
@@ -511,6 +555,11 @@ export default function CeoPatients() {
                     <ActionMenu
                       items={[
                         {
+                          label: 'Tahrirlash va xizmatlar',
+                          icon: Icons.edit,
+                          onClick: () => openEditPatient(p),
+                        },
+                        {
                           label: 'Tashriflar tarixi',
                           icon: Icons.history,
                           onClick: () => openVisits(p),
@@ -612,6 +661,11 @@ export default function CeoPatients() {
                               icon: Icons.plus,
                               variant: 'gold',
                               onClick: () => setReRegisterPatient(u.latestPatient),
+                            },
+                            {
+                              label: 'Tahrirlash va xizmatlar',
+                              icon: Icons.edit,
+                              onClick: () => openEditPatient(u.latestPatient),
                             },
                             {
                               label: 'Tashriflar tarixi',
@@ -722,20 +776,7 @@ export default function CeoPatients() {
                             {
                               label: 'Tahrirlash va xizmatlar',
                               icon: Icons.edit,
-                              onClick: () => {
-                                setEdit({
-                                  ...p,
-                                  servicesList: (p.services && p.services.length)
-                                    ? p.services.map((s) => ({
-                                        service_id: s.service_id,
-                                        service_name: s.service_name || s.name,
-                                        price: s.total_price || s.price || 0,
-                                        quantity: s.quantity || 1,
-                                      }))
-                                    : [{ service_id: p.service_id, service_name: p.service_name, price: p.payment_amount || 0, quantity: 1 }],
-                                })
-                                setEditReason('')
-                              },
+                              onClick: () => openEditPatient(p),
                             },
                             {
                               label: "To'lovni bekor qilish",
@@ -788,22 +829,32 @@ export default function CeoPatients() {
                 onChange={(e) => setEdit({ ...edit, address: e.target.value })} />
             </div>
 
-            {/* XIZMATLARNI BITTALAB O'CHIRISH BO'LIMI */}
+            {/* XIZMATLARNI TAHRIRLASH BO'LIMI */}
             <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-2">
               <span className="text-xs font-bold text-gold uppercase tracking-wider block mb-1">
                 📋 Bemor Xizmatlari Ro'yxati ({edit.servicesList?.length || 0} ta xizmat)
               </span>
               <p className="text-[11px] text-muted mb-2">
-                Alohida bironta xizmatni bekor qilmoqchi bo'lsangiz, shu yerning o'zida olib tashlashingiz mumkin:
+                Miqdorini o'zgartirishingiz, olib tashlashingiz yoki yangi xizmat qo'shishingiz mumkin:
               </p>
-              
+
               <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                 {edit.servicesList && edit.servicesList.map((svc, i) => (
-                  <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border text-xs">
-                    <div className="min-w-0 pr-2">
+                  <div key={i} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-surface border border-border text-xs">
+                    <div className="min-w-0 pr-2 flex-1">
                       <span className="font-extrabold text-body block truncate">{svc.service_name || 'Xizmat'}</span>
-                      <span className="text-[10px] text-emerald font-mono font-bold">{formatMoney(svc.price)}</span>
+                      <span className="text-[10px] text-emerald font-mono font-bold">
+                        {formatMoney(svc.price)} × {svc.quantity || 1} = {formatMoney((svc.price || 0) * (svc.quantity || 1))}
+                      </span>
                     </div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={svc.quantity || 1}
+                      onChange={(e) => changeEditServiceQty(i, e.target.value)}
+                      className="w-12 px-1 py-1 rounded-lg bg-surface-2 border border-border text-center text-xs font-mono font-bold shrink-0"
+                      title="Soni"
+                    />
                     <Btn
                       variant="danger"
                       size="xs"
@@ -817,10 +868,35 @@ export default function CeoPatients() {
                 ))}
               </div>
 
+              <select
+                className="input-field text-xs mt-2 font-bold"
+                value={addServiceId}
+                onChange={(e) => addServiceToEdit(e.target.value)}
+              >
+                <option value="">+ Xizmat qo'shish...</option>
+                {allServices.filter((x) => x.is_active !== false).map((x) => (
+                  <option key={x.id} value={x.id}>{x.name} — {formatMoney(x.price)}</option>
+                ))}
+              </select>
+
               <div className="pt-2 border-t border-border flex justify-between items-center font-bold text-xs">
                 <span className="text-muted">Qayta hisoblangan umumiy to'lov:</span>
                 <span className="text-emerald font-mono font-black text-sm">{formatMoney(edit.payment_amount)}</span>
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-muted block mb-1">Yo'naltiruvchi</label>
+              <select
+                className="input-field text-xs font-bold"
+                value={edit.referrer_id || ''}
+                onChange={(e) => setEdit({ ...edit, referrer_id: e.target.value })}
+              >
+                <option value="">— Yo'naltiruvchi yo'q</option>
+                {referrers.map((r) => (
+                  <option key={r.id} value={r.id}>{r.full_name}</option>
+                ))}
+              </select>
             </div>
 
             <div>

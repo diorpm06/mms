@@ -396,6 +396,7 @@ def _build_patient_search_query(q_builder, raw_search: str):
 def search_patients(
     search: str = "",
     include_cancelled: bool = False,
+    limit: Optional[int] = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_doctor_or_admin_or_ceo),
 ):
@@ -412,7 +413,8 @@ def search_patients(
     if search.strip():
         q = _build_patient_search_query(q, search)
 
-    patients = q.order_by(Patient.created_at.desc()).limit(150).all()
+    max_limit = limit if (limit and limit > 0) else 50000
+    patients = q.order_by(Patient.created_at.desc()).limit(max_limit).all()
     return [_patient_row(p) for p in patients]
 
 
