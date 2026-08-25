@@ -69,6 +69,16 @@ def ceo_dashboard(db: Session = Depends(get_db), _: User = Depends(require_ceo))
                 "patients": prev["patients_count"],
             }
 
+    # Umumiy tushum bo'limi: oylik, yillik va kunlik o'rtacha tushum.
+    # Bugungi kartadan farqli — bular jamlangan davrlar bo'yicha.
+    month_report = monthly_report(db, today.year, today.month)
+    year_report = yearly_report(db, today.year)
+    # O'rtacha = yillik jami / yilning bugungi kungacha bo'lgan kun
+    # tartib raqami (masalan 25-avgust — 237-kun, shunga bo'linadi;
+    # ertaga 238-kunga). Yil oxirigacha kuzatilib boriladi.
+    days_elapsed_this_year = (today - date(today.year, 1, 1)).days + 1
+    avg_daily_income = int(year_report["total_income"] / max(days_elapsed_this_year, 1))
+
     return {
         "daily_income": daily["total_income"],
         "current_balance": daily["current_balance"],
@@ -76,11 +86,41 @@ def ceo_dashboard(db: Session = Depends(get_db), _: User = Depends(require_ceo))
         "paper_income": daily.get("paper_income", 0),
         "paper_count": daily.get("paper_count", 0),
         "month_expenses": int(month_exp or 0),
+        "month_income": int(month_report["total_income"]),
+        "year_income": int(year_report["total_income"]),
+        "avg_daily_income": avg_daily_income,
         "income_chart": chart,
         "top_services": [{"name": t[0], "count": t[1], "total": int(t[2] or 0)} for t in tops],
         "top_referrers": [{"id": t[0], "name": t[1], "count": int(t[2] or 0), "total": int(t[3] or 0)} for t in refs],
         "last_activity": last_activity,
     }
+
+
+@router.get("/revenue-summary")
+def revenue_summary(
+    period: str = Query("day", pattern="^(day|month|year)$"),
+    date_param: Optional[date] = Query(None, alias="date"),
+    year: Optional[int] = Query(None),
+    month: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_ceo),
+):
+    """Rahbar Dashboard'dagi Kun/Oy/Yil tanlagichi uchun — istalgan
+    kun, oy yoki yilning jami tushumini qaytaradi."""
+    today = date.today()
+    if period == "day":
+        d = date_param or today
+        rep = dashboard_summary(db, d)
+        return {"period": "day", "date": d.isoformat(), "income": int(rep["total_income"])}
+    elif period == "month":
+        y = year or today.year
+        m = month or today.month
+        rep = monthly_report(db, y, m)
+        return {"period": "month", "year": y, "month": m, "income": int(rep["total_income"])}
+    else:
+        y = year or today.year
+        rep = yearly_report(db, y)
+        return {"period": "year", "year": y, "income": int(rep["total_income"])}
 
 
 @router.get("/admin-daily")

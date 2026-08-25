@@ -4,7 +4,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { RefreshCw, TrendingUp, Wallet, Users, Receipt } from 'lucide-react'
+import { RefreshCw, TrendingUp, Wallet, Users, Receipt, Calendar, CalendarRange, BarChart3 } from 'lucide-react'
 import { api, downloadBlob } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { formatYAxis, moneyFormatter } from '../../utils/charts'
@@ -18,6 +18,7 @@ import PeakHeatmapChart from '../../components/PeakHeatmapChart'
 const EMPTY = {
   daily_income: 0, current_balance: 0,
   today_patients: 0, month_expenses: 0,
+  month_income: 0, year_income: 0, avg_daily_income: 0,
   income_chart: [], top_services: [], top_referrers: [],
 }
 
@@ -51,6 +52,33 @@ export default function CeoDashboard() {
 
   const [chartPeriod, setChartPeriod] = useState('10days') // '10days' | '1-10' | '11-20' | '21-30'
   const [chartData, setChartData]     = useState([])
+
+  // Istalgan kun/oy/yil tushumini tekshirish uchun tanlagich
+  const now = new Date()
+  const [revPeriod, setRevPeriod] = useState('day') // 'day' | 'month' | 'year'
+  const [revDate, setRevDate]   = useState(now.toISOString().slice(0, 10))
+  const [revYear, setRevYear]   = useState(now.getFullYear())
+  const [revMonth, setRevMonth] = useState(now.getMonth() + 1)
+  const [revResult, setRevResult] = useState(null)
+  const [revLoading, setRevLoading] = useState(false)
+
+  const loadRevenueSummary = useCallback(async () => {
+    setRevLoading(true)
+    try {
+      const params = new URLSearchParams({ period: revPeriod })
+      if (revPeriod === 'day') params.set('date', revDate)
+      if (revPeriod === 'month') { params.set('year', revYear); params.set('month', revMonth) }
+      if (revPeriod === 'year') params.set('year', revYear)
+      const res = await api(`/reports/revenue-summary?${params.toString()}`)
+      setRevResult(res)
+    } catch (e) {
+      toast(e.message || 'Tushum yuklanmadi', 'error')
+    } finally {
+      setRevLoading(false)
+    }
+  }, [revPeriod, revDate, revYear, revMonth, toast])
+
+  useEffect(() => { loadRevenueSummary() }, [loadRevenueSummary])
 
   const loadChart = useCallback(async (period) => {
     try {
@@ -122,6 +150,13 @@ export default function CeoDashboard() {
     { label: 'Jami balans',         value: formatMoney(d.current_balance), icon: CARD_ICONS[1], color: CARD_COLORS[1] },
     { label: 'Bugungi mijozlar',    value: d.today_patients,               icon: CARD_ICONS[2], color: CARD_COLORS[2] },
     { label: 'Harajatlar (bu oy)',  value: formatMoney(d.month_expenses),  icon: CARD_ICONS[3], color: CARD_COLORS[3] },
+  ]
+
+  const revenueCards = [
+    { label: 'Bugungi Tushum',        value: formatMoney(d.daily_income),      icon: TrendingUp,   color: 'var(--success)' },
+    { label: 'Oylik Tushum',          value: formatMoney(d.month_income),      icon: Calendar,      color: 'var(--gold)' },
+    { label: 'Yillik Tushum',         value: formatMoney(d.year_income),       icon: CalendarRange, color: 'var(--info)' },
+    { label: "Kunlik O'rtacha (shu yil)", value: formatMoney(d.avg_daily_income), icon: BarChart3,  color: 'var(--danger)' },
   ]
 
   const openReferrerDetails = async (referrer) => {
@@ -198,6 +233,106 @@ export default function CeoDashboard() {
             </div>
           )
         })}
+      </div>
+
+      {/* Umumiy Tushum: kunlik / oylik / yillik / kunlik o'rtacha */}
+      <div className="card mb-6 space-y-4">
+        <h2 className="text-body font-bold text-base">💰 Umumiy Tushum</h2>
+
+        {/* Istalgan davrni tanlab tekshirish: Kun / Oy / Yil */}
+        <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: 'day', label: '📅 Kun' },
+              { id: 'month', label: '🗓️ Oy' },
+              { id: 'year', label: '📆 Yil' },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setRevPeriod(p.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  revPeriod === p.id
+                    ? 'bg-gold text-slate-950 shadow-md'
+                    : 'bg-surface-1 text-muted hover:text-body border border-border'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+
+            {revPeriod === 'day' && (
+              <input
+                type="date"
+                className="input-field text-xs py-1.5"
+                value={revDate}
+                max={now.toISOString().slice(0, 10)}
+                onChange={(e) => setRevDate(e.target.value)}
+              />
+            )}
+
+            {revPeriod === 'month' && (
+              <>
+                <select
+                  className="input-field text-xs py-1.5"
+                  value={revMonth}
+                  onChange={(e) => setRevMonth(+e.target.value)}
+                >
+                  {['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr']
+                    .map((name, i) => <option key={i} value={i + 1}>{name}</option>)}
+                </select>
+                <select
+                  className="input-field text-xs py-1.5"
+                  value={revYear}
+                  onChange={(e) => setRevYear(+e.target.value)}
+                >
+                  {Array.from({ length: 5 }, (_, i) => now.getFullYear() - i)
+                    .map((y) => <option key={y} value={y}>{y}-yil</option>)}
+                </select>
+              </>
+            )}
+
+            {revPeriod === 'year' && (
+              <select
+                className="input-field text-xs py-1.5"
+                value={revYear}
+                onChange={(e) => setRevYear(+e.target.value)}
+              >
+                {Array.from({ length: 5 }, (_, i) => now.getFullYear() - i)
+                  .map((y) => <option key={y} value={y}>{y}-yil</option>)}
+              </select>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs font-bold text-muted">Tanlangan davr tushumi:</span>
+            <span className="text-lg font-black font-mono text-gold">
+              {revLoading ? '…' : formatMoney(revResult?.income || 0)}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {revenueCards.map((c) => {
+            const Icon = c.icon
+            return (
+              <div key={c.label} className="stat-card">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-muted text-xs font-medium uppercase tracking-wide">{c.label}</p>
+                    <p className="mt-2 text-xl font-bold" style={{ color: c.color }}>{c.value}</p>
+                  </div>
+                  <div
+                    className="rounded-xl p-2.5"
+                    style={{ background: `${c.color}18` }}
+                  >
+                    <Icon className="h-5 w-5" style={{ color: c.color }} />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Income chart with Dekada Periods (Rasm 2) */}
