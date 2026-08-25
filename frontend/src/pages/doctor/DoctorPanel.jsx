@@ -698,7 +698,7 @@ export default function DoctorPanel() {
           KPI, tushum va balans kartochkalari bu yerdan olib tashlandi —
           ular endi "Profilim" bo'limida. Bemor qabul paytida ekranga
           qarasa pul raqamlari ko'rinib qolmasligi uchun. */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* COMPLETED COUNT */}
         <div className="card p-4 border-emerald-500/20 shadow-sm flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-emerald-500/12 border border-emerald-500/25 flex items-center justify-center shrink-0">
@@ -771,7 +771,7 @@ export default function DoctorPanel() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
             {/* RE-CALL CURRENT PATIENT BUTTON */}
             {current_patient && (
               <Btn
@@ -781,7 +781,7 @@ export default function DoctorPanel() {
                 loading={actionLoading}
                 disabled={data?.is_shift_closed || is_paused}
                 onClick={handleRecallCurrent}
-                className="font-bold"
+                className="font-bold justify-center w-full sm:w-auto"
                 title="Hozirgi qabuldagi bemorni TV ekranda qayta chaqirish"
               >
                 Qayta Chaqirish
@@ -796,7 +796,7 @@ export default function DoctorPanel() {
               loading={actionLoading}
               disabled={data?.is_shift_closed || is_paused || (stats?.waiting === 0 && !current_patient)}
               onClick={handleCallNext}
-              className="font-black shadow-md"
+              className="font-black shadow-md justify-center w-full sm:w-auto"
             >
               Keyingi Bemorni Chaqirish
             </Btn>
@@ -840,64 +840,66 @@ export default function DoctorPanel() {
                 va laboratoriya javoblari. Ikkitadan ko'p amal bo'lsa 2 ustunli setka
                 bilan chiqadi — ilgari to'liq kenglikda vertikal ustunda sig'mas edi. */}
             <div className="lg:col-span-3 flex flex-col justify-between gap-4 lg:border-l lg:border-border lg:pl-6">
-              {((specialization || '').toLowerCase().match(/(fizio|физио|ozon|озон|ineks|инъек|ukol|muolaj)/i)) ? (
-                <Btn
-                  variant="amber"
-                  size="md"
-                  icon={<Package className="h-4 w-4" />}
-                  onClick={() => {
-                    fetchInventory()
-                    setInventoryModal(true)
-                  }}
-                  className="w-full font-extrabold justify-center"
-                >
-                  Ombordan material yozish
-                </Btn>
-              ) : joriyShablonKat ? (
-                <Btn
-                  variant="gold"
-                  size="md"
-                  icon={<ClipboardList className="h-4 w-4" />}
-                  onClick={() => setTemplatePatient(current_patient)}
-                  className="w-full font-black justify-center"
-                >
-                  Natija blankasini to'ldirish
-                </Btn>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <Btn
-                    variant="cyan"
-                    size="sm"
-                    icon={<FileText className="h-4 w-4" />}
-                    onClick={() => openMedicalRecord(current_patient)}
-                    className="w-full font-bold justify-center"
-                  >
-                    Tashxis / Retsept
-                  </Btn>
-
-                  <Btn
-                    variant="info"
-                    size="sm"
-                    icon={<TestTube className="h-4 w-4" />}
-                    onClick={() => setLabPatient(current_patient)}
-                    className="w-full font-bold justify-center"
-                  >
-                    Lab javoblari
-                  </Btn>
-
+              {!((specialization || '').toLowerCase().includes('massaj') || (current_patient?.service_category || '').toLowerCase().includes('massaj') || (current_patient?.service_name || '').toLowerCase().includes('massaj')) && (
+                ((specialization || '').toLowerCase().match(/(fizio|физио|ozon|озон|ineks|инъек|ukol|muolaj)/i)) ? (
                   <Btn
                     variant="amber"
-                    size="sm"
+                    size="md"
                     icon={<Package className="h-4 w-4" />}
                     onClick={() => {
                       fetchInventory()
                       setInventoryModal(true)
                     }}
-                    className="w-full font-bold justify-center"
+                    className="w-full font-extrabold justify-center"
                   >
-                    Material
+                    Ombordan material yozish
                   </Btn>
-                </div>
+                ) : joriyShablonKat ? (
+                  <Btn
+                    variant="gold"
+                    size="md"
+                    icon={<ClipboardList className="h-4 w-4" />}
+                    onClick={() => setTemplatePatient(current_patient)}
+                    className="w-full font-black justify-center"
+                  >
+                    Natija blankasini to'ldirish
+                  </Btn>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <Btn
+                      variant="cyan"
+                      size="sm"
+                      icon={<FileText className="h-4 w-4" />}
+                      onClick={() => openMedicalRecord(current_patient)}
+                      className="w-full font-bold justify-center"
+                    >
+                      Tashxis / Retsept
+                    </Btn>
+
+                    <Btn
+                      variant="info"
+                      size="sm"
+                      icon={<TestTube className="h-4 w-4" />}
+                      onClick={() => setLabPatient(current_patient)}
+                      className="w-full font-bold justify-center"
+                    >
+                      Lab javoblari
+                    </Btn>
+
+                    <Btn
+                      variant="amber"
+                      size="sm"
+                      icon={<Package className="h-4 w-4" />}
+                      onClick={() => {
+                        fetchInventory()
+                        setInventoryModal(true)
+                      }}
+                      className="w-full font-bold justify-center"
+                    >
+                      Material
+                    </Btn>
+                  </div>
+                )
               )}
 
               <div className="flex gap-2.5 pt-3 border-t border-border/60">
@@ -992,14 +994,16 @@ export default function DoctorPanel() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Btn
-                        variant="ghost"
-                        size="xs"
-                        icon={<FileText className="h-3.5 w-3.5" />}
-                        onClick={() => openMedicalRecord(p)}
-                      >
-                        Karta / Retsept
-                      </Btn>
+                      {!(specialization || '').toLowerCase().includes('massaj') && (
+                        <Btn
+                          variant="ghost"
+                          size="xs"
+                          icon={<FileText className="h-3.5 w-3.5" />}
+                          onClick={() => openMedicalRecord(p)}
+                        >
+                          Karta / Retsept
+                        </Btn>
+                      )}
 
                       <Btn
                         variant="gold"
@@ -1059,14 +1063,16 @@ export default function DoctorPanel() {
                         </Btn>
                       )}
 
-                      <Btn
-                        variant="outline"
-                        size="xs"
-                        icon={<FileText className="h-3.5 w-3.5" />}
-                        onClick={() => setPrintableRecord(p)}
-                      >
-                        Blanka
-                      </Btn>
+                      {!(specialization || '').toLowerCase().includes('massaj') && (
+                        <Btn
+                          variant="outline"
+                          size="xs"
+                          icon={<FileText className="h-3.5 w-3.5" />}
+                          onClick={() => setPrintableRecord(p)}
+                        >
+                          Blanka
+                        </Btn>
+                      )}
                     </div>
                   </div>
                 ))}
