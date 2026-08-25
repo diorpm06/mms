@@ -68,7 +68,23 @@ export default function Layout({ role }) {
   
   // Prioritize layout route role over store authRole so doctor layout strictly shows DOCTOR_LINKS
   const effectiveRole = role || authRole
-  const links = effectiveRole === 'doctor' ? DOCTOR_LINKS : effectiveRole === 'admin' ? ADMIN_LINKS : CEO_LINKS
+
+  // Massaj va fizioterapiya/ozon/ineksiya shifokorlari UZI/Lab shablon
+  // natijasi to'ldirmaydi — "Natijalarim" menyusi ularga keraksiz.
+  const [doctorSpecialization, setDoctorSpecialization] = useState('')
+  useEffect(() => {
+    if (effectiveRole !== 'doctor') return
+    api('/queue/doctor/my-queue')
+      .then((res) => setDoctorSpecialization(res?.specialization || ''))
+      .catch(() => {})
+  }, [effectiveRole])
+
+  const isResultlessDoctor = /(massaj|fizio|физио|ozon|озон|ineks|инъек|ukol|muolaj)/i.test(doctorSpecialization)
+  const doctorLinks = isResultlessDoctor
+    ? DOCTOR_LINKS.filter((l) => l.to !== '/doctor/natijalar')
+    : DOCTOR_LINKS
+
+  const links = effectiveRole === 'doctor' ? doctorLinks : effectiveRole === 'admin' ? ADMIN_LINKS : CEO_LINKS
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navRef = useRef(null)
   const scrollKey = `sidebar-scroll-${effectiveRole}`
