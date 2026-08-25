@@ -32,7 +32,7 @@ def export_excel(report: dict, title: str = "Marjona Med Service") -> bytes:
         ("Mijozlar soni", report.get("patients_count", 0)),
         ("Jami daromad", _format_money(report.get("total_income", 0))),
         ("Naqt", _format_money(report.get("cash", 0))),
-        ("Karta", _format_money(report.get("card", 0))),
+        ("Karta", _format_money(report.get("card", 0) + report.get("qr", 0))),
         ("Yo'naltiruvchi hissi", _format_money(report.get("referrer_share", 0))),
         ("Xizmat ko'rsatuvchi hissi", _format_money(report.get("provider_share", 0))),
         ("Markaz ulushi", _format_money(report.get("center_share", 0))),
@@ -391,7 +391,10 @@ def export_pdf(report: dict, title: str = "MARJONA MED SERVIS KLINIKASI — KUNL
     net_sum = tot_income - tot_exp
 
     cash_amt = int(report.get("cash", 0))
-    card_amt = int(report.get("card", 0))
+    # QR endi hisoblashda karta'dan ajratilgan, lekin chop etishda
+    # avvalgidek birga ko'rsatiladi (faqat ekrandagi Kunlik Hisobot
+    # kartochkalarida alohida chiqadi).
+    card_amt = int(report.get("card", 0)) + int(report.get("qr", 0))
     click_amt = int(report.get("click", 0))
     if cash_amt == 0 and tot_income > 0:
         cash_amt = max(0, tot_income - card_amt - click_amt)

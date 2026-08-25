@@ -173,13 +173,16 @@ def get_report(db: Session, start: date, end: date) -> dict:
             ptype = (t.payment_type or "").lower()
             if ptype in ("cash", "naqd"):
                 cash += (t.cash_amount if t.cash_amount else t.total_amount)
-            elif ptype in ("card", "karta", "terminal", "qr"):
-                card += (t.card_amount if t.card_amount else t.total_amount) + (t.qr_amount or 0)
+            elif ptype == "qr":
+                qr += (t.qr_amount if t.qr_amount else t.total_amount)
+            elif ptype in ("card", "karta", "terminal"):
+                card += (t.card_amount if t.card_amount else t.total_amount)
             elif ptype in ("click", "payme"):
                 click += t.total_amount
             elif ptype in ("split", "aralash"):
                 cash += (t.cash_amount or 0)
-                card += (t.card_amount or 0) + (t.qr_amount or 0)
+                card += (t.card_amount or 0)
+                qr += (t.qr_amount or 0)
                 click += (t.click_amount or 0)
             elif ptype in ("later", "keyinroq", "nasiya", "qarz"):
                 later_total += t.total_amount
@@ -197,13 +200,16 @@ def get_report(db: Session, start: date, end: date) -> dict:
             amt = int(p.payment_amount or 0)
             if ptype in ("cash", "naqd"):
                 cash += (p.cash_amount if p.cash_amount else amt)
-            elif ptype in ("card", "karta", "terminal", "qr"):
-                card += (p.card_amount if p.card_amount else amt) + (getattr(p, "qr_amount", 0) or 0)
+            elif ptype == "qr":
+                qr += (getattr(p, "qr_amount", 0) or 0) or amt
+            elif ptype in ("card", "karta", "terminal"):
+                card += (p.card_amount if p.card_amount else amt)
             elif ptype in ("click", "payme"):
                 click += amt
             elif ptype in ("split", "aralash"):
                 cash += (p.cash_amount or 0)
-                card += (p.card_amount or 0) + (getattr(p, "qr_amount", 0) or 0)
+                card += (p.card_amount or 0)
+                qr += (getattr(p, "qr_amount", 0) or 0)
                 click += (p.click_amount or 0)
             elif ptype in ("later", "keyinroq", "nasiya", "qarz"):
                 later_total += amt

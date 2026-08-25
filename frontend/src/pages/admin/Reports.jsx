@@ -122,7 +122,8 @@ export default function AdminReports() {
       value: formatMoney((report.total_income || 0) - (report.expenses || 0)),
     },
     { label: '💵 Naqd', value: formatMoney(report.cash) },
-    { label: '💳 Karta / QR', value: formatMoney((report.card || 0) + (report.qr || 0)) },
+    { label: '💳 Karta', value: formatMoney(report.card || 0) },
+    { label: '📲 QR', value: formatMoney(report.qr || 0) },
     { label: '📱 Click / Payme', value: formatMoney(report.click || 0) },
   ]
 
