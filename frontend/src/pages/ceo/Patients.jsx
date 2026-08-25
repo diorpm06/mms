@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Search, User, Phone, Calendar, DollarSign, Activity, FileText,
+  Search, User, Phone, Calendar, Activity, FileText,
   PlusCircle, Edit, CheckCircle, ShieldAlert,
   UserCheck, HeartPulse, Filter, Grid, List, Sparkles, MapPin
 } from 'lucide-react'
@@ -221,9 +221,6 @@ export default function CeoPatients() {
 
   // Overall Metrics Calculation
   const totalUniqueCount = uniquePatientsList.length
-  const totalRevenue = uniquePatientsList.reduce((acc, u) => acc + u.total_spent, 0)
-  const totalVisitsCount = uniquePatientsList.reduce((acc, u) => acc + u.visit_count, 0)
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
@@ -262,7 +259,7 @@ export default function CeoPatients() {
       />
 
       {/* ── PRO TOP KPI METRICS CARDS ────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="card p-4 border-cyan-500/30 bg-cyan-500/5 flex items-center justify-between shadow-md">
           <div>
             <span className="text-xs font-extrabold text-cyan uppercase tracking-wider">Unikal Bemorlar</span>
@@ -270,26 +267,6 @@ export default function CeoPatients() {
           </div>
           <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 flex items-center justify-center text-cyan">
             <UserCheck className="h-6 w-6" />
-          </div>
-        </div>
-
-        <div className="card p-4 border-emerald/30 bg-emerald/5 flex items-center justify-between shadow-md">
-          <div>
-            <span className="text-xs font-extrabold text-emerald uppercase tracking-wider">Jami Kelgan Tushum</span>
-            <p className="text-2xl font-black text-emerald font-mono mt-1">{formatMoney(totalRevenue)}</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald/20 flex items-center justify-center text-emerald">
-            <DollarSign className="h-6 w-6" />
-          </div>
-        </div>
-
-        <div className="card p-4 border-gold/30 bg-gold/5 flex items-center justify-between shadow-md">
-          <div>
-            <span className="text-xs font-extrabold text-gold uppercase tracking-wider">Jami Tashriflar</span>
-            <p className="text-2xl font-black text-gold font-mono mt-1">{totalVisitsCount} <span className="text-xs font-normal text-muted">ta qabul</span></p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-gold/20 flex items-center justify-center text-gold">
-            <Activity className="h-6 w-6" />
           </div>
         </div>
       </div>

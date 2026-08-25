@@ -637,15 +637,16 @@ export default function DoctorPanel() {
         subtitle={`${specialization || 'Shifokor'} • Xona: ${cabinet || '1-Xona'}`}
         icon={<Stethoscope className="h-6 w-6 text-gold" />}
       >
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
           {/* Utility actions — qidiruv va yangilash, asosiy amallardan ajratilgan */}
-          <div className="flex items-center gap-1.5 pr-2 mr-1 border-r border-border">
+          <div className="flex items-center gap-1.5 sm:pr-2 sm:mr-1 sm:border-r border-border">
             <Btn
               variant="ghost"
               size="sm"
               icon={<Search className="h-4 w-4" />}
               onClick={() => setHistorySearchModal(true)}
               title="Bemorlar tarixini izlash"
+              className="flex-1 sm:flex-none justify-center"
             >
               Bemorlar Tarixi
             </Btn>
@@ -653,7 +654,7 @@ export default function DoctorPanel() {
               type="button"
               onClick={fetchDoctorQueue}
               title="Yangilash"
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-muted hover:text-body hover:bg-surface-2 transition-all"
+              className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-muted hover:text-body hover:bg-surface-2 transition-all"
             >
               <RefreshCw className="h-4 w-4" />
             </button>
@@ -667,6 +668,7 @@ export default function DoctorPanel() {
             loading={actionLoading}
             onClick={handleTogglePause}
             disabled={data?.is_shift_closed}
+            className="w-full sm:w-auto justify-center"
           >
             {is_paused ? 'Qabulni Davom Ettirish' : 'Tanaffus'}
           </Btn>
@@ -677,6 +679,7 @@ export default function DoctorPanel() {
             icon={data?.is_shift_closed ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
             loading={actionLoading}
             onClick={handleToggleShift}
+            className="w-full sm:w-auto justify-center"
           >
             {data?.is_shift_closed ? 'Qabulni Ochish' : 'Ish Kunini Yakunlash'}
           </Btn>
@@ -902,14 +905,14 @@ export default function DoctorPanel() {
                 )
               )}
 
-              <div className="flex gap-2.5 pt-3 border-t border-border/60">
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-3 border-t border-border/60">
                 <Btn
                   variant="success"
                   size="md"
                   icon={<UserCheck className="h-4 w-4" />}
                   loading={actionLoading}
                   onClick={handleCompleteCurrent}
-                  className="flex-1 font-black justify-center"
+                  className="w-full sm:flex-1 font-black justify-center"
                 >
                   Qabulni Yakunlash
                 </Btn>
@@ -920,7 +923,7 @@ export default function DoctorPanel() {
                   icon={<PhoneOff className="h-4 w-4" />}
                   loading={actionLoading}
                   onClick={handleSkipCurrent}
-                  className="text-rose-400 border-rose-500/40 hover:bg-rose-500/10 font-bold"
+                  className="w-full sm:w-auto text-rose-400 border-rose-500/40 hover:bg-rose-500/10 font-bold justify-center"
                   title="Bemor kelmadi — navbatdan o'tkazib yuborish"
                 >
                   O'tkazish
