@@ -204,8 +204,8 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
           #print-clone .shadow-inner, #print-clone .shadow-2xl, #print-clone .shadow-lg { box-shadow: none !important; }
           #print-clone img.logo-img {
             display: block !important;
-            max-height: 18mm !important;
-            height: 18mm !important;
+            max-height: 24mm !important;
+            height: 24mm !important;
             width: auto !important;
             margin: 0 auto 1mm !important;
           }

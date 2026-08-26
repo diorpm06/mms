@@ -16,7 +16,7 @@ export default function ReceiptHeader({ subtitle = null, compact = false }) {
       <img
         src={BRAND.logo}
         alt={BRAND.name}
-        className={`logo-img mx-auto mb-1 object-contain ${compact ? 'h-12 max-h-12' : 'h-16 max-h-16'}`}
+        className="logo-img mx-auto mb-1 object-contain h-16 max-h-16"
       />
       <h2 className={`font-black tracking-wider uppercase text-slate-900 dark:text-slate-100 ${compact ? 'text-xs' : 'text-base'}`}>
         {BRAND.name}

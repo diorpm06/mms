@@ -98,6 +98,11 @@ export default function CeoInpatients() {
     unit_price: '',
     is_included_in_tariff: false,
   })
+  // Xizmatlarni qidirib, bir nechtasini bir vaqtda tanlash uchun
+  const [admitServiceSearch, setAdmitServiceSearch] = useState('')
+  const [admitSelectedServiceIds, setAdmitSelectedServiceIds] = useState({})
+  const [itemServiceSearch, setItemServiceSearch] = useState('')
+  const [itemSelectedServiceIds, setItemSelectedServiceIds] = useState({})
 
   const toast = useToastStore((s) => s.add)
   const role = useAuthStore((s) => s.role)
@@ -199,6 +204,31 @@ export default function CeoInpatients() {
       item_type: 'service', service_id: '', material_id: '', quantity: 1, unit_price: '', is_included_in_tariff: false
     })
     toast("Qo'shimcha element biriktirildi")
+  }
+
+  // Qidiruvda belgilangan bir nechta xizmatni bir vaqtda biriktirish
+  const handleAddSelectedAdmitServices = () => {
+    const ids = Object.keys(admitSelectedServiceIds).filter((id) => admitSelectedServiceIds[id])
+    if (!ids.length) {
+      toast('Kamida bitta xizmatni tanlang', 'error')
+      return
+    }
+    const newItems = ids.map((id) => {
+      const s = services.find((x) => x.id === +id)
+      return {
+        item_type: 'service',
+        service_id: +id,
+        material_id: null,
+        name: s ? s.name : '',
+        quantity: 1,
+        unit_price: admitItemForm.is_included_in_tariff ? 0 : (s ? s.price : 0),
+        is_included_in_tariff: admitItemForm.is_included_in_tariff,
+      }
+    })
+    setAdmitExtraItems((prev) => [...prev, ...newItems])
+    setAdmitSelectedServiceIds({})
+    setAdmitServiceSearch('')
+    toast(`${newItems.length} ta xizmat biriktirildi`)
   }
 
   // Submit Admission
@@ -327,6 +357,38 @@ export default function CeoInpatients() {
         }),
       })
       toast('Qo\'shimcha xizmat/material biriktirildi')
+      setItemModal(null)
+      loadData()
+    } catch (e) {
+      toast(e.message, 'error')
+    }
+  }
+
+  // Qidiruvda belgilangan bir nechta xizmatni mavjud bemorga ketma-ket
+  // biriktirish (backend bitta xizmatni qabul qiladi)
+  const handleAddSelectedItemServices = async () => {
+    if (!itemModal) return
+    const ids = Object.keys(itemSelectedServiceIds).filter((id) => itemSelectedServiceIds[id])
+    if (!ids.length) {
+      toast('Kamida bitta xizmatni tanlang', 'error')
+      return
+    }
+    try {
+      for (const id of ids) {
+        await api(`/inpatients/${itemModal.id}/items`, {
+          method: 'POST',
+          body: JSON.stringify({
+            item_type: 'service',
+            service_id: +id,
+            quantity: 1,
+            is_included_in_tariff: itemForm.is_included_in_tariff,
+            is_no_charge: itemForm.is_no_charge,
+          }),
+        })
+      }
+      toast(`${ids.length} ta xizmat biriktirildi`)
+      setItemSelectedServiceIds({})
+      setItemServiceSearch('')
       setItemModal(null)
       loadData()
     } catch (e) {
@@ -772,7 +834,7 @@ export default function CeoInpatients() {
       )}
 
       {/* MODAL 1: ADMIT INPATIENT */}
-      <Modal open={admitModal} onClose={() => setAdmitModal(false)} title="Yotgan bemorni qabul qilish">
+      <Modal open={admitModal} onClose={() => { setAdmitModal(false); setAdmitSelectedServiceIds({}); setAdmitServiceSearch('') }} title="Yotgan bemorni qabul qilish">
         <div className="space-y-3 pt-2">
           {/* Mode Switcher: Existing vs New */}
           <div className="flex rounded-xl bg-surface-2 p-1 border border-border/80 gap-1">
@@ -997,29 +1059,34 @@ export default function CeoInpatients() {
               </div>
 
               {admitItemForm.item_type === 'service' ? (
-                <select
-                  className="input-field text-xs"
-                  value={admitItemForm.service_id}
-                  onChange={(e) => setAdmitItemForm({ ...admitItemForm, service_id: e.target.value })}
-                >
-                  <option value="">— Bo'limlar bo'yicha xizmatni tanlang —</option>
-                  {Object.entries(
-                    services.reduce((acc, s) => {
-                      const cat = s.category || 'Umumiy'
-                      if (!acc[cat]) acc[cat] = []
-                      acc[cat].push(s)
-                      return acc
-                    }, {})
-                  ).map(([catName, list]) => (
-                    <optgroup key={catName} label={`📁 ${catName.toUpperCase()}`}>
-                      {list.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} — {formatMoney(s.price)}
-                        </option>
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    className="input-field text-xs"
+                    placeholder="🔍 Xizmat nomini qidiring..."
+                    value={admitServiceSearch}
+                    onChange={(e) => setAdmitServiceSearch(e.target.value)}
+                  />
+                  <div className="max-h-40 overflow-y-auto space-y-0.5 p-1.5 bg-surface rounded-lg border border-border/60">
+                    {services
+                      .filter((s) => s.name.toLowerCase().includes(admitServiceSearch.toLowerCase()))
+                      .map((s) => (
+                        <label key={s.id} className="flex items-center gap-2 text-xs p-1 rounded hover:bg-surface-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="accent-gold rounded shrink-0"
+                            checked={!!admitSelectedServiceIds[s.id]}
+                            onChange={(e) => setAdmitSelectedServiceIds((prev) => ({ ...prev, [s.id]: e.target.checked }))}
+                          />
+                          <span className="flex-1 truncate">{s.name}</span>
+                          <span className="text-muted font-mono shrink-0">{formatMoney(s.price)}</span>
+                        </label>
                       ))}
-                    </optgroup>
-                  ))}
-                </select>
+                    {services.filter((s) => s.name.toLowerCase().includes(admitServiceSearch.toLowerCase())).length === 0 && (
+                      <p className="text-center text-muted text-[11px] py-2">Xizmat topilmadi</p>
+                    )}
+                  </div>
+                </div>
               ) : (
                 <select
                   className="input-field text-xs"
@@ -1033,32 +1100,53 @@ export default function CeoInpatients() {
                 </select>
               )}
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  className="input-field text-xs w-20"
-                  placeholder="Soni"
-                  value={admitItemForm.quantity}
-                  onChange={(e) => setAdmitItemForm({ ...admitItemForm, quantity: e.target.value })}
-                />
-                <label className="flex items-center gap-1.5 text-[11px] text-muted cursor-pointer flex-1">
+              {admitItemForm.item_type === 'service' ? (
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted cursor-pointer flex-1">
+                    <input
+                      type="checkbox"
+                      checked={admitItemForm.is_included_in_tariff}
+                      onChange={(e) => setAdmitItemForm({ ...admitItemForm, is_included_in_tariff: e.target.checked })}
+                      className="accent-gold rounded"
+                    />
+                    <span>Tarif ichida (0 so'm)</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-outline text-xs py-1 px-3 border-cyan-500/40 text-cyan-300 font-bold shrink-0"
+                    onClick={handleAddSelectedAdmitServices}
+                  >
+                    + Tanlanganlarni Biriktirish ({Object.values(admitSelectedServiceIds).filter(Boolean).length})
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
                   <input
-                    type="checkbox"
-                    checked={admitItemForm.is_included_in_tariff}
-                    onChange={(e) => setAdmitItemForm({ ...admitItemForm, is_included_in_tariff: e.target.checked })}
-                    className="accent-gold rounded"
+                    type="number"
+                    min={1}
+                    className="input-field text-xs w-20"
+                    placeholder="Soni"
+                    value={admitItemForm.quantity}
+                    onChange={(e) => setAdmitItemForm({ ...admitItemForm, quantity: e.target.value })}
                   />
-                  <span>Tarif ichida (0 so'm)</span>
-                </label>
-                <button
-                  type="button"
-                  className="btn-outline text-xs py-1 px-3 border-cyan-500/40 text-cyan-300 font-bold shrink-0"
-                  onClick={handleAddAdmitExtraItem}
-                >
-                  + Biriktirish
-                </button>
-              </div>
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted cursor-pointer flex-1">
+                    <input
+                      type="checkbox"
+                      checked={admitItemForm.is_included_in_tariff}
+                      onChange={(e) => setAdmitItemForm({ ...admitItemForm, is_included_in_tariff: e.target.checked })}
+                      className="accent-gold rounded"
+                    />
+                    <span>Tarif ichida (0 so'm)</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-outline text-xs py-1 px-3 border-cyan-500/40 text-cyan-300 font-bold shrink-0"
+                    onClick={handleAddAdmitExtraItem}
+                  >
+                    + Biriktirish
+                  </button>
+                </div>
+              )}
 
               {/* Added extra items list */}
               {admitExtraItems.length > 0 && (
@@ -1312,7 +1400,7 @@ export default function CeoInpatients() {
       </Modal>
 
       {/* MODAL 2: ATTACH EXTRA SERVICE OR MATERIAL */}
-      <Modal open={!!itemModal} onClose={() => { setItemModal(null); setEditingItem(null) }} title="Qo'shimcha Xizmat yoki Material Biriktirish">
+      <Modal open={!!itemModal} onClose={() => { setItemModal(null); setEditingItem(null); setItemSelectedServiceIds({}); setItemServiceSearch('') }} title="Qo'shimcha Xizmat yoki Material Biriktirish">
         {itemModal && (
           <div className="space-y-3 pt-2">
             <p className="font-bold text-foreground">{itemModal.first_name} {itemModal.last_name} — Palata {itemModal.room_number}/{itemModal.bed_number}</p>
@@ -1381,37 +1469,34 @@ export default function CeoInpatients() {
             )}
 
             {itemForm.item_type === 'service' && (
-              <select
-                className="input-field text-xs"
-                value={itemForm.service_id}
-                onChange={(e) => {
-                  const sid = e.target.value
-                  const found = services.find((s) => String(s.id) === String(sid))
-                  setItemForm({
-                    ...itemForm,
-                    service_id: sid,
-                    unit_price: found ? String(found.price) : '',
-                  })
-                }}
-              >
-                <option value="">— Bo'limlar bo'yicha xizmatni tanlang —</option>
-                {Object.entries(
-                  services.reduce((acc, s) => {
-                    const cat = s.category || 'Umumiy'
-                    if (!acc[cat]) acc[cat] = []
-                    acc[cat].push(s)
-                    return acc
-                  }, {})
-                ).map(([catName, list]) => (
-                  <optgroup key={catName} label={`📁 ${catName.toUpperCase()}`}>
-                    {list.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} — {formatMoney(s.price)}
-                      </option>
+              <div className="space-y-1.5">
+                <input
+                  type="text"
+                  className="input-field text-xs"
+                  placeholder="🔍 Xizmat nomini qidiring..."
+                  value={itemServiceSearch}
+                  onChange={(e) => setItemServiceSearch(e.target.value)}
+                />
+                <div className="max-h-40 overflow-y-auto space-y-0.5 p-1.5 bg-surface rounded-lg border border-border/60">
+                  {services
+                    .filter((s) => s.name.toLowerCase().includes(itemServiceSearch.toLowerCase()))
+                    .map((s) => (
+                      <label key={s.id} className="flex items-center gap-2 text-xs p-1 rounded hover:bg-surface-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="accent-gold rounded shrink-0"
+                          checked={!!itemSelectedServiceIds[s.id]}
+                          onChange={(e) => setItemSelectedServiceIds((prev) => ({ ...prev, [s.id]: e.target.checked }))}
+                        />
+                        <span className="flex-1 truncate">{s.name}</span>
+                        <span className="text-muted font-mono shrink-0">{formatMoney(s.price)}</span>
+                      </label>
                     ))}
-                  </optgroup>
-                ))}
-              </select>
+                  {services.filter((s) => s.name.toLowerCase().includes(itemServiceSearch.toLowerCase())).length === 0 && (
+                    <p className="text-center text-muted text-[11px] py-2">Xizmat topilmadi</p>
+                  )}
+                </div>
+              </div>
             )}
 
             {itemForm.item_type === 'material' && (
@@ -1437,24 +1522,26 @@ export default function CeoInpatients() {
               </select>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                className="input-field"
-                type="number"
-                min={1}
-                placeholder="Soni *"
-                value={itemForm.quantity}
-                onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })}
-              />
-              <input
-                className="input-field bg-surface-2 opacity-90 cursor-not-allowed font-mono font-bold text-gold"
-                type="number"
-                placeholder="Narxi (katalogdan)"
-                value={itemForm.unit_price}
-                readOnly
-                title="Narx katalogdan avtomatik belgilanadi"
-              />
-            </div>
+            {itemForm.item_type !== 'service' && (
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  className="input-field"
+                  type="number"
+                  min={1}
+                  placeholder="Soni *"
+                  value={itemForm.quantity}
+                  onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })}
+                />
+                <input
+                  className="input-field bg-surface-2 opacity-90 cursor-not-allowed font-mono font-bold text-gold"
+                  type="number"
+                  placeholder="Narxi (katalogdan)"
+                  value={itemForm.unit_price}
+                  readOnly
+                  title="Narx katalogdan avtomatik belgilanadi"
+                />
+              </div>
+            )}
 
             <label className="flex items-center gap-2 text-xs text-muted cursor-pointer pt-1">
               <input type="checkbox" checked={itemForm.is_included_in_tariff} onChange={(e) => setItemForm({ ...itemForm, is_included_in_tariff: e.target.checked })} className="accent-gold rounded" />
@@ -1466,9 +1553,15 @@ export default function CeoInpatients() {
               <span>Balansga qo'shilmaydi (faqat chekda ko'rinadi)</span>
             </label>
 
-            <button type="button" className="btn-gold w-full py-3 mt-2" onClick={handleAddItem}>
-              Qo'shish
-            </button>
+            {itemForm.item_type === 'service' ? (
+              <button type="button" className="btn-gold w-full py-3 mt-2" onClick={handleAddSelectedItemServices}>
+                Tanlanganlarni Qo'shish ({Object.values(itemSelectedServiceIds).filter(Boolean).length})
+              </button>
+            ) : (
+              <button type="button" className="btn-gold w-full py-3 mt-2" onClick={handleAddItem}>
+                Qo'shish
+              </button>
+            )}
 
             {/* Attached items list */}
             {itemModal.items && itemModal.items.length > 0 && (
