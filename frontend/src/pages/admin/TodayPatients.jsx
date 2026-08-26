@@ -7,6 +7,7 @@ import PaymentTicketModal from '../../components/PaymentTicketModal'
 import PatientMedicalCardModal from '../../components/PatientMedicalCardModal'
 import ReRegisterPatientModal from '../../components/ReRegisterPatientModal'
 import PayUnpaidServicesModal from '../../components/PayUnpaidServicesModal'
+import ShiftControlBar from '../../components/ShiftControlBar'
 import { Btn, Icons, PageHeader, THead, StatusBadge, ActionRow, EmptyState } from '../../components/UIKit'
 import ActionMenu from '../../components/ActionMenu'
 
@@ -582,6 +583,8 @@ export default function TodayPatients() {
           }}
         />
       )}
+
+      <ShiftControlBar onShiftChange={() => fetchPatients()} />
 
       <PageHeader
         title="Bugungi Bemorlar va Navbat"

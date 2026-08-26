@@ -14,6 +14,7 @@ import { useToastStore } from '../../store/toastStore'
 import { Btn, Icons } from '../../components/UIKit'
 import Modal from '../../components/Modal'
 import PeakHeatmapChart from '../../components/PeakHeatmapChart'
+import ShiftControlBar from '../../components/ShiftControlBar'
 
 const EMPTY = {
   daily_income: 0, current_balance: 0,
@@ -171,6 +172,8 @@ export default function CeoDashboard() {
 
   return (
     <div>
+      <ShiftControlBar onShiftChange={() => load()} />
+
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="page-title">Rahbar Dashboard</h1>
