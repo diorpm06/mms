@@ -32,6 +32,7 @@ export default function CeoPatients() {
   const [referrers, setReferrers] = useState([])
   const [allServices, setAllServices] = useState([])
   const [addServiceId, setAddServiceId] = useState('')
+  const [editServiceSearch, setEditServiceSearch] = useState('')
   const toast = useToastStore((s) => s.add)
 
   const load = () => api('/patients?include_cancelled=true').then(setPatients)
@@ -79,7 +80,7 @@ export default function CeoPatients() {
     if (!svc) return
     const updated = [
       ...(edit.servicesList || []),
-      { service_id: svc.id, service_name: svc.name, price: svc.price, quantity: 1 },
+      { service_id: svc.id, service_name: svc.name, price: svc.price, quantity: 1, category: svc.category || svc.department_name },
     ]
     const newTotal = updated.reduce((acc, s) => acc + (s.price || 0) * (s.quantity || 1), 0)
     setEdit({ ...edit, servicesList: updated, payment_amount: newTotal })
@@ -144,6 +145,7 @@ export default function CeoPatients() {
     })
     setEditReason('')
     setAddServiceId('')
+    setEditServiceSearch('')
     if (!referrers.length) api('/referrers').then(setReferrers).catch(() => {})
     if (!allServices.length) api('/services').then(setAllServices).catch(() => {})
   }
@@ -845,16 +847,85 @@ export default function CeoPatients() {
                 ))}
               </div>
 
-              <select
-                className="input-field text-xs mt-2 font-bold"
-                value={addServiceId}
-                onChange={(e) => addServiceToEdit(e.target.value)}
-              >
-                <option value="">+ Xizmat qo'shish...</option>
-                {allServices.filter((x) => x.is_active !== false).map((x) => (
-                  <option key={x.id} value={x.id}>{x.name} — {formatMoney(x.price)}</option>
-                ))}
-              </select>
+              {/* SEARCH INPUT & QUICK MULTI-ADD SECTION */}
+              <div className="space-y-2 p-2.5 rounded-xl bg-surface-2 border border-cyan-500/30 mt-2">
+                <label className="text-xs font-extrabold text-cyan uppercase tracking-wider block">
+                  🔍 Xizmat qidirish va bir nechta qo'shish
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Xizmat nomini yozing (masalan: UZI, Massaj, Laboratoriya)..."
+                    value={editServiceSearch}
+                    onChange={(e) => setEditServiceSearch(e.target.value)}
+                    className="w-full pl-3 pr-8 py-1.5 rounded-xl bg-surface border border-cyan-500/40 text-xs font-medium focus:outline-none focus:border-cyan-400"
+                  />
+                  {editServiceSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setEditServiceSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-rose-400 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick-add Badges when typing */}
+                {editServiceSearch.trim() && (
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-1.5 border-t border-border/40">
+                    {allServices
+                      .filter((x) => x.is_active !== false)
+                      .filter((s) => {
+                        const q = editServiceSearch.toLowerCase().trim()
+                        return (s.name || '').toLowerCase().includes(q) || (s.category || s.department_name || '').toLowerCase().includes(q)
+                      })
+                      .map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => addServiceToEdit(s.id)}
+                          className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan border border-cyan-500/40 text-xs font-bold flex items-center gap-1 transition-all active:scale-95 text-left"
+                          title="Bemorga shu xizmatni qo'shish uchun bosing"
+                        >
+                          <span>+ {s.category || s.department_name ? `[${s.category || s.department_name}] ` : ''}{s.name} ({formatMoney(s.price)})</span>
+                        </button>
+                      ))}
+                  </div>
+                )}
+
+                {/* Standard Dropdown Select (filtered live by search) */}
+                <select
+                  className="input-field text-xs font-bold py-1.5 w-full"
+                  value={addServiceId}
+                  onChange={(e) => addServiceToEdit(e.target.value)}
+                >
+                  <option value="">+ Xizmat ro'yxatidan tanlab qo'shish (bo'limlar bo'yicha)...</option>
+                  {Object.entries(
+                    allServices
+                      .filter((x) => x.is_active !== false)
+                      .filter((s) => {
+                        if (!editServiceSearch.trim()) return true
+                        const q = editServiceSearch.toLowerCase().trim()
+                        return (s.name || '').toLowerCase().includes(q) || (s.category || s.department_name || '').toLowerCase().includes(q)
+                      })
+                      .reduce((acc, s) => {
+                        const dept = s.department_name || s.category || "Boshqa bo'limlar"
+                        if (!acc[dept]) acc[dept] = []
+                        acc[dept].push(s)
+                        return acc
+                      }, {})
+                  ).map(([deptName, deptServices]) => (
+                    <optgroup key={deptName} label={`📂 ${deptName.toUpperCase()}`}>
+                      {deptServices.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          [📁 {deptName}] {x.name} — {formatMoney(x.price)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
 
               <div className="pt-2 border-t border-border flex justify-between items-center font-bold text-xs">
                 <span className="text-muted">Qayta hisoblangan umumiy to'lov:</span>
