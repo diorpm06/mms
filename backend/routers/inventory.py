@@ -92,13 +92,19 @@ def list_inventory_logs(
         .limit(100)
         .all()
     )
+    # AuditLog'da "user" relationship yo'q, faqat user_id bor — shuning
+    # uchun ismlar alohida, bitta so'rovda olinadi (N+1 bo'lmasin).
+    user_ids = {l.user_id for l in logs if l.user_id}
+    users_map = {
+        u.id: u.full_name for u in db.query(User).filter(User.id.in_(user_ids)).all()
+    } if user_ids else {}
     return [
         {
             "id": l.id,
             "created_at": l.created_at.strftime("%d.%m.%Y %H:%M") if l.created_at else "",
             "user_role": l.user_role,
-            "user_name": l.user.full_name if l.user else "Tizim",
-            "detail_message": l.detail_message,
+            "user_name": users_map.get(l.user_id, "Tizim"),
+            "detail_message": l.old_data,
             "new_data": l.new_data,
         }
         for l in logs

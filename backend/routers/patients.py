@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks, Query
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -320,10 +320,23 @@ def _patient_to_dict(p: Patient, db: Session) -> dict:
 
 
 @router.get("/today")
-def today_patients(db: Session = Depends(get_db), _: User = Depends(require_doctor_or_admin_or_ceo)):
-    today = date.today()
-    start = datetime.combine(today, datetime.min.time())
-    end = datetime.combine(today, datetime.max.time())
+def today_patients(
+    shift_only: bool = Query(False),
+    date_param: Optional[date] = Query(None, alias="date"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_doctor_or_admin_or_ceo),
+):
+    # `date` berilsa (masalan tungi navbatchilikda ertangi sana) — aynan
+    # o'sha kunga yozilgan bemorlar qaytadi. Tungi rejimda `created_at`
+    # haqiqiy vaqt emas, balki `custom_date` (ertangi kun)ga o'rnatiladi —
+    # shu sababli oddiy "bugun" filtri ularni topa olmasdi.
+    target_day = date_param or date.today()
+    if shift_only and not date_param:
+        from services.reports_data import get_active_shift_start
+        start = get_active_shift_start(db)
+    else:
+        start = datetime.combine(target_day, datetime.min.time())
+    end = datetime.combine(target_day, datetime.max.time())
 
     patients = (
         db.query(Patient)
@@ -332,19 +345,8 @@ def today_patients(db: Session = Depends(get_db), _: User = Depends(require_doct
             joinedload(Patient.provider),
             joinedload(Patient.service),
             joinedload(Patient.creator),
-            # _patient_row har bir xizmat qatorida ps.service.name ni o'qiydi.
-            # services_detail o'zi "selectin" bilan bitta so'rovda kelardi,
-            # lekin ichidagi service bog'lanishi kelmasdi — har bir YANGI
-            # xizmat turi uchun alohida SELECT ketardi (takrorlanganini
-            # SQLAlchemy o'z xotirasidan oladi). Katalogda xizmat turi
-            # ko'p bo'lgani sari bu qimmatlashadi.
             selectinload(Patient.services_detail).joinedload(PatientService.service),
         )
-        # Ilgari qog'oz yozuvlari kechadan buyon ko'rsatilardi: tungi smena
-        # qog'ozga yozilib ertalab kiritilgani uchun. Endi custom_date sanani
-        # o'z kuniga qo'yadi, shu sababli kechagi navbatchilik bugungi
-        # ro'yxatda ham turib olar va ekrandagi son kunlik hisobotdan farq
-        # qilardi. Har bir yozuv faqat o'z kunida ko'rinadi.
         .filter(Patient.created_at >= start, Patient.created_at <= end)
         .order_by(Patient.created_at.desc())
         .all()

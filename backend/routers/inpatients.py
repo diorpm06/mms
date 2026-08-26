@@ -684,7 +684,7 @@ def list_inpatients(
 
 
 @router.get("/history")
-def inpatient_history(db: Session = Depends(get_db), _: User = Depends(require_ceo)):
+def inpatient_history(db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)):
     items = (
         db.query(Inpatient)
         .options(

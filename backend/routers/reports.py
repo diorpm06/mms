@@ -136,12 +136,13 @@ def report_admin_daily(
 @router.get("/admin-summary")
 def report_admin_summary(
     date_param: Optional[date] = Query(None, alias="date"),
+    shift_only: bool = Query(False),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin_or_ceo),
 ):
     """Admin bosh sahifasi uchun yengil xulosa (3 ta SQL so'rov)."""
     target_date = date_param or date.today()
-    return admin_dashboard_summary(db, target_date)
+    return admin_dashboard_summary(db, target_date, shift_only=shift_only)
 
 
 @router.get("/period-chart")

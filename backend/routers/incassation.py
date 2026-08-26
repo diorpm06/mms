@@ -26,7 +26,8 @@ def get_current_shift_status(
     user: User = Depends(get_current_user),
 ):
     today = date.today()
-    start_dt = datetime.combine(today, datetime.min.time())
+    from services.reports_data import get_active_shift_start
+    start_dt = get_active_shift_start(db)
     end_dt = datetime.combine(today, datetime.max.time())
 
     from sqlalchemy import case

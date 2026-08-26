@@ -1207,8 +1207,8 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                   {payouts.length === 0 ? (
                     <tr><td colSpan={9} className="py-6 text-center text-muted italic">Ushbu davrda yo'naltiruvchilar ma'lumoti yo'q</td></tr>
                   ) : payouts.map((r, i) => (
-                    <>
-                      <tr key={r.referrer_id} className="hover:bg-surface-hover font-semibold">
+                    <Fragment key={r.referrer_id}>
+                      <tr className="hover:bg-surface-hover font-semibold">
                         <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
                         <td className="p-2.5 text-body font-bold">{r.name} <span className="text-muted text-[10px]">({r.phone || '—'})</span></td>
                         <td className="p-2.5 text-center font-mono font-bold text-cyan">{r.patient_count} nafar</td>
@@ -1273,7 +1273,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
 

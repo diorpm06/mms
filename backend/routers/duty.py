@@ -2,12 +2,12 @@ from datetime import date, datetime
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from auth_utils import require_admin_or_ceo, require_ceo
-from database import get_db
+from database import get_db, SessionLocal
 from models.app_setting import AppSetting
 from models.duty_log import DutyLog
 from models.user import User
@@ -41,12 +41,34 @@ def _set_setting(db: Session, key: str, value: str):
     db.commit()
 
 
+async def _send_telegram_report_bg(today: date):
+    """Telegram botga kunlik PDF hisobot yuborish (fonda bajariladi)."""
+    try:
+        from services.export import export_pdf
+        from services.reports_data import daily_report
+        from services.telegram_notify import format_daily_message, send_telegram_document
+
+        db = SessionLocal()
+        try:
+            rep = daily_report(db, today)
+            pdf_bytes = export_pdf(rep, title=f"Marjona Med — Kunlik Hisobot ({today.strftime('%d.%m.%Y')})")
+            msg = f"🔴 **SMENA TUGATILDI ({today.strftime('%d.%m.%Y')})**\n\n" + format_daily_message(db, today)
+            filename = f"Kunlik_Hisobot_{today.strftime('%d.%m.%Y')}.pdf"
+            await send_telegram_document(pdf_bytes, filename, caption=msg, section="reports")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Background telegram notify warning: {e}")
+
+
 @router.get("/shift-status")
 def get_shift_status(db: Session = Depends(get_db), _: User = Depends(require_admin_or_ceo)):
     shift_mode = _get_setting(db, "shift_mode", "KUNDUZGI")
     shift_date = _get_setting(db, "shift_date", date.today().isoformat())
     closed_at = _get_setting(db, "shift_closed_at", "")
     started_at = _get_setting(db, "shift_started_at", "")
+    from services.reports_data import get_active_shift_start
+    active_start = get_active_shift_start(db)
 
     return {
         "shift_mode": shift_mode,  # "KUNDUZGI" | "TUNGI"
@@ -54,11 +76,13 @@ def get_shift_status(db: Session = Depends(get_db), _: User = Depends(require_ad
         "today_date": date.today().isoformat(),
         "closed_at": closed_at,
         "started_at": started_at,
+        "active_shift_start": active_start.isoformat(),
     }
 
 
 @router.post("/close-shift")
 async def close_shift(
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_or_ceo),
 ):
@@ -66,7 +90,11 @@ async def close_shift(
     today = date.today()
     today_str = today.isoformat()
 
-    # 1. Kunlik hisobotni saqlash (SavedReport)
+    # 1. Tungi smenaga o'tish (zudlik bilan)
+    _set_setting(db, "shift_mode", "TUNGI")
+    _set_setting(db, "shift_closed_at", datetime.now().isoformat())
+
+    # 2. Kunlik hisobotni saqlash (SavedReport)
     try:
         from models.saved_report import SavedReport
         from services.export import export_pdf
@@ -98,26 +126,6 @@ async def close_shift(
     except Exception as e:
         logger.warning(f"Close shift save report warning: {e}")
 
-    # 2. Telegram botga yuborish
-    telegram_sent = False
-    try:
-        from services.export import export_pdf
-        from services.reports_data import daily_report
-        from services.telegram_notify import format_daily_message, send_telegram_document
-
-        rep = daily_report(db, today)
-        pdf_bytes = export_pdf(rep, title=f"Marjona Med — Kunlik Hisobot ({today.strftime('%d.%m.%Y')})")
-        msg = f"🔴 **SMENA TUGATILDI ({today.strftime('%d.%m.%Y')})**\n\n" + format_daily_message(db, today)
-        filename = f"Kunlik_Hisobot_{today.strftime('%d.%m.%Y')}.pdf"
-        await send_telegram_document(pdf_bytes, filename, caption=msg, section="reports")
-        telegram_sent = True
-    except Exception as e:
-        logger.warning(f"Close shift telegram notify warning: {e}")
-
-    # 3. Tungi smenaga o'tish
-    _set_setting(db, "shift_mode", "TUNGI")
-    _set_setting(db, "shift_closed_at", datetime.now().isoformat())
-
     log_audit(
         db,
         user_id=user.id,
@@ -125,13 +133,16 @@ async def close_shift(
         action_type="CLOSE_SHIFT",
         table_name="app_settings",
         record_id=0,
-        new_data={"shift_mode": "TUNGI", "date": today_str, "telegram_sent": telegram_sent},
+        new_data={"shift_mode": "TUNGI", "date": today_str},
     )
 
+    # 3. Telegram botga yuborishni fonda bajarish (ekran qotib qolmasligi uchun)
+    background_tasks.add_task(_send_telegram_report_bg, today)
+
     return {
-        "message": f"Bugungi ({today.strftime('%d.%m.%Y')}) smena tugatildi! Kunlik hisobot Telegram botga uzatildi va Tungi Navbatchilik rejimi faollashdi.",
+        "message": f"Bugungi ({today.strftime('%d.%m.%Y')}) smena tugatildi! Kunlik hisobot Telegram botga yuborilmoqda va Tungi Navbatchilik rejimi faollashdi.",
         "shift_mode": "TUNGI",
-        "telegram_sent": telegram_sent,
+        "telegram_sent": True,
     }
 
 

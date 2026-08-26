@@ -15,6 +15,7 @@ import {
   Landmark,
   Smartphone,
 } from 'lucide-react'
+import ShiftControlBar from '../../components/ShiftControlBar'
 
 // Mahalliy sana. new Date().toISOString() UTC beradi — Toshkent vaqti bilan
 // yarim tundan ertalab 5 gacha KECHAGI kunni so'rab qolardi.
@@ -30,6 +31,9 @@ export default function AdminDashboard() {
   const [today, setToday] = useState([])
   const [xato, setXato] = useState(false)
 
+  // Dashboard doim to'liq kunlik (00:00 dan) raqamlarni ko'rsatadi.
+  // Ilgari "Joriy Smena (0 dan)" degan alohida ko'rinish bor edi —
+  // smena yopilganda raqamlar 0'ga tushib, xodimlarni chalg'itardi.
   const load = useCallback(() => {
     setXato(false)
     api(`/reports/admin-summary?date=${bugun()}`)
@@ -38,7 +42,7 @@ export default function AdminDashboard() {
         setXato(false)
       })
       .catch(() => setXato(true))
-    api('/patients/today').then(setToday).catch(() => {})
+    api(`/patients/today`).then(setToday).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -49,7 +53,8 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
+      <ShiftControlBar onShiftChange={() => load()} />
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="page-title">Admin Dashboard</h1>
           <p className="text-muted mt-1 text-sm">

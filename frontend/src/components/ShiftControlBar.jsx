@@ -82,8 +82,8 @@ export default function ShiftControlBar({ onShiftChange }) {
           </div>
           <p className="text-[11px] text-muted font-medium mt-0.5">
             {isNight
-              ? 'Tungi navbatchilikda registratsiyada tezkor ineksiya/massaj/ozon xizmatlari filtri tayyor.'
-              : 'Barcha bo\'limlar to\'liq rejimda ishlamoqda.'}
+              ? "Yangi Mijoz Qabul formasi avtomatik \"Navbatchilik\" rejimida (ertangi sana bilan) ochiladi."
+              : 'Yangi Mijoz Qabul formasi avtomatik bugungi jonli rejimda ochiladi.'}
           </p>
         </div>
       </div>
@@ -126,10 +126,10 @@ export default function ShiftControlBar({ onShiftChange }) {
               <p>
                 ⚠️ Smenani tugatsangiz, bugungi (
                 <strong className="text-body font-bold">{status.today_date}</strong>) kunlik hisobot
-                PDF formatida saqlanadi hamda <strong className="text-emerald font-bold">Telegram botga</strong> uzatiladi.
+                PDF formatida saqlanadi va <strong className="text-emerald font-bold">Telegram botga</strong> yuboriladi.
               </p>
               <p className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300">
-                🌙 Shundan so'ng tizim avtomatik <strong className="text-amber-200">Tungi Navbatchilik</strong> rejimiga o'tadi va yangi smenaga tayyorlanadi.
+                🌙 Shundan so'ng <strong className="text-amber-200">Tungi Navbatchilik rejimi</strong> yoqiladi: Yangi Mijoz Qabul formasi avtomatik "Navbatchilik" (ertangi sana) holatida ochiladi, toki "Yangi Ish Kunini Boshlash" bosilguncha.
               </p>
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-border">

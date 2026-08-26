@@ -79,6 +79,34 @@ export default function Layout({ role }) {
       .catch(() => {})
   }, [effectiveRole])
 
+  // Tungi Navbatchilik rejimida BUTUN panel "Yangi Mijoz Qabul"
+  // ekraniga qulflanadi — xodim boshqa hech qaysi sahifaga (hisobot,
+  // bemorlar ro'yxati va h.k.) kira olmaydi, faqat navbatchilik
+  // shakli ko'rinadi, toki "Yangi Ish Kunini Boshlash" bosilguncha.
+  const [shiftMode, setShiftMode] = useState(null)
+  useEffect(() => {
+    if (effectiveRole !== 'admin' && effectiveRole !== 'ceo') return
+    const fetchShift = () => {
+      api('/duty/shift-status')
+        .then((r) => setShiftMode(r?.shift_mode || null))
+        .catch(() => {})
+    }
+    fetchShift()
+    // Davriy tekshirish shart — "Smenani Yopish" boshqa sahifada
+    // (Dashboard) bosiladi, Layout esa shu o'zgarishni darhol bilishi
+    // va qulflashni ishga tushirishi kerak.
+    const interval = setInterval(fetchShift, 8000)
+    return () => clearInterval(interval)
+  }, [effectiveRole, location.pathname])
+  const isNewPatientPath = location.pathname.endsWith('/new-patient')
+  const isNightEntryMode = isNewPatientPath && shiftMode === 'TUNGI'
+
+  useEffect(() => {
+    if ((effectiveRole !== 'admin' && effectiveRole !== 'ceo') || shiftMode !== 'TUNGI') return
+    if (isNewPatientPath) return
+    navigate(effectiveRole === 'ceo' ? '/ceo/new-patient' : '/admin/new-patient', { replace: true })
+  }, [effectiveRole, shiftMode, isNewPatientPath, navigate])
+
   const isResultlessDoctor = /(massaj|fizio|физио|ozon|озон|ineks|инъек|ukol|muolaj)/i.test(doctorSpecialization)
   const doctorLinks = isResultlessDoctor
     ? DOCTOR_LINKS.filter((l) => l.to !== '/doctor/natijalar')
@@ -241,13 +269,17 @@ export default function Layout({ role }) {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-app font-sans text-body transition-colors duration-200">
-      {/* Desktop Sidebar (Independent Left Scroll Area) */}
-      <aside className="hidden md:flex md:w-64 flex-shrink-0 h-screen overflow-hidden border-r border-border/40">
-        <SidebarContent />
-      </aside>
+      {/* Desktop Sidebar (Independent Left Scroll Area) — Tungi
+          Navbatchilik rejimida "Yangi Mijoz Qabul"da butunlay
+          yashiriladi, xodim chalg'imasin deb faqat forma qoladi. */}
+      {!isNightEntryMode && (
+        <aside className="hidden md:flex md:w-64 flex-shrink-0 h-screen overflow-hidden border-r border-border/40">
+          <SidebarContent />
+        </aside>
+      )}
 
       {/* Mobile Drawer */}
-      {sidebarOpen && (
+      {!isNightEntryMode && sidebarOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
@@ -261,53 +293,67 @@ export default function Layout({ role }) {
 
       {/* Main Content Area (Independent Right Scroll Area) */}
       <div className="flex flex-1 flex-col min-w-0 h-screen overflow-hidden">
-        {/* Mobile Header Bar */}
-        <header className="flex h-14 items-center justify-between border-b px-4 md:hidden flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="btn-ghost p-1 text-gold"
-          >
-            {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
-          <span className="font-extrabold text-sm text-gold">{BRAND.name}</span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setChatOpen(!chatOpen)}
-              className="p-2 rounded-xl text-cyan-400 hover:bg-cyan-500/10 relative"
-              title="Klinika Chat"
-            >
-              <MessageSquare className="h-5 w-5" />
-              {unreadChatCount > 0 && (
-                <span className="absolute -top-1 -right-1 badge badge-danger text-[9px] font-mono font-black px-1.5 py-0.2 rounded-full">
-                  {unreadChatCount}
-                </span>
-              )}
-            </button>
-            <NotificationBell />
-            <button type="button" onClick={handleLogout} className="text-rose-400 p-1">
-              <LogOut className="h-5 w-5" />
-            </button>
-          </div>
-        </header>
+        {isNightEntryMode ? (
+          /* Tungi Navbatchilik uchun sodda, yon panelsiz sarlavha —
+             chiqish tugmasi ataylab yo'q: xodim tizimdan chiqib,
+             qulfni chetlab o'tmasin, faqat "Ish Boshlash" (parol
+             bilan) orqali ochiladi. */
+          <header className="flex h-14 items-center border-b px-4 flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}>
+            <span className="font-extrabold text-sm text-amber-400 flex items-center gap-2">
+              🌙 {BRAND.name} — Tungi Navbatchilik
+            </span>
+          </header>
+        ) : (
+          <>
+            {/* Mobile Header Bar */}
+            <header className="flex h-14 items-center justify-between border-b px-4 md:hidden flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="btn-ghost p-1 text-gold"
+              >
+                {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+              <span className="font-extrabold text-sm text-gold">{BRAND.name}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChatOpen(!chatOpen)}
+                  className="p-2 rounded-xl text-cyan-400 hover:bg-cyan-500/10 relative"
+                  title="Klinika Chat"
+                >
+                  <MessageSquare className="h-5 w-5" />
+                  {unreadChatCount > 0 && (
+                    <span className="absolute -top-1 -right-1 badge badge-danger text-[9px] font-mono font-black px-1.5 py-0.2 rounded-full">
+                      {unreadChatCount}
+                    </span>
+                  )}
+                </button>
+                <NotificationBell />
+                <button type="button" onClick={handleLogout} className="text-rose-400 p-1">
+                  <LogOut className="h-5 w-5" />
+                </button>
+              </div>
+            </header>
 
-        {/* Desktop Top Header Bar for Notifications */}
-        <header className="hidden md:flex h-12 items-center justify-between px-6 border-b border-border/40 bg-surface-1/40 backdrop-blur-sm flex-shrink-0">
-          <div className="flex items-center gap-2 text-xs font-bold text-muted">
-            <span>🏥 {BRAND.system}</span>
-            <span>•</span>
-            <span className="text-gold font-mono uppercase tracking-wider">{effectiveRole === 'ceo' ? 'Rahbar' : effectiveRole} Paneli</span>
-          </div>
+            {/* Desktop Top Header Bar for Notifications */}
+            <header className="hidden md:flex h-12 items-center justify-between px-6 border-b border-border/40 bg-surface-1/40 backdrop-blur-sm flex-shrink-0">
+              <div className="flex items-center gap-2 text-xs font-bold text-muted">
+                <span>🏥 {BRAND.system}</span>
+                <span>•</span>
+                <span className="text-gold font-mono uppercase tracking-wider">{effectiveRole === 'ceo' ? 'Rahbar' : effectiveRole} Paneli</span>
+              </div>
 
-          {/* Chat tugmasi bu yerdan olib tashlandi — u yon panelning
-              pastida allaqachon bor edi va ikkitasi ortiqcha edi.
-              Telefon ko'rinishida yon panel yopiq turgani uchun u yerdagi
-              tugma qoldirilgan. */}
-          <div className="flex items-center gap-3">
-            <NotificationBell />
-          </div>
-        </header>
+              {/* Chat tugmasi bu yerdan olib tashlandi — u yon panelning
+                  pastida allaqachon bor edi va ikkitasi ortiqcha edi.
+                  Telefon ko'rinishida yon panel yopiq turgani uchun u yerdagi
+                  tugma qoldirilgan. */}
+              <div className="flex items-center gap-3">
+                <NotificationBell />
+              </div>
+            </header>
+          </>
+        )}
 
         {/* Dynamic Route Page Body (INDEPENDENT RIGHT SCROLL) */}
         {/* min-w-0 shart: usti overflow-hidden bo'lgani uchun, kengroq jadval
@@ -325,8 +371,10 @@ export default function Layout({ role }) {
       {/* Internal Clinic Staff Chat Modal */}
       <InternalChatModal open={chatOpen} onClose={() => setChatOpen(false)} />
 
-      {/* Floating Bottom-Left Unpaid Payment Reminder Widget */}
-      <PaymentReminderWidget />
+      {/* Floating Bottom-Left Unpaid Payment Reminder Widget — backend
+          faqat admin/ceo uchun ruxsat beradi, shifokorda har sahifada
+          keraksiz 403 xatosi chiqib turardi. */}
+      {(effectiveRole === 'admin' || effectiveRole === 'ceo') && <PaymentReminderWidget />}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../utils/api'
-import { formatMoney, formatWithCommas, parseDigits, ismTuzat, birthYear } from '../../utils/format'
+import { formatMoney, formatWithCommas, parseDigits, ismTuzat, birthYear, paymentLabel } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import { savePendingPatient } from '../../utils/offline'
 import PageHeader from '../../components/PageHeader'
@@ -56,6 +56,8 @@ export default function NewPatient({ homePath = '/admin' }) {
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [createdPatient, setCreatedPatient] = useState(null)
+  const [nightPatients, setNightPatients] = useState([])
+  const [nightPatientsLoading, setNightPatientsLoading] = useState(false)
   const [expandedCat, setExpandedCat] = useState(null) // accordion
   const [splitSecond, setSplitSecond] = useState('card') // 'card' | 'qr'
   // Chegirma qaysi xizmat(lar)dan olinishi — MAJBURIY belgilanadi.
@@ -160,6 +162,169 @@ export default function NewPatient({ homePath = '/admin' }) {
       .catch((e) => toast(e.message || 'Ro\'yxatlar yuklanmadi', 'error'))
       .finally(() => setCatalogLoading(false))
   }, [])
+
+  // "Smenani Yopish" bosilgan bo'lsa (Tungi Navbatchilik rejimi), forma
+  // avtomatik "Qog'oz Jurnaldan Kiritish" holatida, ertangi sana bilan
+  // ochilsin — xodim har safar o'zi tanlab o'tirmasin.
+  const [shiftMode, setShiftMode] = useState(null)
+  const [startingShift, setStartingShift] = useState(false)
+  useEffect(() => {
+    api('/duty/shift-status')
+      .then((res) => {
+        setShiftMode(res?.shift_mode || null)
+        if (res?.shift_mode === 'TUNGI') {
+          const ertaga = new Date()
+          ertaga.setDate(ertaga.getDate() + 1)
+          const oy = String(ertaga.getMonth() + 1).padStart(2, '0')
+          const kun = String(ertaga.getDate()).padStart(2, '0')
+          setIsPaperMode(true)
+          setCustomDate(`${ertaga.getFullYear()}-${oy}-${kun}`)
+          // Navbatchilikda faqat Naqd/Click-Payme/Aralash bor — Karta va
+          // Keyinroq (nasiya) yo'q.
+          setForm((f) => (['cash', 'click', 'split'].includes(f.payment_type) ? f : { ...f, payment_type: 'cash' }))
+          // Aralash to'lovning 2-usuli ham Karta/QR emas, faqat Click bo'lishi kerak
+          setSplitSecond('click')
+        }
+      })
+      .catch(() => {})
+  }, [])
+  const isNightMode = isPaperMode && shiftMode === 'TUNGI'
+
+  // Navbatchilikda kiritilgan bemorlar — xodim panelni tark etmasdan
+  // turib kimlarni kiritganini ko'rib turishi uchun. DIQQAT: bu yozuvlar
+  // `created_at`i haqiqiy soat emas, balki `customDate` (ertangi kun)ga
+  // o'rnatiladi — shu sababli "bugun" emas, aynan shu sanani so'raymiz.
+  const loadNightPatients = async () => {
+    if (!customDate) return
+    setNightPatientsLoading(true)
+    try {
+      const res = await api(`/patients/today?date=${customDate}`)
+      setNightPatients(Array.isArray(res) ? res : [])
+    } catch (_) {
+      // jim — ro'yxat faqat qulaylik uchun, xato bemor kiritishni to'xtatmasin
+    } finally {
+      setNightPatientsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!isNightMode) return
+    loadNightPatients()
+    const interval = setInterval(loadNightPatients, 15000)
+    return () => clearInterval(interval)
+  }, [isNightMode, customDate])
+
+  // Navbatchilik ro'yxatidagi bemorni tahrirlash — xizmat, miqdor va
+  // to'lov usulini shu ekranning o'zida tuzatish uchun (CEO/Admin
+  // bemorlar ro'yxatidagi tahrirlashga o'xshash, lekin to'lov usulini
+  // ham o'zgartirish imkoni qo'shilgan).
+  const [editPatient, setEditPatient] = useState(null)
+  const [editReason, setEditReason] = useState('')
+  const [editServiceSearch, setEditServiceSearch] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+
+  const openEditNightPatient = (p) => {
+    setEditPatient({
+      id: p.id,
+      first_name: p.first_name,
+      last_name: p.last_name,
+      payment_type: ['cash', 'click', 'split'].includes(p.payment_type) ? p.payment_type : 'cash',
+      cash_amount: p.cash_amount || 0,
+      servicesList: (p.services && p.services.length)
+        ? p.services.map((s) => ({
+            service_id: s.service_id,
+            service_name: s.service_name,
+            price: s.unit_price ?? s.total_price ?? 0,
+            quantity: s.quantity || 1,
+          }))
+        : [{ service_id: p.service_id, service_name: p.service_name, price: p.payment_amount || 0, quantity: 1 }],
+    })
+    setEditReason('')
+    setEditServiceSearch('')
+  }
+
+  const editTotal = editPatient
+    ? editPatient.servicesList.reduce((acc, s) => acc + (s.price || 0) * (s.quantity || 1), 0)
+    : 0
+
+  const changeEditPatientServiceQty = (i, q) => {
+    setEditPatient((ep) => ({
+      ...ep,
+      servicesList: ep.servicesList.map((s, idx) => (idx === i ? { ...s, quantity: Math.max(1, Number(q) || 1) } : s)),
+    }))
+  }
+
+  const removeServiceFromEditPatient = (i) => {
+    setEditPatient((ep) => {
+      if (ep.servicesList.length <= 1) {
+        toast('Kamida 1 ta xizmat qolishi kerak', 'error')
+        return ep
+      }
+      return { ...ep, servicesList: ep.servicesList.filter((_, idx) => idx !== i) }
+    })
+  }
+
+  const addServiceToEditPatient = (sid) => {
+    const svc = services.find((x) => String(x.id) === String(sid))
+    if (!svc) return
+    setEditPatient((ep) => ({
+      ...ep,
+      servicesList: [...ep.servicesList, { service_id: svc.id, service_name: svc.name, price: svc.price, quantity: 1 }],
+    }))
+    setEditServiceSearch('')
+  }
+
+  const saveEditPatient = async () => {
+    if (editReason.trim().length < 3) {
+      toast('Tahrirlash sababi kamida 3 harf bo\'lishi kerak', 'error')
+      return
+    }
+    setEditSaving(true)
+    try {
+      const payload = {
+        first_name: editPatient.first_name,
+        last_name: editPatient.last_name,
+        payment_type: editPatient.payment_type,
+        services: editPatient.servicesList.map((s) => ({ service_id: s.service_id, quantity: s.quantity || 1, price: s.price })),
+        reason: editReason,
+      }
+      if (editPatient.payment_type === 'split') {
+        const cashAmt = Math.max(0, Number(editPatient.cash_amount) || 0)
+        payload.cash_amount = cashAmt
+        payload.click_amount = Math.max(0, editTotal - cashAmt)
+      }
+      await api(`/patients/${editPatient.id}`, { method: 'PUT', body: JSON.stringify(payload) })
+      toast('✓ Bemor ma\'lumoti tahrirlandi')
+      setEditPatient(null)
+      loadNightPatients()
+    } catch (e) {
+      toast(e.message, 'error')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  // Tungi qulfni ochish uchun parol so'raladi — aks holda navbatchilik
+  // xodimi o'zi "Ish Boshlash"ni bosib, butun panelni ochib olishi mumkin edi.
+  const START_SHIFT_PASSWORD = '4442'
+  const [startShiftModal, setStartShiftModal] = useState(false)
+  const [startShiftPassword, setStartShiftPassword] = useState('')
+
+  const handleStartShift = async () => {
+    if (startShiftPassword !== START_SHIFT_PASSWORD) {
+      toast("Parol noto'g'ri", 'error')
+      return
+    }
+    setStartingShift(true)
+    try {
+      await api('/duty/start-shift', { method: 'POST' })
+      toast("Yangi kunduzgi smena boshlandi! 🚀")
+      window.location.href = homePath
+    } catch (e) {
+      toast(e.message || 'Xatolik yuz berdi', 'error')
+      setStartingShift(false)
+    }
+  }
 
   useEffect(() => {
     const prefill = location.state?.patient
@@ -369,8 +534,19 @@ export default function NewPatient({ homePath = '/admin' }) {
     )
   }
 
-  // Filter services by search query
+  // Tungi Navbatchilikda faqat shu bo'limlarning xizmatlari yoziladi —
+  // kechasi UZI/Laboratoriya kabi to'liq shtat kerak bo'ladigan xizmatlar
+  // ko'rsatilmaydi.
+  const NIGHT_ALLOWED_KEYWORDS = ['ozon', 'massaj', 'ineks', 'ukol', 'injekt']
+
+  // Filter services by search query (va Tungi rejimda bo'lim bo'yicha ham)
   const filteredServices = services.filter((s) => {
+    if (isPaperMode) {
+      const catLower = (s.category || '').toLowerCase()
+      const nameLower = (s.name || '').toLowerCase()
+      const allowed = NIGHT_ALLOWED_KEYWORDS.some((k) => catLower.includes(k) || nameLower.includes(k))
+      if (!allowed) return false
+    }
     if (!serviceQuery.trim()) return true
     const q = serviceQuery.toLowerCase().trim()
     const nameMatch = (s.name || '').toLowerCase().includes(q)
@@ -562,7 +738,17 @@ export default function NewPatient({ homePath = '/admin' }) {
         toast('Navbatchilik bemori bazaga saqlandi ✓')
       } else {
         toast('To\'lov qabul qilindi ✓')
+      }
+      // Chek faqat: (1) jonli qabulda, yoki (2) avtomatik qulflangan
+      // Tungi Navbatchilik panelida chiqadi — bemor haqiqatan hozir
+      // shu yerda. Kunduzi xodim "qolib ketgan"ni orqaga sana bilan
+      // qo'lda kiritsa (isPaperMode, lekin isNightMode emas), bemor
+      // jismonan yo'q — chek kerak emas, faqat bazaga yoziladi.
+      if (!isPaperMode || isNightMode) {
         setCreatedPatient(res)
+      }
+      if (isNightMode) {
+        loadNightPatients()
       }
       setForm(empty)
       setSelectedServices([])
@@ -650,11 +836,14 @@ export default function NewPatient({ homePath = '/admin' }) {
 
   const handleCloseReceipt = () => {
     setCreatedPatient(null)
-    navigate(homePath)
+    // Tungi rejimda Dashboard baribir qulflangan (Layout qaytarib
+    // yuboradi) — shuning uchun shu ekranning o'zida qolib, keyingi
+    // navbatchilik bemorini kiritishga tayyor turadi.
+    if (!isNightMode) navigate(homePath)
   }
 
   return (
-    <div className="max-w-3xl pb-10">
+    <div className={`mx-auto pb-10 ${isNightMode ? 'max-w-6xl' : 'max-w-3xl'}`}>
       <PageHeader title="Yangi Mijoz Qabul Qilish" subtitle="Bemor ma'lumotlari, xizmatlar va to'lov qabul qilish" backTo={homePath} />
 
       {/* THERMAL PRINT RECEIPT & QUEUE TICKET MODAL */}
@@ -662,49 +851,80 @@ export default function NewPatient({ homePath = '/admin' }) {
         <PaymentTicketModal open={!!createdPatient} patient={createdPatient} onClose={handleCloseReceipt} />
       )}
 
-      <div ref={formRef} onKeyDown={handleFormKeyDown} className="card space-y-5">
-
-        {/* MODE SELECTOR: LIVE INTAKE VS PAPER SHIFT JOURNAL ENTRY */}
-        <div className="p-3.5 rounded-2xl border border-gold/30 bg-gold/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      {/* TUNGI NAVBATCHILIK: panel shu ekranga qulflangan bo'lgani uchun
+          ish kunini boshlash tugmasi ham AYNAN shu yerda bo'lishi shart —
+          aks holda xodim qulfni ochadigan joyga umuman kira olmaydi. */}
+      {isNightMode && (
+        <div className="mb-5 p-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-gold flex items-center gap-1.5">
-              📋 Qabul Rejimi
+            <span className="text-sm font-black text-emerald-400 flex items-center gap-2">
+              🌙 Tungi Navbatchilik Rejimi Faol
             </span>
-            <p className="text-[11px] text-muted">
-              {isPaperMode
-                ? "Kechagi yoki o'tgan smena qog'oz jurnali ma'lumotlarini kiritish (Hisobotlarga qo'shiladi)"
-                : "Bugungi jonli bemorlarni ro'yxatdan o'tkazish va TV navbatga qo'shish"}
+            <p className="text-[11px] text-muted mt-0.5">
+              Ish kuni tugagach yoki ertalab qabul boshlanganda shu tugmani bosing — panel to'liq ochiladi.
             </p>
           </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => setIsPaperMode(false)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                !isPaperMode
-                  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-lg'
-                  : 'bg-white/5 border-border text-muted hover:text-body'
-              }`}
-            >
-              🟢 Bugungi Jonli Qabul
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsPaperMode(true)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                isPaperMode
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-lg'
-                  : 'bg-white/5 border-border text-muted hover:text-body'
-              }`}
-            >
-              📄 Qog'oz Jurnaldan Kiritish
-            </button>
-          </div>
+          <Btn
+            variant="success"
+            size="md"
+            onClick={() => { setStartShiftPassword(''); setStartShiftModal(true) }}
+            className="font-black shadow-lg shrink-0"
+          >
+            🟢 Yangi Ish Kunini Boshlash
+          </Btn>
         </div>
+      )}
 
-        {/* CUSTOM DATE PICKER WHEN IN PAPER MODE */}
-        {isPaperMode && (
+      <div ref={formRef} onKeyDown={handleFormKeyDown} className="card space-y-5">
+
+        {/* MODE SELECTOR: LIVE INTAKE VS PAPER SHIFT JOURNAL ENTRY — navbatchilik rejimida kerak emas, chunki bu yerda faqat qog'oz jurnal rejimi bor */}
+        {!isNightMode && (
+          <div className="p-3.5 rounded-2xl border border-gold/30 bg-gold/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-gold flex items-center gap-1.5">
+                📋 Qabul Rejimi
+              </span>
+              <p className="text-[11px] text-muted">
+                {isPaperMode
+                  ? "Kechagi yoki o'tgan smena qog'oz jurnali ma'lumotlarini kiritish (Hisobotlarga qo'shiladi)"
+                  : "Bugungi jonli bemorlarni ro'yxatdan o'tkazish va TV navbatga qo'shish"}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setIsPaperMode(false)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  !isPaperMode
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-lg'
+                    : 'bg-white/5 border-border text-muted hover:text-body'
+                }`}
+              >
+                🟢 Bugungi Jonli Qabul
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPaperMode(true)
+                  setForm((f) => (f.payment_type === 'later' ? { ...f, payment_type: 'cash' } : f))
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  isPaperMode
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-lg'
+                    : 'bg-white/5 border-border text-muted hover:text-body'
+                }`}
+              >
+                📄 Qog'oz Jurnaldan Kiritish
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CUSTOM DATE PICKER WHEN IN PAPER MODE — tungi rejimda kerak emas,
+            chunki sana avtomatik ertangi kunga o'rnatiladi va o'zgartirib
+            bo'lmasligi kerak (hisobot-navbatchilik bog'lanishi buzilmasin). */}
+        {isPaperMode && !isNightMode && (
           <div className="p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 space-y-2 animate-in fade-in">
             <div className="flex items-center justify-between">
               <label className="form-label text-amber-300 font-bold text-xs mb-0">
@@ -1452,14 +1672,21 @@ export default function NewPatient({ homePath = '/admin' }) {
         {/* 4. TO'LOV USULI */}
         <div className="space-y-3">
           <label className="form-label">💳 To'lov Usulini Tanlang</label>
-          <div data-kbd-group="payment" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            {[
-              { id: 'cash',  label: '💵 Naqd',        desc: 'Naqd Pul' },
-              { id: 'card',  label: '💳 Karta / QR',   desc: 'Terminal / Bank QR (Bank)' },
-              { id: 'click', label: '📱 Click/Payme', desc: 'Click, Payme' },
-              { id: 'split', label: '🔀 Aralash',     desc: 'Naqd + Karta/QR' },
-              { id: 'later', label: '⏳ Keyinroq',    desc: 'Nasiya / Qarz' },
-            ].map((pm) => (
+          <div data-kbd-group="payment" className={`grid grid-cols-2 gap-2 ${isPaperMode ? 'sm:grid-cols-3' : 'sm:grid-cols-3 lg:grid-cols-5'}`}>
+            {(isPaperMode
+              ? [
+                  { id: 'cash',  label: '💵 Naqd',        desc: 'Naqd Pul' },
+                  { id: 'click', label: '📱 Click/Payme', desc: 'Click, Payme' },
+                  { id: 'split', label: '🔀 Aralash',     desc: 'Naqd + Karta/QR' },
+                ]
+              : [
+                  { id: 'cash',  label: '💵 Naqd',        desc: 'Naqd Pul' },
+                  { id: 'card',  label: '💳 Karta / QR',   desc: 'Terminal / Bank QR (Bank)' },
+                  { id: 'click', label: '📱 Click/Payme', desc: 'Click, Payme' },
+                  { id: 'split', label: '🔀 Aralash',     desc: 'Naqd + Karta/QR' },
+                  { id: 'later', label: '⏳ Keyinroq',    desc: 'Nasiya / Qarz' },
+                ]
+            ).map((pm) => (
               <button
                 key={pm.id}
                 type="button"
@@ -1519,17 +1746,19 @@ export default function NewPatient({ homePath = '/admin' }) {
                   {splitSecond === 'card' ? '💳' : splitSecond === 'click' ? '📱' : '🔳'} 2-usulni tanlang:
                 </label>
                 <div className="flex gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => setSplitSecond('card')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                      splitSecond === 'card'
-                        ? 'bg-cyan-600/20 border-cyan-500/60 text-cyan-300'
-                        : 'bg-transparent border-border text-muted hover:border-border-strong'
-                    }`}
-                  >
-                    💳 Karta
-                  </button>
+                  {!isNightMode && (
+                    <button
+                      type="button"
+                      onClick={() => setSplitSecond('card')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                        splitSecond === 'card'
+                          ? 'bg-cyan-600/20 border-cyan-500/60 text-cyan-300'
+                          : 'bg-transparent border-border text-muted hover:border-border-strong'
+                      }`}
+                    >
+                      💳 Karta
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setSplitSecond('click')}
@@ -1541,17 +1770,19 @@ export default function NewPatient({ homePath = '/admin' }) {
                   >
                     📱 Click / Payme
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setSplitSecond('qr')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                      splitSecond === 'qr'
-                        ? 'bg-violet-600/20 border-violet-500/60 text-violet-300'
-                        : 'bg-transparent border-border text-muted hover:border-border-strong'
-                    }`}
-                  >
-                    🔳 QR kod
-                  </button>
+                  {!isNightMode && (
+                    <button
+                      type="button"
+                      onClick={() => setSplitSecond('qr')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                        splitSecond === 'qr'
+                          ? 'bg-violet-600/20 border-violet-500/60 text-violet-300'
+                          : 'bg-transparent border-border text-muted hover:border-border-strong'
+                      }`}
+                    >
+                      🔳 QR kod
+                    </button>
+                  )}
                 </div>
                 <input
                   type="text"
@@ -1574,7 +1805,7 @@ export default function NewPatient({ homePath = '/admin' }) {
 
               <p className="text-xs text-muted text-center pt-1 font-mono">
                 💡 {formatMoney(form.cash_amount || 0)} Naqd +{' '}
-                {formatMoney(form.card_amount || 0)} {splitSecond === 'card' ? 'Karta' : 'QR'}{' '}
+                {formatMoney(form.card_amount || 0)} {splitSecond === 'card' ? 'Karta' : splitSecond === 'click' ? 'Click' : 'QR'}{' '}
                 = <b className="text-gold">{formatMoney(finalPrice)}</b>
               </p>
             </div>
@@ -1617,6 +1848,219 @@ export default function NewPatient({ homePath = '/admin' }) {
         </Btn>
       </div>
 
+      {/* TUNGI NAVBATCHILIK: shu smenada ro'yxatga olingan bemorlar —
+          registratsiya blokidan pastda, xodim panelni tark etmasdan
+          kimlarni kiritganini ko'rib va kerak bo'lsa tahrirlay oladi. */}
+      {isNightMode && (
+        <div className="mt-5 card space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-gold flex items-center gap-1.5">
+              📋 Shu Navbatchilikda Ro'yxatga Olinganlar ({nightPatients.length})
+            </span>
+            {nightPatientsLoading && <span className="text-[11px] text-muted">Yangilanmoqda…</span>}
+          </div>
+          {nightPatients.length === 0 ? (
+            <p className="text-xs text-muted italic py-2">Hali hech kim ro'yxatga olinmagan</p>
+          ) : (
+            <div className="overflow-x-auto max-h-80 overflow-y-auto rounded-xl border border-border">
+              <table className="w-full text-xs">
+                <thead className="bg-surface-2 text-muted uppercase font-mono sticky top-0">
+                  <tr>
+                    <th className="p-2 text-left">#</th>
+                    <th className="p-2 text-left">F.I.Sh</th>
+                    <th className="p-2 text-left">Bo'lim / Xizmat(lar)</th>
+                    <th className="p-2 text-left">To'lov usuli</th>
+                    <th className="p-2 text-right">Summa</th>
+                    <th className="p-2 text-right">Vaqt</th>
+                    <th className="p-2 text-center">Amal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {nightPatients.map((p, i) => (
+                    <tr key={p.id} className={p.is_cancelled ? 'opacity-40 line-through' : 'hover:bg-surface-hover'}>
+                      <td className="p-2 text-muted font-mono">#{i + 1}</td>
+                      <td className="p-2 font-bold text-body">
+                        {p.full_name} <span className="text-muted font-normal">({birthYear(p.birth_date)}-y.)</span>
+                      </td>
+                      <td className="p-2 text-muted">
+                        <span className="text-cyan font-bold">{p.service_category || p.category || '—'}</span>
+                        {' — '}
+                        {(p.services || []).map((s) => s.service_name).filter(Boolean).join(', ') || p.service_name || '—'}
+                      </td>
+                      <td className="p-2 text-muted font-bold whitespace-nowrap">{paymentLabel(p.payment_type)}</td>
+                      <td className="p-2 text-right font-mono font-bold text-emerald-400">{formatMoney(p.payment_amount || 0)}</td>
+                      <td className="p-2 text-right font-mono text-muted">
+                        {new Date(p.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="p-2 text-center">
+                        {!p.is_cancelled && (
+                          <button
+                            type="button"
+                            onClick={() => openEditNightPatient(p)}
+                            className="px-2 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan border border-cyan-500/40 text-[11px] font-bold"
+                          >
+                            ✏️ Tahrirlash
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* NAVBATCHILIK RO'YXATIDAGI BEMORNI TAHRIRLASH MODALI */}
+      <Modal open={!!editPatient} onClose={() => setEditPatient(null)} title="Bemorni Tahrirlash" size="md">
+        {editPatient && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-muted block mb-1">Ism</label>
+                <input
+                  className="input-field text-xs font-bold"
+                  value={editPatient.first_name}
+                  onChange={(e) => setEditPatient({ ...editPatient, first_name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-muted block mb-1">Familiya</label>
+                <input
+                  className="input-field text-xs font-bold"
+                  value={editPatient.last_name}
+                  onChange={(e) => setEditPatient({ ...editPatient, last_name: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* XIZMATLAR RO'YXATI */}
+            <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-2">
+              <span className="text-xs font-bold text-gold uppercase tracking-wider block mb-1">
+                📋 Xizmatlar ({editPatient.servicesList.length} ta)
+              </span>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {editPatient.servicesList.map((svc, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-surface border border-border text-xs">
+                    <div className="min-w-0 pr-2 flex-1">
+                      <span className="font-extrabold text-body block truncate">{svc.service_name || 'Xizmat'}</span>
+                      <span className="text-[10px] text-emerald font-mono font-bold">
+                        {formatMoney(svc.price)} × {svc.quantity || 1} = {formatMoney((svc.price || 0) * (svc.quantity || 1))}
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={svc.quantity || 1}
+                      onChange={(e) => changeEditPatientServiceQty(i, e.target.value)}
+                      className="w-12 px-1 py-1 rounded-lg bg-surface-2 border border-border text-center text-xs font-mono font-bold shrink-0"
+                      title="Soni"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeServiceFromEditPatient(i)}
+                      className="text-rose-400 hover:text-rose-300 shrink-0"
+                      title="Olib tashlash"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Xizmat qidirish va qo'shish..."
+                  value={editServiceSearch}
+                  onChange={(e) => setEditServiceSearch(e.target.value)}
+                  className="w-full pl-3 pr-3 py-1.5 rounded-xl bg-surface border border-cyan-500/40 text-xs font-medium focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+              {editServiceSearch.trim() && (
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pt-1">
+                  {filteredServices
+                    .filter((s) => (s.name || '').toLowerCase().includes(editServiceSearch.toLowerCase().trim()))
+                    .map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => addServiceToEditPatient(s.id)}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan border border-cyan-500/40 text-xs font-bold"
+                      >
+                        + {s.name} ({formatMoney(s.price)})
+                      </button>
+                    ))}
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-border flex justify-between items-center font-bold text-xs">
+                <span className="text-muted">Jami:</span>
+                <span className="text-emerald font-mono font-black text-sm">{formatMoney(editTotal)}</span>
+              </div>
+            </div>
+
+            {/* TO'LOV USULI */}
+            <div>
+              <label className="text-xs font-bold text-muted block mb-1.5">To'lov usuli</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'cash', label: '💵 Naqd' },
+                  { id: 'click', label: '📱 Click' },
+                  { id: 'split', label: '🔀 Aralash' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setEditPatient({ ...editPatient, payment_type: opt.id })}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                      editPatient.payment_type === opt.id
+                        ? 'bg-gold/20 border-gold/60 text-gold'
+                        : 'bg-white/5 border-border text-muted hover:text-body'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {editPatient.payment_type === 'split' && (
+              <div>
+                <label className="text-xs font-bold text-emerald-400 block mb-1">Naqd to'lanadigan summa (so'm)</label>
+                <input
+                  type="text"
+                  className="input-field font-bold text-emerald-400 text-sm font-mono"
+                  value={formatWithCommas(editPatient.cash_amount)}
+                  onChange={(e) => setEditPatient({ ...editPatient, cash_amount: parseDigits(e.target.value) })}
+                />
+                <p className="text-[11px] text-muted mt-1">
+                  📱 Click orqali qolgani: {formatMoney(Math.max(0, editTotal - (Number(editPatient.cash_amount) || 0)))}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-bold text-muted block mb-1">Tahrirlash sababi *</label>
+              <input
+                className="input-field text-xs"
+                placeholder="Kamida 3 ta harf..."
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Btn variant="ghost" full icon={Icons.x} onClick={() => setEditPatient(null)}>
+                Bekor
+              </Btn>
+              <Btn variant="gold" full icon={Icons.save} loading={editSaving} onClick={saveEditPatient}>
+                Saqlash
+              </Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* QUICK ADD NEW REFERRER MODAL */}
       <Modal open={newRefModal} onClose={() => setNewRefModal(false)} title="Yangi Yo'naltiruvchi Qo'shish" size="xs">
         <div className="space-y-3 pt-1">
@@ -1645,6 +2089,35 @@ export default function NewPatient({ homePath = '/admin' }) {
             </Btn>
             <Btn variant="gold" full icon={Icons.save} loading={savingRef} onClick={handleQuickAddReferrer}>
               Saqlash va Tanlash
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      {/* NIGHT SHIFT UNLOCK PASSWORD MODAL */}
+      <Modal open={startShiftModal} onClose={() => setStartShiftModal(false)} title="🟢 Yangi Ish Kunini Boshlash" size="xs">
+        <div className="space-y-3 pt-1">
+          <p className="text-xs text-muted">
+            Tungi Navbatchilik rejimini yopib, panelni to'liq ochish uchun parolni kiriting.
+          </p>
+          <div>
+            <label className="form-label">Parol *</label>
+            <input
+              type="password"
+              className="input-field font-bold text-center text-lg tracking-widest"
+              value={startShiftPassword}
+              onChange={(e) => setStartShiftPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleStartShift()}
+              autoFocus
+              maxLength={4}
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Btn variant="ghost" full icon={Icons.x} onClick={() => setStartShiftModal(false)} disabled={startingShift}>
+              Bekor
+            </Btn>
+            <Btn variant="success" full loading={startingShift} onClick={handleStartShift}>
+              Tasdiqlash va Boshlash
             </Btn>
           </div>
         </div>

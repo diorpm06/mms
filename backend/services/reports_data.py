@@ -71,10 +71,34 @@ def _infer_service_category(name: str, category: str, cabinet: str) -> str:
 QOGOZ_SMENA_OYNASI = timedelta(0)
 
 
+def get_active_shift_start(db: Session) -> datetime:
+    """Joriy smena boshlangan/yopilgan vaqtini qaytaradi.
+    - shift_mode == 'TUNGI': shift_closed_at (tungi navbatchilik boshlangan vaqt)
+    - shift_mode == 'KUNDUZGI': shift_started_at (yangi kunduzgi smena boshlangan vaqt)
+    """
+    from models.app_setting import AppSetting
+    shift_mode_item = db.query(AppSetting).filter(AppSetting.key == "shift_mode").first()
+    mode = shift_mode_item.value if (shift_mode_item and shift_mode_item.value) else "KUNDUZGI"
+
+    key = "shift_closed_at" if mode == "TUNGI" else "shift_started_at"
+    ts_item = db.query(AppSetting).filter(AppSetting.key == key).first()
+
+    if ts_item and ts_item.value:
+        try:
+            dt = datetime.fromisoformat(ts_item.value)
+            if dt.date() == date.today():
+                return dt
+        except Exception:
+            pass
+
+    return datetime.combine(date.today(), datetime.min.time())
+
+
 def _day_range(d: date):
     start = datetime.combine(d, datetime.min.time())
     end = datetime.combine(d, datetime.max.time())
     return start, end
+
 
 
 def _period_range(start: date, end: date):
@@ -872,7 +896,7 @@ def admin_daily_report(db: Session, d: date) -> dict:
     return out
 
 
-def admin_dashboard_summary(db: Session, d: date) -> dict:
+def admin_dashboard_summary(db: Session, d: date, shift_only: bool = False) -> dict:
     """Admin bosh sahifasi uchun YENGIL xulosa.
 
     Ilgari bosh sahifa to'liq kunlik hisobotni (get_report) chaqirardi — u
@@ -886,27 +910,33 @@ def admin_dashboard_summary(db: Session, d: date) -> dict:
     harajat manbasi).
     """
     s, e = _day_range(d)
+    if shift_only:
+        s = get_active_shift_start(db)
+
     paper_shift_s = s - QOGOZ_SMENA_OYNASI
 
     # 1-so'rov: kunlik tranzaksiyalar (tungi navbatchilik yozuvlari bilan)
+    tx_filter = (
+        and_(Transaction.created_at >= s, Transaction.created_at <= e)
+        if shift_only
+        else or_(
+            and_(Transaction.created_at >= s, Transaction.created_at <= e),
+            and_(
+                Transaction.created_at >= paper_shift_s,
+                Transaction.created_at < s,
+                Transaction.patient_id.in_(
+                    db.query(Patient.id).filter(Patient.is_paper_entry == True)
+                ),
+            ),
+        )
+    )
     qatorlar = (
         _active_tx_filter(
             db.query(
                 Transaction.payment_type, Transaction.total_amount,
                 Transaction.cash_amount, Transaction.card_amount,
                 Transaction.click_amount, Transaction.qr_amount,
-            ).filter(
-                or_(
-                    and_(Transaction.created_at >= s, Transaction.created_at <= e),
-                    and_(
-                        Transaction.created_at >= paper_shift_s,
-                        Transaction.created_at < s,
-                        Transaction.patient_id.in_(
-                            db.query(Patient.id).filter(Patient.is_paper_entry == True)
-                        ),
-                    ),
-                )
-            )
+            ).filter(tx_filter)
         ).all()
     )
 
@@ -931,6 +961,18 @@ def admin_dashboard_summary(db: Session, d: date) -> dict:
             cash += jami
 
     # 2-so'rov: bemorlar soni va navbatchilik tushumi birga
+    patient_filter = (
+        and_(Patient.created_at >= s, Patient.created_at <= e)
+        if shift_only
+        else or_(
+            and_(Patient.created_at >= s, Patient.created_at <= e),
+            and_(
+                Patient.created_at >= paper_shift_s,
+                Patient.created_at < s,
+                Patient.is_paper_entry == True,
+            ),
+        )
+    )
     bemor = (
         db.query(
             func.count(Patient.id),
@@ -938,17 +980,7 @@ def admin_dashboard_summary(db: Session, d: date) -> dict:
                 case((Patient.is_paper_entry == True, Patient.payment_amount), else_=0)
             ), 0),
         )
-        .filter(
-            or_(
-                and_(Patient.created_at >= s, Patient.created_at <= e),
-                and_(
-                    Patient.created_at >= paper_shift_s,
-                    Patient.created_at < s,
-                    Patient.is_paper_entry == True,
-                ),
-            ),
-            Patient.is_cancelled == False,
-        )
+        .filter(patient_filter, Patient.is_cancelled == False)
         .first()
     )
     patients_count, paper_total = int(bemor[0] or 0), int(bemor[1] or 0)
