@@ -165,10 +165,13 @@ export default function NewPatient({ homePath = '/admin' }) {
 
   // "Smenani Yopish" bosilgan bo'lsa (Tungi Navbatchilik rejimi), forma
   // avtomatik "Qog'oz Jurnaldan Kiritish" holatida, ertangi sana bilan
-  // ochilsin — xodim har safar o'zi tanlab o'tirmasin.
+  // ochilsin — xodim har safar o'zi tanlab o'tirmasin. FAQAT ADMIN uchun —
+  // CEO smenadan qat'i nazar bu sahifani odatdagidek ishlatishi kerak.
+  const isAdminRole = homePath !== '/ceo'
   const [shiftMode, setShiftMode] = useState(null)
   const [startingShift, setStartingShift] = useState(false)
   useEffect(() => {
+    if (!isAdminRole) return
     api('/duty/shift-status')
       .then((res) => {
         setShiftMode(res?.shift_mode || null)
@@ -213,6 +216,16 @@ export default function NewPatient({ homePath = '/admin' }) {
     const interval = setInterval(loadNightPatients, 15000)
     return () => clearInterval(interval)
   }, [isNightMode, customDate])
+
+  // Ro'yxat tepasidagi jami hisob-kitob — bekor qilinganlar hisobga
+  // olinmaydi.
+  const nightActivePatients = nightPatients.filter((p) => !p.is_cancelled)
+  const nightStats = {
+    count: nightActivePatients.length,
+    total: nightActivePatients.reduce((a, p) => a + (p.payment_amount || 0), 0),
+    cash: nightActivePatients.reduce((a, p) => a + (p.cash_amount || 0), 0),
+    card: nightActivePatients.reduce((a, p) => a + (p.card_amount || 0) + (p.click_amount || 0) + (p.qr_amount || 0), 0),
+  }
 
   // Navbatchilik ro'yxatidagi bemorni tahrirlash — xizmat, miqdor va
   // to'lov usulini shu ekranning o'zida tuzatish uchun (CEO/Admin
@@ -1859,6 +1872,29 @@ export default function NewPatient({ homePath = '/admin' }) {
             </span>
             {nightPatientsLoading && <span className="text-[11px] text-muted">Yangilanmoqda…</span>}
           </div>
+
+          {/* JAMI HISOB-KITOB */}
+          {nightActivePatients.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="p-2.5 rounded-xl bg-gold/10 border border-gold/30 text-center">
+                <p className="text-[10px] text-muted uppercase font-bold">💰 Jami Tushum</p>
+                <p className="text-sm font-black text-gold font-mono">{formatMoney(nightStats.total)}</p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center">
+                <p className="text-[10px] text-muted uppercase font-bold">💵 Naqd</p>
+                <p className="text-sm font-black text-emerald-400 font-mono">{formatMoney(nightStats.cash)}</p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-center">
+                <p className="text-[10px] text-muted uppercase font-bold">💳 Karta/Click</p>
+                <p className="text-sm font-black text-cyan font-mono">{formatMoney(nightStats.card)}</p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/30 text-center">
+                <p className="text-[10px] text-muted uppercase font-bold">👥 Bemorlar</p>
+                <p className="text-sm font-black text-violet-400 font-mono">{nightStats.count} nafar</p>
+              </div>
+            </div>
+          )}
+
           {nightPatients.length === 0 ? (
             <p className="text-xs text-muted italic py-2">Hali hech kim ro'yxatga olinmagan</p>
           ) : (

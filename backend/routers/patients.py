@@ -743,12 +743,13 @@ async def create_patient(
 
         svc_prefix = dep_data["prefix"]
 
-        if svc_requires_queue:
-            ticket_num = _keyingi_raqam(db, svc_prefix, start, end)
-            initial_queue_status = "kutmoqda"
-        else:
-            ticket_num = None
-            initial_queue_status = "yakunlandi"
+        # Navbat talab qilmaydigan xizmatlarda ham ticket_num HAR DOIM
+        # generatsiya qilinadi — aks holda `_patient_row` bo'sh
+        # ticket_number'ni bemorning xom bazadagi ID'si bilan
+        # to'ldirardi (masalan "A-1172"), bu chekda mantiqsiz katta
+        # "navbat raqami" bo'lib ko'rinardi.
+        ticket_num = _keyingi_raqam(db, svc_prefix, start, end)
+        initial_queue_status = "kutmoqda" if svc_requires_queue else "yakunlandi"
 
         group_raw_price = sum(it["price"] for it in group_items)
 

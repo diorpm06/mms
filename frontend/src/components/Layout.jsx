@@ -83,9 +83,11 @@ export default function Layout({ role }) {
   // ekraniga qulflanadi — xodim boshqa hech qaysi sahifaga (hisobot,
   // bemorlar ro'yxati va h.k.) kira olmaydi, faqat navbatchilik
   // shakli ko'rinadi, toki "Yangi Ish Kunini Boshlash" bosilguncha.
+  // FAQAT ADMIN uchun — CEO smenadan qat'i nazar panelga to'liq
+  // kirishi kerak, qulflanmasin.
   const [shiftMode, setShiftMode] = useState(null)
   useEffect(() => {
-    if (effectiveRole !== 'admin' && effectiveRole !== 'ceo') return
+    if (effectiveRole !== 'admin') return
     const fetchShift = () => {
       api('/duty/shift-status')
         .then((r) => setShiftMode(r?.shift_mode || null))
@@ -99,12 +101,12 @@ export default function Layout({ role }) {
     return () => clearInterval(interval)
   }, [effectiveRole, location.pathname])
   const isNewPatientPath = location.pathname.endsWith('/new-patient')
-  const isNightEntryMode = isNewPatientPath && shiftMode === 'TUNGI'
+  const isNightEntryMode = effectiveRole === 'admin' && isNewPatientPath && shiftMode === 'TUNGI'
 
   useEffect(() => {
-    if ((effectiveRole !== 'admin' && effectiveRole !== 'ceo') || shiftMode !== 'TUNGI') return
+    if (effectiveRole !== 'admin' || shiftMode !== 'TUNGI') return
     if (isNewPatientPath) return
-    navigate(effectiveRole === 'ceo' ? '/ceo/new-patient' : '/admin/new-patient', { replace: true })
+    navigate('/admin/new-patient', { replace: true })
   }, [effectiveRole, shiftMode, isNewPatientPath, navigate])
 
   const isResultlessDoctor = /(massaj|fizio|физио|ozon|озон|ineks|инъек|ukol|muolaj)/i.test(doctorSpecialization)
