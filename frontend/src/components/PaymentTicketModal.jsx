@@ -1,5 +1,5 @@
 import { Printer, X, AlertTriangle } from 'lucide-react'
-import { formatMoney, paymentLabel } from '../utils/format'
+import { formatMoney, paymentLabel, birthYear } from '../utils/format'
 import { Btn, Icons } from './UIKit'
 import { BRAND } from '../config/brand'
 import ReceiptHeader from './ReceiptHeader'
@@ -290,7 +290,10 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
           <div className="space-y-1 text-[10px] pt-1">
             <div className="flex justify-between border-b border-slate-200 pb-1">
               <span className="text-slate-600 font-bold">Bemor:</span>
-              <strong className="text-slate-900 text-right">{firstPatient.first_name} {firstPatient.last_name}</strong>
+              <strong className="text-slate-900 text-right">
+                {birthYear(firstPatient.birth_date) ? `(${birthYear(firstPatient.birth_date)}-y.) ` : ''}
+                {firstPatient.first_name} {firstPatient.last_name}
+              </strong>
             </div>
 
             {/* SERVICES LIST GROUPED BY DEPARTMENT */}
