@@ -133,6 +133,7 @@ async def close_shift(
         action_type="CLOSE_SHIFT",
         table_name="app_settings",
         record_id=0,
+        old_data=f"🔴 Bugungi ({today.strftime('%d.%m.%Y')}) smena tugatildi va kunlik hisobot Telegram botga yuborildi.",
         new_data={"shift_mode": "TUNGI", "date": today_str},
     )
 
@@ -166,6 +167,7 @@ def start_shift(
         action_type="START_SHIFT",
         table_name="app_settings",
         record_id=0,
+        old_data=f"🌅 Bugungi ({today.strftime('%d.%m.%Y')}) yangi ish kuni va kunduzgi smena muvaffaqiyatli boshlandi!",
         new_data={"shift_mode": "KUNDUZGI", "date": today_str},
     )
 

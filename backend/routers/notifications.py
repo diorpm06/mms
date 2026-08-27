@@ -23,6 +23,8 @@ ACTION_LABELS = {
     "DISCHARGE": "Bemor chiqarildi",
     "ADMIT":     "Bemor yotqizildi",
     "REPORT_SUBMITTED": "Shablon chop etishga yuborildi",
+    "CLOSE_SHIFT": "Smena tugatildi va kunlik hisobot botga yuborildi",
+    "START_SHIFT": "Yangi kunduzgi smena boshlandi",
 }
 
 ACTION_ICONS = {
@@ -38,6 +40,8 @@ ACTION_ICONS = {
     "DISCHARGE": "🏥",
     "ADMIT":     "🛏️",
     "REPORT_SUBMITTED": "📋",
+    "CLOSE_SHIFT": "🔴",
+    "START_SHIFT": "🌅",
 }
 
 

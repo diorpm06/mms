@@ -80,7 +80,7 @@ export default function NotificationBell() {
     isPollerRef.current = true
 
     load()
-    const t = setInterval(load, 60_000)
+    const t = setInterval(load, 15_000)
     return () => {
       clearInterval(t)
       notifSingletonClaimed = false
@@ -97,8 +97,6 @@ export default function NotificationBell() {
 
   useEffect(() => {
     if (!isPollerRef.current) return
-    if (typeof window === 'undefined' || !('Notification' in window)) return
-    if (Notification.permission !== 'granted') return
     if (!Array.isArray(items) || items.length === 0) return
 
     const tsList = items
@@ -112,15 +110,17 @@ export default function NotificationBell() {
       return
     }
 
-    // Faol sessiyada faqat keyin kelgan yangi xabarlarni desktopda ko'rsatamiz.
+    // Faol sessiyada faqat keyin kelgan yangi xabarlarni ovoz va push bilan ko'rsatamiz.
     if (newestTs <= lastSeenTsRef.current) return
 
     const newestItem = items
       .slice()
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
 
-    if (document.visibilityState === 'hidden') {
-      playNotificationChime()
+    // Ekran ochiq bo'lsa ham OVOZ doim chalinadi
+    playNotificationChime()
+
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       try {
         new Notification(BRAND.name, {
           body: newestItem?.message || "Yangi bildirishnoma",
