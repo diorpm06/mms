@@ -46,6 +46,7 @@ export default function CeoInpatients() {
   const [extendModal, setExtendModal] = useState(null)
   const [extendDaysCount, setExtendDaysCount] = useState(1)
   const [viewPatientModal, setViewPatientModal] = useState(null)
+  const [selectedReceipt, setSelectedReceipt] = useState(null)
   const [editInpatientModal, setEditInpatientModal] = useState(null)
   const [editInpatientForm, setEditInpatientForm] = useState({
     first_name: '', last_name: '', phone: '', birth_date: '', address: '',

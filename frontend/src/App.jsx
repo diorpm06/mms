@@ -6,6 +6,7 @@ import { api } from './utils/api'
 import Toast from './components/Toast'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import { isChunkLoadError, recoverFromChunkError } from './utils/chunkErrorRecovery'
 
 // Helper wrapper for React lazy dynamic imports: if Vercel deploys a new commit while
 // a user is on an open tab, old chunk hashes disappear resulting in 404/chunk load errors.
@@ -13,20 +14,8 @@ import Login from './pages/Login'
 function safeLazy(importFn) {
   return lazy(() =>
     importFn().catch((err) => {
-      const msg = String(err?.message || '').toLowerCase()
-      if (
-        msg.includes('dynamically imported module') ||
-        msg.includes('loading chunk') ||
-        msg.includes('failed to fetch') ||
-        msg.includes('importing a module script failed')
-      ) {
-        const lastReload = sessionStorage.getItem('last_chunk_reload_time')
-        const now = Date.now()
-        if (!lastReload || now - Number(lastReload) > 10000) {
-          sessionStorage.setItem('last_chunk_reload_time', String(now))
-          window.location.reload()
-          return new Promise(() => {})
-        }
+      if (isChunkLoadError(err) && recoverFromChunkError()) {
+        return new Promise(() => {})
       }
       throw err
     })
