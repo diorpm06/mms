@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users,
@@ -15,6 +15,30 @@ import {
 } from 'lucide-react'
 import { api } from '../../utils/api'
 import { useAuthStore } from '../../store/authStore'
+import { BRAND } from '../../config/brand'
+
+// Yangi bemor kelganda chalinadigan ikki notali "ding" ovozi (Web Audio,
+// tashqi audio fayl kerak emas).
+function playNewPatientChime() {
+  try {
+    const AudioCtxClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtxClass) return
+    const ctx = new AudioCtxClass()
+    const now = ctx.currentTime
+    ;[[880, 0], [1174.66, 0.15]].forEach(([freq, delay]) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now + delay)
+      gain.gain.setValueAtTime(0.5, now + delay)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.6)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now + delay)
+      osc.stop(now + delay + 0.6)
+    })
+  } catch (_) {}
+}
 
 export default function ReferrerPortal() {
   const navigate = useNavigate()
@@ -24,12 +48,40 @@ export default function ReferrerPortal() {
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('daily') // 'daily' | 'patients'
 
+  // Yangi bemor bildirishnomasi — sahifa birinchi ochilganda mavjud
+  // bemorlarni "yangi" deb e'lon qilmasligi kerak (TV navbat ekranida
+  // aynan shu xato tufayli qayta-qayta e'lon qilib yuborilgan edi),
+  // shuning uchun birinchi yuklanish faqat "boshlang'ich holat"ni yozib
+  // qo'yadi, e'lon qilmaydi.
+  const seenPatientIdsRef = useRef(null)
+
   const fetchProfile = async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await api('/referrers/me/profile?days=10')
       setProfileData(res)
+
+      const currentIds = new Set((res?.patients || []).map((p) => p.patient_id))
+      if (seenPatientIdsRef.current === null) {
+        seenPatientIdsRef.current = currentIds
+      } else {
+        const newOnes = (res?.patients || []).filter((p) => !seenPatientIdsRef.current.has(p.patient_id))
+        if (newOnes.length > 0) {
+          playNewPatientChime()
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            newOnes.forEach((p) => {
+              try {
+                new Notification(`🆕 ${BRAND.name} — Yangi bemor`, {
+                  body: `${p.patient_name} — ${p.service_name} (${formatMoney(p.referrer_fee)} ulush)`,
+                  tag: `referrer-patient-${p.patient_id}`,
+                })
+              } catch (_) {}
+            })
+          }
+        }
+        seenPatientIdsRef.current = currentIds
+      }
     } catch (err) {
       setError(err.message || "Profil ma'lumotlarini yuklashda xatolik")
     } finally {
@@ -38,7 +90,15 @@ export default function ReferrerPortal() {
   }
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
+    }
     fetchProfile()
+    // Yangi bemor tez bilinishi uchun 20 soniyada bir tekshiriladi —
+    // portal ochiq turgan (yoki fonda ishlayotgan, o'rnatilgan web-app)
+    // paytda ovoz + bildirishnoma shu orqali keladi.
+    const t = setInterval(fetchProfile, 20000)
+    return () => clearInterval(t)
   }, [])
 
   const handleLogout = async () => {
