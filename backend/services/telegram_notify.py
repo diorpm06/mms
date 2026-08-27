@@ -24,17 +24,20 @@ def _format_report_message(report: dict, title: str) -> str:
   def m(n):
       return f"{n:,}".replace(",", " ")
 
+  net_cash_val = report.get('net_cash', max(0, report.get('cash', 0) - report.get('expenses', 0)))
+
   return (
       f"📊 {title}\n"
       f"📅 Sana: {date_label}\n"
       f"👥 Mijozlar: {report.get('patients_count', 0)} nafar\n"
       f"💰 Jami daromad: {m(report.get('total_income', 0))} so'm\n"
-      f"💵 Naqt: {m(report.get('cash', 0))} so'm\n"
-      f"💳 Karta: {m(report.get('card', 0))} so'm\n"
+      f"💵 Naqt tushum: {m(report.get('cash', 0))} so'm\n"
+      f"💳 Karta/QR: {m(report.get('card', 0) + report.get('click', 0) + report.get('qr', 0))} so'm\n"
       f"📤 Yo'naltiruvchi hissi: {m(report.get('referrer_share', 0))} so'm\n"
       f"📤 Xizmat ko'rs. hissi: {m(report.get('provider_share', 0))} so'm\n"
       f"🏦 Markaz ulushi: {m(report.get('center_share', 0))} so'm\n"
       f"🧾 Harajatlar: {m(report.get('expenses', 0))} so'm\n"
+      f"💵 Kassada qolgan naqd: {m(net_cash_val)} so'm\n"
       f"✅ Sof daromad: {m(report.get('net_profit', 0))} so'm\n"
       f"💼 Joriy balans: {m(report.get('current_balance', 0))} so'm"
   )
