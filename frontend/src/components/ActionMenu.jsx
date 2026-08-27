@@ -26,14 +26,21 @@ export default function ActionMenu({ items = [], title = 'Amallar' }) {
     if (!open || !tugmaRef.current) return
     const r = tugmaRef.current.getBoundingClientRect()
     const kenglik = 200
-    const balandlik = korinadigan.length * 38 + 12
+    const zaxira = 8 // ekran chetidan bo'sh joy
+    const kerakli_balandlik = korinadigan.length * 38 + 12
+    // Amallar ko'p bo'lsa (masalan Statsionarda 6-7 ta), ro'yxat butun
+    // ekrandan balandroq bo'lib qolishi mumkin edi — sahifa aylantirilsa
+    // menyu yopilib ketgani uchun pastdagi tugmalarga UMUMAN yetib
+    // bo'lmasdi. Endi ro'yxat kerak bo'lsa o'zi ichida aylantiriladi.
+    const max_balandlik = window.innerHeight - zaxira * 2
+    const balandlik = Math.min(kerakli_balandlik, max_balandlik)
     // Ekrandan chiqib ketmasin
-    const left = Math.min(Math.max(8, r.right - kenglik), window.innerWidth - kenglik - 8)
+    const left = Math.min(Math.max(zaxira, r.right - kenglik), window.innerWidth - kenglik - zaxira)
     const pastda = r.bottom + 6
-    const top = pastda + balandlik > window.innerHeight - 8
-      ? Math.max(8, r.top - balandlik - 6)
+    const top = pastda + balandlik > window.innerHeight - zaxira
+      ? Math.max(zaxira, r.top - balandlik - 6)
       : pastda
-    setJoy({ top, left, width: kenglik })
+    setJoy({ top, left, width: kenglik, maxHeight: balandlik })
   }, [open, korinadigan.length])
 
   // Tashqariga bosilsa, Escape bosilsa yoki sahifa aylantirilsa — yopiladi
@@ -45,7 +52,13 @@ export default function ActionMenu({ items = [], title = 'Amallar' }) {
       setOpen(false)
     }
     const tugma = (e) => e.key === 'Escape' && setOpen(false)
-    const aylandi = () => setOpen(false)
+    // Ro'yxatning O'ZI ichida aylantirish (ko'p bandli menyuda pastdagi
+    // tugmalarga yetish uchun) uni yopib qo'ymasin — faqat sahifaning
+    // qolgan qismi aylantirilsa yopiladi.
+    const aylandi = (e) => {
+      if (royxatRef.current?.contains(e.target)) return
+      setOpen(false)
+    }
     document.addEventListener('mousedown', bosildi)
     document.addEventListener('keydown', tugma)
     window.addEventListener('scroll', aylandi, true)
@@ -96,6 +109,8 @@ export default function ActionMenu({ items = [], title = 'Amallar' }) {
             top: joy.top,
             left: joy.left,
             width: joy.width,
+            maxHeight: joy.maxHeight,
+            overflowY: 'auto',
             background: 'var(--surface)',
             border: '1px solid var(--border-strong)',
             boxShadow: '0 10px 30px rgba(0,0,0,0.28)',
