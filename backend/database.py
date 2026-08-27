@@ -464,6 +464,12 @@ def run_migrations():
         # User <-> Referrer bog'liqligi
         "ALTER TABLE users ADD COLUMN referrer_id INTEGER",
         "CREATE INDEX IF NOT EXISTS ix_users_referrer_id ON users (referrer_id)",
+        # Statsionar bemorning tug'ilgan yili va manzili — model'ga
+        # qo'shilgan, lekin migratsiyasi yo'q edi, shuning uchun
+        # /inpatients ro'yxati va tarixi 500 xato bilan yiqilardi
+        # (ustunlar bazada mavjud emas edi).
+        "ALTER TABLE inpatients ADD COLUMN birth_date DATE",
+        "ALTER TABLE inpatients ADD COLUMN address VARCHAR(255)",
     ):
         try:
             with engine.connect() as conn:

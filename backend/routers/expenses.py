@@ -105,6 +105,14 @@ def _sync_ichki(db: Session):
     # 2. Provider Advances
     prov_advances = db.query(ProviderAdvance).all()
     for pa in prov_advances:
+        if pa.is_cancelled:
+            if pa.expense_id:
+                exp = db.query(Expense).filter(Expense.id == pa.expense_id).first()
+                if exp and not exp.is_cancelled:
+                    exp.is_cancelled = True
+                    changed = True
+            continue
+
         p_name = "Noma'lum"
         if pa.recipient_type == "provider":
             p = db.query(Provider).filter(Provider.id == pa.recipient_id).first()
@@ -113,21 +121,44 @@ def _sync_ichki(db: Session):
             ref = db.query(Referrer).filter(Referrer.id == pa.recipient_id).first()
             if ref: p_name = ref.full_name
         desc_text = f"Avans: {p_name}" + (f" — {pa.note}" if pa.note else "")
+
+        if pa.expense_id:
+            exp = db.query(Expense).filter(Expense.id == pa.expense_id).first()
+            if exp:
+                if exp.is_cancelled != pa.is_cancelled:
+                    exp.is_cancelled = pa.is_cancelled
+                    changed = True
+                if not exp.is_cancelled and exp.amount != pa.amount:
+                    exp.amount = pa.amount
+                    changed = True
+                continue
+
         exists = db.query(Expense).filter(
             Expense.category == "Avans",
-            Expense.amount == pa.amount,
+            Expense.is_cancelled == False,
             Expense.description.like(f"%{p_name}%"),
             Expense.created_at >= pa.created_at - timedelta(minutes=5),
             Expense.created_at <= pa.created_at + timedelta(minutes=5),
         ).first()
-        if not exists:
-            db.add(Expense(
+
+        if exists:
+            if not pa.expense_id:
+                pa.expense_id = exists.id
+                changed = True
+            if exists.amount != pa.amount:
+                exists.amount = pa.amount
+                changed = True
+        else:
+            new_exp = Expense(
                 description=f"[MANBA: Naqt kassa] {desc_text}",
                 amount=pa.amount,
                 category="Avans",
                 created_at=pa.created_at,
                 created_by=1,
-            ))
+            )
+            db.add(new_exp)
+            db.flush()
+            pa.expense_id = new_exp.id
             changed = True
 
     # 3. Employee Salary Logs
@@ -311,6 +342,19 @@ def update_expense(
     if data.category is not None:
         e.category = data.category
 
+    # Avans harajati tahrirlansa — unga bog'liq ProviderAdvance ham yangilanadi
+    if e.category == "Avans" or (e.description and "Avans:" in e.description):
+        from models.provider_advance import ProviderAdvance
+        pa = db.query(ProviderAdvance).filter(ProviderAdvance.expense_id == e.id).first()
+        if pa and not pa.is_cancelled:
+            diff = e.amount - pa.amount
+            pa.amount = e.amount
+            pa.remaining = max(0, pa.remaining + diff)
+            if pa.remaining == 0 and pa.amount > 0:
+                pa.is_settled = True
+            elif pa.remaining > 0:
+                pa.is_settled = False
+
     e.updated_at = datetime.now()
     db.commit()
     db.refresh(e)
@@ -331,6 +375,17 @@ def _perform_expense_cancel(e: Expense, reason: str, user: User, db: Session):
     e.cancelled_at = datetime.now()
     e.cancelled_by = user.id
     e.cancel_reason = reason
+
+    if e.category == "Avans" or (e.description and "Avans:" in e.description):
+        from models.provider_advance import ProviderAdvance
+        pa = db.query(ProviderAdvance).filter(ProviderAdvance.expense_id == e.id).first()
+        if pa and not pa.is_cancelled:
+            pa.is_cancelled = True
+            pa.cancelled_at = datetime.now()
+            pa.cancelled_by = user.id
+            pa.cancel_reason = reason
+            pa.remaining = 0
+
     db.commit()
     try:
         send_telegram_background(

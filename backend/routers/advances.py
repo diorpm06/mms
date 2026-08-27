@@ -183,3 +183,68 @@ def cancel_advance_endpoint(
 
     db.commit()
     return {"message": "Avans bekor qilindi, kassaga qaytarildi"}
+
+
+class ProviderAdvanceUpdate(BaseModel):
+    amount: Optional[int] = None
+    note: Optional[str] = None
+
+
+@router.put("/{advance_id}", response_model=ProviderAdvanceOut)
+def update_advance(
+    advance_id: int,
+    data: ProviderAdvanceUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    advance = db.query(ProviderAdvance).filter(
+        ProviderAdvance.id == advance_id, ProviderAdvance.is_cancelled == False
+    ).first()
+    if not advance:
+        raise HTTPException(status_code=404, detail="Avans topilmadi")
+
+    if data.amount is not None and data.amount != advance.amount:
+        diff = data.amount - advance.amount
+        from services.finance import get_or_create_balance, log_balance_change
+        bal = get_or_create_balance(db)
+        bal.current_balance -= diff
+        bal.updated_at = datetime.now()
+        log_balance_change(
+            db,
+            -diff,
+            "advance_edit",
+            f"Avans tahrirlandi (#{advance.id}): {advance.amount:,} so'm -> {data.amount:,} so'm",
+        )
+        advance.amount = data.amount
+        advance.remaining = max(0, advance.remaining + diff)
+
+    if data.note is not None:
+        advance.note = data.note
+
+    if advance.expense_id:
+        exp = db.query(Expense).filter(Expense.id == advance.expense_id).first()
+        if exp and not exp.is_cancelled:
+            exp.amount = advance.amount
+            name = "Noma'lum"
+            if advance.recipient_type == "provider":
+                p = db.query(Provider).filter(Provider.id == advance.recipient_id).first()
+                if p: name = p.full_name
+            elif advance.recipient_type == "referrer":
+                r = db.query(Referrer).filter(Referrer.id == advance.recipient_id).first()
+                if r: name = r.full_name
+            desc_text = f"Avans: {name}" + (f" — {advance.note}" if advance.note else "")
+            exp.description = f"[MANBA: Naqt kassa] {desc_text}"
+
+    db.commit()
+    db.refresh(advance)
+
+    name = "Noma'lum"
+    if advance.recipient_type == "provider":
+        p = db.query(Provider).filter(Provider.id == advance.recipient_id).first()
+        if p: name = p.full_name
+    elif advance.recipient_type == "referrer":
+        r = db.query(Referrer).filter(Referrer.id == advance.recipient_id).first()
+        if r: name = r.full_name
+
+    return _row(advance, name)
+

@@ -488,10 +488,17 @@ def autocomplete_patients(
 
 
 
-def _sync_patient_background(patient_ids: list, user_role: str, first_name: str, last_name: str, payment_type: str, total_batch_paid: int):
-    """Executes Google Sheets sync, backup webhook, and Telegram notification asynchronously."""
+def _sync_patient_background(patient_ids: list):
+    """Executes Google Sheets sync and backup webhook asynchronously.
+
+    DIQQAT: Telegram xabari ENDI shu yerda YUBORILMAYDI — Vercel'da
+    javob (response) qaytarilgach jarayon MUZLAYDI (cron.py'dagi izohga
+    qarang), shuning uchun BackgroundTasks orqali rejalashtirilgan
+    tarmoq so'rovi ko'pincha hech qachon tugamasdi. Telegram xabari
+    endi create_patient() ichida, javob qaytarilishidan OLDIN, kutib
+    (await) yuboriladi — shu bilan ishonchli yetkaziladi.
+    """
     from database import SessionLocal
-    import asyncio
 
     db = SessionLocal()
     try:
@@ -503,19 +510,6 @@ def _sync_patient_background(patient_ids: list, user_role: str, first_name: str,
                 push_row_to_backup_url(row)
             except Exception as e:
                 print(f"[BG Sync Sheets Warning]: {e}")
-
-        report = daily_report(db, date.today())
-        svc_names = ", ".join(p.service.name if (p.service and p.service.name) else "Xizmat" for p in patients)
-        msg = (
-            f"🆕 Yangi mijoz qabul qilindi ({user_role})\n"
-            f"👤 {first_name} {last_name}\n"
-            f"🩺 Xizmatlar: {svc_names}\n"
-            f"💳 To'lov turi: {payment_type.upper()}\n"
-            f"💰 Jami: {total_batch_paid:,} so'm\n"
-            f"💼 Balans: {report['current_balance']:,} so'm"
-        ).replace(",", " ")
-        from services.telegram_notify import send_telegram_background
-        send_telegram_background(msg, section="registration")
     except Exception as ex:
         print(f"[BG Task Error]: {ex}")
     finally:
@@ -916,17 +910,31 @@ async def create_patient(
 
     db.commit()
 
-    # Queue background sync tasks (Google Sheets, Backup URL, Telegram) asynchronously
+    # Telegram xabari shu yerda, javob qaytishidan OLDIN kutib (await)
+    # yuboriladi — Vercel'da javobdan keyingi background ish ishonchsiz
+    # bo'lgani uchun (yuqoridagi _sync_patient_background izohiga qarang).
+    try:
+        report = daily_report(db, date.today())
+        svc_names = ", ".join(
+            dict.fromkeys(s["service_name"] for p in created_patients for s in p.get("services", []) if s.get("service_name"))
+        ) or "Xizmat"
+        msg = (
+            f"🆕 Yangi mijoz qabul qilindi ({user.role})\n"
+            f"👤 {data.first_name} {data.last_name or ''}\n"
+            f"🩺 Xizmatlar: {svc_names}\n"
+            f"💳 To'lov turi: {data.payment_type.upper()}\n"
+            f"💰 Jami: {total_batch_paid:,} so'm\n"
+            f"💼 Balans: {report['current_balance']:,} so'm"
+        ).replace(",", " ")
+        await send_telegram_message(msg, section="registration")
+    except Exception as ex:
+        print(f"[Telegram registration xabari xato]: {ex}")
+
+    # Google Sheets/backup webhook sinxronizatsiyasi — Telegram'dan farqli,
+    # bu foydalanuvchiga ko'rinmaydi, shuning uchun best-effort fon
+    # vazifasi sifatida qoldirildi (javobni sekinlatmasin).
     patient_ids = [p["id"] for p in created_patients]
-    background_tasks.add_task(
-        _sync_patient_background,
-        patient_ids,
-        user.role,
-        data.first_name,
-        data.last_name or "",
-        data.payment_type,
-        total_batch_paid,
-    )
+    background_tasks.add_task(_sync_patient_background, patient_ids)
 
     if len(created_patients) == 1:
         return created_patients[0]
@@ -1156,7 +1164,7 @@ def update_patient(
 
 
 @router.post("/{patient_id}/cancel")
-def cancel_patient(
+async def cancel_patient(
     patient_id: int,
     body: CancelBody,
     request: Request,
@@ -1188,6 +1196,19 @@ def cancel_patient(
         detail_message=f"To'lov bekor qilindi — sabab: {body.reason}, kim: {user.full_name}",
     )
     db.commit()
+
+    try:
+        msg = (
+            f"❌ To'lov bekor qilindi ({user.role})\n"
+            f"👤 {p.first_name} {p.last_name or ''}\n"
+            f"💰 Summa: {(tx.total_amount or 0):,} so'm\n"
+            f"📝 Sabab: {body.reason}\n"
+            f"👮 Kim: {user.full_name}"
+        ).replace(",", " ")
+        await send_telegram_message(msg, section="cancellations")
+    except Exception as ex:
+        print(f"[Telegram bekor qilish xabari xato]: {ex}")
+
     return {"status": "ok"}
 
 
@@ -1522,7 +1543,7 @@ def get_unpaid_services(
 
 
 @router.post("/{patient_id}/pay-services")
-def pay_unpaid_services(
+async def pay_unpaid_services(
     patient_id: int,
     body: PayUnpaidServicesBody,
     request: Request,
@@ -1641,6 +1662,19 @@ def pay_unpaid_services(
         ip_address=ip,
         device_info=ua,
     )
+
+    try:
+        svc_names = ", ".join(dict.fromkeys(d["service_name"] for d in paid_details)) or "Xizmat"
+        msg = (
+            f"💰 Nasiya to'lov qabul qilindi ({user.role})\n"
+            f"👤 {target_patient.first_name} {target_patient.last_name or ''}\n"
+            f"🩺 Xizmatlar: {svc_names}\n"
+            f"💳 To'lov turi: {ptype.upper()}\n"
+            f"💰 Jami: {total_amount:,} so'm"
+        ).replace(",", " ")
+        await send_telegram_message(msg, section="finance")
+    except Exception as ex:
+        print(f"[Telegram to'lov xabari xato]: {ex}")
 
     return {
         "success": True,
