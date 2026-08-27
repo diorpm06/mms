@@ -20,6 +20,7 @@ import Modal from '../../components/Modal'
 import { Btn, Icons, THead } from '../../components/UIKit'
 import CeoSavedReports from './SavedReports'
 import IncassationModal from '../../components/IncassationModal'
+import ReferrerProfileModal from '../../components/ReferrerProfileModal'
 import { BRAND } from '../../config/brand'
 
 const MONTH_NAMES = [
@@ -902,6 +903,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
   }
 
   const [expandedRefId, setExpandedRefId] = useState(null)
+  const [selectedRefModalId, setSelectedRefModalId] = useState(null)
 
   const handleDownloadReferrersPdf = async () => {
     try {
@@ -1210,7 +1212,17 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                     <Fragment key={r.referrer_id}>
                       <tr className="hover:bg-surface-hover font-semibold">
                         <td className="p-2.5 text-muted font-mono">#{i + 1}</td>
-                        <td className="p-2.5 text-body font-bold">{r.name} <span className="text-muted text-[10px]">({r.phone || '—'})</span></td>
+                        <td className="p-2.5 text-body font-bold">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRefModalId(r.referrer_id)}
+                            className="hover:text-cyan font-black text-left flex items-center gap-1 transition-colors group"
+                            title="👤 Yo'naltiruvchi profilini va login-parolini ko'rish"
+                          >
+                            <span>👤 {r.name}</span>
+                            <span className="text-muted text-[10px] font-mono group-hover:text-cyan">({r.phone || '—'})</span>
+                          </button>
+                        </td>
                         <td className="p-2.5 text-center font-mono font-bold text-cyan">{r.patient_count} nafar</td>
                         <td className="p-2.5 text-right font-mono text-muted">{formatMoney(r.gross_total)}</td>
                         <td className="p-2.5 text-right font-mono text-gold font-bold">{formatMoney(r.earned_commission)}</td>
@@ -1775,6 +1787,14 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
           fetchWithDates(dateFrom, dateTo)
         }}
       />
+
+      {/* ── REFERRER PROFILE MODAL ───────────────────────────────── */}
+      {selectedRefModalId && (
+        <ReferrerProfileModal
+          referrerId={selectedRefModalId}
+          onClose={() => setSelectedRefModalId(null)}
+        />
+      )}
 
     </div>
   )

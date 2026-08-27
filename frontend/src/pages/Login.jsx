@@ -23,6 +23,7 @@ export default function Login() {
   const getRedirectPath = (role) => {
     if (role === 'ceo') return '/ceo'
     if (role === 'doctor') return '/doctor'
+    if (role === 'referrer') return '/referrer-portal'
     return '/admin'
   }
 

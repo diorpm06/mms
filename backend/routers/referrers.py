@@ -1,10 +1,12 @@
+import secrets
+import string
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from auth_utils import require_admin_or_ceo, require_ceo
+from auth_utils import get_current_user, require_admin_or_ceo, require_ceo
 from database import get_db
 from models.referrer import Referrer
 from models.user import User
@@ -66,6 +68,13 @@ def list_referrers(
         .all()
     )
 
+    # Portalga kirish login/parollari — bitta so'rovda hammasini olib,
+    # har bir qatorga haqiqiy (taxminiy emas) qiymatni biriktiramiz.
+    users_map = {
+        u.referrer_id: u
+        for u in db.query(User).filter(User.referrer_id.in_([r.id for r in referrers]), User.is_active == True).all()
+    }
+
     res = []
     for r in referrers:
         item = ReferrerOut.model_validate(r)
@@ -73,6 +82,9 @@ def list_referrers(
         item.today_earned = x.get("today", 0)
         item.total_earned = x.get("total_earned", 0)
         item.advance_debt = int(qarzlar.get(r.id) or 0)
+        u = users_map.get(r.id)
+        item.username = u.username if u else None
+        item.plain_password = u.plain_password if u else None
         res.append(item)
     return res
 
@@ -221,3 +233,280 @@ def payout_referrer(
         "settled_from_advance": qoplandi,
         "source": body.source,
     }
+
+
+class CredentialsBody(BaseModel):
+    username: str
+    password: str = Field(min_length=4)
+
+
+def _build_referrer_profile(db: Session, referrer_id: int, days: int = 10, current_user: User = None):
+    from datetime import date, timedelta
+    from sqlalchemy import func
+    from models.referrer import Referrer
+    from models.patient import Patient
+    from models.transaction import Transaction
+    from models.provider_advance import ProviderAdvance
+
+    r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
+
+    # User info
+    u = db.query(User).filter(User.referrer_id == referrer_id, User.is_active == True).first()
+    username = u.username if u else f"doctor{r.id}"
+    plain_password = u.plain_password if (u and current_user and current_user.role in ("ceo", "admin")) else None
+
+    cutoff_date = date.today() - timedelta(days=days - 1)
+
+    pats = (
+        db.query(Patient, Transaction)
+        .outerjoin(Transaction, (Transaction.patient_id == Patient.id) & (Transaction.is_cancelled == False))
+        .filter(Patient.referrer_id == referrer_id, Patient.is_cancelled == False)
+        .order_by(Patient.created_at.desc())
+        .all()
+    )
+
+    patient_list = []
+    total_gross = 0
+    total_earned = 0
+    ten_day_earned = 0
+    ten_day_patients_count = 0
+
+    daily_map = {}
+    for i in range(days):
+        d_str = str(date.today() - timedelta(days=i))
+        daily_map[d_str] = {"date": d_str, "patient_count": 0, "gross_total": 0, "earned_fee": 0}
+
+    seen_patients = set()
+
+    for p, t in pats:
+        p_date = p.created_at.strftime("%Y-%m-%d") if p.created_at else ""
+        p_datetime = p.created_at.strftime("%d.%m.%Y %H:%M") if p.created_at else "—"
+        p_amt = p.payment_amount or 0
+        ref_fee = t.referrer_amount if (t and t.referrer_amount is not None) else 0
+
+        svc_name = p.service.name if p.service else "Xizmat"
+        cat_name = p.service.category if p.service else ""
+        rate_label = "10%"
+        if cat_name and "Laboratoriya" in cat_name:
+            rate_label = f"{r.lab_percent}%"
+        elif cat_name and "Fizioterapiya" in cat_name:
+            rate_label = f"{r.fizio_percent}%"
+        elif "UZI" in svc_name.upper():
+            rate_label = f"{r.uzi_sum:,} so'm".replace(",", " ")
+        elif "OZON" in svc_name.upper():
+            rate_label = f"{r.ozon_sum:,} so'm".replace(",", " ")
+
+        total_gross += p_amt
+        total_earned += ref_fee
+
+        if p.created_at and p.created_at.date() >= cutoff_date:
+            ten_day_earned += ref_fee
+
+        if p.id not in seen_patients:
+            seen_patients.add(p.id)
+            if p.created_at and p.created_at.date() >= cutoff_date:
+                ten_day_patients_count += 1
+
+        if p_date in daily_map:
+            daily_map[p_date]["patient_count"] += 1
+            daily_map[p_date]["gross_total"] += p_amt
+            daily_map[p_date]["earned_fee"] += ref_fee
+
+        patient_list.append({
+            "patient_id": p.id,
+            "patient_name": f"{p.first_name} {p.last_name}".strip(),
+            "date": p_datetime,
+            "raw_date": p_date,
+            "service_name": svc_name,
+            "payment_amount": p_amt,
+            "rate_label": rate_label,
+            "referrer_fee": ref_fee,
+        })
+
+    adv_debt = (
+        db.query(func.coalesce(func.sum(ProviderAdvance.remaining), 0))
+        .filter(
+            ProviderAdvance.recipient_type == "referrer",
+            ProviderAdvance.recipient_id == referrer_id,
+            ProviderAdvance.is_cancelled == False,
+            ProviderAdvance.is_settled == False,
+        )
+        .scalar() or 0
+    )
+
+    initial_adv = (
+        db.query(func.coalesce(func.sum(ProviderAdvance.amount), 0))
+        .filter(
+            ProviderAdvance.recipient_type == "referrer",
+            ProviderAdvance.recipient_id == referrer_id,
+            ProviderAdvance.is_cancelled == False,
+        )
+        .scalar() or 0
+    )
+
+    daily_stats = list(daily_map.values())
+    daily_stats.sort(key=lambda x: x["date"], reverse=True)
+
+    calculated_net = (r.balance - int(adv_debt or 0)) if (adv_debt and adv_debt > 0 and r.balance == 0) else r.balance
+
+    return {
+        "referrer": {
+            "id": r.id,
+            "full_name": r.full_name,
+            "phone": r.phone or "",
+            "balance": r.balance,
+            "is_active": r.is_active,
+            "is_confirmed": r.is_confirmed,
+            "lab_percent": r.lab_percent,
+            "fizio_percent": r.fizio_percent,
+            "uzi_sum": r.uzi_sum,
+            "ozon_sum": r.ozon_sum,
+            "other_sum": r.other_sum,
+            "username": username,
+            "plain_password": plain_password,
+        },
+        "summary": {
+            "total_patients": len(seen_patients),
+            "ten_day_patients": ten_day_patients_count,
+            "total_gross": total_gross,
+            "total_earned": total_earned,
+            "ten_day_earned": ten_day_earned,
+            "initial_advance": int(initial_adv or 0),
+            "advance_debt": int(adv_debt or 0),
+            "net_balance": calculated_net,
+            "net_payable": max(0, r.balance),
+        },
+        "daily_stats": daily_stats,
+        "patients": patient_list,
+    }
+
+
+@router.get("/me/profile")
+def get_my_referrer_profile(
+    days: int = 10,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "referrer" or not user.referrer_id:
+        raise HTTPException(status_code=403, detail="Faqat yo'naltiruvchilar uchun")
+    return _build_referrer_profile(db, user.referrer_id, days=days, current_user=user)
+
+
+@router.get("/{referrer_id}/profile")
+def get_referrer_profile(
+    referrer_id: int,
+    days: int = 10,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role not in ("ceo", "admin") and (user.role != "referrer" or user.referrer_id != referrer_id):
+        raise HTTPException(status_code=403, detail="Ruxsat yo'q")
+    return _build_referrer_profile(db, referrer_id, days=days, current_user=user)
+
+
+def _random_password(length: int = 8) -> str:
+    """Taxmin qilib bo'lmaydigan tasodifiy parol — ID asosidagi andoza
+    (masalan "mmed5 00") har qanday kishi tomonidan hisoblab topilardi."""
+    alphabet = string.ascii_lowercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+@router.post("/generate-all-credentials")
+def generate_all_referrer_credentials(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    from auth_utils import hash_password
+
+    referrers = db.query(Referrer).filter(Referrer.is_active == True).order_by(Referrer.id).all()
+    created_count = 0
+    updated_count = 0
+    res = []
+
+    for r in referrers:
+        u = db.query(User).filter(User.referrer_id == r.id, User.is_active == True).first()
+        uname = f"doctor{r.id}"
+        pwd = _random_password()
+
+        if not u:
+            existing_uname = db.query(User).filter(User.username == uname).first()
+            if existing_uname:
+                uname = f"ref_{r.id}"
+
+            u = User(
+                full_name=r.full_name,
+                role="referrer",
+                username=uname,
+                hashed_password=hash_password(pwd),
+                plain_password=pwd,
+                referrer_id=r.id,
+                is_active=True,
+            )
+            db.add(u)
+            created_count += 1
+        else:
+            if not u.plain_password:
+                u.plain_password = pwd
+                u.hashed_password = hash_password(pwd)
+                updated_count += 1
+            uname = u.username
+            pwd = u.plain_password
+
+        res.append({
+            "referrer_id": r.id,
+            "full_name": r.full_name,
+            "username": uname,
+            "plain_password": pwd,
+        })
+
+    db.commit()
+    return {
+        "message": f"{created_count} ta yangi login yaratildi, {updated_count} ta yangilandi",
+        "credentials": res,
+    }
+
+
+@router.post("/{referrer_id}/credentials")
+def set_referrer_credentials(
+    referrer_id: int,
+    body: CredentialsBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    from auth_utils import hash_password
+
+    r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
+
+    clean_uname = body.username.strip()
+    if not clean_uname:
+        raise HTTPException(status_code=400, detail="Login kiritilmadi")
+
+    u_exist = db.query(User).filter(User.username == clean_uname, User.referrer_id != referrer_id).first()
+    if u_exist:
+        raise HTTPException(status_code=400, detail=f"'{clean_uname}' logini boshqa foydalanuvchida bor")
+
+    u = db.query(User).filter(User.referrer_id == referrer_id).first()
+    if not u:
+        u = User(
+            full_name=r.full_name,
+            role="referrer",
+            username=clean_uname,
+            hashed_password=hash_password(body.password),
+            plain_password=body.password,
+            referrer_id=r.id,
+            is_active=True,
+        )
+        db.add(u)
+    else:
+        u.username = clean_uname
+        u.hashed_password = hash_password(body.password)
+        u.plain_password = body.password
+        u.is_active = True
+
+    db.commit()
+    return {"message": "Login va parol saqlandi", "username": u.username, "plain_password": u.plain_password}
+

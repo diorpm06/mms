@@ -69,6 +69,7 @@ const Inventory = safeLazy(() => import('./pages/admin/Inventory'))
 const Payroll = safeLazy(() => import('./pages/ceo/Payroll'))
 const TvManagerDashboard = safeLazy(() => import('./pages/TvManagerDashboard'))
 const UnifiedReportsHub = safeLazy(() => import('./pages/ceo/UnifiedReportsHub'))
+const ReferrerPortal = safeLazy(() => import('./pages/referrer/ReferrerPortal'))
 
 function PageLoader() {
   return (
@@ -133,6 +134,14 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/tv" element={<TvQueueDisplay />} />
         <Route path="/queue" element={<TvQueueDisplay />} />
+        <Route
+          path="/referrer-portal"
+          element={
+            <PrivateRoute roles={['referrer']}>
+              <ReferrerPortal />
+            </PrivateRoute>
+          }
+        />
         <Route path="/doctor" element={<DoctorLayout />}>
           <Route index element={<DoctorPanel />} />
           <Route path="natijalar" element={<DoctorResults />} />

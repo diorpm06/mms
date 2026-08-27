@@ -38,6 +38,7 @@ LOCKOUT_MINUTES = 15
 @limiter.limit("10/minute")
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     clean_username = data.username.strip() if data.username else ""
+    clean_password = data.password.strip() if data.password else ""
     user = db.query(User).filter(func.lower(User.username) == func.lower(clean_username), User.is_active == True).first()
 
     # DB-backed lockout — IP-based rate limiting above doesn't reliably survive
@@ -50,7 +51,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
             detail=f"Ko'p marta noto'g'ri urinildi. {remaining_min} daqiqadan keyin qayta urinib ko'ring.",
         )
 
-    if not user or not verify_password(data.password, user.hashed_password):
+    if not user or not (verify_password(data.password, user.hashed_password) or verify_password(clean_password, user.hashed_password)):
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
@@ -58,6 +59,13 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
                 user.failed_login_attempts = 0
             db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login yoki parol noto'g'ri")
+
+    # Yo'naltiruvchi "nofaol" qilib belgilansa, uning portal akkaunti
+    # alohida o'chirilmagan bo'lsa ham kira olmasligi kerak — aks holda
+    # "o'chirilgan" yo'naltiruvchi baribir shaxsiy kabinetiga kirib,
+    # moliyaviy ma'lumotlarini ko'rishda davom etaverardi.
+    if user.role == "referrer" and (not user.referrer or not user.referrer.is_active):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Yo'naltiruvchi profili faol emas")
 
     user.failed_login_attempts = 0
     user.locked_until = None
@@ -94,6 +102,8 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == int(payload["sub"]), User.is_active == True).first()
     if not user:
         raise HTTPException(status_code=401, detail="Foydalanuvchi topilmadi")
+    if user.role == "referrer" and (not user.referrer or not user.referrer.is_active):
+        raise HTTPException(status_code=403, detail="Yo'naltiruvchi profili faol emas")
     token_data = {"sub": str(user.id), "role": user.role}
     return TokenResponse(
         access_token=create_access_token(token_data),

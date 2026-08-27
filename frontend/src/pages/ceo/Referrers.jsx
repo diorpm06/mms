@@ -9,6 +9,7 @@ import { BRAND } from '../../config/brand'
 import CommissionSettings from './Commissions'
 import ActionMenu from '../../components/ActionMenu'
 import EarningsDailyModal from '../../components/EarningsDailyModal'
+import ReferrerProfileModal from '../../components/ReferrerProfileModal'
 
 const SOURCES = ['Naqt kassa', 'Karta kassa', 'Bank hisob', 'Boshqa']
 
@@ -17,6 +18,7 @@ export default function CeoReferrers() {
   const [items, setItems] = useState(null)
   // "Jami ishlagan" bosilganda ochiladigan kunma-kun oynasi
   const [kunlik, setKunlik] = useState(null)   // {kind, id, name}
+  const [selectedRefModalId, setSelectedRefModalId] = useState(null)
   const [topAnalytics, setTopAnalytics] = useState([])
   const [modal, setModal] = useState(false)
   const [edit, setEdit] = useState(null)
@@ -750,7 +752,16 @@ export default function CeoReferrers() {
                   {items.map((r, idx) => (
                     <tr key={r.id} className="hover:bg-surface-hover transition-colors whitespace-nowrap">
                       <td className="p-1.5 text-center text-muted font-mono font-bold text-[11px]">{idx + 1}</td>
-                      <td className="p-1.5 text-left font-extrabold text-body text-xs truncate max-w-[140px]" title={r.full_name}>{r.full_name}</td>
+                      <td className="p-1.5 text-left font-extrabold text-body text-xs truncate max-w-[140px]" title={r.full_name}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRefModalId(r.id)}
+                          className="hover:text-cyan font-extrabold text-left transition-colors cursor-pointer"
+                          title="👤 Profil va statistikasini ko'rish"
+                        >
+                          {r.full_name}
+                        </button>
+                      </td>
                       <td className="p-1.5 text-left text-muted font-mono text-[10px]">{r.phone || '—'}</td>
 
                       <td className="p-1.5 text-center">
@@ -808,6 +819,11 @@ export default function CeoReferrers() {
                       <td className="p-2.5 text-center">
                         <ActionMenu
                           items={[
+                            {
+                              label: 'Profil & Analytics',
+                              icon: Icons.user,
+                              onClick: () => setSelectedRefModalId(r.id),
+                            },
                             {
                               label: 'Balansni chiqarish',
                               icon: Icons.arrowDown,
@@ -1363,6 +1379,14 @@ export default function CeoReferrers() {
           </div>
         )}
       </Modal>
+
+      {/* ── REFERRER PROFILE MODAL ───────────────────────────────── */}
+      {selectedRefModalId && (
+        <ReferrerProfileModal
+          referrerId={selectedRefModalId}
+          onClose={() => setSelectedRefModalId(null)}
+        />
+      )}
     </div>
   )
 }

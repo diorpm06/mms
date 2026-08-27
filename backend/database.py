@@ -461,6 +461,9 @@ def run_migrations():
         # Statsionar qo'shimcha xizmat/material: chekda ko'rinadi, lekin
         # bemor hisobiga (balansga) qo'shilmaydi
         "ALTER TABLE inpatient_items ADD COLUMN is_no_charge BOOLEAN DEFAULT FALSE",
+        # User <-> Referrer bog'liqligi
+        "ALTER TABLE users ADD COLUMN referrer_id INTEGER",
+        "CREATE INDEX IF NOT EXISTS ix_users_referrer_id ON users (referrer_id)",
     ):
         try:
             with engine.connect() as conn:

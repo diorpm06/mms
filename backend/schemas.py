@@ -152,6 +152,11 @@ class ReferrerOut(BaseModel):
     # Hali qoplanmagan avans qarzi — balansdan (ishlab topgani) alohida,
     # aks holda bu ikkisini birlashtirib ko'rsatadigan joy yo'q edi
     advance_debt: Optional[int] = 0
+    # Portalga kirish logini/paroli — biriktirilmagan bo'lsa None (frontend
+    # buni taxminiy andoza bilan TO'LDIRMASLIGI kerak, aks holda haqiqiy
+    # parol bilan mos kelmaydigan noto'g'ri ma'lumot ko'rsatiladi).
+    username: Optional[str] = None
+    plain_password: Optional[str] = None
 
     class Config:
         from_attributes = True

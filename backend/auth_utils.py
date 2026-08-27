@@ -100,3 +100,16 @@ def require_doctor_or_admin_or_ceo(user: User = Depends(get_current_user)) -> Us
     return user
 
 
+def require_referrer(user: User = Depends(get_current_user)) -> User:
+    if user.role != "referrer" or not user.referrer_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Faqat yo'naltiruvchilar uchun")
+    return user
+
+
+def require_referrer_or_admin_or_ceo(user: User = Depends(get_current_user)) -> User:
+    if user.role not in ("ceo", "admin", "referrer"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ruxsat yo'q")
+    return user
+
+
+
