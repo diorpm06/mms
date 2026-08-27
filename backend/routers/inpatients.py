@@ -171,6 +171,23 @@ class InpatientExtendBody(BaseModel):
     new_planned_days: int | None = Field(default=None, ge=1, le=180)
 
 
+class InpatientUpdate(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    birth_date: str | None = None
+    address: str | None = None
+    room_number: str | None = None
+    bed_number: str | None = None
+    tariff_id: int | None = None
+    doctor_id: int | None = None
+    referrer_id: int | None = None
+    diagnosis: str | None = None
+    daily_rate: int | None = None
+    planned_days: int | None = None
+
+
+
 # -------------------------------------------------------------------------
 # SERIALIZATION & HELPERS
 # -------------------------------------------------------------------------
@@ -260,6 +277,8 @@ def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
         "first_name": i.first_name,
         "last_name": i.last_name,
         "phone": i.phone,
+        "birth_date": i.birth_date.isoformat() if getattr(i, "birth_date", None) else None,
+        "address": getattr(i, "address", None),
         "room_number": i.room_number,
         "bed_number": i.bed_number,
         "tariff_id": i.tariff_id,
@@ -784,6 +803,13 @@ def admit(
     l_name = ism_tuzat(l_name) or l_name
 
     telefon = (p.phone if p else (data.phone or "").strip()) or "mavjud emas"
+    b_date = getattr(p, "birth_date", None)
+    if not b_date and data.birth_date:
+        try:
+            b_date = datetime.strptime(data.birth_date.split("T")[0], "%Y-%m-%d").date()
+        except Exception:
+            b_date = None
+    manzil = (p.address if p else (data.address or "").strip()) or None
 
     diagnosis = (data.diagnosis or "").strip()
     if data.planned_days:
@@ -793,6 +819,8 @@ def admit(
         first_name=f_name,
         last_name=l_name,
         phone=telefon,
+        birth_date=b_date,
+        address=manzil,
         room_number=data.room_number,
         bed_number=data.bed_number,
         tariff_id=data.tariff_id,
@@ -1256,3 +1284,65 @@ def cancel_inpatient(
         "payments_reversed": pul_qaytdi,
         "accruals_reversed": haq_qaytdi,
     }
+
+
+@router.put("/{inpatient_id}")
+def update_inpatient(
+    inpatient_id: int,
+    data: InpatientUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    inp = _qulflab_ol(db, inpatient_id)
+    if not inp:
+        raise HTTPException(status_code=404, detail="Statsionar bemor topilmadi")
+
+    xona = (data.room_number or inp.room_number).strip()
+    koyka = (data.bed_number or inp.bed_number).strip()
+
+    if (data.room_number and data.room_number.strip() != inp.room_number) or (data.bed_number and data.bed_number.strip() != inp.bed_number):
+        band = _koyka_bandmi(db, xona, koyka, bundan_tashqari=inpatient_id)
+        if band:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{xona}-palata {koyka}-koykada {band.first_name} {band.last_name} yotibdi. Bo'sh koyka tanlang.",
+            )
+
+    inp.room_number = xona
+    inp.bed_number = koyka
+
+    if data.first_name and data.first_name.strip():
+        inp.first_name = ism_tuzat(data.first_name.strip())
+    if data.last_name is not None:
+        inp.last_name = ism_tuzat(data.last_name.strip()) or "."
+    if data.phone is not None:
+        inp.phone = data.phone.strip()
+    if data.address is not None:
+        inp.address = data.address.strip()
+    if data.birth_date:
+        try:
+            inp.birth_date = datetime.strptime(data.birth_date.split("T")[0], "%Y-%m-%d").date()
+        except Exception:
+            pass
+
+    if data.tariff_id is not None:
+        inp.tariff_id = data.tariff_id if data.tariff_id > 0 else None
+    if data.doctor_id is not None:
+        inp.doctor_id = data.doctor_id if data.doctor_id > 0 else None
+    if data.referrer_id is not None:
+        inp.referrer_id = data.referrer_id if data.referrer_id > 0 else None
+    if data.daily_rate is not None and data.daily_rate > 0:
+        inp.daily_rate = data.daily_rate
+
+    if data.diagnosis is not None or data.planned_days is not None:
+        diag = data.diagnosis if data.diagnosis is not None else _clean_diagnosis(inp.diagnosis)
+        p_days = data.planned_days if data.planned_days is not None else _extract_planned_days(inp.diagnosis)
+        if p_days and p_days > 0:
+            inp.diagnosis = _update_planned_days(diag, p_days)
+        else:
+            inp.diagnosis = _clean_diagnosis(diag)
+
+    db.commit()
+    db.refresh(inp)
+    return _serialize_inp(inp)
+

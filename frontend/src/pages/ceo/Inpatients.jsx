@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../utils/api'
-import { formatMoney, formatWithCommas, parseDigits } from '../../utils/format'
+import { formatMoney, formatWithCommas, parseDigits, birthYear } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import { useAuthStore } from '../../store/authStore'
 import Modal from '../../components/Modal'
@@ -45,8 +45,14 @@ export default function CeoInpatients() {
   const [editingItem, setEditingItem] = useState(null)
   const [extendModal, setExtendModal] = useState(null)
   const [extendDaysCount, setExtendDaysCount] = useState(1)
-  const [selectedReceipt, setSelectedReceipt] = useState(null)
   const [viewPatientModal, setViewPatientModal] = useState(null)
+  const [editInpatientModal, setEditInpatientModal] = useState(null)
+  const [editInpatientForm, setEditInpatientForm] = useState({
+    first_name: '', last_name: '', phone: '', birth_date: '', address: '',
+    room_number: '', bed_number: '', tariff_id: '', doctor_id: '', referrer_id: '',
+    daily_rate: '', diagnosis: '', planned_days: '',
+  })
+  const [savingInpatientEdit, setSavingInpatientEdit] = useState(false)
 
   // Forms
   const [admitForm, setAdmitForm] = useState({
@@ -547,21 +553,71 @@ export default function CeoInpatients() {
     }
   }
 
-  // Cancel Inpatient Stay
-  const handleCancelInpatient = async (id) => {
-    const defaultReason = 'Sinov bemorini o\'chirish / Test'
-    const userInput = prompt('Bekor qilish (o\'chirish) sababi:', defaultReason)
-    if (userInput === null) return // User clicked Cancel
-    const reason = (userInput || defaultReason).trim()
-    if (reason.length < 3) return
+  // Open Edit Inpatient Modal
+  const openEditInpatient = (inp) => {
+    setEditInpatientForm({
+      first_name: inp.first_name || '',
+      last_name: inp.last_name || '',
+      phone: inp.phone || '',
+      birth_date: birthYear(inp.birth_date),
+      address: inp.address || '',
+      room_number: inp.room_number || '',
+      bed_number: inp.bed_number || '',
+      tariff_id: inp.tariff_id ? String(inp.tariff_id) : '',
+      doctor_id: inp.doctor_id ? String(inp.doctor_id) : '',
+      referrer_id: inp.referrer_id ? String(inp.referrer_id) : '',
+      daily_rate: inp.daily_rate ? String(inp.daily_rate) : '',
+      diagnosis: inp.diagnosis || '',
+      planned_days: inp.planned_days ? String(inp.planned_days) : '',
+    })
+    setEditInpatientModal(inp)
+  }
+
+  // Save Edit Inpatient
+  const handleSaveInpatientEdit = async () => {
+    if (!editInpatientModal) return
+    if (!editInpatientForm.first_name.trim()) {
+      toast('Bemor ismi kiritilishi shart', 'error')
+      return
+    }
+    if (!editInpatientForm.room_number.trim() || !editInpatientForm.bed_number.trim()) {
+      toast('Palata va koyka kiritilishi shart', 'error')
+      return
+    }
+    setSavingInpatientEdit(true)
     try {
-      await api(`/inpatients/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) })
-      toast('Bemor yotishi bekor qilindi (o\'chirildi)')
+      const bDateStr = /^\d{4}$/.test(editInpatientForm.birth_date.trim())
+        ? `${editInpatientForm.birth_date.trim()}-01-01`
+        : editInpatientForm.birth_date.trim() || null
+
+      await api(`/inpatients/${editInpatientModal.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          first_name: editInpatientForm.first_name.trim(),
+          last_name: editInpatientForm.last_name.trim() || '.',
+          phone: editInpatientForm.phone.trim() || undefined,
+          birth_date: bDateStr,
+          address: editInpatientForm.address.trim() || undefined,
+          room_number: editInpatientForm.room_number.trim(),
+          bed_number: editInpatientForm.bed_number.trim(),
+          tariff_id: editInpatientForm.tariff_id ? +editInpatientForm.tariff_id : 0,
+          doctor_id: editInpatientForm.doctor_id ? +editInpatientForm.doctor_id : 0,
+          referrer_id: editInpatientForm.referrer_id ? +editInpatientForm.referrer_id : 0,
+          daily_rate: editInpatientForm.daily_rate ? +editInpatientForm.daily_rate : undefined,
+          diagnosis: editInpatientForm.diagnosis.trim() || null,
+          planned_days: editInpatientForm.planned_days ? +editInpatientForm.planned_days : undefined,
+        }),
+      })
+      toast("Statsionar bemor ma'lumotlari yangilandi ✓")
+      setEditInpatientModal(null)
       loadData()
     } catch (e) {
-      toast(e.message, 'error')
+      toast(e.message || 'Saqlashda xatolik', 'error')
+    } finally {
+      setSavingInpatientEdit(false)
     }
   }
+
 
   // Live patient search from API when receptionist types in search box
   useEffect(() => {
@@ -730,6 +786,11 @@ export default function CeoInpatients() {
                         label: '👁️ Bemor kartochkasi',
                         variant: 'gold',
                         onClick: () => setViewPatientModal(i),
+                      },
+                      {
+                        label: '✏️ Ma\'lumotlarni tahrirlash',
+                        variant: 'gold',
+                        onClick: () => openEditInpatient(i),
                       },
                       {
                         label: '🧪 + Xizmat/Dori qo\'shish',
@@ -2014,6 +2075,216 @@ export default function CeoInpatients() {
                 onClick={handleExtendStay}
               >
                 ✓ Muddatni Uzaytirish (+{extendDaysCount} kun)
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── EDIT INPATIENT MODAL ────────────────────────────────────── */}
+      <Modal
+        open={Boolean(editInpatientModal)}
+        onClose={() => setEditInpatientModal(null)}
+        title="✏️ Statsionar Bemor Ma'lumotlarini Tahrirlash"
+      >
+        {editInpatientModal && (
+          <div className="space-y-4 text-xs">
+            <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
+              <p className="font-extrabold text-cyan-300">
+                👤 {editInpatientModal.first_name} {editInpatientModal.last_name} #{editInpatientModal.id}
+              </p>
+              <p className="text-[11px] text-muted">
+                Palata: {editInpatientModal.room_number}/{editInpatientModal.bed_number} • Qabul kilingan: {new Date(editInpatientModal.admitted_at).toLocaleDateString('uz-UZ')}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="input-label">Ismi (*)</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={editInpatientForm.first_name}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, first_name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="input-label">Familiyasi</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={editInpatientForm.last_name}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, last_name: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="input-label">Telefon</label>
+                <input
+                  type="text"
+                  className="input-field font-mono"
+                  value={editInpatientForm.phone}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, phone: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="input-label">Tug'ilgan Yili</label>
+                <input
+                  type="text"
+                  placeholder="Masalan: 1985"
+                  className="input-field font-mono"
+                  value={editInpatientForm.birth_date}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, birth_date: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="input-label">Manzil / Shahar</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={editInpatientForm.address}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, address: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/60">
+              <div>
+                <label className="input-label">Palata Raqami (*)</label>
+                <input
+                  type="text"
+                  className="input-field font-mono font-bold"
+                  value={editInpatientForm.room_number}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, room_number: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="input-label">Koyka Raqami (*)</label>
+                <input
+                  type="text"
+                  className="input-field font-mono font-bold"
+                  value={editInpatientForm.bed_number}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, bed_number: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="input-label">Tarif Paketi</label>
+                <select
+                  className="input-field"
+                  value={editInpatientForm.tariff_id}
+                  onChange={(e) => {
+                    const tid = e.target.value
+                    const t = tariffs.find((x) => x.id === +tid)
+                    setEditInpatientForm({
+                      ...editInpatientForm,
+                      tariff_id: tid,
+                      daily_rate: t ? String(t.daily_rate) : editInpatientForm.daily_rate,
+                    })
+                  }}
+                >
+                  <option value="">-- Tarif Tanlanmagan --</option>
+                  {tariffs.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({formatMoney(t.daily_rate)}/kun)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="input-label">Kunlik Narx (so'm)</label>
+                <input
+                  type="number"
+                  className="input-field font-mono font-bold text-gold"
+                  value={editInpatientForm.daily_rate}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, daily_rate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="input-label">Biriktirilgan Statsionar Shifokori</label>
+                <select
+                  className="input-field"
+                  value={editInpatientForm.doctor_id}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, doctor_id: e.target.value })}
+                >
+                  <option value="">-- Shifokor Tanlanmagan --</option>
+                  {inpatientProviders.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.full_name} ({p.specialization || 'Shifokor'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="input-label">Yo'naltiruvchi (Referrer)</label>
+                <select
+                  className="input-field"
+                  value={editInpatientForm.referrer_id}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, referrer_id: e.target.value })}
+                >
+                  <option value="">-- To'g'ridan-to'g'ri (Yo'naltiruvchisiz) --</option>
+                  {referrers.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <label className="input-label">Tashxis & Ma'lumot</label>
+                <input
+                  type="text"
+                  placeholder="Masalan: Gipertoniya II daraja..."
+                  className="input-field"
+                  value={editInpatientForm.diagnosis}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, diagnosis: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="input-label">Reja kunlar</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="180"
+                  className="input-field font-mono font-bold"
+                  value={editInpatientForm.planned_days}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, planned_days: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                className="btn-outline flex-1 py-2.5"
+                onClick={() => setEditInpatientModal(null)}
+              >
+                Bekor qilish
+              </button>
+              <button
+                type="button"
+                disabled={savingInpatientEdit}
+                className="btn-gold flex-1 py-2.5 font-black text-xs uppercase"
+                onClick={handleSaveInpatientEdit}
+              >
+                {savingInpatientEdit ? 'Saqlanmoqda...' : '✓ O\'zgarishlarni Saqlash'}
               </button>
             </div>
           </div>

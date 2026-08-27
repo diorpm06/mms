@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, FileText, Calendar, Phone, Stethoscope, User, Printer, Plus, ShieldCheck, MapPin, DollarSign, Clock, Tag } from 'lucide-react'
 import { api } from '../utils/api'
-import { formatMoney, formatDate } from '../utils/format'
+import { formatMoney, formatDate, birthYear } from '../utils/format'
 import ReRegisterPatientModal from './ReRegisterPatientModal'
 import PaymentTicketModal from './PaymentTicketModal'
 import LabResultsModal from './LabResultsModal'
@@ -175,7 +175,7 @@ export default function PatientMedicalCardModal({ patient, onClose }) {
             <div>
               <span className="text-muted text-[10px] uppercase font-bold block">🗓️ Tug'ilgan yili:</span>
               <strong className="font-mono font-bold text-body">
-                {patient.birth_date ? (patient.birth_date.length >= 4 ? `${patient.birth_date.slice(0, 4)}-yil` : patient.birth_date) : '—'}
+                {birthYear(patient.birth_date) ? `${birthYear(patient.birth_date)}-yil` : '—'}
               </strong>
             </div>
             <div>

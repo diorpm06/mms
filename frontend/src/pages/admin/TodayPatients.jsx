@@ -274,15 +274,18 @@ export default function TodayPatients() {
     }
   }
 
+  const [shiftScope, setShiftScope] = useState('shift') // 'shift' (joriy smena) | 'day' (kunlik to'liq)
+
   const fetchPatients = () => {
-    api('/patients/today').then(setPatients).catch(() => {})
+    const url = shiftScope === 'shift' ? '/patients/today?shift_only=true' : '/patients/today?shift_only=false'
+    api(url).then(setPatients).catch(() => {})
   }
 
   useEffect(() => {
     fetchPatients()
     const t = setInterval(fetchPatients, 10000)
     return () => clearInterval(t)
-  }, [])
+  }, [shiftScope])
 
   const handleUpdateStatus = async (patientId, newStatus, cabinet = null) => {
     try {
@@ -592,6 +595,32 @@ export default function TodayPatients() {
         icon={Icons.list}
       >
         <div className="flex flex-wrap gap-2 items-center">
+          {/* Scope Selector: Joriy Smena vs Kunlik To'liq */}
+          <div className="flex items-center gap-1 p-1 bg-surface-2 rounded-xl border border-border">
+            <button
+              type="button"
+              onClick={() => setShiftScope('shift')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                shiftScope === 'shift'
+                  ? 'bg-amber-500 text-slate-950 shadow'
+                  : 'text-muted hover:text-body'
+              }`}
+            >
+              🌙 Joriy Smena (0 dan)
+            </button>
+            <button
+              type="button"
+              onClick={() => setShiftScope('day')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                shiftScope === 'day'
+                  ? 'bg-cyan-500 text-slate-950 shadow'
+                  : 'text-muted hover:text-body'
+              }`}
+            >
+              📅 Bugun Kunlik (00:00 dan)
+            </button>
+          </div>
+
           <input
             type="text"
             placeholder="🔎 Qidirish (Ism, Tel, Talon)..."

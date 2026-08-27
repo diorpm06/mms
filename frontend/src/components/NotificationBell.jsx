@@ -6,6 +6,30 @@ import { useNotificationStore } from '../store/notificationStore'
 import { useAuthStore } from '../store/authStore'
 import { BRAND } from '../config/brand'
 
+// Yangi bildirishnoma kelganda chalinadigan ikki notali "ding" ovozi
+// (Web Audio, tashqi audio fayl kerak emas) — yo'naltiruvchi portalidagi
+// bildirishnoma ovozi bilan bir xil naqsh, faqat balandligi boshqacha.
+function playNotificationChime() {
+  try {
+    const AudioCtxClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtxClass) return
+    const ctx = new AudioCtxClass()
+    const now = ctx.currentTime
+    ;[[698.46, 0], [523.25, 0.15]].forEach(([freq, delay]) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now + delay)
+      gain.gain.setValueAtTime(0.5, now + delay)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.6)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now + delay)
+      osc.stop(now + delay + 0.6)
+    })
+  } catch (_) {}
+}
+
 function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime()
   const m = Math.floor(diff / 60000)
@@ -17,15 +41,24 @@ function timeAgo(iso) {
   return 'Hozirgina'
 }
 
+// Layout mobil va desktop sarlavhalarda <NotificationBell/> ni ikkalasida
+// ham render qiladi (CSS bilan ko'rsatish/yashirish qilinadi, lekin
+// ikkalasi ham doim DOM'da mavjud bo'ladi). Modul darajasidagi shu bayroq
+// ta'minlaydiki, so'rov yuborish va ovoz/bildirishnoma chiqarish faqat
+// BITTASIDA ishlaydi — aks holda har bir yangi xabar 2 marta e'lon
+// qilinardi (ikkala nusxa mustaqil ravishda bir xil narsani aniqlagani
+// uchun).
+let notifSingletonClaimed = false
+
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
-  const { lastChecked, setLastChecked } = useNotificationStore()
+  const { lastChecked, setLastChecked, items, setItems } = useNotificationStore()
   const { accessToken } = useAuthStore()
   const ref = useRef(null)
   const initializedRef = useRef(false)
   const lastSeenTsRef = useRef(0)
+  const isPollerRef = useRef(false)
 
   const unreadCount = lastChecked
     ? items.filter((n) => new Date(n.created_at) > new Date(lastChecked)).length
@@ -42,9 +75,17 @@ export default function NotificationBell() {
   }
 
   useEffect(() => {
+    if (notifSingletonClaimed) return
+    notifSingletonClaimed = true
+    isPollerRef.current = true
+
     load()
     const t = setInterval(load, 60_000)
-    return () => clearInterval(t)
+    return () => {
+      clearInterval(t)
+      notifSingletonClaimed = false
+      isPollerRef.current = false
+    }
   }, [accessToken])
 
   useEffect(() => {
@@ -55,6 +96,7 @@ export default function NotificationBell() {
   }, [])
 
   useEffect(() => {
+    if (!isPollerRef.current) return
     if (typeof window === 'undefined' || !('Notification' in window)) return
     if (Notification.permission !== 'granted') return
     if (!Array.isArray(items) || items.length === 0) return
@@ -78,6 +120,7 @@ export default function NotificationBell() {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
 
     if (document.visibilityState === 'hidden') {
+      playNotificationChime()
       try {
         new Notification(BRAND.name, {
           body: newestItem?.message || "Yangi bildirishnoma",

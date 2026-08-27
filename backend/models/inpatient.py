@@ -14,6 +14,8 @@ class Inpatient(CancelMixin, Base):
     first_name: Mapped[str] = mapped_column(String(100))
     last_name: Mapped[str] = mapped_column(String(100))
     phone: Mapped[str] = mapped_column(String(20))
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     room_number: Mapped[str] = mapped_column(String(20))
     bed_number: Mapped[str] = mapped_column(String(20))
     tariff_id: Mapped[int | None] = mapped_column(ForeignKey("inpatient_tariffs.id"), nullable=True)
