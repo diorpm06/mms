@@ -20,42 +20,6 @@ function getAudioContext() {
   return globalAudioCtx
 }
 
-// Web Audio API double chime bell sound (Clinic ding-dong)
-function playChimeBell() {
-  try {
-    const ctx = getAudioContext()
-    if (!ctx) return
-
-    const now = ctx.currentTime
-
-    // 1st note (High E - 659.25Hz)
-    const osc1 = ctx.createOscillator()
-    const gain1 = ctx.createGain()
-    osc1.type = 'sine'
-    osc1.frequency.setValueAtTime(659.25, now)
-    gain1.gain.setValueAtTime(0.6, now)
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 1.2)
-    osc1.connect(gain1)
-    gain1.connect(ctx.destination)
-    osc1.start(now)
-    osc1.stop(now + 1.2)
-
-    // 2nd note (High A - 880Hz)
-    const osc2 = ctx.createOscillator()
-    const gain2 = ctx.createGain()
-    osc2.type = 'sine'
-    osc2.frequency.setValueAtTime(880, now + 0.35)
-    gain2.gain.setValueAtTime(0.6, now + 0.35)
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.6)
-    osc2.connect(gain2)
-    gain2.connect(ctx.destination)
-    osc2.start(now + 0.35)
-    osc2.stop(now + 1.6)
-  } catch (e) {
-    console.warn('Audio chime failure:', e)
-  }
-}
-
 // Soft Chime Sound when a NEW ticket enters waiting queue
 function playNewTicketChime() {
   try {
@@ -105,13 +69,11 @@ function startSilentBackgroundAudio() {
   }
 }
 
-// Force Play Alert Audio with Cast-compatible Audio player + Web Audio Chime
+// Force Play Alert Audio with Cast-compatible Audio player
 function forcePlayAlertAudio(onComplete) {
   try {
-    // 1) Play Web Audio Synth Chime
-    playChimeBell()
-
-    // 2) Play DOM Audio player for TV / Chromecast stream
+    // Play DOM Audio player for TV / Chromecast stream — faqat ovozli
+    // e'lon (ding-dong qo'ng'iroq olib tashlandi, so'ralgan edi).
     const player = ensureCastAudioPlayer()
     player.loop = false
     player.src = '/sound/alert.mp3?v=' + Date.now()
@@ -234,6 +196,12 @@ export default function TvQueueDisplay() {
   const isProcessingCallRef = useRef(false)
   // Ovoz javob qaytarmay qolsa navbatni majburan davom ettiruvchi taymer
   const qorovulRef = useRef(null)
+  // Har bir chaqiruv "id:updated_at" imzosi bilan MANGU eslab qolinadi —
+  // navbatdagi dublikat tekshiruvidan farqli, bu ro'yxatdan hech qachon
+  // o'chmaydi, shuning uchun qanday sabab bilan bo'lmasin (ikkita poll
+  // bir-biriga yaqin tushib qolishi, tarmoq kechikishi va h.k.) BIR XIL
+  // chaqiruv ikkinchi marta navbatga qo'shilib, ustma-ust e'lon qilinmaydi.
+  const announcedSignaturesRef = useRef(new Set())
 
   // Process calls sequentially from FIFO queue
   const processCallQueue = () => {
@@ -407,9 +375,14 @@ export default function TvQueueDisplay() {
         if (newlyCalled.length > 0) {
           newlyCalled.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at))
           for (const item of newlyCalled) {
-            if (!callQueueRef.current.some((q) => q.id === item.id && String(q.updated_at) === String(item.updated_at))) {
-              callQueueRef.current.push(item)
+            const signature = `${item.id}:${item.updated_at}`
+            if (announcedSignaturesRef.current.has(signature)) continue
+            announcedSignaturesRef.current.add(signature)
+            // Xotira cheksiz o'smasin — eskilarini tozalab boramiz.
+            if (announcedSignaturesRef.current.size > 500) {
+              announcedSignaturesRef.current.delete(announcedSignaturesRef.current.values().next().value)
             }
+            callQueueRef.current.push(item)
           }
           processCallQueue()
         }
