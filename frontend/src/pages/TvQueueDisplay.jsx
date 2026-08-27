@@ -390,11 +390,19 @@ export default function TvQueueDisplay() {
 
         const currentWaitingIds = new Set((safeData.waiting).map((w) => w.id))
 
-        // Detect newly called or re-called patients
-        const newlyCalled = safeData.calling.filter((c) => {
-          const prevTime = previousCallingTimes.current.get(c.id)
-          return prevTime === undefined || String(prevTime) !== String(c.updated_at)
-        })
+        // Detect newly called or re-called patients. Birinchi yuklanishda
+        // (yoki TV sahifasi qayta yuklanganda) "calling" ro'yxatida allaqachon
+        // turgan bemorlar hali ham bor bo'lishi mumkin — ular ilgari
+        // chaqirilgan, endi yangidan emas. Ilgari `previousCallingTimes`
+        // bo'sh boshlangani uchun ularning barchasi "yangi chaqiruv" deb
+        // hisoblanib, TV har safar sahifa yangilanganda (tarmoq uzilishi,
+        // qayta ulanish va h.k.) ularni QAYTA e'lon qilardi.
+        const newlyCalled = isFirstRender.current
+          ? []
+          : safeData.calling.filter((c) => {
+              const prevTime = previousCallingTimes.current.get(c.id)
+              return prevTime === undefined || String(prevTime) !== String(c.updated_at)
+            })
 
         if (newlyCalled.length > 0) {
           newlyCalled.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at))
