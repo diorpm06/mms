@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw, Calendar, CalendarClock, Wallet, ChevronDown, ChevronUp, Eye, X, Stethoscope, FileText } from 'lucide-react'
+import { RefreshCw, Calendar, CalendarClock, Wallet, MinusCircle, ChevronDown, ChevronUp, Eye, X, Stethoscope, FileText } from 'lucide-react'
 import { api } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
@@ -57,7 +57,7 @@ export default function MyProfile() {
       ) : (
         <>
           {/* Top Quick Stats Summary Cards */}
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Today */}
             <div className="card p-4 border-emerald-500/25 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
@@ -104,6 +104,26 @@ export default function MyProfile() {
               </p>
             </div>
 
+            {/* Advances taken */}
+            <div className="card p-4 border-rose-500/25 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/12 border border-rose-500/25 flex items-center justify-center shrink-0">
+                    <MinusCircle className="h-4 w-4 text-rose-400" />
+                  </div>
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-400">
+                    Olingan Avans
+                  </span>
+                </div>
+              </div>
+              <p className="text-2xl font-black font-mono text-rose-400">
+                {formatMoney(data?.advances_total || 0)}
+              </p>
+              <p className="text-[10px] text-muted font-semibold">
+                Ilgari olingan avans — balansdan shuncha ayirilgan
+              </p>
+            </div>
+
             {/* Balance */}
             <div className="card p-4 border-gold/30 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
@@ -121,7 +141,7 @@ export default function MyProfile() {
                 {formatMoney(data?.balance || 0)}
               </p>
               <p className="text-[10px] text-muted font-semibold">
-                Kassadan yechib olinmagan qolgan hisobingiz
+                Jami ishlagan − avans − chiqarilgan
               </p>
             </div>
           </div>
