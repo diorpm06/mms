@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from fastapi import HTTPException
-from sqlalchemy import extract
+from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
 from models.advance import Advance
@@ -245,53 +245,56 @@ def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None,
     return provider, referrer, referrer_amount, provider_amount, center_amount
 
 
-def _qarzni_qopla_va_qoldigini_qaytar(
-    db: Session, recipient_type: str, recipient_id: int, amount: int
-) -> int:
-    """Ishlab topilgan pulni avval qoplanmagan avans qarziga yo'naltiradi
-    (eng eskisidan boshlab), qolganini qaytaradi — o'sha qoldiq balansga
-    qo'shiladi. Ilgari ishlab topilgan pul qarzdan mustaqil to'g'ridan-
-    to'g'ri balansga qo'shilardi: shifokor/yo'naltiruvchi ham qarzdor,
-    ham "balansi bor" bo'lib ikkalasi alohida-alohida ko'rinardi, holbuki
-    avvalgi qarzi hali qoplanmagan edi."""
-    if amount <= 0 or not recipient_id:
-        return max(0, amount)
-    qarzlar = (
-        db.query(ProviderAdvance)
-        .filter(
-            ProviderAdvance.recipient_type == recipient_type,
-            ProviderAdvance.recipient_id == recipient_id,
-            ProviderAdvance.is_cancelled == False,  # noqa: E712
-            ProviderAdvance.is_settled == False,  # noqa: E712
-        )
-        .order_by(ProviderAdvance.created_at.asc())
-        .all()
-    )
-    qoldi = amount
-    for adv in qarzlar:
-        if qoldi <= 0:
-            break
-        deduct = min(qoldi, adv.remaining)
-        if deduct <= 0:
-            continue
-        adv.remaining -= deduct
-        qoldi -= deduct
-        if adv.remaining <= 0:
-            adv.remaining = 0
-            adv.is_settled = True
-            adv.settled_at = datetime.now()
-    return qoldi
+def sync_provider_balance(db: Session, provider_id: int) -> int:
+    p = db.query(Provider).filter(Provider.id == provider_id).first()
+    if not p:
+        return 0
+    tot_earned = db.query(func.coalesce(func.sum(Transaction.provider_amount), 0)).filter(
+        Transaction.provider_id == provider_id, Transaction.is_cancelled == False
+    ).scalar() or 0
+
+    tot_adv = db.query(func.coalesce(func.sum(ProviderAdvance.amount), 0)).filter(
+        ProviderAdvance.recipient_type == "provider",
+        ProviderAdvance.recipient_id == provider_id,
+        ProviderAdvance.is_cancelled == False,
+    ).scalar() or 0
+
+    tot_payouts = db.query(func.coalesce(func.sum(Payout.amount), 0)).filter(
+        Payout.recipient_type.in_(["provider", "employee"]),
+        Payout.recipient_id == provider_id,
+    ).scalar() or 0
+
+    p.balance = max(0, tot_earned - tot_adv - tot_payouts)
+    return p.balance
+
+
+def sync_referrer_balance(db: Session, referrer_id: int) -> int:
+    r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
+    if not r:
+        return 0
+    tot_earned = db.query(func.coalesce(func.sum(Transaction.referrer_amount), 0)).filter(
+        Transaction.referrer_id == referrer_id, Transaction.is_cancelled == False
+    ).scalar() or 0
+
+    tot_adv = db.query(func.coalesce(func.sum(ProviderAdvance.amount), 0)).filter(
+        ProviderAdvance.recipient_type == "referrer",
+        ProviderAdvance.recipient_id == referrer_id,
+        ProviderAdvance.is_cancelled == False,
+    ).scalar() or 0
+
+    tot_payouts = db.query(func.coalesce(func.sum(Payout.amount), 0)).filter(
+        Payout.recipient_type == "referrer",
+        Payout.recipient_id == referrer_id,
+    ).scalar() or 0
+
+    r.balance = max(0, tot_earned - tot_adv - tot_payouts)
+    return r.balance
 
 
 def process_payment(db: Session, patient: Patient) -> Transaction:
     provider, referrer, referrer_amount, provider_amount, center_amount = _split_amounts(
         patient.payment_amount, patient.referrer_id, patient.provider_id, db, service_id=patient.service_id
     )
-
-    if referrer:
-        referrer.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "referrer", referrer.id, referrer_amount)
-    if provider:
-        provider.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "provider", provider.id, provider_amount)
 
     bal = get_or_create_balance(db)
     bal.current_balance += center_amount
@@ -320,6 +323,16 @@ def process_payment(db: Session, patient: Patient) -> Transaction:
         created_at=patient.created_at or datetime.now(),
     )
     db.add(tx)
+    db.flush()
+
+    # tx yuqorida db.add qilingandan KEYIN sinxronlanadi — aks holda
+    # joriy to'lov Transaction jadvaliga hali kirmagan bo'lib, balans bir
+    # to'lov orqada qolib ketardi.
+    if referrer:
+        sync_referrer_balance(db, referrer.id)
+    if provider:
+        sync_provider_balance(db, provider.id)
+
     return tx
 
 
@@ -334,33 +347,22 @@ def reprice_patient_payment(db: Session, patient: Patient, tx: Transaction) -> T
     # Eski markaz ulushini eslab qolamiz: kassa tarixiga YANGI summa emas,
     # HAQIQIY o'zgarish (yangi - eski) yozilishi kerak.
     eski_markaz = int(tx.center_amount or 0)
-
-    # 1) Eski taqsimotni orqaga qaytaramiz
-    if tx.referrer_id:
-        old_ref = db.query(Referrer).filter(Referrer.id == tx.referrer_id).first()
-        if old_ref:
-            old_ref.balance = max(0, old_ref.balance - (tx.referrer_amount or 0))
-    if tx.provider_id:
-        old_prov = db.query(Provider).filter(Provider.id == tx.provider_id).first()
-        if old_prov:
-            old_prov.balance = max(0, old_prov.balance - (tx.provider_amount or 0))
+    eski_referrer_id = tx.referrer_id
+    eski_provider_id = tx.provider_id
 
     bal = get_or_create_balance(db)
-    bal.current_balance = max(0, bal.current_balance - (tx.center_amount or 0))
 
-    # 2) Yangi taqsimotni hisoblaymiz
+    # Yangi taqsimotni hisoblaymiz. Shifokor/yo'naltiruvchi balansini bu
+    # yerda qo'lda o'zgartirmaymiz — pastda tranzaksiya yangilangandan keyin
+    # sync_referrer_balance/sync_provider_balance orqali NOLDAN qayta
+    # hisoblanadi, shu bilan eski va yangi taqsimot farqi avtomatik to'g'ri
+    # chiqadi (hatto yo'naltiruvchi/shifokor almashtirilgan bo'lsa ham).
     provider, referrer, referrer_amount, provider_amount, center_amount = _split_amounts(
         patient.payment_amount, patient.referrer_id, patient.provider_id, db,
         service_id=patient.service_id,
     )
-    if referrer:
-        referrer.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "referrer", referrer.id, referrer_amount)
-    if provider:
-        provider.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "provider", provider.id, provider_amount)
-    bal.current_balance += center_amount
-    bal.updated_at = datetime.now()
 
-    # 3) Tranzaksiyani yangilaymiz
+    # Tranzaksiyani yangilaymiz
     tx.total_amount = patient.payment_amount
     tx.referrer_id = patient.referrer_id
     tx.referrer_amount = referrer_amount
@@ -378,11 +380,27 @@ def reprice_patient_payment(db: Session, patient: Patient, tx: Transaction) -> T
     # (yangi - eski) ga o'zgaradi. Natijada har bir tahrirdan keyin tarix
     # eski summacha ortiqcha ko'rsatardi va "kassada pul kam" degan
     # nomutanosiblik chiqardi.
+    bal.current_balance += center_amount - eski_markaz
+    bal.updated_at = datetime.now()
     log_balance_change(
         db, center_amount - eski_markaz, "correction",
         f"Tahrirlandi: mijoz #{patient.id} {patient.first_name} "
         f"{patient.last_name} ({eski_markaz:,} -> {center_amount:,})",
     )
+
+    # Shifokor/yo'naltiruvchi balansini noldan qayta hisoblaymiz — eski va
+    # yangi kishi boshqa-boshqa bo'lishi mumkin, shuning uchun ikkalasi ham
+    # yangilanadi.
+    db.flush()
+    if eski_referrer_id and eski_referrer_id != tx.referrer_id:
+        sync_referrer_balance(db, eski_referrer_id)
+    if tx.referrer_id:
+        sync_referrer_balance(db, tx.referrer_id)
+    if eski_provider_id and eski_provider_id != tx.provider_id:
+        sync_provider_balance(db, eski_provider_id)
+    if tx.provider_id:
+        sync_provider_balance(db, tx.provider_id)
+
     return tx
 
 
@@ -441,13 +459,31 @@ def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int
     else:
         obj = db.query(Provider).filter(Provider.id == recipient_id, Provider.is_active == True).first()
 
+    if not obj:
+        raise HTTPException(status_code=400, detail="Chiqariladigan balans yo'q")
+
+    # Balans faqat har bir to'lovda yangilanadi — agar shu oradan keyin avans
+    # berilgan yoki bekor qilingan bo'lsa, saqlangan balans eskirgan bo'lishi
+    # mumkin. Chiqarim oldidan har doim yangidan hisoblab olamiz.
+    if recipient_type == "referrer":
+        sync_referrer_balance(db, recipient_id)
+    else:
+        sync_provider_balance(db, recipient_id)
+
     if not obj or obj.balance <= 0:
         raise HTTPException(status_code=400, detail="Chiqariladigan balans yo'q")
 
-    # Oldin berilgan avanslar birinchi navbatda qoplanadi. Ilgari bu hisobga
-    # olinmasdi: avans olgan shifokorga balansi TO'LIQ yana to'lanardi, ya'ni
-    # klinika bir ishni ikki marta to'lardi. (Xodimlarda bu to'g'ri ishlaydi.)
+    # obj.balance sync_provider_balance/sync_referrer_balance orqali hisoblanadi
+    # va u allaqachon barcha olingan avanslarni TO'LIQ ayirib tashlagan holda
+    # keladi (Jami Ishlangan - Avanslar - Oldingi To'lovlar). Shuning uchun bu
+    # yerda avansni yana bir marta ayirish KERAK EMAS — aks holda avans ikki
+    # marta ayrilib, odamga kam pul chiqadi. Bu yerda faqat hali "yopilgan"
+    # deb belgilanmagan avanslarni yopilgan deb belgilaymiz — sof shunchaki
+    # buxgalteriya uchun (boshqa joylarda "avans qarzi" noto'g'ri ko'rinib
+    # qolmasligi uchun), pul hisobiga ta'sir qilmaydi.
     from models.provider_advance import ProviderAdvance
+
+    beriladi = int(obj.balance)
 
     advances = (
         db.query(ProviderAdvance)
@@ -456,28 +492,14 @@ def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int
             ProviderAdvance.recipient_id == recipient_id,
             ProviderAdvance.is_settled == False,
         )
-        .order_by(ProviderAdvance.created_at.asc())
         .all()
     )
-
-    ishlagani = int(obj.balance)
     qoplanadi = 0
-    qoldiq = ishlagani
     for adv in advances:
-        if qoldiq <= 0:
-            break
-        ayiriladi = min(qoldiq, int(adv.remaining or 0))
-        if ayiriladi <= 0:
-            continue
-        adv.remaining = int(adv.remaining) - ayiriladi
-        if adv.remaining <= 0:
-            adv.remaining = 0
-            adv.is_settled = True
-            adv.settled_at = datetime.now()
-        qoplanadi += ayiriladi
-        qoldiq -= ayiriladi
-
-    beriladi = max(0, ishlagani - qoplanadi)
+        qoplanadi += int(adv.remaining or 0)
+        adv.remaining = 0
+        adv.is_settled = True
+        adv.settled_at = datetime.now()
 
     bal = get_or_create_balance(db)
     if bal.current_balance < beriladi:
@@ -497,8 +519,7 @@ def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int
         bal.updated_at = datetime.now()
         log_balance_change(db, -beriladi, "payout", f"Qo'lda chiqarim ({source_label}): {who}")
     if qoplanadi > 0:
-        # Pul chiqmaydi — faqat avans qarzi yopiladi, shuning uchun kassa yozuvi yo'q
-        log_balance_change(db, 0, "advance_settle", f"Avansdan qoplandi: {who} — {qoplanadi:,} so'm")
+        log_balance_change(db, 0, "advance_settle", f"Avans yopildi (hisobda edi): {who} — {qoplanadi:,} so'm")
     obj.balance = 0
     db.add(payout)
     payout.settled_from_advance = qoplanadi  # javobda ko'rsatish uchun (bazaga yozilmaydi)
@@ -727,11 +748,6 @@ def process_inpatient_payment(
                     elif "labora" in cat_name or "tahlil" in cat_name:
                         prov = db.query(Provider).filter(Provider.specialization.ilike("%labora%"), Provider.is_active == True).first()
             
-            if prov and p_amt > 0:
-                prov.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "provider", prov.id, p_amt)
-            if ref and r_amt > 0:
-                ref.balance += _qarzni_qopla_va_qoldigini_qaytar(db, "referrer", ref.id, r_amt)
-
             bal = get_or_create_balance(db)
             bal.current_balance += c_amt_calc
             bal.updated_at = datetime.now()
@@ -760,6 +776,11 @@ def process_inpatient_payment(
                 qr_amount=0,
             )
             db.add(tx_item)
+            db.flush()
+            if prov and p_amt > 0:
+                sync_provider_balance(db, prov.id)
+            if ref and r_amt > 0:
+                sync_referrer_balance(db, ref.id)
 
         return tx_main if (room_amount > 0 or not extra_items) else tx_item
 

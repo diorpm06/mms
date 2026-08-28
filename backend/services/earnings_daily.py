@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from models.patient import Patient
 from models.payout import Payout
 from models.provider import Provider
+from models.provider_advance import ProviderAdvance
 from models.referrer import Referrer
 from models.transaction import Transaction
 
@@ -79,7 +80,7 @@ def _kunning_bemorlari(db: Session, ustun, filtr, kun: date):
     return natija
 
 
-def _xulosa(db: Session, ustun, filtr, balans: int, kim: str, kim_id: int,
+def _xulosa(db: Session, ustun, filtr, kim: str, kim_id: int, recipient_type: str,
             kunlar: list[dict], tolov_turi: tuple[str, ...]):
     bugun = date.today().isoformat()
     bugungi = next((k["amount"] for k in kunlar if k["date"] == bugun), 0)
@@ -88,22 +89,50 @@ def _xulosa(db: Session, ustun, filtr, balans: int, kim: str, kim_id: int,
         .filter(filtr, Transaction.is_cancelled == False)  # noqa: E712
         .scalar() or 0
     )
+
+    advances_list = (
+        db.query(ProviderAdvance)
+        .filter(
+            ProviderAdvance.recipient_type == recipient_type,
+            ProviderAdvance.recipient_id == kim_id,
+            ProviderAdvance.is_cancelled == False,  # noqa: E712
+        )
+        .order_by(ProviderAdvance.created_at.desc())
+        .all()
+    )
+    olingan_avans = sum(a.amount for a in advances_list)
+
     chiqarilgan = int(
         db.query(func.coalesce(func.sum(Payout.amount), 0))
         .filter(Payout.recipient_type.in_(tolov_turi),
                 Payout.recipient_id == kim_id)
         .scalar() or 0
     )
+
+    net_balance = max(0, jami - olingan_avans - chiqarilgan)
+
+    adv_history = [
+        {
+            "id": a.id,
+            "amount": a.amount,
+            "remaining": a.remaining,
+            "note": a.note or "—",
+            "created_at": a.created_at.isoformat() if a.created_at else "",
+            "is_settled": a.is_settled,
+        }
+        for a in advances_list
+    ]
+
     return {
         "id": kim_id,
         "name": kim,
         "today": bugungi,
         "total_earned": jami,
+        "advances_total": olingan_avans,
         "paid_out": chiqarilgan,
-        "balance": int(balans or 0),
-        # Balans yig'ma raqam; ishlagan puli minus chiqarilgani bilan
-        # mos kelmasa, bu yerda ko'rinadi.
-        "expected_balance": max(0, jami - chiqarilgan),
+        "balance": net_balance,
+        "expected_balance": net_balance,
+        "advances": adv_history,
         "days": kunlar,
     }
 
@@ -114,8 +143,8 @@ def provider_daily(db: Session, provider_id: int, limit: int | None = 60) -> dic
         return {}
     filtr = Transaction.provider_id == provider_id
     kunlar = _kunlik(db, Transaction.provider_amount, filtr, limit)
-    return _xulosa(db, Transaction.provider_amount, filtr, p.balance,
-                   p.full_name, provider_id, kunlar, ("provider", "employee"))
+    return _xulosa(db, Transaction.provider_amount, filtr, p.full_name, provider_id, "provider",
+                   kunlar, ("provider", "employee"))
 
 
 def referrer_daily(db: Session, referrer_id: int, limit: int | None = 60) -> dict:
@@ -124,8 +153,8 @@ def referrer_daily(db: Session, referrer_id: int, limit: int | None = 60) -> dic
         return {}
     filtr = Transaction.referrer_id == referrer_id
     kunlar = _kunlik(db, Transaction.referrer_amount, filtr, limit)
-    return _xulosa(db, Transaction.referrer_amount, filtr, r.balance,
-                   r.full_name, referrer_id, kunlar, ("referrer",))
+    return _xulosa(db, Transaction.referrer_amount, filtr, r.full_name, referrer_id, "referrer",
+                   kunlar, ("referrer",))
 
 
 def provider_day_patients(db: Session, provider_id: int, kun: date) -> list[dict]:

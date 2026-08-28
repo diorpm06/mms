@@ -87,9 +87,16 @@ def create_advance(
         is_settled=False,
     )
     db.add(advance)
-    from services.finance import process_advance
+    from services.finance import process_advance, sync_provider_balance, sync_referrer_balance
     desc = f"Avans: {name}" + (f" — {data.note}" if data.note else "")
     process_advance(db, data.amount, desc)
+
+    # Balans shu zahoti yangi avansni hisobga olishi uchun — aks holda
+    # ro'yxatlarda eski (avansdan oldingi) balans ko'rinib qolardi.
+    if data.recipient_type == "provider":
+        sync_provider_balance(db, data.recipient_id)
+    else:
+        sync_referrer_balance(db, data.recipient_id)
 
     # Harajatlar ro'yxatida ham ko'rinishi uchun Expense jadvaliga qo'shamiz.
     # expense_id orqali avansga bog'lanadi — bekor qilinganda ikkalasi
@@ -180,6 +187,12 @@ def cancel_advance_endpoint(
             exp.cancelled_at = datetime.now()
             exp.cancelled_by = user.id
             exp.cancel_reason = advance.cancel_reason
+
+    from services.finance import sync_provider_balance, sync_referrer_balance
+    if advance.recipient_type == "provider":
+        sync_provider_balance(db, advance.recipient_id)
+    else:
+        sync_referrer_balance(db, advance.recipient_id)
 
     db.commit()
     return {"message": "Avans bekor qilindi, kassaga qaytarildi"}

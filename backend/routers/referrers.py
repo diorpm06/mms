@@ -223,10 +223,9 @@ def payout_referrer(
     payout = payout_recipient_balance(db, "referrer", referrer_id, source=body.source)
     qoplandi = getattr(payout, "settled_from_advance", 0) or 0
     db.commit()
-    msg = "Balans chiqarildi"
+    msg = f"Qo'lga {payout.amount:,} so'm berildi"
     if qoplandi:
-        msg = (f"{qoplandi:,} so'm avans qarzidan qoplandi"
-               + (f", qo'lga {payout.amount:,} so'm berildi" if payout.amount else ", qo'lga pul berilmadi"))
+        msg += f" (bu summa {qoplandi:,} so'mlik avansni allaqachon hisobga olgan)"
     return {
         "message": msg,
         "amount": payout.amount,
@@ -247,6 +246,7 @@ def _build_referrer_profile(db: Session, referrer_id: int, days: int = 10, curre
     from models.patient import Patient
     from models.transaction import Transaction
     from models.provider_advance import ProviderAdvance
+    from models.payout import Payout
 
     r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
     if not r:
@@ -349,7 +349,15 @@ def _build_referrer_profile(db: Session, referrer_id: int, days: int = 10, curre
     daily_stats = list(daily_map.values())
     daily_stats.sort(key=lambda x: x["date"], reverse=True)
 
-    calculated_net = (r.balance - int(adv_debt or 0)) if (adv_debt and adv_debt > 0 and r.balance == 0) else r.balance
+    tot_payouts = (
+        db.query(func.coalesce(func.sum(Payout.amount), 0))
+        .filter(Payout.recipient_type == "referrer", Payout.recipient_id == referrer_id)
+        .scalar() or 0
+    )
+    # r.balance (sync_referrer_balance orqali) 0 dan pastga tushmaydi — lekin
+    # bu yerda haqiqiy sof holatni (avans ishlagandan ko'p bo'lsa, minusda)
+    # ko'rsatish uchun alohida, cheklovsiz hisoblaymiz.
+    calculated_net = total_earned - int(initial_adv or 0) - int(tot_payouts or 0)
 
     return {
         "referrer": {

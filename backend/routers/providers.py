@@ -410,10 +410,9 @@ def payout_provider(
         db.add(exp)
     qoplandi = getattr(payout, "settled_from_advance", 0) or 0
     db.commit()
-    msg = "Balans chiqarildi"
+    msg = f"Qo'lga {payout.amount:,} so'm berildi"
     if qoplandi:
-        msg = (f"{qoplandi:,} so'm avans qarzidan qoplandi"
-               + (f", qo'lga {payout.amount:,} so'm berildi" if payout.amount else ", qo'lga pul berilmadi"))
+        msg += f" (bu summa {qoplandi:,} so'mlik avansni allaqachon hisobga olgan)"
     return {
         "message": msg,
         "amount": payout.amount,
@@ -428,6 +427,7 @@ from models.patient import Patient
 from models.employee import Employee
 from models.advance import Advance
 from models.provider_advance import ProviderAdvance
+from models.payout import Payout
 
 
 @router.get("/advance-summaries")
@@ -456,13 +456,33 @@ def all_provider_advances(
         # remaining maydoni bo'lsa qoplanmagan qismini, bo'lmasa to'liq summani olamiz
         jami = int(sum((getattr(a, "remaining", None) or a.amount) for a in advances))
         balans = int(pr.balance or 0)
+
+        # pr.balance (sync_provider_balance) allaqachon avansni TO'LIQ ayirib
+        # tashlagan holda keladi, shuning uchun uni jami bilan yana bir marta
+        # ayirish avansni ikki marta hisobga oladi. "Qarz" faqat ishlagani
+        # avansdan kam bo'lganda (balans 0 ga tushib qolganda) bo'ladi — bu
+        # holatda haqiqiy farqni alohida hisoblaymiz.
+        debt = 0
+        if jami > 0 and balans == 0:
+            tot_earned = db.query(func.coalesce(func.sum(Transaction.provider_amount), 0)).filter(
+                Transaction.provider_id == pr.id, Transaction.is_cancelled == False
+            ).scalar() or 0
+            tot_adv_all = db.query(func.coalesce(func.sum(ProviderAdvance.amount), 0)).filter(
+                ProviderAdvance.recipient_type == "provider",
+                ProviderAdvance.recipient_id == pr.id,
+                ProviderAdvance.is_cancelled == False,
+            ).scalar() or 0
+            tot_payouts = db.query(func.coalesce(func.sum(Payout.amount), 0)).filter(
+                Payout.recipient_type.in_(["provider", "employee"]), Payout.recipient_id == pr.id
+            ).scalar() or 0
+            debt = max(0, int(tot_adv_all) - int(tot_earned) + int(tot_payouts))
+
         out[str(pr.id)] = {
             "advances_total": jami,
             "advances_count": len(advances),
             "balance": balans,
-            # Ishlagani avansdan kam bo'lsa — shifokor qarzda
-            "remaining": max(0, balans - jami),
-            "debt": max(0, jami - balans),
+            "remaining": balans,
+            "debt": debt,
         }
     return out
 

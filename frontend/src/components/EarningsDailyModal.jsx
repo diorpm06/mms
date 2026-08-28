@@ -63,7 +63,7 @@ export default function EarningsDailyModal({ open, onClose, kind, id, name }) {
       ) : (
         <div className="space-y-4">
           {/* Yig'ma */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             <div className="card p-3 border-gold/30">
               <span className="text-[10px] font-extrabold text-muted uppercase block">Bugun</span>
               <span className="font-black text-gold font-mono text-base">
@@ -74,6 +74,12 @@ export default function EarningsDailyModal({ open, onClose, kind, id, name }) {
               <span className="text-[10px] font-extrabold text-muted uppercase block">Jami ishlagan</span>
               <span className="font-black text-cyan font-mono text-base">
                 {formatMoney(data.total_earned)}
+              </span>
+            </div>
+            <div className="card p-3 border-rose-500/30">
+              <span className="text-[10px] font-extrabold text-muted uppercase block">Olingan avans</span>
+              <span className="font-black text-rose-400 font-mono text-base">
+                {formatMoney(data.advances_total)}
               </span>
             </div>
             <div className="card p-3 border-border">
@@ -89,6 +95,45 @@ export default function EarningsDailyModal({ open, onClose, kind, id, name }) {
               </span>
             </div>
           </div>
+
+          {/* Avanslar tarixi */}
+          {data.advances?.length > 0 && (
+            <div className="border border-border rounded-lg overflow-hidden">
+              <div className="px-3 py-2 bg-surface-2 text-[10px] font-extrabold text-muted uppercase tracking-wider">
+                Avanslar tarixi
+              </div>
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="text-muted uppercase text-[9px] font-extrabold">
+                    <th className="text-left py-1 px-3">Sana</th>
+                    <th className="text-left py-1">Izoh</th>
+                    <th className="text-right py-1">Summa</th>
+                    <th className="text-right py-1 px-3">Holati</th>
+                  </tr>
+                </thead>
+                <tbody className="font-semibold">
+                  {data.advances.map((a) => (
+                    <tr key={a.id} className="border-t border-border/50">
+                      <td className="py-1.5 px-3 font-mono text-muted">
+                        {sanaUz((a.created_at || '').slice(0, 10))}
+                      </td>
+                      <td className="py-1.5 text-body">{a.note}</td>
+                      <td className="py-1.5 font-mono text-right text-rose-400">
+                        {formatMoney(a.amount)}
+                      </td>
+                      <td className="py-1.5 px-3 text-right">
+                        {a.is_settled ? (
+                          <span className="badge badge-success text-[9px] font-bold">yopilgan</span>
+                        ) : (
+                          <span className="badge badge-amber text-[9px] font-bold">ochiq</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Balans yig'ma raqam. Ishlagan puli minus chiqarilgani bilan
               mos kelmasa, buni aytib qo'yamiz — jimgina o'tib ketmasin. */}
