@@ -100,7 +100,7 @@ def _xulosa(db: Session, ustun, filtr, kim: str, kim_id: int, recipient_type: st
         .order_by(ProviderAdvance.created_at.desc())
         .all()
     )
-    olingan_avans = sum(a.amount for a in advances_list)
+    olingan_avans = sum(a.amount for a in advances_list if not a.is_settled)
 
     chiqarilgan = int(
         db.query(func.coalesce(func.sum(Payout.amount), 0))

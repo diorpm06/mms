@@ -257,6 +257,7 @@ def sync_provider_balance(db: Session, provider_id: int) -> int:
         ProviderAdvance.recipient_type == "provider",
         ProviderAdvance.recipient_id == provider_id,
         ProviderAdvance.is_cancelled == False,
+        ProviderAdvance.is_settled == False,
     ).scalar() or 0
 
     tot_payouts = db.query(func.coalesce(func.sum(Payout.amount), 0)).filter(
@@ -280,6 +281,7 @@ def sync_referrer_balance(db: Session, referrer_id: int) -> int:
         ProviderAdvance.recipient_type == "referrer",
         ProviderAdvance.recipient_id == referrer_id,
         ProviderAdvance.is_cancelled == False,
+        ProviderAdvance.is_settled == False,
     ).scalar() or 0
 
     tot_payouts = db.query(func.coalesce(func.sum(Payout.amount), 0)).filter(
