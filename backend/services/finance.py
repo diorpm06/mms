@@ -245,6 +245,32 @@ def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None,
     return provider, referrer, referrer_amount, provider_amount, center_amount
 
 
+def _settle_open_advances(db: Session, recipient_type: str, recipient_id: int) -> int:
+    """Balans to'liq chiqarilgandan keyin chaqiriladi: shu paytgacha berilgan
+    avanslar allaqachon balansga (tot_adv orqali) hisobga olingan bo'lib,
+    to'liq to'lov bilan birga "yopiladi" — aks holda ular is_settled=False
+    holida qolib, KEYINGI davrda ham balansni abadiy kamaytirib turaveradi
+    (xuddi hech qachon to'lanmagandek)."""
+    from models.provider_advance import ProviderAdvance
+
+    advances = (
+        db.query(ProviderAdvance)
+        .filter(
+            ProviderAdvance.recipient_type == recipient_type,
+            ProviderAdvance.recipient_id == recipient_id,
+            ProviderAdvance.is_settled == False,
+        )
+        .all()
+    )
+    qoplanadi = 0
+    for adv in advances:
+        qoplanadi += int(adv.remaining or 0)
+        adv.remaining = 0
+        adv.is_settled = True
+        adv.settled_at = datetime.now()
+    return qoplanadi
+
+
 def sync_provider_balance(db: Session, provider_id: int) -> int:
     p = db.query(Provider).filter(Provider.id == provider_id).first()
     if not p:
@@ -421,7 +447,10 @@ def process_expense(db: Session, amount: int, description: str) -> Balance:
 def process_ten_day_payouts(db: Session, period_start: date, period_end: date) -> list[Payout]:
     bal = get_or_create_balance(db)
     payouts = []
-    for ref in db.query(Referrer).filter(Referrer.is_active == True, Referrer.balance > 0).all():
+    for ref in db.query(Referrer).filter(Referrer.is_active == True).all():
+        sync_referrer_balance(db, ref.id)
+        if ref.balance <= 0:
+            continue
         if bal.current_balance < ref.balance:
             raise ValueError("10 kunlik chiqarim uchun balans yetarli emas")
         payouts.append(
@@ -436,8 +465,14 @@ def process_ten_day_payouts(db: Session, period_start: date, period_end: date) -
         bal.current_balance -= ref.balance
         log_balance_change(db, -ref.balance, "payout", f"10 kunlik: yo'naltiruvchi {ref.full_name}")
         ref.balance = 0
+        # Shu paytgacha berilgan avanslar shu to'lov bilan birga yopiladi —
+        # aks holda keyingi davrda ham balansni abadiy kamaytirib turaveradi.
+        _settle_open_advances(db, "referrer", ref.id)
 
-    for prov in db.query(Provider).filter(Provider.is_active == True, Provider.balance > 0).all():
+    for prov in db.query(Provider).filter(Provider.is_active == True).all():
+        sync_provider_balance(db, prov.id)
+        if prov.balance <= 0:
+            continue
         if bal.current_balance < prov.balance:
             raise ValueError("10 kunlik chiqarim uchun balans yetarli emas")
         payouts.append(
@@ -452,6 +487,7 @@ def process_ten_day_payouts(db: Session, period_start: date, period_end: date) -
         bal.current_balance -= prov.balance
         log_balance_change(db, -prov.balance, "payout", f"10 kunlik: provider {prov.full_name}")
         prov.balance = 0
+        _settle_open_advances(db, "provider", prov.id)
 
     bal.updated_at = datetime.now()
     db.add_all(payouts)
@@ -487,25 +523,8 @@ def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int
     # deb belgilanmagan avanslarni yopilgan deb belgilaymiz — sof shunchaki
     # buxgalteriya uchun (boshqa joylarda "avans qarzi" noto'g'ri ko'rinib
     # qolmasligi uchun), pul hisobiga ta'sir qilmaydi.
-    from models.provider_advance import ProviderAdvance
-
     beriladi = int(obj.balance)
-
-    advances = (
-        db.query(ProviderAdvance)
-        .filter(
-            ProviderAdvance.recipient_type == recipient_type,
-            ProviderAdvance.recipient_id == recipient_id,
-            ProviderAdvance.is_settled == False,
-        )
-        .all()
-    )
-    qoplanadi = 0
-    for adv in advances:
-        qoplanadi += int(adv.remaining or 0)
-        adv.remaining = 0
-        adv.is_settled = True
-        adv.settled_at = datetime.now()
+    qoplanadi = _settle_open_advances(db, recipient_type, recipient_id)
 
     bal = get_or_create_balance(db)
     if bal.current_balance < beriladi:
