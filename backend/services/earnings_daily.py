@@ -100,7 +100,11 @@ def _xulosa(db: Session, ustun, filtr, kim: str, kim_id: int, recipient_type: st
         .order_by(ProviderAdvance.created_at.desc())
         .all()
     )
-    olingan_avans = sum(a.amount for a in advances_list if not a.is_settled)
+    # is_settled bo'yicha filtrlanmaydi: avans "yopilgan" deb belgilanishi
+    # chiqarim (payout) paytida sodir bo'ladi. Agar shu yerda hisobga
+    # olinmasa, chiqarimdan keyin balans avans hech qachon berilmagandek
+    # yana o'sib ketadi va ikkinchi marta chiqarib olish imkoni tug'iladi.
+    olingan_avans = sum(a.amount for a in advances_list)
 
     chiqarilgan = int(
         db.query(func.coalesce(func.sum(Payout.amount), 0))
