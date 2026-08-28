@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../utils/api'
 import { playNotificationSound } from '../../utils/sound'
+import { birthYear } from '../../utils/format'
 import { useAuthStore } from '../../store/authStore'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -846,6 +847,11 @@ export default function DoctorPanel() {
 
               <h3 className="text-2xl font-black text-foreground tracking-tight leading-tight">
                 {current_patient.first_name} {current_patient.last_name}
+                {birthYear(current_patient.birth_date) && (
+                  <span className="text-muted font-bold text-base ml-1.5">
+                    ({birthYear(current_patient.birth_date)}-y.)
+                  </span>
+                )}
               </h3>
 
               {/* Qaysi xizmatga kelgani — shifokor uchun eng muhim ma'lumot,
@@ -1014,7 +1020,12 @@ export default function DoctorPanel() {
                         {p.ticket_number}
                       </span>
                       <div>
-                        <h4 className="font-extrabold text-sm text-body">{p.first_name} {p.last_name}</h4>
+                        <h4 className="font-extrabold text-sm text-body">
+                          {p.first_name} {p.last_name}
+                          {birthYear(p.birth_date) && (
+                            <span className="text-muted font-bold">{' '}({birthYear(p.birth_date)}-y.)</span>
+                          )}
+                        </h4>
                         <p className="text-xs text-muted flex items-center gap-2.5">
                           <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {p.phone}</span>
                           <span className="flex items-center gap-1 text-cyan font-semibold"><Stethoscope className="h-3 w-3" /> {p.service_name}</span>

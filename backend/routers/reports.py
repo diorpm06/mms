@@ -600,6 +600,24 @@ def analytics_forecast(db: Session = Depends(get_db), _: User = Depends(require_
 
     busiest_hour = max(hour_counts, key=hour_counts.get) if hour_counts else 10
 
+    # Xarita "shu haftadagi [kun]" emas, oxirgi 30 kundagi HAR BIR [kun]ning
+    # yig'indisi (masalan "Juma" qatori — o'tgan barcha jumalar yig'indisi).
+    # Shuning uchun bugungi kun hali tugamagan bo'lsa ham, o'tgan jumalarning
+    # 15:00-18:00 kabi soatlari to'lib ko'rinardi — CEO buni "hali kelmagan
+    # vaqt band bo'lib turibdi" deb (haqli ravishda chalkashtirib) qabul
+    # qildi. Endi: bugungi kun ustuni joriy soatdan keyin, ertangi va undan
+    # keyingi kunlar esa BUTUNLAY bo'sh ko'rsatiladi.
+    now = datetime.now()
+    today_idx = now.weekday()
+    current_hour = now.hour
+    for idx, day_name in enumerate(days_map):
+        if idx > today_idx:
+            heatmap[day_name] = {h: 0 for h in range(8, 19)}
+        elif idx == today_idx:
+            for h in range(8, 19):
+                if h > current_hour:
+                    heatmap[day_name][h] = 0
+
     return {
         "avg_daily_revenue": int(avg_daily_rev),
         "projected_next_30_days": projected_next_30_days,
