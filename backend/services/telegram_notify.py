@@ -157,22 +157,37 @@ async def delete_telegram_message(chat_id: str, message_id: int) -> None:
 
 
 def send_telegram_background(text: str, section: str = "system") -> None:
-    """Telegram xabarini alohida fon oqimida (daemon thread) yuboradi.
-    FastAPI API javobi telegram sababli 1 millisekund ham ushlanib qolmaydi!
+    """Telegram xabarini darhol va to'g'ridan-to'g'ri yuboradi.
+    Vercel Serverless konteyneri background threadlarni javob berilishi bilan
+    o'ldirgani sababli, httpx.Client 3.0s timeout bilan to'g'ridan-to'g'ri ishlatiladi.
     """
-    import asyncio
-    import threading
+    if not settings.BOT_TOKEN:
+        return
+    url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/sendMessage"
+    chat_ids = _target_chat_ids()
+    topic_key = TOPIC_MAP.get(section)
+    topic_id = getattr(settings, topic_key, None) if topic_key else None
+    targets: list[tuple[str, int | None]] = []
+    parsed_topic = int(topic_id) if str(topic_id).strip().isdigit() else None
+    for cid in chat_ids:
+        targets.append((cid, parsed_topic))
+    for linked in resolve_targets(section):
+        if linked not in targets:
+            targets.append(linked)
+    if not targets:
+        return
 
-    def _worker():
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(send_telegram_message(text, section=section))
-            loop.close()
-        except Exception as e:
-            logger.warning("Telegram background xatosi: %s", e)
-
-    threading.Thread(target=_worker, daemon=True).start()
+    try:
+        with httpx.Client(timeout=3.0) as client:
+            for chat_id, thread_id in targets:
+                payload = {"chat_id": chat_id, "text": text}
+                if thread_id:
+                    payload["message_thread_id"] = int(thread_id)
+                resp = client.post(url, json=payload)
+                if resp.status_code >= 400:
+                    logger.error("Telegram (direct) yuborilmadi (%s): %s", resp.status_code, resp.text[:300])
+    except Exception as e:
+        logger.error("Telegram direct notify error: %s", e)
 
 
 def format_daily_message(db, d: date | None = None) -> str:

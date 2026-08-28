@@ -137,11 +137,17 @@ async def close_shift(
         new_data={"shift_mode": "TUNGI", "date": today_str},
     )
 
-    # 3. Telegram botga yuborishni fonda bajarish (ekran qotib qolmasligi uchun)
-    background_tasks.add_task(_send_telegram_report_bg, today)
+    # 3. Telegram botga PDF hisobotni uzatish (Vercel Serverless uchun to'g'ridan-to'g'ri)
+    try:
+        from services.telegram_notify import format_daily_message, send_telegram_document
+        msg = f"🔴 **SMENA TUGATILDI ({today.strftime('%d.%m.%Y')})**\n\n" + format_daily_message(db, today)
+        filename = f"Kunlik_Hisobot_{today.strftime('%d.%m.%Y')}.pdf"
+        await send_telegram_document(pdf_bytes, filename, caption=msg, section="reports")
+    except Exception as err:
+        logger.warning(f"Close shift Telegram report send error: {err}")
 
     return {
-        "message": f"Bugungi ({today.strftime('%d.%m.%Y')}) smena tugatildi! Kunlik hisobot Telegram botga yuborilmoqda va Tungi Navbatchilik rejimi faollashdi.",
+        "message": f"Bugungi ({today.strftime('%d.%m.%Y')}) smena tugatildi! Kunlik hisobot Telegram botga yuborildi va Tungi Navbatchilik rejimi faollashdi.",
         "shift_mode": "TUNGI",
         "telegram_sent": True,
     }
