@@ -740,8 +740,12 @@ def process_inpatient_payment(
         # yoki karta deb yozib bo'lmaydi. Ilgari bu yerda payment_type
         # umuman tekshirilmasdi: naqddan qolgan HAMMASI avtomatik "karta"
         # deb yozilardi, hatto nasiya bo'lsa ham.
-        ptype = (payment_type or "").lower()
+        ptype = (payment_type or "cash").lower()
         is_later = ptype in ("later", "keyinroq", "nasiya", "qarz")
+
+        if ptype in ("cash", "naqd"):
+            if cash_amount is None or cash_amount == 0:
+                cash_amount = amount
 
         # 1. Main Statsionar Transaction (Palata & Room daily rate)
         if room_amount > 0 or not extra_items:
