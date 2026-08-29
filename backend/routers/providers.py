@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +17,7 @@ from schemas import ProviderCreate, ProviderOut, ProviderUpdate
 from services.finance import payout_recipient_balance
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
+logger = logging.getLogger(__name__)
 
 
 class PayoutBody(BaseModel):
@@ -413,6 +415,20 @@ def payout_provider(
         db.add(exp)
     qoplandi = getattr(payout, "settled_from_advance", 0) or 0
     db.commit()
+
+    if payout.amount > 0:
+        try:
+            from services.sheets import add_payout_to_sheets
+            add_payout_to_sheets({
+                "created_at": payout.period_start,
+                "recipient_name": p.full_name if p else f"#{provider_id}",
+                "recipient_type": "provider",
+                "amount": payout.amount,
+                "source": body.source or "Naqt kassa",
+            })
+        except Exception as err:
+            logger.warning(f"Sheets ga yuborilmadi (payout): {err}")
+
     msg = f"Qo'lga {payout.amount:,} so'm berildi"
     if qoplandi:
         msg += f" (bu summa {qoplandi:,} so'mlik avansni allaqachon hisobga olgan)"

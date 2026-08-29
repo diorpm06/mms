@@ -1,3 +1,4 @@
+import logging
 import secrets
 import string
 from datetime import date
@@ -14,6 +15,7 @@ from schemas import ReferrerCreate, ReferrerOut, ReferrerUpdate
 from services.finance import payout_recipient_balance
 
 router = APIRouter(prefix="/api/referrers", tags=["referrers"])
+logger = logging.getLogger(__name__)
 
 
 class PayoutBody(BaseModel):
@@ -220,9 +222,24 @@ def payout_referrer(
     # yo'q edi, lekin API ochiq turgani uchun so'rov yuborib chiqarish mumkin edi.
     _: User = Depends(require_ceo),
 ):
+    r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
     payout = payout_recipient_balance(db, "referrer", referrer_id, source=body.source)
     qoplandi = getattr(payout, "settled_from_advance", 0) or 0
     db.commit()
+
+    if payout.amount > 0:
+        try:
+            from services.sheets import add_payout_to_sheets
+            add_payout_to_sheets({
+                "created_at": payout.period_start,
+                "recipient_name": r.full_name if r else f"#{referrer_id}",
+                "recipient_type": "referrer",
+                "amount": payout.amount,
+                "source": body.source or "Naqt kassa",
+            })
+        except Exception as err:
+            logger.warning(f"Sheets ga yuborilmadi (payout): {err}")
+
     msg = f"Qo'lga {payout.amount:,} so'm berildi"
     if qoplandi:
         msg += f" (bu summa {qoplandi:,} so'mlik avansni allaqachon hisobga olgan)"

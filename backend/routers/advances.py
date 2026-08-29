@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import List, Optional
 
@@ -15,6 +16,7 @@ from models.user import User
 from schemas import ProviderAdvanceCreate, ProviderAdvanceOut
 
 router = APIRouter(prefix="/api/advances", tags=["advances"])
+logger = logging.getLogger(__name__)
 
 
 def _row(a: ProviderAdvance, name: str) -> ProviderAdvanceOut:
@@ -113,6 +115,18 @@ def create_advance(
 
     db.commit()
     db.refresh(advance)
+
+    try:
+        from services.sheets import add_payout_to_sheets
+        add_payout_to_sheets({
+            "created_at": advance.created_at,
+            "recipient_name": name,
+            "recipient_type": data.recipient_type,
+            "amount": data.amount,
+            "source": "Avans",
+        })
+    except Exception as err:
+        logger.warning(f"Sheets ga yuborilmadi (avans): {err}")
 
     return _row(advance, name)
 

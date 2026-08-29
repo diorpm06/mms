@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
@@ -18,6 +19,7 @@ from services.salary_reminder import load_salary_reminder, save_salary_reminder
 from services.telegram_notify import send_telegram_message
 
 router = APIRouter(prefix="/api/employees", tags=["employees"])
+logger = logging.getLogger(__name__)
 
 
 class SalaryReminderBody(BaseModel):
@@ -102,6 +104,20 @@ async def pay_salary(
         )
         db.add(exp)
     db.commit()
+
+    if log.amount > 0:
+        try:
+            from services.sheets import add_payout_to_sheets
+            add_payout_to_sheets({
+                "created_at": datetime.now(),
+                "recipient_name": emp_name,
+                "recipient_type": "employee",
+                "amount": log.amount,
+                "source": "Qo'lda (oylik)",
+            })
+        except Exception as err:
+            logger.warning(f"Sheets ga yuborilmadi (oylik): {err}")
+
     report = daily_report(db, datetime.now().date())
     # Ilgari bu yerda `await` turardi — Telegram javob bermaguncha (yoki
     # taym-aut bo'lguncha) kassir ekranda kutib turardi. Endi xabar javob

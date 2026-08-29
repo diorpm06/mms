@@ -153,7 +153,23 @@ def job_monthly_report_and_salary():
 
     def _job(db: Session):
         try:
-            process_monthly_salaries(db)
+            logs = process_monthly_salaries(db)
+            for log in logs:
+                if log.amount <= 0:
+                    continue
+                try:
+                    from models.employee import Employee
+                    from services.sheets import add_payout_to_sheets
+                    emp = db.query(Employee).filter(Employee.id == log.employee_id).first()
+                    add_payout_to_sheets({
+                        "created_at": datetime.now(),
+                        "recipient_name": emp.full_name if emp else f"#{log.employee_id}",
+                        "recipient_type": "employee",
+                        "amount": log.amount,
+                        "source": f"Oylik avtomatik ({log.month})",
+                    })
+                except Exception as err:
+                    logger.warning("Sheets ga yuborilmadi (oylik maosh): %s", err)
             msg = format_monthly_message(db)
             msg = "💼 Oylik maoshlar to'landi.\n\n" + msg
             _run_async(send_telegram_message(msg, section="reports"))
@@ -186,6 +202,17 @@ def job_ten_day_payout():
             name = obj.full_name if obj else f"#{p.recipient_id}"
             role = "Yo'naltiruvchi" if p.recipient_type == "referrer" else "Provider"
             lines.append(f"- {role}: {name} — {p.amount:,} so'm".replace(",", " "))
+            try:
+                from services.sheets import add_payout_to_sheets
+                add_payout_to_sheets({
+                    "created_at": p.period_start,
+                    "recipient_name": name,
+                    "recipient_type": p.recipient_type,
+                    "amount": p.amount,
+                    "source": "10 kunlik avtomatik chiqarim",
+                })
+            except Exception as err:
+                logger.warning("Sheets ga yuborilmadi (10 kunlik payout): %s", err)
         details = "\n".join(lines[:30]) if lines else "—"
         msg = (
             f"📤 10 kunlik foiz chiqarimi\n"

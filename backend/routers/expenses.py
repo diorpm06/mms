@@ -293,6 +293,19 @@ def create_expense(
         )
     except Exception as err:
         logger.warning(f"Telegram xabari yuborilmadi (harajat): {err}")
+
+    try:
+        from services.sheets import add_expense_to_sheets
+        add_expense_to_sheets({
+            "created_at": expense.created_at,
+            "creator_name": user.full_name,
+            "category": data.category or "Boshqa",
+            "description": data.description,
+            "amount": data.amount,
+        })
+    except Exception as err:
+        logger.warning(f"Sheets ga yuborilmadi (harajat): {err}")
+
     return _expense_out(expense)
 
 
