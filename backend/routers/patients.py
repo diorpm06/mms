@@ -269,7 +269,11 @@ def _patient_row(p: Patient) -> dict:
         "cabinet": p.cabinet,
         "referrer_name": p.referrer.full_name if p.referrer else None,
         "provider_name": p.provider.full_name if p.provider else None,
-        "service_name": p.service.name if p.service else None,
+        "service_name": (
+            ", ".join([ps.service.name for ps in (p.services_detail or []) if ps.service])
+            if (getattr(p, "services_detail", None) and len(p.services_detail) > 0)
+            else (p.service.name if p.service else None)
+        ),
         "service_category": p.service.category if p.service else "Umumiy",
         "category": p.service.category if p.service else "Umumiy",
         "creator_name": p.creator.full_name if p.creator else None,
