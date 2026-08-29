@@ -48,6 +48,7 @@ def calculate_financial_split(
     ref_doc_split_sum: int | None = 0,
     is_uzi: bool = False,
     original_price: int | None = None,
+    provider_basis: int | None = None,
 ):
     """
     Financial split logic:
@@ -83,7 +84,11 @@ def calculate_financial_split(
 
     # Normal services: Direct percentage split (Doctor gets provider_percentage % of total,
     # Referrer gets referrer_percentage % or fixed sum of total, Center gets remaining)
-    provider_amount = int(total * provider_percentage / 100)
+    # provider_basis berilgan bo'lsa (masalan massaj xizmatida chegirma bo'lsa),
+    # shifokor ulushi CHEGIRMASIZ asl narxdan hisoblanadi — chegirma faqat
+    # klinika ulushini kamaytiradi, shifokorniki avvalgidek to'liq qoladi.
+    basis = provider_basis if provider_basis is not None else total
+    provider_amount = int(basis * provider_percentage / 100)
     center_amount = total - referrer_amount - provider_amount
 
     return referrer_amount, provider_amount, center_amount
@@ -206,7 +211,7 @@ def _sessiya_ol():
     return SessionLocal()
 
 
-def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None, db: Session, service_id: int | None = None):
+def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None, db: Session, service_id: int | None = None, discount_amount: int = 0):
     provider = None
     provider_pct = 0
     if provider_id:
@@ -232,6 +237,16 @@ def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None,
     is_uzi = main_category(service.category).lower().startswith("uzi") if service else False
     original_price = service.price if service else total
 
+    # Massaj xizmatida chegirma berilgan bo'lsa — shifokor ulushi asl
+    # (chegirmasiz) narxdan hisoblanadi, chegirma faqat klinika ulushini
+    # kamaytiradi. Boshqa xizmatlarda bunday emas: chegirma hammaga
+    # (klinika, shifokor, yo'naltiruvchi) proportsional ta'sir qiladi.
+    provider_basis = None
+    if service and discount_amount and discount_amount > 0:
+        is_massage = main_category(service.category).strip().lower() == "massaj"
+        if is_massage:
+            provider_basis = total + discount_amount
+
     referrer_amount, provider_amount, center_amount = calculate_financial_split(
         total=total,
         provider_percentage=provider_pct,
@@ -241,6 +256,7 @@ def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None,
         ref_doc_split_sum=ref_doc_split_sum if referrer else 0,
         is_uzi=is_uzi,
         original_price=original_price,
+        provider_basis=provider_basis,
     )
     return provider, referrer, referrer_amount, provider_amount, center_amount
 
@@ -325,7 +341,8 @@ def sync_referrer_balance(db: Session, referrer_id: int) -> int:
 
 def process_payment(db: Session, patient: Patient) -> Transaction:
     provider, referrer, referrer_amount, provider_amount, center_amount = _split_amounts(
-        patient.payment_amount, patient.referrer_id, patient.provider_id, db, service_id=patient.service_id
+        patient.payment_amount, patient.referrer_id, patient.provider_id, db, service_id=patient.service_id,
+        discount_amount=patient.discount_amount or 0,
     )
 
     bal = get_or_create_balance(db)
@@ -391,7 +408,7 @@ def reprice_patient_payment(db: Session, patient: Patient, tx: Transaction) -> T
     # chiqadi (hatto yo'naltiruvchi/shifokor almashtirilgan bo'lsa ham).
     provider, referrer, referrer_amount, provider_amount, center_amount = _split_amounts(
         patient.payment_amount, patient.referrer_id, patient.provider_id, db,
-        service_id=patient.service_id,
+        service_id=patient.service_id, discount_amount=patient.discount_amount or 0,
     )
 
     # Tranzaksiyani yangilaymiz

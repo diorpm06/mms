@@ -863,18 +863,38 @@ async def create_patient(
             ip_address=ip, device_info=device,
             detail_message=f"Yangi mijoz qo'shildi: {patient.last_name} {patient.first_name}",
         )
+        # Guruh ichida bir nechta xizmat bo'lsa, chegirma ular orasida ham
+        # narxga proportsional bo'linadi — aks holda faqat guruhning
+        # BIRINCHI xizmati "butun chegirmani yutib yuborgandek" ko'rinardi
+        # (sub_items/services hali ham har biriga to'liq narxni yozardi,
+        # go'yo chegirma faqat 1 ta xizmatdan olingandek ko'rinardi).
+        item_discounts = [0] * len(group_items)
+        if group_discount > 0:
+            if len(group_items) == 1:
+                item_discounts[0] = group_discount
+            else:
+                _item_alloc = 0
+                for _ii, _it in enumerate(group_items):
+                    if _ii == len(group_items) - 1:
+                        item_discounts[_ii] = max(0, group_discount - _item_alloc)
+                    else:
+                        _d = (group_discount * _it["price"] // group_raw_price) if group_raw_price > 0 else 0
+                        item_discounts[_ii] = _d
+                        _item_alloc += _d
+
         sub_items = []
         services_detail = []
-        for it in group_items:
+        for _ii, it in enumerate(group_items):
             s_obj = db.query(Service).filter(Service.id == it["service_id"]).first()
             if s_obj:
                 qty = it.get("quantity", 1)
                 unit = it.get("unit_price") or (it["price"] // max(qty, 1))
                 is_c = bool(it.get("is_course", False))
+                item_final_price = max(0, it["price"] - item_discounts[_ii])
                 sub_items.append({
                     "service_name": s_obj.name,
                     "category": s_obj.category or "Umumiy",
-                    "price": it["price"],
+                    "price": item_final_price,
                     "quantity": qty,
                     "is_course": is_c,
                 })
@@ -884,12 +904,20 @@ async def create_patient(
                     "category": s_obj.category or "Umumiy",
                     "quantity": qty,
                     "unit_price": unit,
-                    "total_price": it["price"],
+                    "total_price": item_final_price,
                     "is_course": is_c,
                 })
                 # Har bir xizmatni alohida saqlaymiz. Ilgari faqat guruhning
                 # birinchi xizmati (patients.service_id) qolib, qolganlari
                 # yo'qolib ketardi.
+                #
+                # DIQQAT: total_price bazada HAR DOIM chegirmasiz (xom) narx
+                # bo'lib saqlanadi — chegirma faqat yuqoridagi sub_items/
+                # services_detail javobida ko'rsatiladi. Agar bu yerga
+                # chegirmalangan narx yozilsa, keyinchalik bemor tahrirlanganda
+                # (masalan faqat chegirma o'zgartirilganda) "xom summa" sifatida
+                # allaqachon chegirmalangan qiymat qayta ishlatilib, chegirma
+                # har safar saqlashda yana bir bor ayrilib ketaveradi.
                 db.add(PatientService(
                     patient_id=patient.id,
                     service_id=it["service_id"],
