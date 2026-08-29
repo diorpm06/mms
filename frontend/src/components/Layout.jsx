@@ -176,7 +176,10 @@ export default function Layout({ role }) {
   }, [])
 
   const SidebarContent = () => (
-    <div className="sidebar flex h-full w-64 flex-col p-4">
+    <div
+      className="sidebar flex h-full w-64 flex-col p-4"
+      style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+    >
       <div
         className="mb-5 flex flex-col items-center gap-2 border-b pb-4"
         style={{ borderColor: 'var(--border)' }}
@@ -300,15 +303,17 @@ export default function Layout({ role }) {
              chiqish tugmasi ataylab yo'q: xodim tizimdan chiqib,
              qulfni chetlab o'tmasin, faqat "Ish Boshlash" (parol
              bilan) orqali ochiladi. */
-          <header className="flex h-14 items-center border-b px-4 flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}>
+          <header className="flex min-h-14 items-center border-b px-4 flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--surface-1)', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
             <span className="font-extrabold text-sm text-amber-400 flex items-center gap-2">
               🌙 {BRAND.name} — Tungi Navbatchilik
             </span>
           </header>
         ) : (
           <>
-            {/* Mobile Header Bar */}
-            <header className="flex h-14 items-center justify-between border-b px-4 md:hidden flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--surface-1)' }}>
+            {/* Mobile Header Bar — iOS'da "black-translucent" status bar tagida
+                yashiringan/bosilmaydigan bo'lib qolmasin uchun xavfsiz zona
+                (notch/Dynamic Island) balandligicha yuqoridan bo'shliq qo'shiladi. */}
+            <header className="flex min-h-14 items-center justify-between border-b px-4 md:hidden flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--surface-1)', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
               <button
                 type="button"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
