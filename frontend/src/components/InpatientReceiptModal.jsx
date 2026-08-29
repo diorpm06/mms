@@ -32,16 +32,28 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
     ? new Date(inpatient.discharged_at).toLocaleDateString('uz-UZ')
     : '— (Davolanmoqda)'
 
-  const daysCount = inpatient.days || inpatient.days_count || 1
+  const daysCount = inpatient.elapsed_days || inpatient.days || inpatient.days_count || 1
   const dailyPrice = inpatient.daily_rate || inpatient.daily_price || 0
   const roomTotal = inpatient.room_total || (daysCount * dailyPrice)
 
   const items = inpatient.items || []
   const payments = inpatient.payments || []
 
+  const LATER_TYPES = ['later', 'keyinroq', 'nasiya', 'qarz']
+  const realPayments = payments.filter(p => !LATER_TYPES.includes((p.payment_type || '').toLowerCase()))
+  const laterPayments = payments.filter(p => LATER_TYPES.includes((p.payment_type || '').toLowerCase()))
+
   const extraItemsTotal = inpatient.extra_items_total || items.filter(it => !it.is_included_in_tariff && !it.is_no_charge).reduce((sum, it) => sum + (it.total_price || 0), 0)
   const grandTotal = inpatient.total_amount || (roomTotal + extraItemsTotal)
-  const paidTotal = inpatient.paid_total || inpatient.total_paid || payments.reduce((sum, p) => sum + (p.amount || 0), 0)
+  
+  const paidTotal = inpatient.paid_total !== undefined
+    ? inpatient.paid_total
+    : realPayments.reduce((sum, p) => sum + (p.amount || 0), 0)
+
+  const laterTotal = inpatient.later_total !== undefined
+    ? inpatient.later_total
+    : laterPayments.reduce((sum, p) => sum + (p.amount || 0), 0)
+
   const balanceDue = inpatient.balance_due !== undefined ? inpatient.balance_due : Math.max(0, grandTotal - paidTotal)
 
   const createdDateStr = inpatient.created_at
@@ -284,8 +296,14 @@ export default function InpatientReceiptModal({ inpatient, onClose }) {
             </div>
             {paidTotal > 0 && (
               <div className="flex justify-between text-xs">
-                <span className="text-slate-700">- Jami To'langan:</span>
+                <span className="text-slate-700">- Jami To'langan (Naqd/Karta/Click):</span>
                 <strong className="font-mono text-emerald-600 dark:text-emerald-400">- {formatMoney(paidTotal)}</strong>
+              </div>
+            )}
+            {laterTotal > 0 && (
+              <div className="flex justify-between text-xs font-bold text-amber-700 dark:text-amber-400">
+                <span>🟡 Keyinroq to'lanadi (Nasiya / Qarz):</span>
+                <strong className="font-mono">{formatMoney(laterTotal)}</strong>
               </div>
             )}
             <div className="flex justify-between items-center text-xs font-extrabold pt-1.5 border-t border-slate-300 dark:border-slate-700">

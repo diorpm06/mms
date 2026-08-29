@@ -252,10 +252,8 @@ def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
     planned_days = _extract_planned_days(i.diagnosis)
     diagnosis = _clean_diagnosis(i.diagnosis)
 
-    if i.status == "yotmoqda" and planned_days and planned_days > 0:
-        bill_days = max(elapsed_days, planned_days)
-    else:
-        bill_days = elapsed_days
+    # Chek va hisobotlar REJA (7 kun) bo'yicha emas, HAQIQATDA o'tgan kunlar (5 kun) bo'yicha hisoblanadi.
+    bill_days = elapsed_days
 
     room_total = bill_days * i.daily_rate
 
@@ -265,10 +263,18 @@ def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
     
     grand_total = room_total + extra_items_total
 
-    # Payments
+    # Payments: Naqd, karta, click, qr, split — HAQIQIY TO'LANGAN pul!
+    # Nasiya / Keyinroq / Qarz ("later", "keyinroq", "nasiya", "qarz") — to'langan pul emas, nasiya qarz!
+    LATER_TYPES = ("later", "keyinroq", "nasiya", "qarz")
     active_payments = [p for p in (i.payments or []) if not getattr(p, "is_cancelled", False)]
-    paid_total = sum(p.amount for p in active_payments)
-    balance_due = grand_total - paid_total
+
+    real_payments = [p for p in active_payments if (p.payment_type or "").lower() not in LATER_TYPES]
+    paid_total = sum(p.amount for p in real_payments)
+
+    later_payments = [p for p in active_payments if (p.payment_type or "").lower() in LATER_TYPES]
+    later_total = sum(p.amount for p in later_payments)
+
+    balance_due = max(0, grand_total - paid_total)
 
     tariff_name = i.tariff.name if getattr(i, "tariff", None) else None
 
@@ -285,11 +291,7 @@ def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
         "tariff_name": tariff_name,
         "doctor_id": i.doctor_id,
         "doctor_name": i.doctor.full_name if getattr(i, "doctor", None) else None,
-        # Shifokorga shu bemor uchun kuniga qancha yozilishi va shu paytgacha
-        # jami qancha yozilgani — hisobda ko'rinib tursin
         "doctor_daily_rate": int(getattr(i.doctor, "inpatient_daily_rate", 0) or 0) if getattr(i, "doctor", None) else 0,
-        # Reja emas, haqiqatda o'tgan kunlar bo'yicha — bemorning hisobi
-        # oldindan to'liq ko'rsatilsa ham shifokorga faqat yotgan kun to'lanadi
         "doctor_accrued_total": elapsed_days * int(getattr(i.doctor, "inpatient_daily_rate", 0) or 0) if getattr(i, "doctor", None) else 0,
         "referrer_id": i.referrer_id,
         "diagnosis": diagnosis,
@@ -304,6 +306,7 @@ def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
         "extra_items_total": extra_items_total,
         "total_amount": grand_total,
         "paid_total": paid_total,
+        "later_total": later_total,
         "balance_due": balance_due,
         "is_cancelled": i.is_cancelled,
         "payments": [
