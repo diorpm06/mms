@@ -68,8 +68,28 @@ function PageLoader() {
   )
 }
 
+// Zustand `persist` localStorage'dan ASINXRON o'qiydi. Ilova to'liq
+// o'chirilib (masalan telefonda "so'nggi ilovalar"dan olib tashlangandan
+// keyin) qayta ochilganda, birinchi render paytida hali hydratsiya
+// tugamagan bo'ladi — shu lahzada accessToken hali `null`, garchi
+// haqiqatda localStorage'da saqlangan bo'lsa ham. Shu sababli foydalanuvchi
+// tizimga kirgan bo'lsa ham "/login" ga otilib ketardi. Hydratsiya
+// tugashini kutib turish shu muammoni tuzatadi.
+function useAuthHydrated() {
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated())
+  useEffect(() => {
+    if (hydrated) return
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true))
+    if (useAuthStore.persist.hasHydrated()) setHydrated(true)
+    return unsub
+  }, [hydrated])
+  return hydrated
+}
+
 function PrivateRoute({ children, roles }) {
   const { accessToken, role } = useAuthStore()
+  const hydrated = useAuthHydrated()
+  if (!hydrated) return null
   if (!accessToken) return <Navigate to="/login" replace />
   if (roles && !roles.includes(role)) return <Navigate to="/login" replace />
   return children
@@ -100,14 +120,19 @@ function DoctorLayout() {
 }
 
 function useStartupAuth() {
-  const { refreshToken, setAuth, logout } = useAuthStore()
+  const { accessToken, refreshToken, setAuth } = useAuthStore()
   useEffect(() => {
     if (!refreshToken) return
+    // Faqat tokenlar bor bo'lsa fonda yangilaymiz.
+    // Tarmoq sekinlashsa yoki server javob berishi kechiksa — foydalanuvchini
+    // saqlangan sessiyasidan chiqarib yubormaymiz.
     api('/auth/refresh', {
       method: 'POST',
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
-      .then((data) => { if (data) setAuth(data); else logout() })
+      .then((data) => {
+        if (data && data.access_token) setAuth(data)
+      })
       .catch(() => {})
   }, [])
 }

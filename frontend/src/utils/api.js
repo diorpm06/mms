@@ -65,7 +65,9 @@ async function refreshTokens() {
     return null
   }
   if (!res.ok) {
-    logout()
+    if (res.status === 401 || res.status === 403) {
+      logout()
+    }
     return null
   }
   const data = await res.json()

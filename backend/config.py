@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./marjona_med.db"  # local fallback (dev uchun)
     SECRET_KEY: str = "marjona_med_service_crm_secret_key_2026_x89f"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 2880  # 2 kun — token sizib chiqsa xavf oynasi qisqa qolsin
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 180  # 6 oy — fon tokeni orqali foydalanuvchi qayta kirmaydi
     BOT_TOKEN: str = ""
     CEO_CHAT_ID: str = ""
     TELEGRAM_CHAT_ID: str = ""
