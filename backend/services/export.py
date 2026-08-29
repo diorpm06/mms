@@ -508,6 +508,23 @@ def export_referrers_pdf(report: dict) -> bytes:
         textColor=colors.HexColor("#1e293b"),
         fontName="Helvetica-Bold",
     )
+    # Jadval sarlavhalari uchun: ustun tor bo'lsa, oddiy matn qatorlar
+    # o'rtasiga "yugurib" ketardi (masalan "Belgilangan" va "Hisoblangan
+    # Ulush" bir-biriga qoplanib ketardi). Paragraph o'z ustuni ichida
+    # so'z bo'yicha 2 qatorga bo'linib yozadi, hech qayerga chiqib
+    # ketmaydi.
+    th_style = ParagraphStyle(
+        "RefTableHeader",
+        parent=styles["Normal"],
+        fontSize=7.3,
+        leading=8.6,
+        alignment=1,
+        textColor=colors.white,
+        fontName="Helvetica-Bold",
+    )
+
+    def _th(text: str):
+        return Paragraph(text, th_style)
 
     p_start = report.get("period_start", "")
     p_end = report.get("period_end", "")
@@ -561,7 +578,10 @@ def export_referrers_pdf(report: dict) -> bytes:
     # ---------------- SECTION 1: GENERAL OVERALL SUMMARY TABLE ----------------
     elements.append(Paragraph("1-QISM: BARCHA YO'NALTIRUVCHILAR BO'YICHA UMUMIY QISQACHA JADVAL", section_head_style))
 
-    summary_table_data = [["#", "Yo'naltiruvchi F.I.Sh", "Bemorlar Soni", "Jami Tushum", "Ishlangan Ulush", "Avans Ushlanma", "Sof To'lanadigan"]]
+    summary_table_data = [[
+        _th("#"), _th("Yo'naltiruvchi F.I.Sh"), _th("Bemorlar Soni"), _th("Jami Tushum"),
+        _th("Ishlangan Ulush"), _th("Avans Ushlanma"), _th("Sof To'lanadigan"),
+    ]]
 
     for i, r in enumerate(ref_list, 1):
         p_cnt = r.get("patient_count", 0)
@@ -649,7 +669,10 @@ def export_referrers_pdf(report: dict) -> bytes:
             header_text = f"{r_name}" + (f" ({r_phone})" if r_phone else "")
             ref_elements.append(Paragraph(header_text, section_head_style))
 
-            table_data = [["№", "Sana", "Bo'lim nomi", "Bemorlar soni", "Xizmatlar soni", "Jami Tushum (so'm)", "Belgilangan Ulush", "Hisoblangan Ulush (so'm)"]]
+            table_data = [[
+                _th("№"), _th("Sana"), _th("Bo'lim nomi"), _th("Bemorlar soni"), _th("Xizmatlar soni"),
+                _th("Jami Tushum (so'm)"), _th("Belgilangan Ulush"), _th("Hisoblangan Ulush (so'm)"),
+            ]]
 
             r_gross = 0
             r_fees = 0
