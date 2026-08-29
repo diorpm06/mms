@@ -4,6 +4,7 @@ import App from './App'
 import './index.css'
 import ErrorBoundary from './components/ErrorBoundary'
 import { registerSW } from 'virtual:pwa-register'
+import { initOfflineSync } from './utils/offline'
 
 const updateSW = registerSW({
   onNeedRefresh() {
@@ -13,6 +14,11 @@ const updateSW = registerSW({
     console.log('Ilova tayyor')
   },
 })
+
+// Internet uzilganda "Yangi bemor" formasi orqali telefon xotirasiga
+// saqlangan bemorlarni ulanish qaytganda (yoki ilova ochilganda, agar
+// internet allaqachon bor bo'lsa) avtomatik serverga yuboradi.
+initOfflineSync()
 
 // Nusxa olishda faqat oddiy matn ko'chirilsin — aks holda Excel/Word
 // kabi dasturlarga tashlaganda manba elementining fon rangi ham

@@ -207,6 +207,18 @@ export default function CeoReferrers() {
     }
   }
 
+  // Bazada qo'lda tuzatilgan yozuvlardan keyin balans eskirib qolgan
+  // bo'lishi mumkin — shuni tranzaksiyalardan qaytadan hisoblab chiqadi.
+  const resyncBalance = async (id) => {
+    try {
+      const res = await api(`/referrers/${id}/resync-balance`, { method: 'POST' })
+      toast(`Balans qayta hisoblandi: ${formatMoney(res.balance)}`)
+      load()
+    } catch (e) {
+      toast(e.message, 'error')
+    }
+  }
+
   const toggleDefer = (refId) => {
     const { from, to } = getTenDayDates()
     const key = `${refId}_${from}_${to}`
@@ -856,6 +868,11 @@ export default function CeoReferrers() {
                                 })
                                 setModal(true)
                               },
+                            },
+                            {
+                              label: 'Balansni qayta hisoblash',
+                              icon: Icons.refresh,
+                              onClick: () => resyncBalance(r.id),
                             },
                             {
                               label: "Ro'yxatdan o'chirish",

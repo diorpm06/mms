@@ -14,7 +14,7 @@ from models.referrer import Referrer
 from models.transaction import Transaction
 from models.user import User
 from schemas import ProviderCreate, ProviderOut, ProviderUpdate
-from services.finance import payout_recipient_balance
+from services.finance import payout_recipient_balance, sync_provider_balance
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
 logger = logging.getLogger(__name__)
@@ -392,6 +392,24 @@ def delete_provider(
     db.commit()
     return {"message": "Status o'zgartirildi / O'chirildi", "is_active": p.is_active if not hard else False}
 
+
+
+@router.post("/{provider_id}/resync-balance")
+def resync_provider_balance(
+    provider_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Shifokorning balansini tranzaksiyalar/avanslar/to'lovlardan NOLDAN
+    qayta hisoblaydi. Odatda balans har to'lovda o'zi yangilanadi — bu
+    tugma faqat yozuv bazada to'g'ridan-to'g'ri (qo'lda) tuzatilgandan
+    keyin, saqlangan balans eskirib qolgan hollar uchun kerak."""
+    p = db.query(Provider).filter(Provider.id == provider_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Shifokor topilmadi")
+    new_balance = sync_provider_balance(db, provider_id)
+    db.commit()
+    return {"message": "Balans qayta hisoblandi", "balance": new_balance}
 
 
 @router.post("/{provider_id}/payout")

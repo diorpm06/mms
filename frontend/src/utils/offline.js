@@ -45,26 +45,59 @@ export async function removePendingPatient(id) {
   })
 }
 
+let _syncing = false
+
 export async function syncPending(apiFn) {
-  if (!navigator.onLine) return
+  // Ikkita chaqiruv (masalan 'online' hodisasi va ilova ochilishi) bir vaqtda
+  // ishga tushib, bitta bemorni ikki marta yubormasin.
+  if (_syncing || !navigator.onLine) return
   const pending = await getPendingPatients()
-  for (const item of pending) {
-    try {
-      await apiFn('/patients', { method: 'POST', body: JSON.stringify(item.payload) })
-      await removePendingPatient(item.id)
-    } catch (e) {
-      console.warn('Sync xato:', e)
+  if (pending.length === 0) return
+
+  _syncing = true
+  let success = 0
+  let failed = 0
+  try {
+    for (const item of pending) {
+      try {
+        await apiFn('/patients', { method: 'POST', body: JSON.stringify(item.payload) })
+        await removePendingPatient(item.id)
+        success += 1
+      } catch (e) {
+        // 4xx (masalan noto'g'ri ma'lumot) qayta urinsa ham tuzalmaydi —
+        // navbatda abadiy qolib, keyingi bemorlarni ham yuborilishini
+        // to'sib qo'ymasin, shuning uchun olib tashlaymiz. Tarmoq/server
+        // xatosi (5xx yoki status yo'q) bo'lsa — keyingi safar qayta
+        // urinish uchun navbatda qoldiramiz.
+        const status = e?.status
+        console.warn('Offline bemorni yuborishda xato:', e)
+        if (typeof status === 'number' && status >= 400 && status < 500) {
+          await removePendingPatient(item.id)
+        }
+        failed += 1
+      }
     }
+  } finally {
+    _syncing = false
+  }
+
+  if (success > 0 || failed > 0) {
+    import('../store/toastStore').then(({ useToastStore }) => {
+      const add = useToastStore.getState().add
+      if (success > 0) add(`${success} ta offline saqlangan bemor serverga yuborildi ✓`, 'success')
+      if (failed > 0) add(`${failed} ta offline bemor hali yuborilmadi — qayta urinib ko'riladi`, 'error')
+    })
   }
 }
 
-export function registerSW() {
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(console.warn)
-    })
-  }
-  window.addEventListener('online', () => {
-    import('./api').then(({ api }) => syncPending(api))
+// Ilova ochilganda (agar internet bo'lsa — oldingi seansdan qolgan
+// bemorlar bo'lishi mumkin) va internet qaytganda navbatdagi bemorlarni
+// avtomatik yuboradi. Service worker'ni O'ZI RO'YXATDAN O'TKAZMAYDI —
+// buni `main.jsx` `virtual:pwa-register` orqali alohida qiladi, bu yerda
+// takror ro'yxatga olinsa ikkita worker bir-biriga xalaqit berishi mumkin.
+export function initOfflineSync() {
+  import('./api').then(({ api }) => {
+    syncPending(api)
+    window.addEventListener('online', () => syncPending(api))
   })
 }

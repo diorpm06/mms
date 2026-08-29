@@ -12,7 +12,7 @@ from database import get_db
 from models.referrer import Referrer
 from models.user import User
 from schemas import ReferrerCreate, ReferrerOut, ReferrerUpdate
-from services.finance import payout_recipient_balance
+from services.finance import payout_recipient_balance, sync_referrer_balance
 
 router = APIRouter(prefix="/api/referrers", tags=["referrers"])
 logger = logging.getLogger(__name__)
@@ -211,6 +211,24 @@ def delete_referrer(referrer_id: int, db: Session = Depends(get_db), _: User = D
     r.is_active = False
     db.commit()
     return {"message": "O'chirildi"}
+
+
+@router.post("/{referrer_id}/resync-balance")
+def resync_referrer_balance(
+    referrer_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Yo'naltiruvchi balansini tranzaksiyalar/avanslar/to'lovlardan NOLDAN
+    qayta hisoblaydi. Odatda balans har to'lovda o'zi yangilanadi — bu
+    tugma faqat yozuv bazada to'g'ridan-to'g'ri (qo'lda) tuzatilgandan
+    keyin, saqlangan balans eskirib qolgan hollar uchun kerak."""
+    r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Yo'naltiruvchi topilmadi")
+    new_balance = sync_referrer_balance(db, referrer_id)
+    db.commit()
+    return {"message": "Balans qayta hisoblandi", "balance": new_balance}
 
 
 @router.post("/{referrer_id}/payout")

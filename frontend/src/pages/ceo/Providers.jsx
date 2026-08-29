@@ -339,6 +339,17 @@ export default function CeoProviders() {
     } catch (e) { toast(e.message, 'error') }
   }
 
+  // Bazada qo'lda (to'g'ridan-to'g'ri) tuzatilgan yozuvlardan keyin
+  // balans eskirib qolgan bo'lishi mumkin — shuni tranzaksiyalardan
+  // qaytadan hisoblab chiqadi.
+  const resyncBalance = async (id) => {
+    try {
+      const res = await api(`/providers/${id}/resync-balance`, { method: 'POST' })
+      toast(`Balans qayta hisoblandi: ${formatMoney(res.balance)}`)
+      load()
+    } catch (e) { toast(e.message, 'error') }
+  }
+
   // Group services by Main Category / Bo'lim
   const categoriesMap = {}
   ;(allServices || []).forEach((s) => {
@@ -628,6 +639,11 @@ export default function CeoProviders() {
                           onClick: () => toggleProviderActive(p),
                         },
                         {
+                          label: 'Balansni qayta hisoblash',
+                          icon: Icons.refresh,
+                          onClick: () => resyncBalance(p.id),
+                        },
+                        {
                           label: "Bazadan to'liq o'chirish",
                           icon: Icons.trash,
                           variant: 'danger',
@@ -755,6 +771,11 @@ export default function CeoProviders() {
                             label: isAct ? "Ishdan ketgan deb belgilash" : 'Qayta tiklash',
                             icon: isAct ? Icons.cancel : Icons.check,
                             onClick: () => toggleProviderActive(p),
+                          },
+                          {
+                            label: 'Balansni qayta hisoblash',
+                            icon: Icons.refresh,
+                            onClick: () => resyncBalance(p.id),
                           },
                           {
                             label: "Bazadan to'liq o'chirish",

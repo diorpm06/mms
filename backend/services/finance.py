@@ -736,16 +736,40 @@ def process_inpatient_payment(
     if extra_items and amount > 0 and amount >= extra_total:
         room_amount = amount - extra_total
 
-        # "Keyinroq" (nasiya/qarz) bo'lsa hech qanday pul kelmagan — naqd
-        # yoki karta deb yozib bo'lmaydi. Ilgari bu yerda payment_type
-        # umuman tekshirilmasdi: naqddan qolgan HAMMASI avtomatik "karta"
-        # deb yozilardi, hatto nasiya bo'lsa ham.
+        # "Keyinroq" (nasiya/qarz) bo'lsa hech qanday pul kelmagan — naqd,
+        # click, qr yoki karta deb yozib bo'lmaydi. Ilgari bu yerda
+        # payment_type umuman tekshirilmasdi: naqddan qolgan HAMMASI
+        # avtomatik "karta" deb yozilardi — nasiya bo'lsa ham, Click yoki
+        # QR orqali to'langan bo'lsa ham xuddi shunday xato bo'lardi.
         ptype = (payment_type or "cash").lower()
         is_later = ptype in ("later", "keyinroq", "nasiya", "qarz")
 
-        if ptype in ("cash", "naqd"):
-            if cash_amount is None or cash_amount == 0:
+        # Chaqiruvchi (masalan kunlik to'lov formasi) faqat to'lov turini
+        # yuborib, ichki naqd/karta/click/qr taqsimotini bermasligi mumkin
+        # — bunda to'liq summani to'lov turiga mos ustunga o'zimiz yozamiz.
+        no_breakdown = cash_amount is None and card_amount is None and click_amount is None and qr_amount is None
+        if no_breakdown and not is_later:
+            if ptype in ("cash", "naqd"):
                 cash_amount = amount
+            elif ptype in ("click", "payme"):
+                click_amount = amount
+            elif ptype == "qr":
+                qr_amount = amount
+            else:
+                card_amount = amount
+
+        c_left = 0 if is_later else (cash_amount or 0)
+        cl_left = 0 if is_later else (click_amount or 0)
+        q_left = 0 if is_later else (qr_amount or 0)
+
+        def _taqsimla(kerak: int):
+            """Berilgan summadan qancha naqd/click/qr/karta bo'lib olinishini
+            hisoblaydi: avval naqd, keyin click, keyin qr, qolgani karta."""
+            nonlocal c_left, cl_left, q_left
+            c = min(c_left, kerak); c_left -= c; kerak -= c
+            cl = min(cl_left, kerak); cl_left -= cl; kerak -= cl
+            q = min(q_left, kerak); q_left -= q; kerak -= q
+            return c, cl, q, kerak  # oxirgisi — karta
 
         # 1. Main Statsionar Transaction (Palata & Room daily rate)
         if room_amount > 0 or not extra_items:
@@ -758,11 +782,9 @@ def process_inpatient_payment(
             )
 
             if is_later:
-                c_amt = 0
-                cd_amt = 0
+                c_amt = cl_amt = q_amt = cd_amt = 0
             else:
-                c_amt = min(cash_amount or 0, room_amount)
-                cd_amt = room_amount - c_amt
+                c_amt, cl_amt, q_amt, cd_amt = _taqsimla(room_amount)
 
             tx_main = Transaction(
                 patient_id=None,
@@ -776,13 +798,12 @@ def process_inpatient_payment(
                 payment_type=payment_type,
                 cash_amount=c_amt,
                 card_amount=cd_amt,
-                click_amount=0,
-                qr_amount=0,
+                click_amount=cl_amt,
+                qr_amount=q_amt,
             )
             db.add(tx_main)
 
         # 2. Add individual transactions for each extra service/material
-        c_rem = 0 if is_later else max(0, (cash_amount or 0) - (room_amount if room_amount > 0 else 0))
         for it in extra_items:
             it_amt = it.total_price
             if it_amt <= 0:
@@ -814,14 +835,20 @@ def process_inpatient_payment(
             )
 
             if is_later:
-                item_cash = 0
-                item_card = 0
+                item_cash = item_click = item_qr = item_card = 0
                 item_ptype = payment_type
             else:
-                item_cash = min(c_rem, it_amt)
-                c_rem -= item_cash
-                item_card = it_amt - item_cash
-                item_ptype = "cash" if item_cash == it_amt else ("card" if item_card == it_amt else "split")
+                item_cash, item_click, item_qr, item_card = _taqsimla(it_amt)
+                if item_cash == it_amt:
+                    item_ptype = "cash"
+                elif item_click == it_amt:
+                    item_ptype = "click"
+                elif item_qr == it_amt:
+                    item_ptype = "qr"
+                elif item_card == it_amt:
+                    item_ptype = "card"
+                else:
+                    item_ptype = "split"
 
             tx_item = Transaction(
                 patient_id=None,
@@ -835,8 +862,8 @@ def process_inpatient_payment(
                 payment_type=item_ptype,
                 cash_amount=item_cash,
                 card_amount=item_card,
-                click_amount=0,
-                qr_amount=0,
+                click_amount=item_click,
+                qr_amount=item_qr,
             )
             db.add(tx_item)
             db.flush()
