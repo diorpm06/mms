@@ -1951,15 +1951,25 @@ export default function NewPatient({ homePath = '/admin' }) {
                         {new Date(p.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td className="p-2 text-center">
-                        {!p.is_cancelled && (
+                        <div className="flex items-center justify-center gap-1.5">
+                          {!p.is_cancelled && (
+                            <button
+                              type="button"
+                              onClick={() => openEditNightPatient(p)}
+                              className="px-2 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan border border-cyan-500/40 text-[11px] font-bold"
+                            >
+                              ✏️ Tahrirlash
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => openEditNightPatient(p)}
-                            className="px-2 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan border border-cyan-500/40 text-[11px] font-bold"
+                            onClick={() => setCreatedPatient(p)}
+                            className="px-2 py-1 rounded-lg bg-gold/15 hover:bg-gold/30 text-gold border border-gold/40 text-[11px] font-bold"
+                            title="Chekni qayta chop etish"
                           >
-                            ✏️ Tahrirlash
+                            🖨️ Chek
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
