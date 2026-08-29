@@ -735,7 +735,14 @@ def process_inpatient_payment(
     # If the payment covers extra services, split extra items to their respective providers
     if extra_items and amount > 0 and amount >= extra_total:
         room_amount = amount - extra_total
-        
+
+        # "Keyinroq" (nasiya/qarz) bo'lsa hech qanday pul kelmagan — naqd
+        # yoki karta deb yozib bo'lmaydi. Ilgari bu yerda payment_type
+        # umuman tekshirilmasdi: naqddan qolgan HAMMASI avtomatik "karta"
+        # deb yozilardi, hatto nasiya bo'lsa ham.
+        ptype = (payment_type or "").lower()
+        is_later = ptype in ("later", "keyinroq", "nasiya", "qarz")
+
         # 1. Main Statsionar Transaction (Palata & Room daily rate)
         if room_amount > 0 or not extra_items:
             bal = get_or_create_balance(db)
@@ -745,10 +752,14 @@ def process_inpatient_payment(
                 db, room_amount, "income",
                 f"Yotgan #{inpatient.id} (Palata): {inpatient.first_name} {inpatient.last_name}",
             )
-            
-            c_amt = min(cash_amount or 0, room_amount)
-            cd_amt = room_amount - c_amt
-            
+
+            if is_later:
+                c_amt = 0
+                cd_amt = 0
+            else:
+                c_amt = min(cash_amount or 0, room_amount)
+                cd_amt = room_amount - c_amt
+
             tx_main = Transaction(
                 patient_id=None,
                 inpatient_id=inpatient.id,
@@ -767,12 +778,12 @@ def process_inpatient_payment(
             db.add(tx_main)
 
         # 2. Add individual transactions for each extra service/material
-        c_rem = max(0, (cash_amount or 0) - (room_amount if room_amount > 0 else 0))
+        c_rem = 0 if is_later else max(0, (cash_amount or 0) - (room_amount if room_amount > 0 else 0))
         for it in extra_items:
             it_amt = it.total_price
             if it_amt <= 0:
                 continue
-                
+
             prov, ref, r_amt, p_amt, c_amt_calc = _split_amounts(
                 it_amt, inpatient.referrer_id, None, db, service_id=it.service_id
             )
@@ -798,9 +809,15 @@ def process_inpatient_payment(
                 f"Yotgan #{inpatient.id} ({it.name}): {inpatient.first_name} {inpatient.last_name}",
             )
 
-            item_cash = min(c_rem, it_amt)
-            c_rem -= item_cash
-            item_card = it_amt - item_cash
+            if is_later:
+                item_cash = 0
+                item_card = 0
+                item_ptype = payment_type
+            else:
+                item_cash = min(c_rem, it_amt)
+                c_rem -= item_cash
+                item_card = it_amt - item_cash
+                item_ptype = "cash" if item_cash == it_amt else ("card" if item_card == it_amt else "split")
 
             tx_item = Transaction(
                 patient_id=None,
@@ -811,7 +828,7 @@ def process_inpatient_payment(
                 provider_id=prov.id if prov else None,
                 provider_amount=p_amt,
                 center_amount=c_amt_calc,
-                payment_type="cash" if item_cash == it_amt else ("card" if item_card == it_amt else "split"),
+                payment_type=item_ptype,
                 cash_amount=item_cash,
                 card_amount=item_card,
                 click_amount=0,

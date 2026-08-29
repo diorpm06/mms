@@ -1087,8 +1087,15 @@ def discharge(
     extra_items_total = sum(it.total_price for it in active_items if not (it.is_included_in_tariff or it.is_no_charge))
     grand_total = room_total + extra_items_total
 
+    # Nasiya/keyinroq to'lovlar haqiqiy pul emas — chiqishda "qancha
+    # yig'ilgan" hisobiga ular ham qo'shilib ketsa, bemor haqiqatda
+    # to'lamagan pulini ham "to'langan" deb hisoblab, kam pul so'raladi
+    # (yoki hatto hech qachon kelmagan pul "ortiqcha to'lov" deb
+    # qaytarilib yuboriladi).
+    LATER_TYPES = ("later", "keyinroq", "nasiya", "qarz")
     active_payments = [p for p in (inp.payments or []) if not getattr(p, "is_cancelled", False)]
-    paid_total = sum(p.amount for p in active_payments)
+    real_payments = [p for p in active_payments if (p.payment_type or "").lower() not in LATER_TYPES]
+    paid_total = sum(p.amount for p in real_payments)
 
     remaining_due = max(0, grand_total - paid_total)
     amount = body.amount if body.amount is not None else remaining_due

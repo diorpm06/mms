@@ -681,6 +681,11 @@ export default function NewPatient({ homePath = '/admin' }) {
       cashAmt = 0; cardAmt = 0; clickAmt = finalPrice
     } else if (form.payment_type === 'qr') {
       cashAmt = 0; cardAmt = 0; qrAmt = finalPrice
+    } else if (form.payment_type === 'later') {
+      // Nasiya/Qarz — hali hech qanday pul kelmagan, karta to'lovi sifatida
+      // yozib qo'yilmasin (aks holda kassa hisobotida "karta" summasi
+      // haqiqatda kelmagan pulni ham qo'shib ko'rsatib yuborardi).
+      cashAmt = 0; cardAmt = 0
     } else {
       cashAmt = 0
       cardAmt = finalPrice
