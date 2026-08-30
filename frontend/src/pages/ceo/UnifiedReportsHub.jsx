@@ -107,7 +107,10 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
   const handleSendTelegramReport = async () => {
     try {
       setSendingTelegram(true)
-      const res = await api('/reports/telegram/send-daily', { method: 'POST' })
+      // DIQQAT: ilgari sana yuborilmasdi — tugma qaysi sana tanlangan
+      // bo'lishidan qat'i nazar HAR DOIM bugungi hisobotni yuborardi.
+      // Endi joriy tanlangan sana (`dateFrom`) yuboriladi.
+      const res = await api(`/reports/telegram/send-daily?date=${dateFrom}`, { method: 'POST' })
       toast(res?.message || "✓ Telegram botga kunlik hisobot yuborildi!")
     } catch (e) {
       toast(e.message || "Telegramga yuborishda xatolik", "error")

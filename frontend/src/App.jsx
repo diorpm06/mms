@@ -96,6 +96,22 @@ function PrivateRoute({ children, roles }) {
   return children
 }
 
+// Noto'g'ri/topilmagan manzil (masalan endi mavjud bo'lmagan havola)
+// bosilganda — allaqachon tizimga kirgan foydalanuvchini "/login"ga
+// otib yuborish chiqib ketgandek taassurot qoldirardi. Endi shunday
+// holatda o'z paneliga qaytariladi, kirmagan bo'lsa hech narsa o'zgarmaydi.
+function NotFoundRedirect() {
+  const { accessToken, role } = useAuthStore()
+  const hydrated = useAuthHydrated()
+  if (!hydrated) return null
+  if (!accessToken) return <Navigate to="/login" replace />
+  if (role === 'ceo') return <Navigate to="/ceo" replace />
+  if (role === 'doctor') return <Navigate to="/doctor" replace />
+  if (role === 'referrer') return <Navigate to="/referrer-portal" replace />
+  if (role === 'omborchi') return <Navigate to="/warehouse" replace />
+  return <Navigate to="/admin" replace />
+}
+
 function CeoLayout() {
   return (
     <PrivateRoute roles={['ceo']}>
@@ -212,6 +228,7 @@ function AppRoutes() {
           <Route path="inventory" element={<Inventory />} />
           <Route path="report-queue" element={<AdminReportQueue />} />
           <Route path="new-patient" element={<NewPatient homePath="/admin" />} />
+          <Route path="search" element={<Search homePath="/admin" />} />
           <Route path="today" element={<TodayPatients />} />
           <Route path="courses" element={<Courses />} />
           <Route path="patients" element={<CeoPatients />} />
@@ -223,7 +240,7 @@ function AppRoutes() {
           <Route path="expenses" element={<AdminExpenses />} />
           <Route path="doctor" element={<DoctorPanel />} />
         </Route>
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<NotFoundRedirect />} />
       </Routes>
       </Suspense>
     </BrowserRouter>

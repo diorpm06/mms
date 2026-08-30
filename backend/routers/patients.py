@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks, Query
@@ -358,12 +359,21 @@ def today_patients(
     return [_patient_row(p) for p in patients]
 
 
+def _phone_ilike_term(raw: str) -> str | None:
+    """Telefon bo'yicha qidiruvda bo'shliq/tire/qavs kabi belgilar
+    hisobga olinmasin — "+998 (90) 123-45-67" deb yozilsa ham, bazada
+    belgisiz saqlangan "+998901234567" bilan mos tushishi kerak."""
+    digits = re.sub(r"[^\d+]", "", raw)
+    return f"%{digits}%" if digits else None
+
+
 def _build_patient_search_query(q_builder, raw_search: str):
     search_str = raw_search.strip()
     if not search_str:
         return q_builder
 
     term = f"%{search_str}%"
+    phone_term = _phone_ilike_term(search_str) or term
 
     full_name_1 = func.concat(Patient.first_name, " ", Patient.last_name)
     full_name_2 = func.concat(Patient.last_name, " ", Patient.first_name)
@@ -371,7 +381,7 @@ def _build_patient_search_query(q_builder, raw_search: str):
     conditions = [
         Patient.first_name.ilike(term),
         Patient.last_name.ilike(term),
-        Patient.phone.ilike(term),
+        Patient.phone.ilike(phone_term),
         Patient.ticket_number.ilike(term),
         Patient.address.ilike(term),
         full_name_1.ilike(term),
@@ -383,12 +393,13 @@ def _build_patient_search_query(q_builder, raw_search: str):
         word_conditions = []
         for w in words:
             wt = f"%{w}%"
+            wt_phone = _phone_ilike_term(w) or wt
             fn2 = func.concat(Patient.first_name, " ", Patient.last_name)
             word_conditions.append(
                 or_(
                     Patient.first_name.ilike(wt),
                     Patient.last_name.ilike(wt),
-                    Patient.phone.ilike(wt),
+                    Patient.phone.ilike(wt_phone),
                     Patient.ticket_number.ilike(wt),
                     fn2.ilike(wt),
                 )

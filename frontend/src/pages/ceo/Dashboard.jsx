@@ -342,7 +342,7 @@ export default function CeoDashboard() {
       <div className="card mb-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-body font-bold text-base">
-            {chartPeriod === '7days' && "So'nggi 7 kunlik daromad charti"}
+            {(chartPeriod === '10days' || chartPeriod === '7days') && `So'nggi ${chartData.length > 0 ? chartData.length : 10} kunlik daromad charti`}
             {chartPeriod === '1-10'  && "1–10 Avgust Daromad Hisoboti (1-Dekada)"}
             {chartPeriod === '11-20' && "11–20 Avgust Daromad Hisoboti (2-Dekada)"}
             {chartPeriod === '21-30' && "21–30 Avgust Daromad Hisoboti (3-Dekada)"}
@@ -350,7 +350,7 @@ export default function CeoDashboard() {
 
           <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border">
             {[
-              { id: '7days', label: '7 kunlik' },
+              { id: '10days', label: `${chartData.length > 0 ? chartData.length : 10} kunlik` },
               { id: '1-10',  label: '1–10 kun' },
               { id: '11-20', label: '11–20 kun' },
               { id: '21-30', label: '21–30 kun' },

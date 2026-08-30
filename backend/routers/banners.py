@@ -88,6 +88,13 @@ async def upload_banner_file(
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Rasm hajmi 5 MB dan oshmasligi kerak")
 
+    # Frontend `accept="image/*,video/*"` faqat mijoz tomonida — hech
+    # narsani kafolatlamaydi. Bu banner TV ekranida ommaviy ko'rsatiladi,
+    # shuning uchun server ham fayl turini tekshiradi.
+    ctype = (file.content_type or "").lower()
+    if not (ctype.startswith("image/") or ctype.startswith("video/")):
+        raise HTTPException(status_code=400, detail="Faqat rasm yoki video fayl yuklash mumkin")
+
     banner = Banner(
         title=title or file.filename,
         image_url="",  # quyida haqiqiy havola bilan almashtiriladi

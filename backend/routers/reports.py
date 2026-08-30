@@ -558,6 +558,23 @@ def delete_saved_report(
     return {"message": "Hisobot o'chirildi"}
 
 
+@router.post("/telegram/send-daily")
+async def send_daily_telegram_report(
+    target_date: Optional[date] = Query(None, alias="date"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    from services.reports_data import daily_report
+    from services.telegram_notify import _format_report_message, send_telegram_message
+
+    d = target_date or date.today()
+    rep = daily_report(db, d)
+    msg = _format_report_message(rep, f"Kunlik Hisobot ({d.strftime('%d.%m.%Y')})")
+    await send_telegram_message(msg, section="reports")
+    return {"message": "✓ Telegram botga kunlik hisobot yuborildi!"}
+
+
+
 
 @router.get("/analytics/forecast")
 def analytics_forecast(db: Session = Depends(get_db), _: User = Depends(require_ceo)):

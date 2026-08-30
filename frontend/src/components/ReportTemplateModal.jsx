@@ -124,7 +124,12 @@ function jadvalKataklariniToldir(container, bemorIsmi, bemorTugilganYili, qoyilg
 // TAHRIRLASH holatida ochiladi. Ilgari har safar "Natija blankasini
 // to'ldirish" bosilganda yangi, ikkinchi yozuv yaratib yuborardi.
 export default function ReportTemplateModal({ patient, category, defaultTemplateKey, serviceId, initialReportId, onClose }) {
-  const [view, setView] = useState(() => (defaultTemplateKey ? 'fill' : 'picker'))
+  // Xizmatning `template_key`si o'chirilgan/nomi o'zgargan shablonga
+  // ishora qilib qolgan bo'lishi mumkin (eski Service yozuvi) — bunda
+  // `getTemplateByKey` `null` qaytaradi. Bunday holda "to'ldirish"
+  // ko'rinishiga emas, tanlash ro'yxatiga o'tkaziladi — aks holda oyna
+  // hech narsa chiqarmasdan bo'sh qolib ketardi.
+  const [view, setView] = useState(() => (defaultTemplateKey && getTemplateByKey(defaultTemplateKey) ? 'fill' : 'picker'))
   const [selectedKey, setSelectedKey] = useState(defaultTemplateKey || null)
   const [editingId, setEditingId] = useState(null)
   const [history, setHistory] = useState([])
@@ -182,7 +187,7 @@ export default function ReportTemplateModal({ patient, category, defaultTemplate
   const openPicker = () => {
     setEditingId(null)
     setSelectedKey(defaultTemplateKey || null)
-    setView(defaultTemplateKey ? 'fill' : 'picker')
+    setView(defaultTemplateKey && getTemplateByKey(defaultTemplateKey) ? 'fill' : 'picker')
   }
 
   const chooseTemplate = (key) => {

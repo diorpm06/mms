@@ -3,15 +3,16 @@ import logging
 import sys
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any, Awaitable, Callable, Dict
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from aiogram import Bot, Dispatcher, F
+from aiogram import BaseMiddleware, Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup, TelegramObject
 
 from config import settings
 from database import SessionLocal
@@ -23,6 +24,57 @@ from services.telegram_notify import _format_report_message
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
+
+
+def _allowed_chat_ids() -> set[str]:
+    ids = set()
+    for raw in (settings.CEO_CHAT_ID, settings.TELEGRAM_CHAT_ID):
+        if raw and str(raw).strip():
+            ids.add(str(raw).strip())
+    for cid in (settings.TELEGRAM_CHAT_IDS or "").split(","):
+        cid = cid.strip()
+        if cid:
+            ids.add(cid)
+    return ids
+
+
+class _AuthMiddleware(BaseMiddleware):
+    """DIQQAT: ilgari BOT'ning HECH BIR komandasida ruxsat tekshiruvi
+    yo'q edi — botni topgan istalgan kishi /kunlik, /balans, /oylik
+    kabi komandalar bilan klinikaning to'liq moliyaviy hisobotini
+    o'qiy olardi, ustiga ustak /ulash orqali O'Z guruhini doimiy
+    moliyaviy xabarlar oluvchi sifatida ro'yxatdan o'tkazib qo'ya
+    olardi (kelajakdagi barcha hisobotlar unga ham ketaverardi).
+    /start va /yordam — bot nima ekanini tushuntiradi, xavfsiz,
+    hammaga ochiq qoladi."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: Message,
+        data: Dict[str, Any],
+    ) -> Any:
+        text = (event.text or "").strip().lower()
+        if text.startswith("/start") or text.startswith("/yordam") or text == "❓ yordam":
+            return await handler(event, data)
+
+        allowed = _allowed_chat_ids()
+        if not allowed:
+            logging.warning(
+                "Telegram bot: CEO_CHAT_ID/TELEGRAM_CHAT_ID(S) sozlanmagan — "
+                "hech kimga (hatto CEO'ga ham) komandalarga ruxsat berilmaydi."
+            )
+            await event.answer("⛔ Bot hali sozlanmagan (ruxsat berilgan chat yo'q).")
+            return None
+
+        if str(event.chat.id) in allowed:
+            return await handler(event, data)
+
+        await event.answer("⛔ Sizga bu botdan foydalanishga ruxsat berilmagan.")
+        return None
+
+
+dp.message.outer_middleware(_AuthMiddleware())
 
 
 class DateRange(StatesGroup):
