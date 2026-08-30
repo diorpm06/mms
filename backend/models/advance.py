@@ -16,6 +16,10 @@ class Advance(CancelMixin, Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # Avans bilan birga yaratilgan harajat yozuvini bog'laydi — bekor
+    # qilinganda o'sha harajat ham (kassaga ikkinchi marta tegmasdan)
+    # bekor deb belgilanadi.
+    expense_id: Mapped[int | None] = mapped_column(ForeignKey("expenses.id"), nullable=True)
 
     employee = relationship("Employee")
     creator = relationship("User", foreign_keys="Advance.created_by")

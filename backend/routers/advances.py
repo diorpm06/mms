@@ -147,6 +147,14 @@ def settle_advance(
     if advance.is_settled:
         raise HTTPException(status_code=400, detail="Ushbu avans allaqachon to'liq qoplangan")
 
+    # `amount` oldin hech qanday tekshiruvsiz qabul qilinardi — manfiy
+    # qiymat yuborilsa `remaining` KAMAYISH o'rniga OSHIB ketardi, keyin
+    # avans bekor qilinganda shu "shishirilgan" summa kassaga qo'shilib
+    # yuborilishi mumkin edi (hech qachon berilmagan pul kassaga kirib
+    # qolardi).
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Summa musbat bo'lishi kerak")
+
     deduct = min(amount, advance.remaining)
     advance.remaining -= deduct
 

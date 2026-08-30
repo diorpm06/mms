@@ -2,6 +2,7 @@ import { useEffect, useState, Fragment } from 'react'
 import { api } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
+import { useAuthStore } from '../../store/authStore'
 import ReferrerProfileModal from '../../components/ReferrerProfileModal'
 
 const TABS = [
@@ -33,6 +34,7 @@ export default function AdminCatalog() {
   const [selectedDept, setSelectedDept] = useState('all')
   const [selectedRefModalId, setSelectedRefModalId] = useState(null)
   const toast = useToastStore((s) => s.add)
+  const isCEO = useAuthStore((s) => s.role) === 'ceo'
 
   useEffect(() => {
     setLoading(true)
@@ -190,22 +192,24 @@ export default function AdminCatalog() {
             <div className="card overflow-x-auto p-0 space-y-3">
               <div className="p-3 bg-surface-2 flex items-center justify-between border-b border-border">
                 <span className="text-xs font-bold text-gold">📢 Yo'naltiruvchilar Tizimga Kirish (Login & Parollar):</span>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const res = await api('/referrers/generate-all-credentials', { method: 'POST' })
-                      toast(res.message || '🔑 Loginlar yaratildi!')
-                      const r = await api('/referrers')
-                      setReferrers(r || [])
-                    } catch (err) {
-                      toast(err.message || 'Xatolik', 'error')
-                    }
-                  }}
-                  className="btn-gold text-[11px] py-1 px-3 font-bold"
-                >
-                  🔑 Barcha Login-Parollarni Yaratish / Yangilash
-                </button>
+                {isCEO && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await api('/referrers/generate-all-credentials', { method: 'POST' })
+                        toast(res.message || '🔑 Loginlar yaratildi!')
+                        const r = await api('/referrers')
+                        setReferrers(r || [])
+                      } catch (err) {
+                        toast(err.message || 'Xatolik', 'error')
+                      }
+                    }}
+                    className="btn-gold text-[11px] py-1 px-3 font-bold"
+                  >
+                    🔑 Barcha Login-Parollarni Yaratish / Yangilash
+                  </button>
+                )}
               </div>
 
               <table className="w-full text-xs">
@@ -215,7 +219,7 @@ export default function AdminCatalog() {
                     <th className="p-3">Ism va Familiya</th>
                     <th className="p-3">Telefon</th>
                     <th className="p-3 font-mono">Tizim Logini</th>
-                    <th className="p-3 font-mono">Parol</th>
+                    {isCEO && <th className="p-3 font-mono">Parol</th>}
                     <th className="p-3 text-center">Harakatlar</th>
                   </tr>
                 </thead>
@@ -228,7 +232,7 @@ export default function AdminCatalog() {
                         <td className="p-3 text-body font-extrabold">📢 {r.full_name}</td>
                         <td className="p-3 text-cyan font-mono">{r.phone || '—'}</td>
                         <td className="p-3 font-mono text-cyan font-bold">{r.username || <span className="text-muted italic font-normal">Yaratilmagan</span>}</td>
-                        <td className="p-3 font-mono text-amber-300 font-bold">{r.plain_password || <span className="text-muted italic font-normal">—</span>}</td>
+                        {isCEO && <td className="p-3 font-mono text-amber-300 font-bold">{r.plain_password || <span className="text-muted italic font-normal">—</span>}</td>}
                         <td className="p-3 text-center">
                           <button
                             type="button"

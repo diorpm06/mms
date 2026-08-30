@@ -397,7 +397,14 @@ def _perform_expense_cancel(e: Expense, reason: str, user: User, db: Session):
             pa.cancelled_at = datetime.now()
             pa.cancelled_by = user.id
             pa.cancel_reason = reason
-            pa.remaining = 0
+            # `remaining` ATAYLAB nolga tushirilmaydi — `restore_expense`
+            # bu avansni qayta faollashtirganda haqiqiy qoldiqni
+            # tiklashi kerak. Balans hisob-kitoblari (`sync_provider_
+            # balance`/`sync_referrer_balance`/`_settle_open_advances`/
+            # 10-kunlik hisobot) barchasi `is_cancelled == False`ni
+            # tekshiradi, shuning uchun `remaining`ning o'zi bekor
+            # qilingan avansda nima bo'lishidan qat'i nazar hisobga
+            # kirmaydi.
 
     db.commit()
     try:
@@ -462,5 +469,20 @@ def restore_expense(
     e.cancelled_at = None
     e.cancelled_by = None
     e.cancel_reason = None
+
+    # `_perform_expense_cancel` shu harajatga bog'liq avansni ham bekor
+    # qilgan bo'lishi mumkin — tiklashda uni ham qayta faollashtirish
+    # kerak, aks holda avans abadiy "bekor" holida qolib, shifokor/
+    # yo'naltiruvchiga bu summa keyingi to'lovda YANA bir marta
+    # to'lanib ketardi (naqd esa bu yerda to'g'ri qaytarilgan bo'lardi).
+    if e.category == "Avans" or (e.description and "Avans:" in e.description):
+        from models.provider_advance import ProviderAdvance
+        pa = db.query(ProviderAdvance).filter(ProviderAdvance.expense_id == e.id).first()
+        if pa and pa.is_cancelled:
+            pa.is_cancelled = False
+            pa.cancelled_at = None
+            pa.cancelled_by = None
+            pa.cancel_reason = None
+
     db.commit()
     return {"message": "Harajat qayta tiklandi ✓", "expense": _expense_out(e)}

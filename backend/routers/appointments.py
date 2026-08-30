@@ -11,6 +11,7 @@ from models.provider import Provider
 from models.service import Service
 from models.user import User
 from auth_utils import require_admin_or_ceo, get_current_user
+from services.finance import process_payment
 from services.ism import ism_tuzat
 from routers.patients import _next_ticket
 
@@ -75,6 +76,25 @@ def create_appointment(
     if not service:
         raise HTTPException(status_code=404, detail="Xizmat turi topilmadi")
 
+    # Ilgari bu yerda hech qanday tekshiruv yo'q edi — ikkita hodim bir
+    # xil shifokorni bir xil kun/soatga ikki marta yozib qo'yishi mumkin
+    # edi (bekor qilinganlarni hisobga olmaganda).
+    conflict = (
+        db.query(Appointment)
+        .filter(
+            Appointment.provider_id == body.provider_id,
+            Appointment.appointment_date == body.appointment_date,
+            Appointment.appointment_time == body.appointment_time,
+            Appointment.status != "bekor",
+        )
+        .first()
+    )
+    if conflict:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Bu shifokor {body.appointment_date} kuni soat {body.appointment_time} da band — {conflict.first_name} {conflict.last_name} allaqachon yozilgan",
+        )
+
     item = Appointment(
         # Qanday yozilganidan qat'i nazar bosh harf bilan saqlaymiz
         first_name=ism_tuzat(body.first_name),
@@ -114,8 +134,8 @@ def check_in_appointment(
 
     # Generate ticket & create patient entry in active queue
     ticket = _next_ticket(db)
-    provider = db.query(Provider).filter(Provider.id == appnt.provider_id).first()
 
+    ptype = (payment_type or "cash").lower()
     patient = Patient(
         first_name=appnt.first_name,
         last_name=appnt.last_name,
@@ -127,12 +147,30 @@ def check_in_appointment(
         service_id=appnt.service_id,
         payment_amount=service.price,
         payment_type=payment_type,
+        cash_amount=service.price if ptype in ("cash", "naqd") else 0,
+        card_amount=service.price if ptype in ("card", "karta", "terminal") else 0,
+        click_amount=service.price if ptype in ("click", "payme") else 0,
+        qr_amount=service.price if ptype == "qr" else 0,
         ticket_number=ticket,
         queue_status="kutmoqda",
-        cabinet=provider.cabinet if provider else None,
+        # `Provider`da `cabinet` maydoni umuman yo'q (u `Service`ga
+        # tegishli) — bu qator har doim AttributeError bilan
+        # yiqilardi, ya'ni "Kalendar & Navbat"dan navbatga kiritish
+        # umuman ishlamas edi.
+        cabinet=service.cabinet if service else None,
         created_by=user.id,
     )
     db.add(patient)
+    db.flush()
+
+    # DIQQAT: ilgari bu yerda process_payment umuman chaqirilmasdi —
+    # bemor navbatga tushardi va (agar naqd/karta to'lagan bo'lsa)
+    # haqiqiy pul olinardi, lekin hech qanday Transaction yozuvi
+    # yaratilmasdi. Hisobotlar (reports_data.py) faqat Transaction'dan
+    # o'qiydi — natijada bu tushum kassa balansida, shifokor KPI'sida
+    # va hisobotlarda umuman KO'RINMASDI, garchi pul haqiqatda olingan
+    # bo'lsa ham.
+    process_payment(db, patient)
 
     appnt.status = "kelgan"
     db.commit()

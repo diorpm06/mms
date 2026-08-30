@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { CalendarCheck, RefreshCw, Search, Undo2 } from 'lucide-react'
+import { CalendarCheck, Edit3, RefreshCw, Search, Undo2 } from 'lucide-react'
 import { api } from '../../utils/api'
 import { formatMoney } from '../../utils/format'
 import { useToastStore } from '../../store/toastStore'
 import { Btn, Icons, PageHeader, EmptyState } from '../../components/UIKit'
 import { TableSkeleton } from '../../components/Skeleton'
 import PaymentTicketModal from '../../components/PaymentTicketModal'
+import Modal from '../../components/Modal'
 
 function sana(iso) {
   if (!iso) return '—'
@@ -20,7 +21,11 @@ export default function Courses() {
   const [ishlanmoqda, setIshlanmoqda] = useState(null)
   // "Keldi" bosilgach bemorga navbat taloni chop etib beriladi
   const [talon, setTalon] = useState(null)
-  
+  // Kurs kunlarini qo'lda tuzatish (masalan adashib eski kunga "Keldi"
+  // bosilgan bo'lsa, "Bekor qilish" faqat bugungisiga ishlaydi)
+  const [editModal, setEditModal] = useState(null)   // { key, patient_name, services: [...] }
+  const [editItems, setEditItems] = useState([])
+  const [saqlanmoqda, setSaqlanmoqda] = useState(false)
 
   const toast = useToastStore((s) => s.add)
 
@@ -76,6 +81,41 @@ export default function Courses() {
       toast(e.message, 'error')
     } finally {
       setIshlanmoqda(null)
+    }
+  }
+
+  const tahrirlashniOch = (r) => {
+    setEditModal(r)
+    setEditItems((r.services || []).map((x) => ({
+      service_id: x.service_id,
+      service_name: x.service_name,
+      quantity: x.quantity,
+      used_count: x.used_count,
+    })))
+  }
+
+  const tahrirniSaqla = async () => {
+    if (!editModal) return
+    setSaqlanmoqda(true)
+    try {
+      const res = await api('/courses/edit', {
+        method: 'PUT',
+        body: JSON.stringify({
+          key: editModal.key,
+          items: editItems.map((x) => ({
+            service_id: x.service_id,
+            quantity: Math.max(1, +x.quantity || 1),
+            used_count: Math.max(0, +x.used_count || 0),
+          })),
+        }),
+      })
+      toast(res.message || 'Saqlandi ✓')
+      setEditModal(null)
+      yukla()
+    } catch (e) {
+      toast(e.message, 'error')
+    } finally {
+      setSaqlanmoqda(false)
     }
   }
 
@@ -230,10 +270,18 @@ export default function Courses() {
                     Keldi
                   </Btn>
 
-                  {/* Kurs kunlarini tahrirlash tugmasi bu yerdan olib
-                      tashlandi: kun soni ro'yxatga olish paytida, "Yangi
-                      Mijoz Qabul" oynasida belgilanadi. Bu sahifa faqat
-                      "bemor keldi" ni qayd qilish uchun. */}
+                  {/* "Bekor qilish" faqat BUGUNGI xato tashrifni tuzatadi.
+                      Eski (o'tgan kunlardagi) xato "Keldi" bosilishini
+                      qo'lda tuzatish uchun — masalan xatolik keyinroq
+                      payqalganda — shu tugma kerak. */}
+                  <button
+                    type="button"
+                    onClick={() => tahrirlashniOch(r)}
+                    className="p-2 rounded-lg text-muted hover:text-cyan hover:bg-cyan-500/10 transition-colors"
+                    title="Kurs kunlarini qo'lda tuzatish (eski xato uchun)"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </button>
 
                   <button
                     type="button"
@@ -250,6 +298,50 @@ export default function Courses() {
           })}
         </div>
       )}
+
+      <Modal
+        open={!!editModal}
+        onClose={() => setEditModal(null)}
+        title={`Kurs kunlarini tuzatish — ${editModal?.patient_name || ''}`}
+      >
+        <div className="space-y-3 pt-2">
+          <p className="text-[11px] text-muted">
+            Har bir xizmat uchun jami kun (sotib olingan) va ishlatilgan kun
+            (bemor kelib ulgurgan kunlar) sonini to'g'irlang.
+          </p>
+          {editItems.map((x, i) => (
+            <div key={x.service_id} className="flex items-center gap-3 p-2.5 bg-surface-2 rounded-lg border border-border">
+              <span className="text-xs font-bold text-body flex-1 truncate">{x.service_name}</span>
+              <div>
+                <label className="text-[10px] text-muted block mb-0.5">Jami kun</label>
+                <input
+                  type="number" min="1"
+                  className="input-field text-xs font-mono w-20 py-1"
+                  value={x.quantity}
+                  onChange={(e) => setEditItems((prev) => prev.map((it, ii) => ii === i ? { ...it, quantity: e.target.value } : it))}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted block mb-0.5">Ishlatilgan</label>
+                <input
+                  type="number" min="0"
+                  className="input-field text-xs font-mono w-20 py-1"
+                  value={x.used_count}
+                  onChange={(e) => setEditItems((prev) => prev.map((it, ii) => ii === i ? { ...it, used_count: e.target.value } : it))}
+                />
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            disabled={saqlanmoqda}
+            onClick={tahrirniSaqla}
+            className="btn-gold w-full py-2.5 text-sm font-bold disabled:opacity-50"
+          >
+            {saqlanmoqda ? 'Saqlanmoqda...' : 'Saqlash'}
+          </button>
+        </div>
+      </Modal>
 
     </div>
   )

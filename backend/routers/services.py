@@ -7,6 +7,7 @@ from models.service import Service
 from models.service_category import ServiceCategory
 from models.user import User
 from schemas import ServiceCreate, ServiceOut, ServiceUpdate
+from services.finance import invalidate_commission_cache
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -63,6 +64,7 @@ def create_category(data: dict, db: Session = Depends(get_db), _: User = Depends
 
     db.add(ServiceCategory(name=nom))
     db.commit()
+    invalidate_commission_cache()
     return {"message": f"\"{nom}\" bo'limi qo'shildi", "name": nom}
 
 
@@ -74,6 +76,7 @@ def remove_empty_category(name: str = "", db: Session = Depends(get_db), _: User
     if c:
         db.delete(c)
         db.commit()
+        invalidate_commission_cache()
     return {"message": f"\"{nom}\" bo'limi ro'yxatdan olib tashlandi"}
 
 
@@ -117,6 +120,7 @@ def rename_category(
         else:
             c.name = new_name
     db.commit()
+    invalidate_commission_cache()
     return {"message": f"{len(services)} ta xizmat bo'limi va prefiksi o'zgartirildi"}
 
 
@@ -143,6 +147,7 @@ def delete_category(
     if c:
         db.delete(c)
     db.commit()
+    invalidate_commission_cache()
     return {"message": f"{len(services)} ta xizmat bo'limi bilan birga o'chirildi"}
 
 

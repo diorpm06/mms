@@ -19,6 +19,12 @@ class Appointment(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="kutilmoqda") # 'kutilmoqda' | 'kelgan' | 'bekor'
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # `TimestampMixin` faqat `updated_at` beradi — bu ustun bazada
+    # (`ALTER TABLE`/create_all orqali) bor edi, lekin modelda yo'q edi,
+    # shuning uchun `_appointment_row()`dagi `a.created_at` har doim
+    # `AttributeError` bilan yiqilardi: yozilish SAQLANARDI (commit
+    # bo'lib ulgurgan), lekin API javobi HAR DOIM 500 xato qaytarardi.
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     provider = relationship("Provider")
     service = relationship("Service")

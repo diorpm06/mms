@@ -44,7 +44,7 @@ def _bir_xil_ismli(db: Session, nom: str, bundan_tashqari: int | None = None):
 def list_referrers(
     active_only: bool = True,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin_or_ceo),
+    user: User = Depends(require_admin_or_ceo),
 ):
     q = db.query(Referrer)
     if active_only:
@@ -86,7 +86,10 @@ def list_referrers(
         item.advance_debt = int(qarzlar.get(r.id) or 0)
         u = users_map.get(r.id)
         item.username = u.username if u else None
-        item.plain_password = u.plain_password if u else None
+        # Parol faqat CEO'ga ko'rinsin — ilgari Admin ham ko'rardi
+        # (shifokorlar/omborchi login-parollari kabi boshqa joylarda
+        # bu allaqachon CEO-only qilingan, bu yerda unutilgan edi).
+        item.plain_password = (u.plain_password if u else None) if user.role == "ceo" else None
         res.append(item)
     return res
 
@@ -290,7 +293,7 @@ def _build_referrer_profile(db: Session, referrer_id: int, days: int = 10, curre
     # User info
     u = db.query(User).filter(User.referrer_id == referrer_id, User.is_active == True).first()
     username = u.username if u else f"doctor{r.id}"
-    plain_password = u.plain_password if (u and current_user and current_user.role in ("ceo", "admin")) else None
+    plain_password = u.plain_password if (u and current_user and current_user.role == "ceo") else None
 
     cutoff_date = date.today() - timedelta(days=days - 1)
 
@@ -459,7 +462,7 @@ def _random_password(length: int = 8) -> str:
 @router.post("/generate-all-credentials")
 def generate_all_referrer_credentials(
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin_or_ceo),
+    _: User = Depends(require_ceo),
 ):
     from auth_utils import hash_password
 
@@ -516,7 +519,7 @@ def set_referrer_credentials(
     referrer_id: int,
     body: CredentialsBody,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin_or_ceo),
+    _: User = Depends(require_ceo),
 ):
     from auth_utils import hash_password
 

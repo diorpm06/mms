@@ -194,6 +194,8 @@ def give_employee_advance(
         category="Avans",
     )
     db.add(exp)
+    db.flush()
+    adv.expense_id = exp.id
 
     ip, device = get_client_info(request)
     log_audit(
@@ -213,6 +215,55 @@ def give_employee_advance(
         "advances_total": yangi["advances_total"],
         "remaining": max(0, yangi["base_salary"] - yangi["advances_total"]),
     }
+
+
+class CancelAdvanceBody(BaseModel):
+    reason: str | None = None
+
+
+@router.post("/advance/{advance_id}/cancel")
+def cancel_employee_advance(
+    advance_id: int,
+    body: CancelAdvanceBody | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    """Adashib berilgan xodim avansini bekor qiladi. Ilgari bunday
+    endpoint umuman yo'q edi — avansga bog'liq Harajatni bekor qilish
+    mumkin bo'lsa ham (kassaga pul qaytadi), `Advance` yozuvining o'zi
+    hech qachon bekor bo'lmasdi, shuning uchun xodim oylikdan bu summa
+    doim ayrilib turaverar edi — garchi klinika puli kassaga qaytgan
+    bo'lsa ham (xodim pulni bir marta ham ushlab ko'rmay, oylikdan
+    "to'lagan" bo'lib chiqardi)."""
+    adv = db.query(Advance).filter(
+        Advance.id == advance_id, Advance.is_cancelled == False,  # noqa: E712
+    ).first()
+    if not adv:
+        raise HTTPException(status_code=404, detail="Avans topilmadi")
+
+    emp = db.query(Employee).filter(Employee.id == adv.employee_id).first()
+
+    from services.finance import cancel_advance as cancel_advance_kassa
+    cancel_advance_kassa(db, adv.amount)
+
+    adv.is_cancelled = True
+    adv.cancelled_at = datetime.now()
+    adv.cancelled_by = user.id
+    adv.cancel_reason = (body.reason if body else None) or "Bekor qilindi"
+
+    if adv.expense_id:
+        exp = db.query(Expense).filter(Expense.id == adv.expense_id).first()
+        if exp and not exp.is_cancelled:
+            # Kassa allaqachon yuqorida qaytarildi — bu yerda faqat
+            # Harajatlar ro'yxatidan chiqarish uchun belgilanadi, yana
+            # bir marta kassaga tegilmaydi.
+            exp.is_cancelled = True
+            exp.cancelled_at = datetime.now()
+            exp.cancelled_by = user.id
+            exp.cancel_reason = adv.cancel_reason
+
+    db.commit()
+    return {"message": f"{'Avans' if not emp else emp.full_name + ' uchun avans'} bekor qilindi", "amount": adv.amount}
 
 
 @router.get("/payroll-summaries")

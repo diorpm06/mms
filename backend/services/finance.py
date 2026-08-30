@@ -79,7 +79,14 @@ def calculate_financial_split(
         remaining = max(0, total - clinic_fixed_fee)
         pct = provider_percentage if provider_percentage > 0 else 50
         provider_amount = int(remaining * pct / 100)
-        center_amount = total - referrer_amount - provider_amount
+        # Yo'naltiruvchi haqi ba'zan qat'iy summa (masalan UZI uchun
+        # 15,000 so'm, foizga bog'liq emas). Bemorga katta chegirma
+        # berilib, u to'lagan summa shu qat'iy summadan kichik bo'lsa,
+        # klinika ulushi manfiy chiqib qolardi — bu esa haqiqiy to'lovda
+        # (process_payment) kassa balansini kamaytirar edi, oshirish
+        # o'rniga. Klinika chegirma yukini o'z zimmasiga oladi (0 dan
+        # pastga tushmaydi).
+        center_amount = max(0, total - referrer_amount - provider_amount)
         return referrer_amount, provider_amount, center_amount
 
     # Normal services: Direct percentage split (Doctor gets provider_percentage % of total,
@@ -88,8 +95,27 @@ def calculate_financial_split(
     # shifokor ulushi CHEGIRMASIZ asl narxdan hisoblanadi — chegirma faqat
     # klinika ulushini kamaytiradi, shifokorniki avvalgidek to'liq qoladi.
     basis = provider_basis if provider_basis is not None else total
-    provider_amount = int(basis * provider_percentage / 100)
-    center_amount = total - referrer_amount - provider_amount
+    provider_base = int(basis * provider_percentage / 100)
+    # `ref_doc_split_pct`/`ref_doc_split_sum` xizmat sozlamasida
+    # "yo'naltiruvchi haqining bir qismini shifokor ko'tarsin" degan
+    # qoidani bildiradi (docstring'da yozilgan), lekin bu ikkalasi
+    # HECH QACHON ishlatilmagan edi — shifokor har doim TO'LIQ ulushni
+    # olardi, klinika esa yo'naltiruvchi xarajatini shifokordan
+    # qaytarib olish o'rniga o'zi to'liq ko'tarardi. Chaqiruvchilar
+    # (`_split_amounts` va h.k.) bu ikkalasini yo'naltiruvchi bo'lmasa
+    # `None`/`0` qilib yuboradi, shuning uchun bu yerda qo'shimcha
+    # tekshiruv shart emas.
+    if ref_doc_split_sum and ref_doc_split_sum > 0:
+        doctor_deduction = int(ref_doc_split_sum)
+    elif ref_doc_split_pct:
+        doctor_deduction = int(referrer_amount * ref_doc_split_pct / 100)
+    else:
+        doctor_deduction = 0
+    provider_amount = max(0, provider_base - doctor_deduction)
+    # Yuqoridagi UZI shoxobchasidagi izohga qarang — qat'iy summali
+    # yo'naltiruvchi haqi katta chegirmadan oshib ketganda klinika
+    # ulushi manfiy chiqmasin.
+    center_amount = max(0, total - referrer_amount - provider_amount)
 
     return referrer_amount, provider_amount, center_amount
 
@@ -275,6 +301,7 @@ def _settle_open_advances(db: Session, recipient_type: str, recipient_id: int) -
             ProviderAdvance.recipient_type == recipient_type,
             ProviderAdvance.recipient_id == recipient_id,
             ProviderAdvance.is_settled == False,
+            ProviderAdvance.is_cancelled == False,
         )
         .all()
     )
@@ -574,8 +601,19 @@ def process_monthly_salaries(db: Session) -> list[SalaryLog]:
     logs = []
     total_salary = 0
 
+    # Kimdir shu oy uchun avval qo'lda to'lagan bo'lishi mumkin
+    # (`pay_employee_salary`) — bu funksiya esa oy oxirida CRON orqali
+    # BARCHA xodimlarga qayta to'lardi, chunki hech qayerda "bu oy
+    # uchun allaqachon to'landimi" tekshirilmasdi. Ikkinchi marta
+    # to'lash xavfi bor edi.
+    already_paid_ids = {
+        row[0] for row in db.query(SalaryLog.employee_id).filter(SalaryLog.month == month).all()
+    }
+
     employees = db.query(Employee).filter(Employee.is_active == True).all()
     for emp in employees:
+        if emp.id in already_paid_ids:
+            continue
         adv_total = _employee_advances_total_for_month(db, emp.id, month)
         total_salary += max(0, emp.monthly_salary - adv_total)
 
@@ -583,6 +621,8 @@ def process_monthly_salaries(db: Session) -> list[SalaryLog]:
         raise ValueError("Oylik maosh uchun balans yetarli emas")
 
     for emp in employees:
+        if emp.id in already_paid_ids:
+            continue
         adv_total = _employee_advances_total_for_month(db, emp.id, month)
         payout_amount = max(0, emp.monthly_salary - adv_total)
         bal.current_balance -= payout_amount
@@ -605,8 +645,19 @@ def pay_employee_salary(db: Session, employee_id: int) -> SalaryLog:
     if not emp:
         raise HTTPException(status_code=404, detail="Xodim topilmadi")
 
-    bal = get_or_create_balance(db)
     month = datetime.now().strftime("%Y-%m")
+    already = (
+        db.query(SalaryLog)
+        .filter(SalaryLog.employee_id == employee_id, SalaryLog.month == month)
+        .first()
+    )
+    if already:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{emp.full_name} uchun {month} oyi maoshi allaqachon to'langan ({already.amount:,} so'm)".replace(",", " "),
+        )
+
+    bal = get_or_create_balance(db)
     adv_total = _employee_advances_total_for_month(db, emp.id, month)
     payout_amount = max(0, emp.monthly_salary - adv_total)
     if bal.current_balance < payout_amount:

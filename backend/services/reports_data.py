@@ -277,12 +277,20 @@ def get_report(db: Session, start: date, end: date) -> dict:
     expense_total = sum(x.amount for x in expenses)
     cash_expenses = 0
     card_expenses = 0
+    # Manba tanlovida ("Naqt kassa"/"Karta kassa"/"Bank hisob"/"Boshqa")
+    # "Click" degan variant UMUMAN yo'q — u yerdagi tekshiruv hech qachon
+    # to'g'ri kelmaydi. Battari, "Boshqa" (aniq naqd emas!) uchinchi
+    # variantlarning hech biriga mos kelmagani uchun `else` orqali
+    # NAQD deb hisoblanib qolardi. Endi faqat aniq "Naqt kassa" (yoki
+    # eski, manba yozilmagan tarixiy yozuvlar — ular har doim naqd
+    # bo'lgan) naqd hisoblanadi, qolgan hammasi (Karta/Bank/Boshqa)
+    # karta/karta-emas kassaga tushadi.
     for x in expenses:
         desc = x.description or ""
-        if "[MANBA: Karta kassa]" in desc or "[MANBA: Bank hisob]" in desc or "[MANBA: Click]" in desc:
-            card_expenses += x.amount
-        else:
+        if "[MANBA: Naqt kassa]" in desc or "[MANBA:" not in desc:
             cash_expenses += x.amount
+        else:
+            card_expenses += x.amount
 
     net_cash = max(0, cash - cash_expenses)
     net_card = max(0, (card + click + qr) - card_expenses)
@@ -659,6 +667,16 @@ def get_report(db: Session, start: date, end: date) -> dict:
     materials_used_breakdown.sort(key=lambda x: x["profit"], reverse=True)
     total_material_income = sum(m["total_income"] for m in materials_used_breakdown)
     total_material_cost = sum(m["total_cost"] for m in materials_used_breakdown)
+
+    # Material sotuvi to'liq sotish narxida `center_share`ga (demak
+    # `net_profit`ga ham) qo'shiladi — tan narxi hech qayerda
+    # ayirilmagan edi (na xarid vaqtida — restock harajat yozmaydi, na
+    # shu yerda). Natijada "Klinikada qolgan" foyda material tan
+    # narxi miqdorida shishirilgan bo'lardi. `total_material_cost` shu
+    # yerdan avval hisoblanmagani uchun (u yuqorida, net_profit endi
+    # o'zgaradi) `finance_chart`dagi mos qatorni ham yangilaymiz.
+    net_profit -= total_material_cost
+    finance_chart[-1]["value"] = int(net_profit)
     total_material_profit = sum(m["profit"] for m in materials_used_breakdown)
     total_material_quantity = sum(m["quantity_used"] for m in materials_used_breakdown)
 
@@ -1001,21 +1019,24 @@ def admin_dashboard_summary(db: Session, d: date, shift_only: bool = False) -> d
     )
     patients_count, paper_total = int(bemor[0] or 0), int(bemor[1] or 0)
 
-    # 3-so'rov: harajatlar, manbasi bo'yicha ajratilgan holda
-    kartadan = (Expense.description.contains("[MANBA: Karta kassa]")
-                | Expense.description.contains("[MANBA: Bank hisob]")
-                | Expense.description.contains("[MANBA: Click]"))
+    # 3-so'rov: harajatlar, manbasi bo'yicha ajratilgan holda. Diqqat:
+    # manba tanlovida "Click" degan variant yo'q, "Boshqa" esa naqd
+    # emas — shuning uchun faqat aniq "Naqt kassa" (yoki manba
+    # yozilmagan eski yozuvlar) naqd hisoblanadi (reports_data.py
+    # yuqorisidagi bir xil izoh).
+    naqddan = (Expense.description.contains("[MANBA: Naqt kassa]")
+               | ~Expense.description.contains("[MANBA:"))
     xar = (
         db.query(
             func.coalesce(func.sum(Expense.amount), 0),
-            func.coalesce(func.sum(case((kartadan, Expense.amount), else_=0)), 0),
+            func.coalesce(func.sum(case((naqddan, Expense.amount), else_=0)), 0),
         )
         .filter(Expense.created_at >= s, Expense.created_at <= e,
                 Expense.is_cancelled == False)
         .first()
     )
-    expense_total, card_expenses = int(xar[0] or 0), int(xar[1] or 0)
-    cash_expenses = expense_total - card_expenses
+    expense_total, cash_expenses = int(xar[0] or 0), int(xar[1] or 0)
+    card_expenses = expense_total - cash_expenses
 
     return {
         "patients_count": patients_count,
@@ -1265,7 +1286,10 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     # Har bir referrer/provider uchun alohida so'rov o'rniga — bitta so'rovda
     # barcha yopilmagan avanslarni olib, xotirada guruhlaymiz
     advance_remaining_map = defaultdict(int)
-    for a in db.query(ProviderAdvance).filter(ProviderAdvance.is_settled == False).all():
+    for a in db.query(ProviderAdvance).filter(
+        ProviderAdvance.is_settled == False,
+        ProviderAdvance.is_cancelled == False,
+    ).all():
         advance_remaining_map[(a.recipient_type, a.recipient_id)] += a.remaining
 
     # 1. Detailed Service Breakdown with Commissions
@@ -1387,15 +1411,19 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         # Check Advances for Referrer
         total_advance_remaining = advance_remaining_map.get(("referrer", r.id), 0)
 
-        # DIQQAT: avans qarzi endi HAR BIR TO'LOVDA real vaqtda avtomatik
-        # qoplanadi (services/finance.py) — shu davr ulushi allaqachon
-        # joriy total_advance_remaining ichida hisobga olingan. Shuning
-        # uchun bu yerda yana bir marta ayirib bo'lmaydi (ikki marta
-        # ayirish "Qolgan Qarz"ni haqiqiysidan kamroq ko'rsatib
-        # qo'yardi). "Sof To'lanadigan" — bu davrning gipotetik hisobi
-        # emas, balansning HOZIRGI haqiqiy qiymati.
+        # `ProviderAdvance.remaining` FAQAT qo'lda "qoplash"/"chiqarish"
+        # amalida kamayadi (services/advances.py, finance.py
+        # _settle_open_advances) — bemor to'lovi kelganda O'ZI kamaymaydi.
+        # Shuning uchun bu yerda shu DAVR uchun ishlangan ulushni joriy
+        # avans qarziga qarshi gipotetik hisoblab ko'rsatamiz: aynan shu
+        # 10 kunlik hisobot — "shu davr ulushidan qancha avans qarzi
+        # yopiladi, qancha qarz qoladi, qancha pul qo'lga tegadi" degan
+        # savolga javob berishi kerak. `r.balance` (umrbod balans) buni
+        # bermaydi — u butun tarix bo'yicha, tanlangan davrga bog'liq
+        # emas edi.
         advance_deducted = min(total_comm, total_advance_remaining)
-        net_payable = r.balance
+        advance_remaining_after = max(0, total_advance_remaining - total_comm)
+        net_payable = max(0, total_comm - total_advance_remaining)
 
         daily_svc_map = {}
         daily_dept_map = {}
@@ -1504,7 +1532,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             "patient_count": patient_count,
             "gross_total": gross_total,
             "earned_commission": total_comm,
-            "advance_remaining": total_advance_remaining,
+            "advance_remaining": advance_remaining_after,
             "advance_deducted": advance_deducted,
             "net_payable": net_payable,
             "patients": patient_details,
@@ -1512,6 +1540,65 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             "daily_departments": daily_departments,
             "daily_services": daily_services,
         }
+
+    # Statsionar (yotgan) bemorga qo'shilgan qo'shimcha xizmatlar (UZI/Lab)
+    # uchun yo'naltiruvchi komissiyasi `process_inpatient_payment` orqali
+    # `Transaction`ga to'g'ri yoziladi (umumiy `referrer_share`ga ham to'g'ri
+    # qo'shiladi), lekin yuqoridagi ro'yxat faqat `Patient` (ambulator)
+    # jadvalidan tuzilgani uchun statsionardan kelgan komissiya bu yerda
+    # umuman ko'rinmasdi — faqat statsionardan komissiya olgan yo'naltiruvchi
+    # ro'yxatda butunlay chiqmay qolar, ambulatori ham bo'lsa ulushi kam
+    # ko'rsatilardi (demak "to'lash" tugmasi kam pul bilan bosilardi).
+    inp_ref_rows = (
+        db.query(
+            Transaction.referrer_id,
+            func.sum(Transaction.referrer_amount),
+            func.sum(Transaction.total_amount),
+            func.count(func.distinct(Transaction.inpatient_id)),
+        )
+        .filter(
+            Transaction.inpatient_id.isnot(None),
+            Transaction.referrer_id.isnot(None),
+            Transaction.referrer_amount > 0,
+            Transaction.created_at >= s,
+            Transaction.created_at <= e,
+        )
+        .group_by(Transaction.referrer_id)
+        .all()
+    )
+    for ref_id, inp_comm, inp_gross, inp_count in inp_ref_rows:
+        inp_comm = int(inp_comm or 0)
+        if inp_comm <= 0:
+            continue
+        adv_rem = advance_remaining_map.get(("referrer", ref_id), 0)
+        if ref_id in ref_map:
+            row = ref_map[ref_id]
+            row["earned_commission"] += inp_comm
+            row["gross_total"] += int(inp_gross or 0)
+            row["patient_count"] += int(inp_count or 0)
+            new_earned = row["earned_commission"]
+            row["advance_deducted"] = min(new_earned, adv_rem)
+            row["advance_remaining"] = max(0, adv_rem - new_earned)
+            row["net_payable"] = max(0, new_earned - adv_rem)
+        else:
+            r_obj = next((rr for rr in referrers if rr.id == ref_id), None)
+            if not r_obj:
+                continue
+            ref_map[ref_id] = {
+                "referrer_id": ref_id,
+                "name": r_obj.full_name,
+                "phone": r_obj.phone,
+                "patient_count": int(inp_count or 0),
+                "gross_total": int(inp_gross or 0),
+                "earned_commission": inp_comm,
+                "advance_remaining": max(0, adv_rem - inp_comm),
+                "advance_deducted": min(inp_comm, adv_rem),
+                "net_payable": max(0, inp_comm - adv_rem),
+                "patients": [],
+                "departments": [],
+                "daily_departments": [],
+                "daily_services": [],
+            }
 
     referrers_payout = list(ref_map.values())
     referrers_payout.sort(key=lambda x: x["earned_commission"], reverse=True)
@@ -1554,12 +1641,12 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         # Check Advances for Provider
         total_advance_remaining = advance_remaining_map.get(("provider", pr.id), 0)
 
-        # Xuddi yo'naltiruvchidagi kabi — qarz endi real vaqtda avtomatik
-        # qoplanadi, shu davr ulushi joriy total_advance_remaining'da
-        # allaqachon hisobga olingan. "Sof To'lanadigan" balansning
-        # hozirgi haqiqiy qiymati, gipotetik hisob emas.
+        # Xuddi yo'naltiruvchidagi kabi — bu DAVR uchun ishlangan ulushni
+        # joriy avans qarziga qarshi gipotetik hisoblaymiz (izoh yuqorida,
+        # yo'naltiruvchi bo'limida).
         advance_deducted = min(total_prov_share, total_advance_remaining)
-        net_payable = pr.balance
+        advance_remaining_after = max(0, total_advance_remaining - total_prov_share)
+        net_payable = max(0, total_prov_share - total_advance_remaining)
 
         prov_map[pr.id] = {
             "provider_id": pr.id,
@@ -1568,7 +1655,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             "patient_count": patient_count,
             "gross_total": gross_total,
             "earned_share": total_prov_share,
-            "advance_remaining": total_advance_remaining,
+            "advance_remaining": advance_remaining_after,
             "advance_deducted": advance_deducted,
             "net_payable": net_payable,
         }
@@ -1579,9 +1666,18 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     base_report["services_detail"] = services_detail
     base_report["referrers_payout"] = referrers_payout
     base_report["providers_payout"] = providers_payout
+    # DIQQAT: `total_ref_payout`/`total_prov_payout` — bu davr uchun
+    # QO'LGA TEGADIGAN pul (avans qarzi ayrilgan holda). `referrer_share`
+    # esa Jami Tushum = Yo'naltiruvchi + Shifokor + Markaz tengligida
+    # ishlatiladigan, HAQIQIY ishlangan komissiya (get_report() da
+    # Transaction.referrer_amount yig'indisidan hisoblangan). Ilgari
+    # bu yerda referrer_share `total_ref_payout` bilan almashtirilib
+    # yuborilardi — agar biror yo'naltiruvchida ochiq avans bo'lsa,
+    # uning "qo'lga tegadigan" puli "ishlangan" pulidan kichik bo'lib,
+    # markaz ulushi qayta hisoblanmagani uchun uchtasining yig'indisi
+    # Jami Tushumdan kam chiqib qolardi (masalan 832,325 so'mlik farq).
     base_report["total_ref_payout"] = sum(r["net_payable"] for r in referrers_payout)
     base_report["total_prov_payout"] = sum(p["net_payable"] for p in providers_payout)
-    base_report["referrer_share"] = base_report["total_ref_payout"]
 
     return base_report
 

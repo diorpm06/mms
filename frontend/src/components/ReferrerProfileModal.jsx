@@ -18,8 +18,10 @@ import {
   FileText
 } from 'lucide-react'
 import { api } from '../utils/api'
+import { useAuthStore } from '../store/authStore'
 
 export default function ReferrerProfileModal({ referrerId, onClose }) {
+  const isCEO = useAuthStore((s) => s.role) === 'ceo'
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -156,6 +158,9 @@ export default function ReferrerProfileModal({ referrerId, onClose }) {
           ) : (
             <>
               {/* 1. CREDENTIALS / LOGIN-PAROL CARD ──────────────── */}
+              {/* Parol faqat CEO'ga ko'rinadi — backend ham shu holatda
+                  faqat CEO uchun qaytaradi/o'zgartirishga ruxsat beradi. */}
+              {isCEO && (
               <div className="card p-4 bg-surface-2 border-amber-500/30 space-y-3">
                 <div className="flex items-center justify-between border-b border-border pb-2">
                   <span className="font-extrabold text-amber-500 uppercase flex items-center gap-1.5 text-xs">
@@ -244,6 +249,7 @@ export default function ReferrerProfileModal({ referrerId, onClose }) {
                   </form>
                 )}
               </div>
+              )}
 
               {/* 2. RATES BAR ────────────────────────────────────── */}
               <div className="card p-3 bg-surface-2 border-border space-y-1.5 text-xs">

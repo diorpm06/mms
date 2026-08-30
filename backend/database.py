@@ -470,6 +470,24 @@ def run_migrations():
         # (ustunlar bazada mavjud emas edi).
         "ALTER TABLE inpatients ADD COLUMN birth_date DATE",
         "ALTER TABLE inpatients ADD COLUMN address VARCHAR(255)",
+        # `Advance` (xodim avansi) modeliga `CancelMixin` qo'shilgan, lekin
+        # bu jadval uchun hech qachon migratsiya yozilmagan edi — faqat
+        # `provider_advances` uchun yozilgan (yuqorida). Kod esa
+        # `Advance.is_cancelled`ni filtrlaydi (finance.py,
+        # `_employee_advances_total_for_month`) — bu ustunlar bazada
+        # yo'q bo'lgan muhitda bu chaqiriq har doim SQL xatosi bilan
+        # yiqilishi kerak edi. `expense_id` esa avans bekor
+        # qilinganda unga bog'liq harajatni ham topib bekor qilish
+        # uchun kerak (provider_advances'dagi bilan bir xil andoza).
+        "ALTER TABLE advances ADD COLUMN is_cancelled BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE advances ADD COLUMN cancelled_at TIMESTAMP",
+        "ALTER TABLE advances ADD COLUMN cancelled_by INTEGER",
+        "ALTER TABLE advances ADD COLUMN cancel_reason TEXT",
+        "ALTER TABLE advances ADD COLUMN expense_id INTEGER",
+        # `Appointment` modeliga endi qo'shildi — ba'zi muhitlarda bu
+        # ustun bazada bo'lmasligi mumkin (model avval buni e'lon
+        # qilmagani uchun create_all uni yaratmagan bo'lishi mumkin).
+        "ALTER TABLE appointments ADD COLUMN created_at TIMESTAMP",
     ):
         try:
             with engine.connect() as conn:
