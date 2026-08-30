@@ -649,12 +649,12 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <div className="card-2 p-4">
                 <h4 className="text-xs font-bold text-gold uppercase mb-2">Naqd / Karta Taqsimoti</h4>
-                {hasPositiveValues(paymentPieData(reportsData?.cash, reportsData?.card, reportsData?.payment_chart)) ? (
+                {hasPositiveValues(paymentPieData(reportsData?.cash, reportsData?.card, reportsData?.payment_chart, reportsData?.click, reportsData?.qr)) ? (
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                         <Pie
-                          data={paymentPieData(reportsData?.cash, reportsData?.card, reportsData?.payment_chart)}
+                          data={paymentPieData(reportsData?.cash, reportsData?.card, reportsData?.payment_chart, reportsData?.click, reportsData?.qr)}
                           dataKey="value"
                           nameKey="name"
                           cx="50%"

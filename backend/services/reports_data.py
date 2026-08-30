@@ -195,25 +195,33 @@ def get_report(db: Session, start: date, end: date) -> dict:
     if txs:
         for t in txs:
             ptype = (t.payment_type or "").lower()
-            if ptype in ("cash", "naqd"):
-                cash += (t.cash_amount if t.cash_amount else t.total_amount)
-            elif ptype == "qr":
-                qr += (t.qr_amount if t.qr_amount else t.total_amount)
-            elif ptype in ("card", "karta", "terminal"):
-                card += (t.card_amount if t.card_amount else t.total_amount)
-            elif ptype in ("click", "payme"):
-                click += t.total_amount
-            elif ptype in ("split", "aralash"):
-                cash += (t.cash_amount or 0)
-                card += (t.card_amount or 0)
-                qr += (t.qr_amount or 0)
-                click += (t.click_amount or 0)
-            elif ptype in ("later", "keyinroq", "nasiya", "qarz"):
+            if ptype in ("later", "keyinroq", "nasiya", "qarz"):
                 later_total += t.total_amount
             elif ptype in ("prepaid", "bekor"):
                 pass
             else:
-                cash += t.total_amount
+                c_amt = t.cash_amount or 0
+                cd_amt = t.card_amount or 0
+                cl_amt = t.click_amount or 0
+                q_amt = t.qr_amount or 0
+                has_breakdown = (c_amt + cd_amt + cl_amt + q_amt) > 0
+
+                if has_breakdown:
+                    cash += c_amt
+                    card += cd_amt
+                    click += cl_amt
+                    qr += q_amt
+                else:
+                    if ptype in ("cash", "naqd"):
+                        cash += t.total_amount
+                    elif ptype in ("card", "karta", "terminal"):
+                        card += t.total_amount
+                    elif ptype in ("click", "payme"):
+                        click += t.total_amount
+                    elif ptype == "qr":
+                        qr += t.total_amount
+                    else:
+                        cash += t.total_amount
         total_income = cash + card + click + qr
         referrer_share = sum((t.referrer_amount or 0) for t in txs)
         provider_share = sum((t.provider_amount or 0) for t in txs)
@@ -222,25 +230,33 @@ def get_report(db: Session, start: date, end: date) -> dict:
         for p in all_patients:
             ptype = (p.payment_type or "").lower()
             amt = int(p.payment_amount or 0)
-            if ptype in ("cash", "naqd"):
-                cash += (p.cash_amount if p.cash_amount else amt)
-            elif ptype == "qr":
-                qr += (getattr(p, "qr_amount", 0) or 0) or amt
-            elif ptype in ("card", "karta", "terminal"):
-                card += (p.card_amount if p.card_amount else amt)
-            elif ptype in ("click", "payme"):
-                click += amt
-            elif ptype in ("split", "aralash"):
-                cash += (p.cash_amount or 0)
-                card += (p.card_amount or 0)
-                qr += (getattr(p, "qr_amount", 0) or 0)
-                click += (p.click_amount or 0)
-            elif ptype in ("later", "keyinroq", "nasiya", "qarz"):
+            if ptype in ("later", "keyinroq", "nasiya", "qarz"):
                 later_total += amt
             elif ptype in ("prepaid", "bekor"):
                 pass
             else:
-                cash += amt
+                c_amt = p.cash_amount or 0
+                cd_amt = p.card_amount or 0
+                cl_amt = getattr(p, "click_amount", 0) or 0
+                q_amt = getattr(p, "qr_amount", 0) or 0
+                has_breakdown = (c_amt + cd_amt + cl_amt + q_amt) > 0
+
+                if has_breakdown:
+                    cash += c_amt
+                    card += cd_amt
+                    click += cl_amt
+                    qr += q_amt
+                else:
+                    if ptype in ("cash", "naqd"):
+                        cash += amt
+                    elif ptype in ("card", "karta", "terminal"):
+                        card += amt
+                    elif ptype in ("click", "payme"):
+                        click += amt
+                    elif ptype == "qr":
+                        qr += amt
+                    else:
+                        cash += amt
         total_income = cash + card + click + qr
         from services.finance import get_referrer_rates_for_service, calculate_financial_split
         referrer_share = 0
