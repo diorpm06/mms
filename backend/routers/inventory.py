@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.inventory import InventoryItem
 from models.user import User
-from auth_utils import require_admin_or_ceo, require_ceo, require_doctor_or_admin_or_ceo
+from auth_utils import require_admin_or_ceo, require_ceo, require_inventory_staff, hash_password
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
@@ -47,6 +47,18 @@ class QuantityChangeBody(BaseModel):
     notes: Optional[str] = None
 
 
+class WarehouseStaffCreate(BaseModel):
+    full_name: str = Field(min_length=1, max_length=200)
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=4)
+
+
+class WarehouseStaffUpdate(BaseModel):
+    full_name: Optional[str] = None
+    password: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
 def _item_row(i: InventoryItem, role: Optional[str] = None) -> dict:
     data = {
         "id": i.id,
@@ -69,7 +81,7 @@ def _item_row(i: InventoryItem, role: Optional[str] = None) -> dict:
 def list_inventory(
     category: Optional[str] = None,
     db: Session = Depends(get_db),
-    user: User = Depends(require_doctor_or_admin_or_ceo),
+    user: User = Depends(require_inventory_staff),
 ):
     q = db.query(InventoryItem)
     if category:
@@ -81,7 +93,7 @@ def list_inventory(
 @router.get("/logs")
 def list_inventory_logs(
     db: Session = Depends(get_db),
-    user: User = Depends(require_doctor_or_admin_or_ceo),
+    user: User = Depends(require_inventory_staff),
 ):
     """Returns history of material usages with linked patient tickets and payments."""
     from models.audit_log import AuditLog
@@ -115,7 +127,7 @@ def list_inventory_logs(
 def create_inventory_item(
     body: InventoryCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_ceo),
+    user: User = Depends(require_ceo),
 ):
     item = InventoryItem(
         name=body.name,
@@ -188,7 +200,7 @@ def consume_item(
     item_id: int,
     body: QuantityChangeBody,
     db: Session = Depends(get_db),
-    user: User = Depends(require_doctor_or_admin_or_ceo),
+    user: User = Depends(require_inventory_staff),
 ):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
@@ -249,9 +261,27 @@ def consume_item(
 
         if charged_amount > 0:
             from models.transaction import Transaction
-            pay_tp = body.payment_type if body.payment_type in ("naqd", "cash", "karta", "card", "split") else "later"
-            cash_amt = charged_amount if pay_tp in ("naqd", "cash") else 0
-            card_amt = charged_amount if pay_tp in ("karta", "card") else 0
+
+            # Ilgari faqat naqd/karta tan olinardi — click/qr yuborilsa
+            # sezilmasdan "later"ga tushib, kunlik kassa hisobidan
+            # butunlay tushib qolardi (statsionarda tuzatilgan xatoning
+            # bir xili). Endi 4 turi ham to'g'ri ustunga yoziladi.
+            ptype = (body.payment_type or "").strip().lower()
+            cash_amt = card_amt = click_amt = qr_amt = 0
+            if ptype in ("naqd", "cash"):
+                pay_tp = "cash"
+                cash_amt = charged_amount
+            elif ptype in ("click", "payme"):
+                pay_tp = "click"
+                click_amt = charged_amount
+            elif ptype == "qr":
+                pay_tp = "qr"
+                qr_amt = charged_amount
+            elif ptype in ("karta", "card", "terminal"):
+                pay_tp = "card"
+                card_amt = charged_amount
+            else:
+                pay_tp = "later"
 
             txn = Transaction(
                 patient_id=target_patient.id if target_patient else None,
@@ -260,8 +290,22 @@ def consume_item(
                 payment_type=pay_tp,
                 cash_amount=cash_amt,
                 card_amount=card_amt,
+                click_amount=click_amt,
+                qr_amount=qr_amt,
             )
             db.add(txn)
+
+            # Kunlik davr hisobotlari Transaction'dan qaytadan hisoblanadi
+            # (allaqachon to'g'ri), lekin doimiy kassa balansi
+            # (get_or_create_balance) shu yerda yangilanmasdi — CEO
+            # dashboardidagi "joriy balans" material sotuvidan o'smay
+            # qolardi. "Keyinroq" (qarz) bo'lsa pul hali qo'lga
+            # kelmagani uchun balansga qo'shilmaydi.
+            if pay_tp != "later":
+                from services.finance import get_or_create_balance, log_balance_change
+                bal = get_or_create_balance(db)
+                bal.current_balance += charged_amount
+                log_balance_change(db, charged_amount, "income", f"Material sotildi: {item.name} x{body.amount} {item.unit}")
 
             if target_patient:
                 clean_ticket = (target_patient.ticket_number or f"A-{target_patient.id:03d}").replace("-Material", "").replace("-material", "").strip()
@@ -333,3 +377,105 @@ def delete_item(
     db.delete(item)
     db.commit()
     return {"message": "Material o'chirildi"}
+
+
+def _staff_row(u: User) -> dict:
+    return {
+        "id": u.id,
+        "full_name": u.full_name,
+        "username": u.username,
+        "password": u.plain_password,
+        "is_active": u.is_active,
+    }
+
+
+@router.get("/staff")
+def list_warehouse_staff(db: Session = Depends(get_db), _: User = Depends(require_ceo)):
+    staff = db.query(User).filter(User.role == "omborchi").order_by(User.id.desc()).all()
+    return [_staff_row(u) for u in staff]
+
+
+@router.post("/staff")
+def create_warehouse_staff(
+    body: WarehouseStaffCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_ceo),
+):
+    exists = db.query(User).filter(User.username == body.username).first()
+    if exists:
+        raise HTTPException(status_code=400, detail=f"'{body.username}' nomli login allaqachon band")
+    u = User(
+        full_name=body.full_name,
+        role="omborchi",
+        username=body.username,
+        hashed_password=hash_password(body.password),
+        plain_password=body.password,
+        is_active=True,
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return _staff_row(u)
+
+
+@router.put("/staff/{staff_id}")
+def update_warehouse_staff(
+    staff_id: int,
+    body: WarehouseStaffUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_ceo),
+):
+    u = db.query(User).filter(User.id == staff_id, User.role == "omborchi").first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Omborchi hisobi topilmadi")
+    if body.full_name is not None:
+        u.full_name = body.full_name
+    if body.password:
+        u.hashed_password = hash_password(body.password)
+        u.plain_password = body.password
+    if body.is_active is not None:
+        u.is_active = body.is_active
+    db.commit()
+    db.refresh(u)
+    return _staff_row(u)
+
+
+@router.get("/my-today-sales")
+def my_today_sales(db: Session = Depends(get_db), user: User = Depends(require_inventory_staff)):
+    """Joriy foydalanuvchi BUGUN sotgan materiallar — soni va summasi.
+    Tan narx/foyda bu yerda umuman qaytarilmaydi (faqat CEO to'liq kunlik
+    hisobotda ko'radi)."""
+    import json
+
+    from models.audit_log import AuditLog
+
+    today = date.today()
+    start = datetime.combine(today, datetime.min.time())
+    end = datetime.combine(today, datetime.max.time())
+
+    logs = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.action_type == "CONSUME_MATERIAL",
+            AuditLog.user_id == user.id,
+            AuditLog.created_at >= start,
+            AuditLog.created_at <= end,
+        )
+        .all()
+    )
+
+    count = 0
+    total = 0
+    for l in logs:
+        if not l.new_data:
+            continue
+        try:
+            data = json.loads(l.new_data)
+        except (TypeError, ValueError):
+            continue
+        charged = data.get("charged") or 0
+        if charged > 0:
+            count += 1
+            total += charged
+
+    return {"count": count, "total": total}

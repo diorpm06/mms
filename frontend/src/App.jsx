@@ -59,6 +59,7 @@ const Payroll = safeLazy(() => import('./pages/ceo/Payroll'))
 const TvManagerDashboard = safeLazy(() => import('./pages/TvManagerDashboard'))
 const UnifiedReportsHub = safeLazy(() => import('./pages/ceo/UnifiedReportsHub'))
 const ReferrerPortal = safeLazy(() => import('./pages/referrer/ReferrerPortal'))
+const WarehousePanel = safeLazy(() => import('./pages/warehouse/WarehousePanel'))
 
 function PageLoader() {
   return (
@@ -119,6 +120,14 @@ function DoctorLayout() {
   )
 }
 
+function WarehouseLayout() {
+  return (
+    <PrivateRoute roles={['omborchi', 'admin', 'ceo']}>
+      <Layout role="omborchi" />
+    </PrivateRoute>
+  )
+}
+
 function useStartupAuth() {
   const { accessToken, refreshToken, setAuth } = useAuthStore()
   useEffect(() => {
@@ -160,6 +169,9 @@ function AppRoutes() {
           <Route index element={<DoctorPanel />} />
           <Route path="natijalar" element={<DoctorResults />} />
           <Route path="profil" element={<DoctorProfile />} />
+        </Route>
+        <Route path="/warehouse" element={<WarehouseLayout />}>
+          <Route index element={<WarehousePanel />} />
         </Route>
         <Route path="/ceo" element={<CeoLayout />}>
           <Route index element={<CeoDashboard />} />

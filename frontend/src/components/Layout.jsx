@@ -57,6 +57,12 @@ const DOCTOR_LINKS = [
   { to: '/doctor/profil',       label: 'Hisobotlarim va Profilim', icon: '📊' },
 ]
 
+// Omborchi/hamshira hisobi — faqat material sotish ekrani, boshqa
+// hech qanday sahifaga (hisobot, bemorlar va h.k.) kirmaydi.
+const WAREHOUSE_LINKS = [
+  { to: '/warehouse',           label: 'Omborxona',             icon: '💊', end: true },
+]
+
 
 export default function Layout({ role }) {
   const { toggleTheme, role: authRole, logout, accessToken } = useAuthStore()
@@ -114,7 +120,11 @@ export default function Layout({ role }) {
     ? DOCTOR_LINKS.filter((l) => l.to !== '/doctor/natijalar')
     : DOCTOR_LINKS
 
-  const links = effectiveRole === 'doctor' ? doctorLinks : effectiveRole === 'admin' ? ADMIN_LINKS : CEO_LINKS
+  const links =
+    effectiveRole === 'doctor' ? doctorLinks :
+    effectiveRole === 'admin' ? ADMIN_LINKS :
+    effectiveRole === 'omborchi' ? WAREHOUSE_LINKS :
+    CEO_LINKS
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navRef = useRef(null)
   const scrollKey = `sidebar-scroll-${effectiveRole}`

@@ -14,9 +14,12 @@ export default function Inventory() {
   // Strictly CEO view only if URL path starts with /ceo AND role is ceo
   const isCEO = role === 'ceo' && location.pathname.startsWith('/ceo')
 
-  const [activeTab, setActiveTab] = useState('catalog') // 'catalog' | 'logs'
+  const [activeTab, setActiveTab] = useState('catalog') // 'catalog' | 'logs' | 'staff'
   const [items, setItems] = useState([])
   const [logs, setLogs] = useState([])
+  const [staff, setStaff] = useState([])
+  const [staffModal, setStaffModal] = useState(false)
+  const [staffForm, setStaffForm] = useState({ full_name: '', username: '', password: '' })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -57,9 +60,40 @@ export default function Inventory() {
     }).finally(() => setLoading(false))
   }
 
+  const loadStaff = () => {
+    api('/inventory/staff').then(setStaff).catch(() => {})
+  }
+
   useEffect(() => {
     loadItems()
+    if (isCEO) loadStaff()
   }, [])
+
+  const handleCreateStaff = async (e) => {
+    e.preventDefault()
+    if (!staffForm.full_name.trim() || !staffForm.username.trim() || !staffForm.password) {
+      toast("Ism, login va parolni to'ldiring", 'error')
+      return
+    }
+    try {
+      await api('/inventory/staff', { method: 'POST', body: JSON.stringify(staffForm) })
+      toast('Omborchi hisobi yaratildi ✓')
+      setStaffModal(false)
+      setStaffForm({ full_name: '', username: '', password: '' })
+      loadStaff()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  const toggleStaffActive = async (u) => {
+    try {
+      await api(`/inventory/staff/${u.id}`, { method: 'PUT', body: JSON.stringify({ is_active: !u.is_active }) })
+      loadStaff()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
 
   const handleCreate = async (e) => {
     e.preventDefault()
@@ -247,6 +281,19 @@ export default function Inventory() {
         >
           📜 Ishlatilgan Materiallar va To'lovlar Tarixi
         </button>
+        {isCEO && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('staff')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'staff'
+                ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                : 'bg-surface text-body hover:bg-white/5 border border-border'
+            }`}
+          >
+            👷 Omborchi Hisoblari
+          </button>
+        )}
       </div>
 
       {activeTab === 'catalog' && (
@@ -447,6 +494,74 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
+      {isCEO && activeTab === 'staff' && (
+        <div className="card overflow-x-auto p-0 border-emerald-500/30">
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-2">
+              👷 Omborxonaga Kirish Huquqi Bor Hisoblar (Telefondan Material Sotish)
+            </h3>
+            <button
+              type="button"
+              onClick={() => setStaffModal(true)}
+              className="btn-gold py-2 px-3 text-xs font-bold flex items-center gap-2 shadow whitespace-nowrap"
+            >
+              <Plus className="h-4 w-4" /> Yangi Hisob Ochish
+            </button>
+          </div>
+
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-surface-sunken text-muted border-b border-border text-left">
+                <th className="p-3">Ism</th>
+                <th className="p-3">Login</th>
+                <th className="p-3">Parol</th>
+                <th className="p-3">Holat</th>
+                <th className="p-3 text-right">Harakat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staff.length === 0 ? (
+                <tr><td colSpan={5} className="p-6 text-center text-muted">Hali omborchi hisobi ochilmagan</td></tr>
+              ) : (
+                staff.map((u) => (
+                  <tr key={u.id} className="border-b border-border hover:bg-surface">
+                    <td className="p-3 font-bold text-body">{u.full_name}</td>
+                    <td className="p-3 font-mono text-cyan">{u.username}</td>
+                    <td className="p-3 font-mono text-muted">{u.password || '—'}</td>
+                    <td className="p-3">
+                      {u.is_active ? (
+                        <span className="badge badge-success text-[10px] font-bold">🟢 Faol</span>
+                      ) : (
+                        <span className="badge badge-danger text-[10px] font-bold">🔴 O'chirilgan</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => toggleStaffActive(u)}
+                        className="btn-outline py-1.5 px-3 text-[11px] font-bold"
+                      >
+                        {u.is_active ? "O'chirish" : 'Faollashtirish'}
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* OMBORCHI HISOBI YARATISH MODAL */}
+      <Modal open={staffModal} onClose={() => setStaffModal(false)} title="Yangi Omborchi Hisobi">
+        <form onSubmit={handleCreateStaff} className="space-y-3 pt-2">
+          <input className="input-field" placeholder="To'liq ism *" value={staffForm.full_name} onChange={(e) => setStaffForm({ ...staffForm, full_name: e.target.value })} required />
+          <input className="input-field" placeholder="Login (username) *" value={staffForm.username} onChange={(e) => setStaffForm({ ...staffForm, username: e.target.value })} required />
+          <input className="input-field" placeholder="Parol *" value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} required />
+          <button type="submit" className="btn-gold w-full py-2.5 text-sm font-bold">Saqlash</button>
+        </form>
+      </Modal>
 
       {/* CREATE MODAL */}
       <Modal open={createModal} onClose={() => setCreateModal(false)} title="Yangi Material Qo'shish (Ikki xil narxda)">

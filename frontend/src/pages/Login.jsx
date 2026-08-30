@@ -24,6 +24,7 @@ export default function Login() {
     if (role === 'ceo') return '/ceo'
     if (role === 'doctor') return '/doctor'
     if (role === 'referrer') return '/referrer-portal'
+    if (role === 'omborchi') return '/warehouse'
     return '/admin'
   }
 
