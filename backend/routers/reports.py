@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -570,7 +570,16 @@ async def send_daily_telegram_report(
     d = target_date or date.today()
     rep = daily_report(db, d)
     msg = _format_report_message(rep, f"Kunlik Hisobot ({d.strftime('%d.%m.%Y')})")
-    await send_telegram_message(msg, section="reports")
+    yuborildi = await send_telegram_message(msg, section="reports")
+    if not yuborildi:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Telegramga yuborilmadi — CEO_CHAT_ID/TELEGRAM_CHAT_ID sozlanmagan "
+                "yoki botda hech qanday chat \"hisobotlar\" bo'limiga ulanmagan "
+                "(botga /ulash hisobotlar buyrug'ini bering)."
+            ),
+        )
     return {"message": "✓ Telegram botga kunlik hisobot yuborildi!"}
 
 

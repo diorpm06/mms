@@ -59,14 +59,26 @@ def _target_chat_ids() -> list[str]:
         ids.extend([x.strip() for x in settings.TELEGRAM_CHAT_IDS.split(",") if x.strip()])
     if settings.TELEGRAM_CHAT_ID.strip():
         ids.append(settings.TELEGRAM_CHAT_ID.strip())
+    # CEO_CHAT_ID ilgari faqat bot BUYRUQLARIGA ruxsat berish uchun
+    # ishlatilardi (kirish tekshiruvi), lekin CHIQUVCHI (avtomatik)
+    # xabarlar ro'yxatida umuman yo'q edi. Ya'ni faqat shuni sozlagan
+    # odam ham botga buyruq yoza olardi, ham hech qanday avtomatik
+    # hisobot olmasdi — ikkalasi mos kelishi kerak.
+    if settings.CEO_CHAT_ID.strip():
+        ids.append(settings.CEO_CHAT_ID.strip())
     return list(dict.fromkeys(ids))
 
 
-async def send_telegram_message(text: str, section: str = "system"):
+async def send_telegram_message(text: str, section: str = "system") -> bool:
+    """`True` — kamida bitta chatga muvaffaqiyatli yuborilgan bo'lsa.
+    Ilgari bu funksiya hech narsa qaytarmasdi — chaqiruvchi kod (masalan
+    "Telegramga yuborish" tugmasi) hech qachon HAQIQATDA yuborilganini
+    tekshirmasdan "✓ yuborildi" deb ko'rsatib turaverardi, hatto
+    sozlanган chat/bog'lanish umuman bo'lmasa ham (jim muvaffaqiyatsizlik)."""
     chat_ids = _target_chat_ids()
     if not settings.BOT_TOKEN:
         logger.warning("Telegram sozlanmagan")
-        return
+        return False
     url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/sendMessage"
     topic_key = TOPIC_MAP.get(section)
     topic_id = getattr(settings, topic_key, None) if topic_key else None
@@ -82,8 +94,9 @@ async def send_telegram_message(text: str, section: str = "system"):
                 targets.append(linked)
         if not targets:
             logger.warning("Telegram target topilmadi: section=%s", section)
-            return
+            return False
 
+        sent_ok = False
         async with httpx.AsyncClient(timeout=2.0) as client:
             for chat_id, thread_id in targets:
                 payload = {"chat_id": chat_id, "text": text}
@@ -92,8 +105,12 @@ async def send_telegram_message(text: str, section: str = "system"):
                 resp = await client.post(url, json=payload)
                 if resp.status_code >= 400:
                     logger.error("Telegram yuborilmadi (%s): %s", resp.status_code, resp.text[:300])
+                else:
+                    sent_ok = True
+        return sent_ok
     except Exception as e:
         logger.error("Telegram xabar xato: %s", e)
+        return False
 
 
 async def send_telegram_document(
