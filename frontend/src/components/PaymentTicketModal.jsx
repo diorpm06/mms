@@ -151,6 +151,10 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
   const kursMap = {}
   patientList.forEach((p) => {
     ;(p.services || []).forEach((s) => {
+      // STRICT RULE: Only print "OLDINDAN TO'LANGAN" course box on receipt
+      // if the service was explicitly marked as a multi-day course (is_course === true).
+      // Purchasing 10 items for a single visit (is_course = false) must NEVER print the course box.
+      if (!s.is_course) return
       const nomi = cleanServiceName(s.service_name)
       if (!nomi) return
       if (!kursMap[nomi]) kursMap[nomi] = { nomi, soni: 0, narx: 0 }
@@ -158,10 +162,6 @@ export default function PaymentTicketModal({ open, patient, onClose }) {
       kursMap[nomi].narx += Number(s.total_price) || 0
     })
   })
-  // Faqat bir kundan ko'p bo'lganlari kurs hisoblanadi.
-  // Bu chek TO'LOV cheki — kun hali sanalmaydi. Birinchi kun ham
-  // "Davolanishdagilar" da "Keldi" bosilganda belgilanadi va o'sha payt
-  // alohida navbat taloni chiqadi.
   const kurslar = Object.values(kursMap)
     .filter((k) => k.soni > 1)
     .map((k) => ({ ...k, ishlatilgan: 0 }))
