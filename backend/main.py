@@ -103,6 +103,13 @@ async def lifespan(app: FastAPI):
                 start_sheet_worker()
             if start_scheduler:
                 start_scheduler()
+            try:
+                from bot.bot import dp, bot
+                import asyncio
+                asyncio.create_task(dp.start_polling(bot))
+                logger.info("✓ Telegram bot polling background worker started!")
+            except Exception as bot_err:
+                logger.warning(f"Telegram bot startup warning: {bot_err}")
         except Exception as e:
             logger.error(f"Startup warning: {e}")
     else:
