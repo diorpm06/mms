@@ -721,7 +721,8 @@ def export_referrers_pdf(report: dict) -> bytes:
             r_pat_cnt = r.get("patient_count") or len(r_patients)
 
             if r_daily_depts:
-                for idx, d in enumerate(r_daily_depts, 1):
+                idx = 0
+                for d in r_daily_depts:
                     p_cnt = d.get("patient_count", 1)
                     cnt = d.get("service_count", 0)
                     gross = d.get("gross_total", 0)
@@ -730,6 +731,12 @@ def export_referrers_pdf(report: dict) -> bytes:
                     r_svc_cnt += cnt
                     r_gross += gross
                     r_fees += fee
+                    # 0 so'm hisoblangan qatorlar (masalan 0% ulushli
+                    # xizmatlar) PDF'da alohida qator sifatida ko'rsatilmaydi
+                    # — jamiga baribir hisoblanadi (yuqorida).
+                    if fee <= 0:
+                        continue
+                    idx += 1
                     table_data.append([
                         str(idx),
                         d.get("date", ""),
@@ -740,7 +747,8 @@ def export_referrers_pdf(report: dict) -> bytes:
                         _format_money(fee),
                     ])
             elif r_depts:
-                for idx, d in enumerate(r_depts, 1):
+                idx = 0
+                for d in r_depts:
                     p_cnt = d.get("patient_count", 1)
                     cnt = d.get("service_count", 0)
                     gross = d.get("gross_total", 0)
@@ -749,6 +757,9 @@ def export_referrers_pdf(report: dict) -> bytes:
                     r_svc_cnt += cnt
                     r_gross += gross
                     r_fees += fee
+                    if fee <= 0:
+                        continue
+                    idx += 1
                     table_data.append([
                         str(idx),
                         date_label,
@@ -759,13 +770,17 @@ def export_referrers_pdf(report: dict) -> bytes:
                         _format_money(fee),
                     ])
             else:
-                for idx, p in enumerate(r_patients, 1):
+                idx = 0
+                for p in r_patients:
                     paid = p.get("payment_amount", 0)
                     fee = p.get("referrer_fee", 0)
                     d_name = p.get("department_name", "Bo'lim")
                     r_svc_cnt += 1
                     r_gross += paid
                     r_fees += fee
+                    if fee <= 0:
+                        continue
+                    idx += 1
                     table_data.append([
                         str(idx),
                         p.get("date", "").split(" ")[0] if p.get("date") else "",
@@ -1028,8 +1043,15 @@ def export_all_staff_pdf(report: dict) -> bytes:
                 _th("Bemorlar"), _th("Ulush"), _th("Hisoblangan (so'm)"),
             ]]
             b_earned = 0
-            for idx, d in enumerate(r.get("breakdown") or [], 1):
-                b_earned += d.get("earned_fee", 0)
+            idx = 0
+            for d in r.get("breakdown") or []:
+                fee = d.get("earned_fee", 0)
+                b_earned += fee
+                # 0 so'm hisoblangan qatorlar (masalan 0% ulushli xizmatlar)
+                # PDF'da alohida qator sifatida ko'rsatilmaydi.
+                if fee <= 0:
+                    continue
+                idx += 1
                 table_data.append([
                     str(idx),
                     d.get("date", ""),
@@ -1037,7 +1059,7 @@ def export_all_staff_pdf(report: dict) -> bytes:
                     d.get("source", ""),
                     f"{d.get('patient_count', 1)} nafar",
                     d.get("rate_label", "—"),
-                    _format_money(d.get("earned_fee", 0)),
+                    _format_money(fee),
                 ])
             table_data.append(["", "JAMI:", "", "", "", "", _format_money(b_earned)])
 

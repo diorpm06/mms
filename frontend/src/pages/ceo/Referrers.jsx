@@ -440,10 +440,16 @@ export default function CeoReferrers() {
         }))
       }
 
-      dailyDepts.forEach((d, idx) => {
+      dailyDepts.forEach((d) => {
         rGross += d.gross_total || 0
         rFee += d.earned_fee || 0
         rSvcCount += d.service_count || 0
+      })
+      // 0 so'm hisoblangan qatorlar (masalan 0% ulushli xizmatlar) chop
+      // etilgan hujjatda joy band qilib, o'qishni qiyinlashtirardi —
+      // jamiga (yuqorida) hisoblanadi, lekin alohida qator sifatida
+      // ko'rsatilmaydi.
+      dailyDepts.filter((d) => (d.earned_fee || 0) > 0).forEach((d, idx) => {
         rowsHtml += `<tr>
           <td style="text-align: center;">${idx + 1}</td>
           <td style="text-align: center; font-weight: bold;">${d.date || '—'}</td>
