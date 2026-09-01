@@ -1693,10 +1693,64 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         })
     consolidated_payout.sort(key=lambda x: x["total_earned"], reverse=True)
 
+    # 4. YAGONA MASTER KONSOLIDATSIYA: Barchasi bitta ro'yxatda (Shifokorlar KPI + Yo'naltiruvchilar + Ikki roldagilar)
+    all_staff_map = {}
+    for prov in providers_payout:
+        r_id = provider_referrer_ids.get(prov["provider_id"])
+        key = f"prov_{prov['provider_id']}"
+        all_staff_map[key] = {
+            "provider_id": prov["provider_id"],
+            "referrer_id": r_id,
+            "name": prov["name"],
+            "role": "Shifokor (KPI)",
+            "provider_earned": prov["earned_share"],
+            "referrer_earned": 0,
+            "total_earned": prov["earned_share"],
+            "advance_deducted": prov["advance_deducted"],
+            "advance_remaining": prov["advance_remaining"],
+            "provider_net_payable": prov["net_payable"],
+            "referrer_net_payable": 0,
+            "net_payable": prov["net_payable"],
+        }
+
+    ref_to_key = {v["referrer_id"]: k for k, v in all_staff_map.items() if v.get("referrer_id")}
+    for ref in referrers_payout:
+        r_id = ref["referrer_id"]
+        existing_key = ref_to_key.get(r_id)
+        if existing_key and existing_key in all_staff_map:
+            row = all_staff_map[existing_key]
+            row["role"] = "Shifokor + Yo'naltiruvchi"
+            row["referrer_earned"] = ref["earned_commission"]
+            row["total_earned"] = row["provider_earned"] + ref["earned_commission"]
+            row["advance_deducted"] += ref["advance_deducted"]
+            row["advance_remaining"] += ref["advance_remaining"]
+            row["referrer_net_payable"] = ref["net_payable"]
+            row["net_payable"] = row["provider_net_payable"] + ref["net_payable"]
+        else:
+            key = f"ref_{r_id}"
+            all_staff_map[key] = {
+                "provider_id": None,
+                "referrer_id": r_id,
+                "name": ref["name"],
+                "role": "Yo'naltiruvchi",
+                "provider_earned": 0,
+                "referrer_earned": ref["earned_commission"],
+                "total_earned": ref["earned_commission"],
+                "advance_deducted": ref["advance_deducted"],
+                "advance_remaining": ref["advance_remaining"],
+                "provider_net_payable": 0,
+                "referrer_net_payable": ref["net_payable"],
+                "net_payable": ref["net_payable"],
+            }
+
+    all_staff_payout = list(all_staff_map.values())
+    all_staff_payout.sort(key=lambda x: x["total_earned"], reverse=True)
+
     base_report["services_detail"] = services_detail
     base_report["referrers_payout"] = referrers_payout
     base_report["providers_payout"] = providers_payout
     base_report["consolidated_payout"] = consolidated_payout
+    base_report["all_staff_payout"] = all_staff_payout
     # DIQQAT: `total_ref_payout`/`total_prov_payout` — bu davr uchun
     # QO'LGA TEGADIGAN pul (avans qarzi ayrilgan holda). `referrer_share`
     # esa Jami Tushum = Yo'naltiruvchi + Shifokor + Markaz tengligida

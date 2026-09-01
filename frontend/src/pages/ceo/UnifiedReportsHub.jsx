@@ -1413,6 +1413,84 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     )
   }
 
+  const renderMasterAllStaffSection = () => {
+    const rows = referrersReport?.all_staff_payout || []
+    if (rows.length === 0) return null
+    const isCollapsed = collapsedSections['master_all']
+    const grandTotal = rows.reduce((acc, r) => acc + (r.total_earned || 0), 0)
+    const grandNet = rows.reduce((acc, r) => acc + (r.net_payable || 0), 0)
+
+    return (
+      <div className="card p-6 space-y-4 transition-all duration-300 border-l-4 border-amber-500 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+          <button
+            type="button"
+            onClick={() => toggleSection('master_all')}
+            className="flex items-center gap-2 text-left hover:opacity-80 transition-opacity"
+          >
+            {isCollapsed ? <ChevronDown className="h-5 w-5 text-amber-400" /> : <ChevronUp className="h-5 w-5 text-amber-400" />}
+            <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+              <Users className="h-4 w-4 text-amber-400" /> 📋 BARCHA SHIFOKOR VA YO'NALTIRUVCHILARNING YAGONA HISOBOTI ({rows.length} nafar xodim)
+            </h3>
+          </button>
+        </div>
+
+        {!isCollapsed && (
+          <div className="overflow-x-auto animate-fadeIn">
+            <table className="w-full text-xs">
+              <THead cols={['F.I.Sh & Roli', 'Shifokor (KPI)', "Yo'naltiruvchi Ulush", 'Jami Ishlangan', 'Avans (-)', 'Qolgan Qarz', "Sof To'lanadigan", '']} />
+              <tbody className="divide-y divide-border">
+                {rows.map((r, i) => (
+                  <tr key={i} className="hover:bg-surface-hover font-semibold">
+                    <td className="p-2.5 text-body font-black">
+                      <span>👤 {r.name}</span>
+                      <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        r.role === 'Shifokor + Yo\'naltiruvchi'
+                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                          : r.role === 'Shifokor (KPI)'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                          : 'bg-gold/20 text-gold border border-gold/40'
+                      }`}>
+                        {r.role}
+                      </span>
+                    </td>
+                    <td className="p-2.5 text-right font-mono text-cyan">{r.provider_earned > 0 ? formatMoney(r.provider_earned) : '—'}</td>
+                    <td className="p-2.5 text-right font-mono text-gold">{r.referrer_earned > 0 ? formatMoney(r.referrer_earned) : '—'}</td>
+                    <td className="p-2.5 text-right font-mono font-bold text-body">{formatMoney(r.total_earned)}</td>
+                    <td className="p-2.5 text-right font-mono text-rose-400">{r.advance_deducted > 0 ? `-${formatMoney(r.advance_deducted)}` : '0'}</td>
+                    <td className="p-2.5 text-right font-mono" style={{ color: r.advance_remaining > 0 ? '#f87171' : undefined }}>
+                      {r.advance_remaining > 0 ? formatMoney(r.advance_remaining) : '—'}
+                    </td>
+                    <td className="p-2.5 text-right font-mono text-emerald font-black">{formatMoney(r.net_payable)}</td>
+                    <td className="p-2.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleConsolidatedPayout(r)}
+                        className="btn-outline py-0.5 px-2 text-[11px] font-bold text-emerald disabled:opacity-40 disabled:cursor-not-allowed"
+                        disabled={r.net_payable <= 0}
+                      >
+                        To'lash
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-surface-2 font-black text-xs border-t-2 border-amber-500">
+                  <td className="p-3 text-gold uppercase" colSpan={3}>BARCHA XODIMLAR JAMI:</td>
+                  <td className="p-3 text-right font-mono">{formatMoney(grandTotal)}</td>
+                  <td colSpan={2}></td>
+                  <td className="p-3 text-right font-mono text-emerald font-black">{formatMoney(grandNet)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const renderPayrollSection = () => {
     const isCollapsed = collapsedSections['payroll']
     return (
@@ -1815,6 +1893,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
         <div className="space-y-6">
           {renderFinanceSection()}
           {renderExpensesSection()}
+          {renderMasterAllStaffSection()}
           {renderReferrersSection()}
           {renderConsolidatedSection()}
           {renderPayrollSection()}
@@ -1828,6 +1907,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       {activeTab === 'expenses' && renderExpensesSection()}
       {activeTab === 'referrers' && (
         <div className="space-y-6">
+          {renderMasterAllStaffSection()}
           {renderReferrersSection()}
           {renderConsolidatedSection()}
         </div>

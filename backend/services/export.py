@@ -526,6 +526,22 @@ def export_referrers_pdf(report: dict) -> bytes:
     def _th(text: str):
         return Paragraph(text, th_style)
 
+    # Ism ustuni ham tor — uzun ism+telefon (masalan uzun test yozuvlari)
+    # oddiy satr sifatida chiqsa, keyingi ustunga "yugurib" kirib, raqamlar
+    # bilan qoplanib qolardi (xuddi _th'siz sarlavha kabi). Paragraph shu
+    # yerda ham so'z bo'yicha o'z ustuni ichida qatorga bo'linadi.
+    td_name_style = ParagraphStyle(
+        "RefTableName",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=11,
+        fontName="Helvetica-Bold",
+        textColor=colors.HexColor("#0f172a"),
+    )
+
+    def _td_name(text: str):
+        return Paragraph(text, td_name_style)
+
     p_start = report.get("period_start", "")
     p_end = report.get("period_end", "")
     date_label = f"{p_start}" if p_start == p_end else f"{p_start} — {p_end}"
@@ -596,7 +612,7 @@ def export_referrers_pdf(report: dict) -> bytes:
 
         summary_table_data.append([
             str(i),
-            name_str,
+            _td_name(name_str),
             f"{p_cnt} nafar",
             _format_money(gross),
             _format_money(earned),
