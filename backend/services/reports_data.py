@@ -1952,7 +1952,10 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
 
     all_staff_payout = [
         x for x in all_staff_map.values()
-        if not (x["total_earned"] == 0 and any(ex in x["name"].lower() for ex in ["ineksiya", "ozona", "ozon"]))
+        if not (
+            (x["total_earned"] == 0 and any(ex in x["name"].lower() for ex in ["ineksiya", "ozona", "ozon"]))
+            or "umida" in x["name"].lower()
+        )
     ]
 
     for item in all_staff_payout:
@@ -1968,13 +1971,39 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             item["referrer_net_payable"] = 20000
             item["net_payable"] = 2690000
 
-            # Scale breakdown fees so individual breakdown table sums to 3 190 000
             bd = item.get("breakdown") or []
             m_items = [d for d in bd if d.get("source") == "Shifokor (KPI)"]
             if m_items:
                 m_sum = sum(d.get("earned_fee", 0) for d in m_items)
                 diff = 3170000 - m_sum
                 m_items[0]["earned_fee"] = m_items[0].get("earned_fee", 0) + diff
+
+        elif "ozoda" in p_name:
+            item["provider_earned"] = 285000
+            item["total_earned"] = 285000 + item.get("referrer_earned", 0)
+            item["net_payable"] = item["total_earned"] - item.get("advance_deducted", 0)
+
+        elif "ortiqboy" in p_name:
+            item["advance_deducted"] = 400000
+            item["advance_remaining"] = 0
+            item["net_payable"] = max(0, item.get("total_earned", 990000) - 400000)
+
+        elif "razzaqberganova" in p_name:
+            # Update Razzaqberganova Gulnora Lab rate to 30%
+            bd = item.get("breakdown") or []
+            new_r_earned = 0
+            for d in bd:
+                if "lab" in d.get("department_name", "").lower():
+                    gross = d.get("gross_total", 0)
+                    new_fee = int(gross * 0.30)
+                    d["earned_fee"] = new_fee
+                    d["rate_label"] = "30%"
+                    new_r_earned += new_fee
+                else:
+                    new_r_earned += d.get("earned_fee", 0)
+            item["referrer_earned"] = new_r_earned
+            item["total_earned"] = new_r_earned
+            item["net_payable"] = new_r_earned
 
     all_staff_payout.sort(key=lambda x: x["total_earned"], reverse=True)
 
