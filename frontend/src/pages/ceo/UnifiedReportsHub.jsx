@@ -1424,6 +1424,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     let grandAdvance = 0
     let grandNet = 0
     let rowsHtml = ''
+    let personBlocksHtml = ''
 
     rows.forEach((r, i) => {
       grandTotal += r.total_earned || 0
@@ -1439,6 +1440,72 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
         <td style="text-align: right; color: #b45309;">${r.advance_remaining > 0 ? formatMoney(r.advance_remaining) : '—'}</td>
         <td style="text-align: right; font-weight: 900; color: #16a34a;">${formatMoney(r.net_payable)}</td>
       </tr>`
+
+      // Har bir xodim uchun alohida batafsil sahifa — qaysi kunda, qaysi
+      // bo'limdan qancha ishlagani (KPI va yo'naltirish ulushi ikkalasi
+      // ham, "Manba" ustunida farqlanadi).
+      const breakdown = r.breakdown || []
+      let personRowsHtml = ''
+      let bGross = 0
+      let bEarned = 0
+      breakdown.forEach((d, idx) => {
+        bGross += d.gross_total || 0
+        bEarned += d.earned_fee || 0
+        personRowsHtml += `<tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td style="text-align: center; font-weight: bold;">${d.date || '—'}</td>
+          <td><strong>${d.department_name}</strong></td>
+          <td style="text-align: center; font-size: 10px; color: ${d.source === 'Shifokor (KPI)' ? '#0284c7' : '#b45309'};">${d.source}</td>
+          <td style="text-align: center; font-weight: bold;">${d.patient_count || 1} nafar</td>
+          <td style="text-align: right; font-weight: bold;">${formatMoney(d.gross_total)}</td>
+          <td style="text-align: center; font-weight: bold;">${d.rate_label}</td>
+          <td style="text-align: right; font-weight: bold; color: #0284c7;">${formatMoney(d.earned_fee)}</td>
+        </tr>`
+      })
+
+      personBlocksHtml += `
+        <div class="referrer-page">
+          <div class="header" style="margin-bottom: 8px;">
+            <p style="font-size: 14px; font-weight: bold; margin: 0; color: #334155;">Davr: ${dateFrom} — ${dateTo}</p>
+          </div>
+          <div style="font-size: 13px; font-weight: 900; background: #f1f5f9; padding: 6px 10px; border-left: 4px solid #0f172a; margin-bottom: 6px; display: flex; justify-content: space-between;">
+            <span>👤 ${r.name} <span style="font-size:11px; color:#64748b;">(${r.role})</span></span>
+            <span>Jami ishlangan: ${formatMoney(r.total_earned)}</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 25px; text-align: center;">№</th>
+                <th style="width: 85px; text-align: center;">Sana</th>
+                <th>Bo'lim nomi</th>
+                <th style="width: 90px; text-align: center;">Manba</th>
+                <th style="width: 80px; text-align: center;">Bemorlar</th>
+                <th style="width: 100px; text-align: center;">Jami Tushum</th>
+                <th style="width: 80px; text-align: center;">Ulush</th>
+                <th style="width: 100px; text-align: right;">Hisoblangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${personRowsHtml || '<tr><td colSpan="8" style="text-align:center; padding:6px;">Ma\'lumot yo\'q</td></tr>'}
+              <tr style="background: #e2e8f0; font-weight: 900;">
+                <td colSpan="5">JAMI:</td>
+                <td style="text-align: right;">${formatMoney(bGross)}</td>
+                <td></td>
+                <td style="text-align: right; color: #0284c7;">${formatMoney(bEarned)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="font-size: 11.5px; font-weight: 700; background: #fffbeb; padding: 5px 10px; margin-top: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 12px; border: 1px solid #fde68a; border-radius: 4px;">
+            <span style="color:#dc2626;">Chegirilgan avans: ${r.advance_deducted > 0 ? '-' + formatMoney(r.advance_deducted) : '0'}</span>
+            ${(r.advance_remaining || 0) > 0 ? `<span style="color:#b45309;">Qolgan avans: -${formatMoney(r.advance_remaining)}</span>` : ''}
+            <span style="color:#16a34a; font-weight:900;">Sof to'lanadigan: ${formatMoney(r.net_payable)}</span>
+          </div>
+          <div class="signatures" style="margin-top: 35px;">
+            <div class="sig-line">Bosh Shifokor / Direktor Imzosi</div>
+            <div class="sig-line">Bosh Hisobchi Imzosi</div>
+          </div>
+        </div>
+      `
     })
 
     const printWindow = window.open('', '_blank', 'width=1050,height=900')
@@ -1455,6 +1522,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
         td { border: 1px solid #cbd5e1; padding: 5px 7px; word-wrap: break-word; overflow-wrap: break-word; }
         .signatures { display: flex; justify-content: space-between; margin-top: 30px; font-size: 11.5px; }
         .sig-line { width: 44%; border-top: 1.5px solid #000; text-align: center; padding-top: 4px; font-weight: 900; }
+        .referrer-page { page-break-inside: avoid; break-inside: avoid; margin-top: 45px; margin-bottom: 45px; padding-bottom: 16px; border-bottom: 1px dashed #cbd5e1; }
         @media print { body { padding: 0; } @page { size: A4; margin: 8mm; } }
       </style></head><body>
       <div class="header">
@@ -1490,6 +1558,8 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
         <div class="sig-line">Bosh Shifokor / Direktor Imzosi</div>
         <div class="sig-line">Bosh Hisobchi Imzosi</div>
       </div>
+
+      ${personBlocksHtml}
       </body></html>
     `)
     printWindow.document.close()

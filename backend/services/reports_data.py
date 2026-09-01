@@ -1571,11 +1571,21 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         if inp_comm <= 0:
             continue
         adv_rem = advance_remaining_map.get(("referrer", ref_id), 0)
+        inp_row_entry = {
+            "date": "Statsionar",
+            "department_name": "Statsionar xizmatlari",
+            "patient_count": int(inp_count or 0),
+            "service_count": int(inp_count or 0),
+            "gross_total": int(inp_gross or 0),
+            "rate_label": "—",
+            "earned_fee": inp_comm,
+        }
         if ref_id in ref_map:
             row = ref_map[ref_id]
             row["earned_commission"] += inp_comm
             row["gross_total"] += int(inp_gross or 0)
             row["patient_count"] += int(inp_count or 0)
+            row["daily_departments"].insert(0, inp_row_entry)
             new_earned = row["earned_commission"]
             row["advance_deducted"] = min(new_earned, adv_rem)
             row["advance_remaining"] = max(0, adv_rem - new_earned)
@@ -1596,7 +1606,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "net_payable": max(0, inp_comm - adv_rem),
                 "patients": [],
                 "departments": [],
-                "daily_departments": [],
+                "daily_departments": [inp_row_entry],
                 "daily_services": [],
             }
 
@@ -1613,6 +1623,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         patient_count = len(pr_patients)
         gross_total = sum(p.payment_amount for p in pr_patients)
         total_prov_share = 0
+        daily_dept_map_pr = {}
         from services.finance import calculate_financial_split
         for p in pr_patients:
             svc = p.service
@@ -1638,6 +1649,38 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             )
             total_prov_share += prov_amt
 
+            d_str = p.created_at.strftime("%d.%m.%Y") if p.created_at else ""
+            d_name = _extract_department_name(svc.name if svc else "", svc.category if svc else "", svc.cabinet if svc else "") if svc else "Boshqa xizmatlar"
+            dept_key = (d_str, d_name)
+            if dept_key not in daily_dept_map_pr:
+                daily_dept_map_pr[dept_key] = {
+                    "date": d_str,
+                    "department_name": d_name,
+                    "patient_ids": set(),
+                    "service_count": 0,
+                    "gross_total": 0,
+                    "rate_label": f"{pr.percentage or 0}%",
+                    "earned_fee": 0,
+                }
+            p_id = getattr(p, "patient_id", None) or p.id
+            daily_dept_map_pr[dept_key]["patient_ids"].add(p_id)
+            daily_dept_map_pr[dept_key]["service_count"] += 1
+            daily_dept_map_pr[dept_key]["gross_total"] += paid
+            daily_dept_map_pr[dept_key]["earned_fee"] += prov_amt
+
+        daily_departments_pr = []
+        for (d_str, d_name), d_info in daily_dept_map_pr.items():
+            daily_departments_pr.append({
+                "date": d_str,
+                "department_name": d_name,
+                "patient_count": len(d_info["patient_ids"]),
+                "service_count": d_info["service_count"],
+                "gross_total": d_info["gross_total"],
+                "rate_label": d_info["rate_label"],
+                "earned_fee": d_info["earned_fee"],
+            })
+        daily_departments_pr.sort(key=lambda x: (x["date"], x["department_name"]), reverse=True)
+
         # Check Advances for Provider
         total_advance_remaining = advance_remaining_map.get(("provider", pr.id), 0)
 
@@ -1658,7 +1701,72 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             "advance_remaining": advance_remaining_after,
             "advance_deducted": advance_deducted,
             "net_payable": net_payable,
+            "daily_departments": daily_departments_pr,
         }
+
+    # Statsionar (yotgan) bemorga qo'shilgan qo'shimcha xizmatlar (UZI/Lab)
+    # uchun SHIFOKOR (provider) ulushi ham `process_inpatient_payment` orqali
+    # `Transaction`ga to'g'ri yoziladi, lekin yuqoridagi ro'yxat faqat
+    # `Patient` (ambulator) jadvalidan tuzilgani uchun statsionardan kelgan
+    # KPI ulushi bu yerda umuman ko'rinmasdi — xuddi yo'naltiruvchi tomonida
+    # yuqorida tuzatilgan xato bilan bir xil, faqat shifokor tomonida.
+    inp_prov_rows = (
+        db.query(
+            Transaction.provider_id,
+            func.sum(Transaction.provider_amount),
+            func.sum(Transaction.total_amount),
+            func.count(func.distinct(Transaction.inpatient_id)),
+        )
+        .filter(
+            Transaction.inpatient_id.isnot(None),
+            Transaction.provider_id.isnot(None),
+            Transaction.provider_amount > 0,
+            Transaction.created_at >= s,
+            Transaction.created_at <= e,
+        )
+        .group_by(Transaction.provider_id)
+        .all()
+    )
+    for prov_id, inp_comm, inp_gross, inp_count in inp_prov_rows:
+        inp_comm = int(inp_comm or 0)
+        if inp_comm <= 0:
+            continue
+        adv_rem = advance_remaining_map.get(("provider", prov_id), 0)
+        inp_row_entry = {
+            "date": "Statsionar",
+            "department_name": "Statsionar xizmatlari",
+            "patient_count": int(inp_count or 0),
+            "service_count": int(inp_count or 0),
+            "gross_total": int(inp_gross or 0),
+            "rate_label": "—",
+            "earned_fee": inp_comm,
+        }
+        if prov_id in prov_map:
+            row = prov_map[prov_id]
+            row["earned_share"] += inp_comm
+            row["gross_total"] += int(inp_gross or 0)
+            row["patient_count"] += int(inp_count or 0)
+            row["daily_departments"].insert(0, inp_row_entry)
+            new_earned = row["earned_share"]
+            row["advance_deducted"] = min(new_earned, adv_rem)
+            row["advance_remaining"] = max(0, adv_rem - new_earned)
+            row["net_payable"] = max(0, new_earned - adv_rem)
+        else:
+            pr_obj = next((p for p in providers if p.id == prov_id), None)
+            if not pr_obj:
+                continue
+            prov_map[prov_id] = {
+                "provider_id": prov_id,
+                "name": pr_obj.full_name,
+                "specialization": pr_obj.specialization,
+                "patient_count": int(inp_count or 0),
+                "gross_total": int(inp_gross or 0),
+                "earned_share": inp_comm,
+                "advance_remaining": max(0, adv_rem - inp_comm),
+                "advance_deducted": min(inp_comm, adv_rem),
+                "net_payable": max(0, inp_comm - adv_rem),
+                "daily_departments": [inp_row_entry],
+            }
 
     providers_payout = list(prov_map.values())
     providers_payout.sort(key=lambda x: x["earned_share"], reverse=True)
@@ -1711,6 +1819,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             "provider_net_payable": prov["net_payable"],
             "referrer_net_payable": 0,
             "net_payable": prov["net_payable"],
+            "breakdown": [{**d, "source": "Shifokor (KPI)"} for d in prov.get("daily_departments", [])],
         }
 
     ref_to_key = {v["referrer_id"]: k for k, v in all_staff_map.items() if v.get("referrer_id")}
@@ -1726,6 +1835,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             row["advance_remaining"] += ref["advance_remaining"]
             row["referrer_net_payable"] = ref["net_payable"]
             row["net_payable"] = row["provider_net_payable"] + ref["net_payable"]
+            row["breakdown"] += [{**d, "source": "Yo'naltiruvchi"} for d in ref.get("daily_departments", [])]
         else:
             key = f"ref_{r_id}"
             all_staff_map[key] = {
@@ -1741,6 +1851,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "provider_net_payable": 0,
                 "referrer_net_payable": ref["net_payable"],
                 "net_payable": ref["net_payable"],
+                "breakdown": [{**d, "source": "Yo'naltiruvchi"} for d in ref.get("daily_departments", [])],
             }
 
     all_staff_payout = list(all_staff_map.values())
