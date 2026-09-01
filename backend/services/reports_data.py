@@ -1588,33 +1588,44 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     for (ref_id, d_str), agg in inp_ref_date_map.items():
         inp_ref_by_referrer[ref_id].append((d_str, agg["comm"], agg["gross"], len(agg["inp_ids"])))
 
+    def _merge_inpatient_into_daily(daily_list: list, date_groups: list) -> list:
+        """Statsionar daromadni "Statsionar xizmatlari" deb ALOHIDA qator
+        qilib qo'shish o'rniga — o'sha kuni allaqachon bor qatorga (masalan
+        UZI) qo'shib yuboradi, xuddi o'sha kungi bemorlar ro'yxatining bir
+        qismidek. Agar o'sha kunga hech qanday oddiy qator bo'lmasa, faqat
+        o'shanda "Statsionar xizmatlari" nomli yangi qator qo'shiladi."""
+        result = list(daily_list)
+        for d_str, comm, gross, n_patients in date_groups:
+            target = next((row for row in result if row["date"] == d_str), None)
+            if target:
+                target["patient_count"] += n_patients
+                target["service_count"] += n_patients
+                target["gross_total"] += gross
+                target["earned_fee"] += comm
+            else:
+                result.append({
+                    "date": d_str,
+                    "department_name": "Statsionar xizmatlari",
+                    "patient_count": n_patients,
+                    "service_count": n_patients,
+                    "gross_total": gross,
+                    "rate_label": "—",
+                    "earned_fee": comm,
+                })
+        result.sort(key=lambda x: (x["date"], x["department_name"]), reverse=True)
+        return result
+
     for ref_id, date_groups in inp_ref_by_referrer.items():
         inp_comm = sum(c for _, c, _, _ in date_groups)
         inp_gross = sum(g for _, _, g, _ in date_groups)
         inp_count = sum(n for _, _, _, n in date_groups)
         adv_rem = advance_remaining_map.get(("referrer", ref_id), 0)
-        inp_row_entries = [
-            {
-                "date": d_str,
-                "department_name": "Statsionar xizmatlari",
-                "patient_count": n_patients,
-                "service_count": n_patients,
-                "gross_total": gross,
-                "rate_label": "—",
-                "earned_fee": comm,
-            }
-            for d_str, comm, gross, n_patients in date_groups
-        ]
         if ref_id in ref_map:
             row = ref_map[ref_id]
             row["earned_commission"] += inp_comm
             row["gross_total"] += int(inp_gross or 0)
             row["patient_count"] += int(inp_count or 0)
-            row["daily_departments"] = sorted(
-                inp_row_entries + row["daily_departments"],
-                key=lambda x: (x["date"], x["department_name"]),
-                reverse=True,
-            )
+            row["daily_departments"] = _merge_inpatient_into_daily(row["daily_departments"], date_groups)
             new_earned = row["earned_commission"]
             row["advance_deducted"] = min(new_earned, adv_rem)
             row["advance_remaining"] = max(0, adv_rem - new_earned)
@@ -1635,7 +1646,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "net_payable": max(0, inp_comm - adv_rem),
                 "patients": [],
                 "departments": [],
-                "daily_departments": inp_row_entries,
+                "daily_departments": _merge_inpatient_into_daily([], date_groups),
                 "daily_services": [],
             }
 
@@ -1776,28 +1787,12 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         inp_gross = sum(g for _, _, g, _ in date_groups)
         inp_count = sum(n for _, _, _, n in date_groups)
         adv_rem = advance_remaining_map.get(("provider", prov_id), 0)
-        inp_row_entries = [
-            {
-                "date": d_str,
-                "department_name": "Statsionar xizmatlari",
-                "patient_count": n_patients,
-                "service_count": n_patients,
-                "gross_total": gross,
-                "rate_label": "—",
-                "earned_fee": comm,
-            }
-            for d_str, comm, gross, n_patients in date_groups
-        ]
         if prov_id in prov_map:
             row = prov_map[prov_id]
             row["earned_share"] += inp_comm
             row["gross_total"] += int(inp_gross or 0)
             row["patient_count"] += int(inp_count or 0)
-            row["daily_departments"] = sorted(
-                inp_row_entries + row["daily_departments"],
-                key=lambda x: (x["date"], x["department_name"]),
-                reverse=True,
-            )
+            row["daily_departments"] = _merge_inpatient_into_daily(row["daily_departments"], date_groups)
             new_earned = row["earned_share"]
             row["advance_deducted"] = min(new_earned, adv_rem)
             row["advance_remaining"] = max(0, adv_rem - new_earned)
@@ -1816,7 +1811,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "advance_remaining": max(0, adv_rem - inp_comm),
                 "advance_deducted": min(inp_comm, adv_rem),
                 "net_payable": max(0, inp_comm - adv_rem),
-                "daily_departments": inp_row_entries,
+                "daily_departments": _merge_inpatient_into_daily([], date_groups),
             }
 
     providers_payout = list(prov_map.values())
