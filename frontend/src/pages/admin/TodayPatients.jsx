@@ -111,7 +111,9 @@ export default function TodayPatients() {
     )
     setAddServiceId('')
     setEditServiceSearch('')
-    if (!referrers.length) api('/referrers').then(setReferrers).catch(() => {})
+    // active_only=false: bemorga avval biriktirilgan yo'naltiruvchi keyinchalik
+    // faolsizlantirilgan bo'lsa ham dropdown'da ko'rinishi kerak.
+    if (!referrers.length) api('/referrers?active_only=false').then(setReferrers).catch(() => {})
     if (!allServices.length) api('/services').then(setAllServices).catch(() => {})
   }
 

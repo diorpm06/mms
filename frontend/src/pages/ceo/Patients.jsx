@@ -146,7 +146,11 @@ export default function CeoPatients() {
     setEditReason('')
     setAddServiceId('')
     setEditServiceSearch('')
-    if (!referrers.length) api('/referrers').then(setReferrers).catch(() => {})
+    // active_only=false: bemorga avval biriktirilgan yo'naltiruvchi keyinchalik
+    // faolsizlantirilgan (o'chirilgan) bo'lsa ham, dropdown'da ko'rinishi
+    // kerak — aks holda tanlov ro'yxatida yo'q bo'lib, forma "Yo'naltiruvchi
+    // yo'q" deb bo'sh ko'rsatib qolardi, garchi haqiqatda biriktirilgan bo'lsa ham.
+    if (!referrers.length) api('/referrers?active_only=false').then(setReferrers).catch(() => {})
     if (!allServices.length) api('/services').then(setAllServices).catch(() => {})
   }
 
