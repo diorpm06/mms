@@ -1036,7 +1036,11 @@ def export_all_staff_pdf(report: dict) -> bytes:
             r_role = r.get("role", "")
 
             person_elements.append(Paragraph(f"Davr: {date_label}", subtitle_style))
-            person_elements.append(Paragraph(f"{r_name} ({r_role})", section_head_style))
+            # Sof yo'naltiruvchilar uchun rol yorlig'i ortiqcha (ular
+            # allaqachon shu ma'noda) — faqat Shifokor va ikki rolli
+            # xodimlar uchun ko'rsatiladi.
+            header_text = r_name if r_role == "Yo'naltiruvchi" else f"{r_name} ({r_role})"
+            person_elements.append(Paragraph(header_text, section_head_style))
 
             table_data = [[
                 _th("№"), _th("Sana"), _th("Bo'lim nomi"), _th("Manba"),
