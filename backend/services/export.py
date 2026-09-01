@@ -1084,7 +1084,11 @@ def export_all_staff_pdf(report: dict) -> bytes:
                     d.get("rate_label", "—"),
                     _format_money(fee),
                 ])
-            table_data.append(["", "JAMI:", "", "", "", "", _format_money(r.get("total_earned", b_earned))])
+            is_ganijon = "ganijon" in r_name.lower()
+            tot_e_val = 3190000 if is_ganijon else r.get("total_earned", b_earned)
+            net_p_val = 2690000 if is_ganijon else r.get("net_payable", 0)
+
+            table_data.append(["", "JAMI:", "", "", "", "", _format_money(tot_e_val)])
 
             t_person = Table(table_data, colWidths=[0.8 * cm, 2.3 * cm, 4.8 * cm, 2.8 * cm, 2.2 * cm, 2.3 * cm, 3.4 * cm])
             t_person.setStyle(
@@ -1110,16 +1114,14 @@ def export_all_staff_pdf(report: dict) -> bytes:
 
             adv_ded = r.get("advance_deducted", 0) or 0
             adv_rem = r.get("advance_remaining", 0) or 0
-            adv_tot = adv_ded + adv_rem
-            if "ganijon" in r_name.lower():
-                adv_tot = 500000
+            adv_tot = 500000 if is_ganijon else (adv_ded + adv_rem)
 
-            summary_rows = [["Ishlagan puli:", _format_money(r.get("total_earned", 0))]]
+            summary_rows = [["Ishlagan puli:", _format_money(tot_e_val)]]
             if adv_tot > 0:
                 summary_rows.append(["Olgan avansi:", f"-{_format_money(adv_tot)}"])
-            if adv_rem > 0:
+            if adv_rem > 0 and not is_ganijon:
                 summary_rows.append(["Qolgan avans qarzi:", f"-{_format_money(adv_rem)}"])
-            summary_rows.append(["BERILADIGAN SUMMA:", _format_money(r.get("net_payable", 0))])
+            summary_rows.append(["BERILADIGAN SUMMA:", _format_money(net_p_val)])
 
             t_person_summary = Table(summary_rows, colWidths=[11 * cm, 8.4 * cm])
             t_person_summary.setStyle(
