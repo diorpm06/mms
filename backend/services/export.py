@@ -546,7 +546,32 @@ def export_referrers_pdf(report: dict) -> bytes:
     p_end = report.get("period_end", "")
     date_label = f"{p_start}" if p_start == p_end else f"{p_start} — {p_end}"
 
-    ref_list = report.get("referrers_payout") or []
+    # Ikki rolda ishlaydiganlar (Provider.referrer_id orqali ham shifokor,
+    # ham yo'naltiruvchi bo'lgan xodimlar) — bu hisobotda ILGARI umuman
+    # ko'rinmasdi (ten_day_report()ning consolidated_payout maydoni faqat
+    # ekranda ko'rinardi, PDF'ga ulanmagan edi). Endi shu ro'yxatning
+    # o'zida ("Shifokor + Yo'naltiruvchi" deb belgilanib) qo'shiladi —
+    # ko'rsatiladigan Ishlangan Ulush/Avans/Sof To'lanadigan raqamlari
+    # ENDI ikkala roldagi ulush YIG'INDISI (faqat yo'naltirish ulushi emas).
+    consolidated_map = {
+        c["referrer_id"]: c for c in (report.get("consolidated_payout") or []) if c.get("referrer_id")
+    }
+    ref_list = []
+    for r in report.get("referrers_payout") or []:
+        c = consolidated_map.get(r.get("referrer_id"))
+        if c:
+            r = {
+                **r,
+                "name": f"{r.get('name', '')} (Shifokor + Yo'naltiruvchi)",
+                "earned_commission": c["total_earned"],
+                "advance_deducted": c["advance_deducted"],
+                "advance_remaining": c["advance_remaining"],
+                "net_payable": c["net_payable"],
+                "is_dual_role": True,
+                "provider_earned": c["provider_earned"],
+                "referrer_earned": c["referrer_earned"],
+            }
+        ref_list.append(r)
 
     tot_patients = sum(r.get("patient_count", 0) for r in ref_list)
     tot_gross = sum(r.get("gross_total", 0) for r in ref_list)
@@ -757,10 +782,14 @@ def export_referrers_pdf(report: dict) -> bytes:
                         _format_money(fee),
                     ])
 
-            # Subtotal row for this referrer
+            # Subtotal row for this referrer. Ism bu yerda TAKRORLANMAYDI —
+            # sahifa boshidagi sarlavhada allaqachon bor; ikki rolli xodimlar
+            # uchun ism "(Shifokor + Yo'naltiruvchi)" bilan uzun bo'lib
+            # ketganida bu tor ustunda chapga "yugurib" chiqib, jadval
+            # chegarasiga qoplanib qolardi.
             table_data.append([
                 "",
-                f"JAMI ({r_name}):",
+                "JAMI:",
                 "",
                 f"{r_pat_cnt} nafar bemor",
                 f"{r_svc_cnt} ta xizmat",
@@ -798,7 +827,17 @@ def export_referrers_pdf(report: dict) -> bytes:
             r_advance_deducted = r.get("advance_deducted", 0)
             r_advance_remaining = r.get("advance_remaining", 0)
             r_net_payable = r.get("net_payable", 0)
-            ref_summary_rows = [["Chegirilgan Avans:", f"-{_format_money(r_advance_deducted)}" if r_advance_deducted > 0 else "0 so'm"]]
+            ref_summary_rows = []
+            if r.get("is_dual_role"):
+                # Jadvaldagi "Hisoblangan Ulush" faqat YO'NALTIRISH ulushi —
+                # bu kishi ayni paytda shifokor sifatida ham ishlagani uchun
+                # pastdagi "Sof To'lanadigan" summasi jadvaldagidan KATTA
+                # chiqadi. Bu farq "sirli" ko'rinmasligi uchun ikkalasi ham
+                # alohida ko'rsatiladi.
+                ref_summary_rows.append(["Yo'naltirish ulushi (yuqoridagi jadval):", _format_money(r.get("referrer_earned", 0))])
+                ref_summary_rows.append(["+ Shifokorlik ulushi (KPI, ushbu davr):", _format_money(r.get("provider_earned", 0))])
+                ref_summary_rows.append(["= Jami ishlangan (ikkala rol):", _format_money(r.get("earned_commission", 0))])
+            ref_summary_rows.append(["Chegirilgan Avans:", f"-{_format_money(r_advance_deducted)}" if r_advance_deducted > 0 else "0 so'm"])
             if r_advance_remaining > 0:
                 ref_summary_rows.append(["Qolgan Avans (keyingi davrga o'tadi):", f"-{_format_money(r_advance_remaining)}"])
             ref_summary_rows.append(["SOF TO'LANADIGAN SUMMA:", _format_money(r_net_payable)])
