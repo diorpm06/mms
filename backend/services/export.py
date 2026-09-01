@@ -1053,9 +1053,9 @@ def export_all_staff_pdf(report: dict) -> bytes:
                     "date": "21.08–31.08",
                     "department_name": "Statsionar xizmatlari",
                     "source": "Shifokor (KPI)",
-                    "patient_count": "16 kun",
+                    "patient_count": "14 kun",
                     "rate_label": "50 000 so'm/kun",
-                    "earned_fee": 800000,
+                    "earned_fee": 700000,
                 })
             elif inp_lines:
                 tot_inp_fee = sum(d.get("earned_fee", 0) for d in inp_lines)
