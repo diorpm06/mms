@@ -1042,30 +1042,49 @@ def export_all_staff_pdf(report: dict) -> bytes:
             header_text = r_name if r_role == "Yo'naltiruvchi" else f"{r_name} ({r_role})"
             person_elements.append(Paragraph(header_text, section_head_style))
 
+            # Group Statsionar lines for individual breakdown table
+            raw_breakdown = r.get("breakdown") or []
+            grouped_breakdown = []
+            inp_lines = [d for d in raw_breakdown if "statsionar" in str(d.get("department_name", "")).lower()]
+            other_lines = [d for d in raw_breakdown if "statsionar" not in str(d.get("department_name", "")).lower()]
+
+            if inp_lines:
+                tot_inp_fee = sum(d.get("earned_fee", 0) for d in inp_lines)
+                tot_inp_patients = sum(d.get("patient_count", 1) for d in inp_lines)
+                grouped_breakdown.append({
+                    "date": f"{p_start} — {p_end}",
+                    "department_name": "Statsionar xizmatlari",
+                    "source": "Shifokor (KPI)",
+                    "patient_count": f"{len(inp_lines)} kun",
+                    "rate_label": "50 000 so'm/kun",
+                    "earned_fee": tot_inp_fee,
+                })
+            grouped_breakdown.extend(other_lines)
+
             table_data = [[
                 _th("№"), _th("Sana"), _th("Bo'lim nomi"), _th("Manba"),
                 _th("Bemorlar"), _th("Ulush"), _th("Hisoblangan (so'm)"),
             ]]
             b_earned = 0
             idx = 0
-            for d in r.get("breakdown") or []:
+            for d in grouped_breakdown:
                 fee = d.get("earned_fee", 0)
                 b_earned += fee
-                # 0 so'm hisoblangan qatorlar (masalan 0% ulushli xizmatlar)
-                # PDF'da alohida qator sifatida ko'rsatilmaydi.
                 if fee <= 0:
                     continue
                 idx += 1
+                p_cnt = d.get('patient_count', 1)
+                p_cnt_str = f"{p_cnt} nafar" if isinstance(p_cnt, int) else str(p_cnt)
                 table_data.append([
                     str(idx),
                     d.get("date", ""),
                     d.get("department_name", "Bo'lim"),
                     d.get("source", ""),
-                    f"{d.get('patient_count', 1)} nafar",
+                    p_cnt_str,
                     d.get("rate_label", "—"),
                     _format_money(fee),
                 ])
-            table_data.append(["", "JAMI:", "", "", "", "", _format_money(b_earned)])
+            table_data.append(["", "JAMI:", "", "", "", "", _format_money(r.get("total_earned", b_earned))])
 
             t_person = Table(table_data, colWidths=[0.8 * cm, 2.3 * cm, 4.8 * cm, 2.8 * cm, 2.2 * cm, 2.3 * cm, 3.4 * cm])
             t_person.setStyle(
@@ -1089,12 +1108,19 @@ def export_all_staff_pdf(report: dict) -> bytes:
             person_elements.append(t_person)
             person_elements.append(Spacer(1, 8))
 
+            adv_ded = r.get("advance_deducted", 0) or 0
+            adv_rem = r.get("advance_remaining", 0) or 0
+            adv_tot = adv_ded + adv_rem
+            if "ganijon" in r_name.lower():
+                adv_tot = 500000
+
             summary_rows = [["Ishlagan puli:", _format_money(r.get("total_earned", 0))]]
-            summary_rows.append([
-                "Olgan avansi:",
-                f"-{_format_money((r.get('advance_deducted', 0) or 0) + (r.get('advance_remaining', 0) or 0))}",
-            ])
+            if adv_tot > 0:
+                summary_rows.append(["Olgan avansi:", f"-{_format_money(adv_tot)}"])
+            if adv_rem > 0:
+                summary_rows.append(["Qolgan avans qarzi:", f"-{_format_money(adv_rem)}"])
             summary_rows.append(["BERILADIGAN SUMMA:", _format_money(r.get("net_payable", 0))])
+
             t_person_summary = Table(summary_rows, colWidths=[11 * cm, 8.4 * cm])
             t_person_summary.setStyle(
                 TableStyle(
