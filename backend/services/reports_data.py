@@ -1814,6 +1814,56 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "daily_departments": _merge_inpatient_into_daily([], date_groups),
             }
 
+    # Statsionar shifokorning kunlik qatnashish haqi (InpatientProviderAccrual)
+    from models.inpatient_accrual import InpatientProviderAccrual
+    inp_accruals = (
+        db.query(
+            InpatientProviderAccrual.provider_id,
+            InpatientProviderAccrual.accrual_date,
+            InpatientProviderAccrual.amount,
+        )
+        .filter(
+            InpatientProviderAccrual.accrual_date >= s.date(),
+            InpatientProviderAccrual.accrual_date <= e.date(),
+            InpatientProviderAccrual.amount > 0,
+        )
+        .all()
+    )
+    accrual_by_prov = defaultdict(list)
+    for p_id, a_date, amt in inp_accruals:
+        d_str = a_date.strftime("%d.%m.%Y") if a_date else "—"
+        accrual_by_prov[p_id].append((d_str, amt))
+
+    for prov_id, acc_list in accrual_by_prov.items():
+        tot_acc = sum(amt for _, amt in acc_list)
+        adv_rem = advance_remaining_map.get(("provider", prov_id), 0)
+        acc_date_groups = [(d_str, amt, 0, 1) for d_str, amt in acc_list]
+        if prov_id in prov_map:
+            row = prov_map[prov_id]
+            row["earned_share"] += tot_acc
+            row["patient_count"] += len(acc_list)
+            row["daily_departments"] = _merge_inpatient_into_daily(row["daily_departments"], acc_date_groups)
+            new_earned = row["earned_share"]
+            row["advance_deducted"] = min(new_earned, adv_rem)
+            row["advance_remaining"] = max(0, adv_rem - new_earned)
+            row["net_payable"] = max(0, new_earned - adv_rem)
+        else:
+            pr_obj = next((p for p in providers if p.id == prov_id), None)
+            if not pr_obj:
+                continue
+            prov_map[prov_id] = {
+                "provider_id": prov_id,
+                "name": pr_obj.full_name,
+                "specialization": pr_obj.specialization,
+                "patient_count": len(acc_list),
+                "gross_total": 0,
+                "earned_share": tot_acc,
+                "advance_remaining": max(0, adv_rem - tot_acc),
+                "advance_deducted": min(tot_acc, adv_rem),
+                "net_payable": max(0, tot_acc - adv_rem),
+                "daily_departments": _merge_inpatient_into_daily([], acc_date_groups),
+            }
+
     providers_payout = list(prov_map.values())
     providers_payout.sort(key=lambda x: x["earned_share"], reverse=True)
 
@@ -1900,7 +1950,10 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "breakdown": [{**d, "source": "Yo'naltiruvchi"} for d in ref.get("daily_departments", [])],
             }
 
-    all_staff_payout = list(all_staff_map.values())
+    all_staff_payout = [
+        x for x in all_staff_map.values()
+        if not (x["total_earned"] == 0 and any(ex in x["name"].lower() for ex in ["ineksiya", "ozona", "ozon"]))
+    ]
     all_staff_payout.sort(key=lambda x: x["total_earned"], reverse=True)
 
     base_report["services_detail"] = services_detail
