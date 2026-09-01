@@ -1549,12 +1549,24 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     # umuman ko'rinmasdi — faqat statsionardan komissiya olgan yo'naltiruvchi
     # ro'yxatda butunlay chiqmay qolar, ambulatori ham bo'lsa ulushi kam
     # ko'rsatilardi (demak "to'lash" tugmasi kam pul bilan bosilardi).
+    def _inpatient_stay_label(inp_id: int) -> str:
+        """Statsionar bemor ismi + necha kun yotgani — har bir bemor
+        alohida qatorda ko'rinishi uchun (bitta umumlashtirilgan
+        "Statsionar xizmatlari" qatori o'rniga)."""
+        inp_obj = db.query(Inpatient).filter(Inpatient.id == inp_id).first()
+        if not inp_obj:
+            return f"Statsionar bemor #{inp_id}"
+        end = inp_obj.discharged_at or datetime.now()
+        days = max(1, (end - inp_obj.admitted_at).days or 1)
+        full_name = f"{inp_obj.first_name or ''} {inp_obj.last_name or ''}".strip() or "Noma'lum bemor"
+        return f"{full_name} ({days} kun yotgan)"
+
     inp_ref_rows = (
         db.query(
             Transaction.referrer_id,
+            Transaction.inpatient_id,
             func.sum(Transaction.referrer_amount),
             func.sum(Transaction.total_amount),
-            func.count(func.distinct(Transaction.inpatient_id)),
         )
         .filter(
             Transaction.inpatient_id.isnot(None),
@@ -1563,29 +1575,39 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             Transaction.created_at >= s,
             Transaction.created_at <= e,
         )
-        .group_by(Transaction.referrer_id)
+        .group_by(Transaction.referrer_id, Transaction.inpatient_id)
         .all()
     )
-    for ref_id, inp_comm, inp_gross, inp_count in inp_ref_rows:
+    inp_ref_by_referrer = defaultdict(list)
+    for ref_id, inp_id, inp_comm, inp_gross in inp_ref_rows:
         inp_comm = int(inp_comm or 0)
         if inp_comm <= 0:
             continue
+        inp_ref_by_referrer[ref_id].append((inp_id, inp_comm, int(inp_gross or 0)))
+
+    for ref_id, items in inp_ref_by_referrer.items():
+        inp_comm = sum(c for _, c, _ in items)
+        inp_gross = sum(g for _, _, g in items)
+        inp_count = len(items)
         adv_rem = advance_remaining_map.get(("referrer", ref_id), 0)
-        inp_row_entry = {
-            "date": "Statsionar",
-            "department_name": "Statsionar xizmatlari",
-            "patient_count": int(inp_count or 0),
-            "service_count": int(inp_count or 0),
-            "gross_total": int(inp_gross or 0),
-            "rate_label": "—",
-            "earned_fee": inp_comm,
-        }
+        inp_row_entries = [
+            {
+                "date": "Statsionar",
+                "department_name": _inpatient_stay_label(inp_id),
+                "patient_count": 1,
+                "service_count": 1,
+                "gross_total": gross,
+                "rate_label": "—",
+                "earned_fee": comm,
+            }
+            for inp_id, comm, gross in items
+        ]
         if ref_id in ref_map:
             row = ref_map[ref_id]
             row["earned_commission"] += inp_comm
             row["gross_total"] += int(inp_gross or 0)
             row["patient_count"] += int(inp_count or 0)
-            row["daily_departments"].insert(0, inp_row_entry)
+            row["daily_departments"] = inp_row_entries + row["daily_departments"]
             new_earned = row["earned_commission"]
             row["advance_deducted"] = min(new_earned, adv_rem)
             row["advance_remaining"] = max(0, adv_rem - new_earned)
@@ -1606,7 +1628,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "net_payable": max(0, inp_comm - adv_rem),
                 "patients": [],
                 "departments": [],
-                "daily_departments": [inp_row_entry],
+                "daily_departments": inp_row_entries,
                 "daily_services": [],
             }
 
@@ -1713,9 +1735,9 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     inp_prov_rows = (
         db.query(
             Transaction.provider_id,
+            Transaction.inpatient_id,
             func.sum(Transaction.provider_amount),
             func.sum(Transaction.total_amount),
-            func.count(func.distinct(Transaction.inpatient_id)),
         )
         .filter(
             Transaction.inpatient_id.isnot(None),
@@ -1724,29 +1746,39 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             Transaction.created_at >= s,
             Transaction.created_at <= e,
         )
-        .group_by(Transaction.provider_id)
+        .group_by(Transaction.provider_id, Transaction.inpatient_id)
         .all()
     )
-    for prov_id, inp_comm, inp_gross, inp_count in inp_prov_rows:
+    inp_prov_by_provider = defaultdict(list)
+    for prov_id, inp_id, inp_comm, inp_gross in inp_prov_rows:
         inp_comm = int(inp_comm or 0)
         if inp_comm <= 0:
             continue
+        inp_prov_by_provider[prov_id].append((inp_id, inp_comm, int(inp_gross or 0)))
+
+    for prov_id, items in inp_prov_by_provider.items():
+        inp_comm = sum(c for _, c, _ in items)
+        inp_gross = sum(g for _, _, g in items)
+        inp_count = len(items)
         adv_rem = advance_remaining_map.get(("provider", prov_id), 0)
-        inp_row_entry = {
-            "date": "Statsionar",
-            "department_name": "Statsionar xizmatlari",
-            "patient_count": int(inp_count or 0),
-            "service_count": int(inp_count or 0),
-            "gross_total": int(inp_gross or 0),
-            "rate_label": "—",
-            "earned_fee": inp_comm,
-        }
+        inp_row_entries = [
+            {
+                "date": "Statsionar",
+                "department_name": _inpatient_stay_label(inp_id),
+                "patient_count": 1,
+                "service_count": 1,
+                "gross_total": gross,
+                "rate_label": "—",
+                "earned_fee": comm,
+            }
+            for inp_id, comm, gross in items
+        ]
         if prov_id in prov_map:
             row = prov_map[prov_id]
             row["earned_share"] += inp_comm
             row["gross_total"] += int(inp_gross or 0)
             row["patient_count"] += int(inp_count or 0)
-            row["daily_departments"].insert(0, inp_row_entry)
+            row["daily_departments"] = inp_row_entries + row["daily_departments"]
             new_earned = row["earned_share"]
             row["advance_deducted"] = min(new_earned, adv_rem)
             row["advance_remaining"] = max(0, adv_rem - new_earned)
@@ -1765,7 +1797,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "advance_remaining": max(0, adv_rem - inp_comm),
                 "advance_deducted": min(inp_comm, adv_rem),
                 "net_payable": max(0, inp_comm - adv_rem),
-                "daily_departments": [inp_row_entry],
+                "daily_departments": inp_row_entries,
             }
 
     providers_payout = list(prov_map.values())

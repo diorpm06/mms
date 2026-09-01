@@ -712,7 +712,7 @@ def export_referrers_pdf(report: dict) -> bytes:
 
             table_data = [[
                 _th("№"), _th("Sana"), _th("Bo'lim nomi"), _th("Bemorlar soni"), _th("Xizmatlar soni"),
-                _th("Jami Tushum (so'm)"), _th("Belgilangan Ulush"), _th("Hisoblangan Ulush (so'm)"),
+                _th("Belgilangan Ulush"), _th("Hisoblangan Ulush (so'm)"),
             ]]
 
             r_gross = 0
@@ -727,7 +727,6 @@ def export_referrers_pdf(report: dict) -> bytes:
                     gross = d.get("gross_total", 0)
                     fee = d.get("earned_fee", 0)
                     d_name = d.get("department_name", "Bo'lim")
-                    is_hidden_rev = any(k in d_name.upper() for k in ["UZI", "OZON"])
                     r_svc_cnt += cnt
                     r_gross += gross
                     r_fees += fee
@@ -737,7 +736,6 @@ def export_referrers_pdf(report: dict) -> bytes:
                         d_name,
                         f"{p_cnt} nafar",
                         f"{cnt} ta",
-                        "" if is_hidden_rev else _format_money(gross),
                         d.get("rate_label", "10%"),
                         _format_money(fee),
                     ])
@@ -748,7 +746,6 @@ def export_referrers_pdf(report: dict) -> bytes:
                     gross = d.get("gross_total", 0)
                     fee = d.get("earned_fee", 0)
                     d_name = d.get("department_name", "Bo'lim")
-                    is_hidden_rev = any(k in d_name.upper() for k in ["UZI", "OZON"])
                     r_svc_cnt += cnt
                     r_gross += gross
                     r_fees += fee
@@ -758,7 +755,6 @@ def export_referrers_pdf(report: dict) -> bytes:
                         d_name,
                         f"{p_cnt} nafar",
                         f"{cnt} ta",
-                        "" if is_hidden_rev else _format_money(gross),
                         d.get("rate_label", "10%"),
                         _format_money(fee),
                     ])
@@ -767,7 +763,6 @@ def export_referrers_pdf(report: dict) -> bytes:
                     paid = p.get("payment_amount", 0)
                     fee = p.get("referrer_fee", 0)
                     d_name = p.get("department_name", "Bo'lim")
-                    is_hidden_rev = any(k in d_name.upper() for k in ["UZI", "OZON"])
                     r_svc_cnt += 1
                     r_gross += paid
                     r_fees += fee
@@ -777,7 +772,6 @@ def export_referrers_pdf(report: dict) -> bytes:
                         d_name,
                         "1 nafar",
                         "1 ta",
-                        "" if is_hidden_rev else _format_money(paid),
                         p.get("rate_label", "10%"),
                         _format_money(fee),
                     ])
@@ -794,11 +788,10 @@ def export_referrers_pdf(report: dict) -> bytes:
                 f"{r_pat_cnt} nafar bemor",
                 f"{r_svc_cnt} ta xizmat",
                 "",
-                "",
                 _format_money(r_fees),
             ])
 
-            t_ref = Table(table_data, colWidths=[0.8 * cm, 2.5 * cm, 4.0 * cm, 2.2 * cm, 2.2 * cm, 2.7 * cm, 2.1 * cm, 2.5 * cm])
+            t_ref = Table(table_data, colWidths=[0.8 * cm, 2.7 * cm, 5.5 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm, 3.0 * cm])
             t_ref.setStyle(
                 TableStyle(
                     [
@@ -809,9 +802,8 @@ def export_referrers_pdf(report: dict) -> bytes:
                         ("ALIGN", (0, 0), (0, -1), "CENTER"),
                         ("ALIGN", (1, 0), (1, -1), "CENTER"),
                         ("ALIGN", (3, 0), (4, -1), "CENTER"),
-                        ("ALIGN", (5, 0), (5, -1), "RIGHT"),
-                        ("ALIGN", (6, 0), (6, -1), "CENTER"),
-                        ("ALIGN", (7, 0), (7, -1), "RIGHT"),
+                        ("ALIGN", (5, 0), (5, -1), "CENTER"),
+                        ("ALIGN", (6, 0), (6, -1), "RIGHT"),
                         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
                         ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
                         ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#e2e8f0")),
@@ -831,16 +823,21 @@ def export_referrers_pdf(report: dict) -> bytes:
             if r.get("is_dual_role"):
                 # Jadvaldagi "Hisoblangan Ulush" faqat YO'NALTIRISH ulushi —
                 # bu kishi ayni paytda shifokor sifatida ham ishlagani uchun
-                # pastdagi "Sof To'lanadigan" summasi jadvaldagidan KATTA
-                # chiqadi. Bu farq "sirli" ko'rinmasligi uchun ikkalasi ham
-                # alohida ko'rsatiladi.
+                # pastdagi "Beriladigan Summa" jadvaldagidan KATTA chiqadi.
+                # Bu farq "sirli" ko'rinmasligi uchun ikkalasi ham alohida
+                # ko'rsatiladi.
                 ref_summary_rows.append(["Yo'naltirish ulushi (yuqoridagi jadval):", _format_money(r.get("referrer_earned", 0))])
                 ref_summary_rows.append(["+ Shifokorlik ulushi (KPI, ushbu davr):", _format_money(r.get("provider_earned", 0))])
-                ref_summary_rows.append(["= Jami ishlangan (ikkala rol):", _format_money(r.get("earned_commission", 0))])
-            ref_summary_rows.append(["Chegirilgan Avans:", f"-{_format_money(r_advance_deducted)}" if r_advance_deducted > 0 else "0 so'm"])
-            if r_advance_remaining > 0:
-                ref_summary_rows.append(["Qolgan Avans (keyingi davrga o'tadi):", f"-{_format_money(r_advance_remaining)}"])
-            ref_summary_rows.append(["SOF TO'LANADIGAN SUMMA:", _format_money(r_net_payable)])
+                ref_summary_rows.append(["= Ishlagan puli (ikkala rol):", _format_money(r.get("earned_commission", 0))])
+            else:
+                ref_summary_rows.append(["Ishlagan puli:", _format_money(r.get("earned_commission", r_fees))])
+            # Avvalgi "Chegirilgan avans" + shartli "Qolgan avans" ikki qatori
+            # tushunarsiz edi (nechta qatorda nima ko'rsatilayotgani aniq
+            # emas). Endi bitta qator — OLINGAN AVANSNING TO'LIQ summasi
+            # (bu davrda ushlanganu, keyingi davrga o'tadigan qismi ham) —
+            # aniq ko'rsatiladi.
+            ref_summary_rows.append(["Olgan avansi:", f"-{_format_money(r_advance_deducted + r_advance_remaining)}"])
+            ref_summary_rows.append(["BERILADIGAN SUMMA:", _format_money(r_net_payable)])
             t_ref_summary = Table(ref_summary_rows, colWidths=[11 * cm, 8.4 * cm])
             t_ref_summary.setStyle(
                 TableStyle(

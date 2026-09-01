@@ -444,14 +444,12 @@ export default function CeoReferrers() {
         rGross += d.gross_total || 0
         rFee += d.earned_fee || 0
         rSvcCount += d.service_count || 0
-        const isHiddenRev = ['UZI', 'OZON'].some(k => (d.department_name || '').toUpperCase().includes(k))
         rowsHtml += `<tr>
           <td style="text-align: center;">${idx + 1}</td>
           <td style="text-align: center; font-weight: bold;">${d.date || '—'}</td>
           <td><strong>${d.department_name}</strong></td>
           <td style="text-align: center; font-weight: bold;">${d.patient_count || 1} nafar</td>
           <td style="text-align: center; font-weight: bold;">${d.service_count} ta</td>
-          <td style="text-align: ${isHiddenRev ? 'center' : 'right'}; font-weight: bold;">${isHiddenRev ? '—' : formatMoney(d.gross_total)}</td>
           <td style="text-align: center; font-weight: bold;">${d.rate_label}</td>
           <td style="text-align: right; font-weight: bold; color: #0284c7;">${formatMoney(d.earned_fee)}</td>
         </tr>`
@@ -467,30 +465,28 @@ export default function CeoReferrers() {
             <span>Jami ulush: ${formatMoney(earned)}</span>
           </div>
           <div style="font-size: 11.5px; font-weight: 700; background: #fffbeb; padding: 5px 10px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 12px; border: 1px solid #fde68a; border-radius: 4px;">
-            <span style="color:#dc2626;">Chegirilgan avans: -${formatMoney(adv)}</span>
-            ${(r.advance_remaining || 0) > 0 ? `<span style="color:#b45309;">Qolgan avans: -${formatMoney(r.advance_remaining)}</span>` : ''}
-            <span style="color:#16a34a; font-weight:900;">Sof to'lanadigan: ${formatMoney(net)}</span>
+            <span>Ishlagan puli: ${formatMoney(earned)}</span>
+            <span style="color:#dc2626;">Olgan avansi: -${formatMoney(adv + (r.advance_remaining || 0))}</span>
+            <span style="color:#16a34a; font-weight:900;">Beriladigan summa: ${formatMoney(net)}</span>
           </div>
           <table>
             <thead>
               <tr>
-                <th style="width: 30px; text-align: center;">№</th>
-                <th style="width: 95px; text-align: center;">Sana</th>
-                <th>Bo'lim nomi</th>
-                <th style="width: 100px; text-align: center;">Bemorlar soni</th>
-                <th style="width: 100px; text-align: center;">Xizmatlar soni</th>
-                <th style="width: 120px; text-align: center;">Jami Tushum</th>
-                <th style="width: 110px; text-align: center;">Belgilangan Ulush</th>
-                <th style="width: 120px; text-align: right;">Hisoblangan Ulush</th>
+                <th style="width: 25px; text-align: center;">№</th>
+                <th style="width: 75px; text-align: center;">Sana</th>
+                <th style="width: 180px;">Bo'lim nomi</th>
+                <th style="width: 80px; text-align: center;">Bemorlar soni</th>
+                <th style="width: 80px; text-align: center;">Xizmatlar soni</th>
+                <th style="width: 90px; text-align: center;">Belgilangan Ulush</th>
+                <th style="width: 110px; text-align: right;">Hisoblangan Ulush</th>
               </tr>
             </thead>
             <tbody>
-              ${rowsHtml || '<tr><td colSpan="8" style="text-align:center; padding:6px;">Xizmatlar yo-q</td></tr>'}
+              ${rowsHtml || '<tr><td colSpan="7" style="text-align:center; padding:6px;">Xizmatlar yo-q</td></tr>'}
               <tr style="background: #e2e8f0; font-weight: 900;">
                 <td colSpan="3">JAMI (${r.name}):</td>
                 <td style="text-align: center;">${rPatCount} nafar bemor</td>
                 <td style="text-align: center;">${rSvcCount} ta xizmat</td>
-                <td style="text-align: center;">—</td>
                 <td></td>
                 <td style="text-align: right; color: #0284c7;">${formatMoney(rFee)}</td>
               </tr>
@@ -1310,15 +1306,9 @@ export default function CeoReferrers() {
                   <span>{formatMoney(printModal.referrer.earned_commission)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '12px', marginBottom: '4px', color: '#dc2626' }}>
-                  <span>Chegirilgan Avans:</span>
-                  <span>-{formatMoney(printModal.referrer.advance_deducted)}</span>
+                  <span>Olgan Avansi:</span>
+                  <span>-{formatMoney((printModal.referrer.advance_deducted || 0) + (printModal.referrer.advance_remaining || 0))}</span>
                 </div>
-                {printModal.referrer.advance_remaining > 0 && (
-                  <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '12px', marginBottom: '4px', color: '#b45309' }}>
-                    <span>Qolgan Avans (keyingi davrga o'tadi):</span>
-                    <span>-{formatMoney(printModal.referrer.advance_remaining)}</span>
-                  </div>
-                )}
                 <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '15px', fontWeight: '900', borderTop: '2px solid #000', paddingTop: '6px', marginTop: '6px' }}>
                   <span>SOF TO'LANADIGAN SUMMA:</span>
                   <span>{formatMoney(printModal.referrer.net_payable)}</span>

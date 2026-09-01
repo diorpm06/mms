@@ -875,11 +875,20 @@ def process_inpatient_payment(
             if it_amt <= 0:
                 continue
 
+            # Statsionar bemorga biriktirilgan shifokor (inpatient.doctor_id)
+            # bo'lsa — qo'shimcha xizmat ulushi ENG AVVALO shu shifokorga
+            # tegishli bo'lishi kerak. Ilgari bu yerda har doim `None`
+            # uzatilardi, ya'ni biriktirilgan shifokor umuman hisobga
+            # olinmasdi — pastdagi "mutaxassislik bo'yicha BIRINCHI faol
+            # shifokor" gipotetik qidiruvi bir nechta bir xil mutaxassislik
+            # egalari orasida tasodifiy notog'ri kishiga pul yozib qo'yishi
+            # mumkin edi (masalan ikkita UZI shifokoridan doim faqat biriga).
             prov, ref, r_amt, p_amt, c_amt_calc = _split_amounts(
-                it_amt, inpatient.referrer_id, None, db, service_id=it.service_id
+                it_amt, inpatient.referrer_id, inpatient.doctor_id, db, service_id=it.service_id
             )
-            
-            # Match provider by service category or specialization if available
+
+            # Faqat biriktirilgan shifokor bo'lmagan holatlar uchun zaxira:
+            # mutaxassislik bo'yicha qidirish (eski xatti-harakat).
             if not prov and it.service_id:
                 from models.service import Service
                 svc = db.query(Service).filter(Service.id == it.service_id).first()
