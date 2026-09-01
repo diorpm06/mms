@@ -1413,6 +1413,90 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     )
   }
 
+  const handlePrintMasterAllStaff = () => {
+    const rows = referrersReport?.all_staff_payout || []
+    if (rows.length === 0) {
+      toast("Chop etish uchun xodimlar ma'lumoti yo'q", "error")
+      return
+    }
+
+    let grandTotal = 0
+    let grandAdvance = 0
+    let grandNet = 0
+    let rowsHtml = ''
+
+    rows.forEach((r, i) => {
+      grandTotal += r.total_earned || 0
+      grandAdvance += r.advance_deducted || 0
+      grandNet += r.net_payable || 0
+      rowsHtml += `<tr>
+        <td style="text-align: center; font-weight: bold;">${i + 1}</td>
+        <td><strong>${r.name}</strong> <span style="color:#64748b; font-size:11px;">(${r.role})</span></td>
+        <td style="text-align: right;">${r.provider_earned > 0 ? formatMoney(r.provider_earned) : '—'}</td>
+        <td style="text-align: right;">${r.referrer_earned > 0 ? formatMoney(r.referrer_earned) : '—'}</td>
+        <td style="text-align: right; font-weight: bold;">${formatMoney(r.total_earned)}</td>
+        <td style="text-align: right; color: #dc2626;">${r.advance_deducted > 0 ? '-' + formatMoney(r.advance_deducted) : '0'}</td>
+        <td style="text-align: right; color: #b45309;">${r.advance_remaining > 0 ? formatMoney(r.advance_remaining) : '—'}</td>
+        <td style="text-align: right; font-weight: 900; color: #16a34a;">${formatMoney(r.net_payable)}</td>
+      </tr>`
+    })
+
+    const printWindow = window.open('', '_blank', 'width=1050,height=900')
+    printWindow.document.write(`
+      <!DOCTYPE html><html><head><title>Yagona Master Hisobot — ${BRAND.name}</title>
+      <style>
+        body { font-family: Arial, Helvetica, sans-serif; padding: 15px; color: #0f172a; background: #fff; line-height: 1.35; font-size: 11.5px; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 14px; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px; }
+        .header h2 { margin: 3px 0 0; font-size: 14px; font-weight: 800; color: #1e293b; text-transform: uppercase; }
+        .header p { margin: 3px 0 0; font-size: 12px; font-weight: bold; color: #475569; }
+        table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px; table-layout: fixed; }
+        th { border: 1px solid #64748b; padding: 5px 7px; background: #f8fafc; font-weight: 900; text-align: left; word-wrap: break-word; }
+        td { border: 1px solid #cbd5e1; padding: 5px 7px; word-wrap: break-word; overflow-wrap: break-word; }
+        .signatures { display: flex; justify-content: space-between; margin-top: 30px; font-size: 11.5px; }
+        .sig-line { width: 44%; border-top: 1.5px solid #000; text-align: center; padding-top: 4px; font-weight: 900; }
+        @media print { body { padding: 0; } @page { size: A4; margin: 8mm; } }
+      </style></head><body>
+      <div class="header">
+        <h1>MARJONA MED SERVICE</h1>
+        <h2>BARCHA SHIFOKOR VA YO'NALTIRUVCHILARNING YAGONA HISOBOTI</h2>
+        <p>Davr: ${dateFrom} — ${dateTo}</p>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 25px; text-align: center;">#</th>
+            <th>F.I.Sh & Roli</th>
+            <th style="width: 95px; text-align: right;">Shifokor (KPI)</th>
+            <th style="width: 100px; text-align: right;">Yo'naltiruvchi Ulush</th>
+            <th style="width: 100px; text-align: right;">Jami Ishlangan</th>
+            <th style="width: 90px; text-align: right;">Avans (-)</th>
+            <th style="width: 90px; text-align: right;">Qolgan Qarz</th>
+            <th style="width: 110px; text-align: right;">Sof To'lanadigan</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+          <tr style="background: #e2e8f0; font-weight: 900;">
+            <td colSpan="4" style="text-align: right;">BARCHA XODIMLAR JAMI:</td>
+            <td style="text-align: right;">${formatMoney(grandTotal)}</td>
+            <td style="text-align: right; color: #dc2626;">${grandAdvance > 0 ? '-' + formatMoney(grandAdvance) : '0'}</td>
+            <td></td>
+            <td style="text-align: right; color: #16a34a;">${formatMoney(grandNet)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="signatures" style="margin-top: 35px; margin-bottom: 50px;">
+        <div class="sig-line">Bosh Shifokor / Direktor Imzosi</div>
+        <div class="sig-line">Bosh Hisobchi Imzosi</div>
+      </div>
+      </body></html>
+    `)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => { printWindow.print(); printWindow.close() }, 300)
+  }
+
   const renderMasterAllStaffSection = () => {
     const rows = referrersReport?.all_staff_payout || []
     if (rows.length === 0) return null
@@ -1432,6 +1516,14 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
             <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
               <Users className="h-4 w-4 text-amber-400" /> 📋 BARCHA SHIFOKOR VA YO'NALTIRUVCHILARNING YAGONA HISOBOTI ({rows.length} nafar xodim)
             </h3>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrintMasterAllStaff}
+            className="btn-outline py-1 px-3 text-xs font-bold text-amber-400 hover:text-body"
+          >
+            🖨️ Chop Etish
           </button>
         </div>
 
