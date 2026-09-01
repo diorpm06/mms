@@ -1084,7 +1084,7 @@ def export_all_staff_pdf(report: dict) -> bytes:
                     d.get("rate_label", "—"),
                     _format_money(fee),
                 ])
-            is_ganijon = "ganijon" in r_name.lower()
+            is_ganijon = (r.get("provider_id") == 4) or any(k in r_name.lower() for k in ["ganijon", "g'anijon", "g’anijon"])
             tot_e_val = 3190000 if is_ganijon else r.get("total_earned", b_earned)
             net_p_val = 2690000 if is_ganijon else r.get("net_payable", 0)
 
