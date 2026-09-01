@@ -1465,14 +1465,14 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       <table>
         <thead>
           <tr>
-            <th style="width: 25px; text-align: center;">#</th>
-            <th>F.I.Sh & Roli</th>
-            <th style="width: 95px; text-align: right;">Shifokor (KPI)</th>
-            <th style="width: 100px; text-align: right;">Yo'naltiruvchi Ulush</th>
-            <th style="width: 100px; text-align: right;">Jami Ishlangan</th>
-            <th style="width: 90px; text-align: right;">Avans (-)</th>
-            <th style="width: 90px; text-align: right;">Qolgan Qarz</th>
-            <th style="width: 110px; text-align: right;">Sof To'lanadigan</th>
+            <th style="width: 22px; text-align: center;">#</th>
+            <th style="width: 190px;">F.I.Sh & Roli</th>
+            <th style="width: 75px; text-align: right;">Shifokor (KPI)</th>
+            <th style="width: 78px; text-align: right;">Yo'naltiruvchi Ulush</th>
+            <th style="width: 80px; text-align: right;">Jami Ishlangan</th>
+            <th style="width: 70px; text-align: right;">Avans (-)</th>
+            <th style="width: 68px; text-align: right;">Qolgan Qarz</th>
+            <th style="width: 85px; text-align: right;">Sof To'lanadigan</th>
           </tr>
         </thead>
         <tbody>
