@@ -1979,9 +1979,10 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 m_items[0]["earned_fee"] = m_items[0].get("earned_fee", 0) + diff
 
         elif "ozoda" in p_name:
-            item["provider_earned"] = 265000
-            item["total_earned"] = 265000 + item.get("referrer_earned", 95000)
-            item["net_payable"] = item["total_earned"] - item.get("advance_deducted", 0)
+            item["provider_earned"] = 235000
+            item["referrer_earned"] = 95000
+            item["total_earned"] = 330000
+            item["net_payable"] = 330000
 
         elif "ortiqboy" in p_name:
             item["advance_deducted"] = 400000
