@@ -1045,6 +1045,11 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
               <span>👨‍⚕️ ${r.name} ${r.phone ? '(' + r.phone + ')' : ''}</span>
               <span>Jami ulush: ${formatMoney(earned)}</span>
             </div>
+            <div style="font-size: 11.5px; font-weight: 700; background: #fffbeb; padding: 5px 10px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 12px; border: 1px solid #fde68a; border-radius: 4px;">
+              <span style="color:#dc2626;">Chegirilgan avans: -${formatMoney(adv)}</span>
+              ${(r.advance_remaining || 0) > 0 ? `<span style="color:#b45309;">Qolgan avans: -${formatMoney(r.advance_remaining)}</span>` : ''}
+              <span style="color:#16a34a; font-weight:900;">Sof to'lanadigan: ${formatMoney(net)}</span>
+            </div>
             <table>
               <thead>
                 <tr>
@@ -1309,6 +1314,99 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                 )}
               </table>
             </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Bir kishi ham shifokor, ham yo'naltiruvchi bo'lganda (Provider.referrer_id
+  // orqali bog'langan) — ikkala ulushni birlashtirib to'laydi. Yangi to'lov
+  // logikasi YOZILMAYDI, faqat ikkita mavjud, sinovdan o'tgan endpoint
+  // (/providers/{id}/payout va /referrers/{id}/payout) ketma-ket chaqiriladi.
+  const handleConsolidatedPayout = async (row) => {
+    if (!window.confirm(`${row.name} uchun jami ${formatMoney(row.net_payable)} (shifokor + yo'naltiruvchi) to'lansinmi?`)) return
+    try {
+      // Faqat musbat ulushi bor tomon chaqiriladi — aks holda 0 summali
+      // tomon backendda "chiqariladigan balans yo'q" deb xato qaytarib,
+      // Promise.all ikkalasini ham bekor qilib qo'yardi.
+      let total = 0
+      if (row.provider_net_payable > 0) {
+        const res = await api(`/providers/${row.provider_id}/payout`, { method: 'POST', body: JSON.stringify({ source: 'Naqt kassa', max_amount: row.provider_net_payable }) })
+        total += res?.amount || 0
+      }
+      if (row.referrer_net_payable > 0) {
+        const res = await api(`/referrers/${row.referrer_id}/payout`, { method: 'POST', body: JSON.stringify({ source: 'Naqt kassa', max_amount: row.referrer_net_payable }) })
+        total += res?.amount || 0
+      }
+      toast(`To'landi: ${formatMoney(total)}`)
+      fetchWithDates(dateFrom, dateTo)
+    } catch (err) {
+      toast(err.message || "To'lashda xatolik", 'error')
+    }
+  }
+
+  const renderConsolidatedSection = () => {
+    const rows = referrersReport?.consolidated_payout || []
+    if (rows.length === 0) return null
+    const isCollapsed = collapsedSections['consolidated']
+    const grandTotal = rows.reduce((acc, r) => acc + (r.total_earned || 0), 0)
+    const grandNet = rows.reduce((acc, r) => acc + (r.net_payable || 0), 0)
+
+    return (
+      <div className="card p-6 space-y-4 transition-all duration-300 border-l-4 border-purple-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+          <button
+            type="button"
+            onClick={() => toggleSection('consolidated')}
+            className="flex items-center gap-2 text-left hover:opacity-80 transition-opacity"
+          >
+            {isCollapsed ? <ChevronDown className="h-5 w-5 text-purple-400" /> : <ChevronUp className="h-5 w-5 text-purple-400" />}
+            <h3 className="text-sm font-black text-gold uppercase tracking-wider flex items-center gap-2">
+              <Users className="h-4 w-4 text-purple-400" /> Ikki Rolda Ishlaydiganlar (Shifokor + Yo'naltiruvchi) ({rows.length} nafar)
+            </h3>
+          </button>
+        </div>
+
+        {!isCollapsed && (
+          <div className="overflow-x-auto animate-fadeIn">
+            <table className="w-full text-xs">
+              <THead cols={['F.I.Sh', 'Shifokor Ulushi', "Yo'naltiruvchi Ulushi", 'Jami Ishlangan', 'Avans (-)', 'Qolgan Qarz', "Sof To'lanadigan", '']} />
+              <tbody className="divide-y divide-border">
+                {rows.map((r) => (
+                  <tr key={`${r.provider_id}-${r.referrer_id}`} className="hover:bg-surface-hover font-semibold">
+                    <td className="p-2.5 text-body font-black">👤 {r.name}</td>
+                    <td className="p-2.5 text-right font-mono text-cyan">{formatMoney(r.provider_earned)}</td>
+                    <td className="p-2.5 text-right font-mono text-gold">{formatMoney(r.referrer_earned)}</td>
+                    <td className="p-2.5 text-right font-mono font-bold">{formatMoney(r.total_earned)}</td>
+                    <td className="p-2.5 text-right font-mono text-rose-400">{r.advance_deducted > 0 ? `-${formatMoney(r.advance_deducted)}` : '0'}</td>
+                    <td className="p-2.5 text-right font-mono" style={{ color: r.advance_remaining > 0 ? '#f87171' : undefined }}>
+                      {r.advance_remaining > 0 ? formatMoney(r.advance_remaining) : '—'}
+                    </td>
+                    <td className="p-2.5 text-right font-mono text-emerald font-black">{formatMoney(r.net_payable)}</td>
+                    <td className="p-2.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleConsolidatedPayout(r)}
+                        className="btn-outline py-0.5 px-2 text-[11px] font-bold text-emerald disabled:opacity-40 disabled:cursor-not-allowed"
+                        disabled={r.net_payable <= 0}
+                      >
+                        To'lash
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-surface-2 font-black text-xs border-t-2 border-purple-500">
+                  <td className="p-3 text-gold uppercase" colSpan={3}>UMUMIY JAMI:</td>
+                  <td className="p-3 text-right font-mono">{formatMoney(grandTotal)}</td>
+                  <td colSpan={2}></td>
+                  <td className="p-3 text-right font-mono text-emerald font-black">{formatMoney(grandNet)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         )}
       </div>
@@ -1718,6 +1816,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
           {renderFinanceSection()}
           {renderExpensesSection()}
           {renderReferrersSection()}
+          {renderConsolidatedSection()}
           {renderPayrollSection()}
           {renderInventorySection()}
           <CeoSavedReports />
@@ -1727,7 +1826,12 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
       {/* ── INDIVIDUAL FILTERED TAB VIEWS ─────────────────────────── */}
       {activeTab === 'finance' && renderFinanceSection()}
       {activeTab === 'expenses' && renderExpensesSection()}
-      {activeTab === 'referrers' && renderReferrersSection()}
+      {activeTab === 'referrers' && (
+        <div className="space-y-6">
+          {renderReferrersSection()}
+          {renderConsolidatedSection()}
+        </div>
+      )}
       {activeTab === 'payroll' && renderPayrollSection()}
       {activeTab === 'inventory' && renderInventorySection()}
       {activeTab === 'saved_reports' && <CeoSavedReports />}

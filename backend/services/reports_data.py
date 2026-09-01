@@ -1663,9 +1663,40 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     providers_payout = list(prov_map.values())
     providers_payout.sort(key=lambda x: x["earned_share"], reverse=True)
 
+    # Konsolidatsiya: bir kishi ham shifokor (Provider), ham yo'naltiruvchi
+    # (Referrer) bo'lgan holatlar uchun (Provider.referrer_id orqali
+    # bog'langan) — mavjud referrers_payout/providers_payout jadvallariga
+    # tegmasdan, ularning yonida ikkala ulushni jamlagan qo'shimcha
+    # ro'yxat beriladi.
+    provider_referrer_ids = {pr.id: pr.referrer_id for pr in providers if pr.referrer_id}
+    consolidated_payout = []
+    for prov in providers_payout:
+        ref_id = provider_referrer_ids.get(prov["provider_id"])
+        ref_row = ref_map.get(ref_id) if ref_id else None
+        if not ref_row:
+            continue
+        consolidated_payout.append({
+            "provider_id": prov["provider_id"],
+            "referrer_id": ref_id,
+            "name": prov["name"],
+            "provider_earned": prov["earned_share"],
+            "referrer_earned": ref_row["earned_commission"],
+            "total_earned": prov["earned_share"] + ref_row["earned_commission"],
+            "advance_deducted": prov["advance_deducted"] + ref_row["advance_deducted"],
+            "advance_remaining": prov["advance_remaining"] + ref_row["advance_remaining"],
+            # Har ikkalasi alohida to'lanadi (pastda) — chiqarimni davr
+            # summasidan oshirib yubormaslik uchun har birining o'z
+            # net_payable qiymati ham alohida saqlanadi.
+            "provider_net_payable": prov["net_payable"],
+            "referrer_net_payable": ref_row["net_payable"],
+            "net_payable": prov["net_payable"] + ref_row["net_payable"],
+        })
+    consolidated_payout.sort(key=lambda x: x["total_earned"], reverse=True)
+
     base_report["services_detail"] = services_detail
     base_report["referrers_payout"] = referrers_payout
     base_report["providers_payout"] = providers_payout
+    base_report["consolidated_payout"] = consolidated_payout
     # DIQQAT: `total_ref_payout`/`total_prov_payout` — bu davr uchun
     # QO'LGA TEGADIGAN pul (avans qarzi ayrilgan holda). `referrer_share`
     # esa Jami Tushum = Yo'naltiruvchi + Shifokor + Markaz tengligida

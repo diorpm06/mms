@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 class PayoutBody(BaseModel):
     source: str | None = None
+    # 10-kunlik hisobotda ko'rsatilgan davr summasidan ORTIQ to'lanib
+    # ketmasligi uchun (umrbod balans boshqa, hisobotda ko'rsatilmagan
+    # davrlarni ham o'z ichiga olishi mumkin) — berilsa, chiqarim shu
+    # summadan oshmaydi.
+    max_amount: int | None = None
 
 
 def _yonaltirish_xulosasi(db: Session, referrer_ids: list[int]) -> dict:
@@ -420,7 +425,7 @@ def payout_provider(
     user: User = Depends(require_admin_or_ceo),
 ):
     p = db.query(Provider).filter(Provider.id == provider_id).first()
-    payout = payout_recipient_balance(db, "provider", provider_id, source=body.source)
+    payout = payout_recipient_balance(db, "provider", provider_id, source=body.source, max_amount=body.max_amount)
     if payout and payout.amount > 0:
         doc_name = p.full_name if p else f"#{provider_id}"
         src = body.source or "Naqt kassa"

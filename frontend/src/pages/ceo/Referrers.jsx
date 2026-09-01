@@ -193,11 +193,18 @@ export default function CeoReferrers() {
     }
   }
 
-  const payout = async (id) => {
+  const payout = async (id, maxAmount) => {
     try {
+      const body = { source: payoutSource }
+      // 10-kunlik hisobot bo'limidan chaqirilganda, umrbod balans o'rniga
+      // hisobotda ko'rsatilgan davr summasidan ORTIQ to'lanmasligi uchun
+      // (umrbod balans boshqa, oldingi to'lanmagan davrlarni ham qamrab
+      // olishi mumkin — ko'rsatilgan bilan haqiqatda to'langan farqli
+      // bo'lib qolmasligi uchun).
+      if (maxAmount !== undefined && maxAmount !== null) body.max_amount = maxAmount
       const res = await api(`/referrers/${id}/payout`, {
         method: 'POST',
-        body: JSON.stringify({ source: payoutSource }),
+        body: JSON.stringify(body),
       })
       toast(`Balans chiqarildi (${res.source || payoutSource}): ${formatMoney(res.amount)}`)
       load()
@@ -458,6 +465,11 @@ export default function CeoReferrers() {
           <div style="font-size: 13px; font-weight: 900; background: #f1f5f9; padding: 6px 10px; border-left: 4px solid #0f172a; margin-bottom: 6px; display: flex; justify-content: space-between;">
             <span>👨‍⚕️ ${r.name} ${r.phone ? '(' + r.phone + ')' : ''}</span>
             <span>Jami ulush: ${formatMoney(earned)}</span>
+          </div>
+          <div style="font-size: 11.5px; font-weight: 700; background: #fffbeb; padding: 5px 10px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 12px; border: 1px solid #fde68a; border-radius: 4px;">
+            <span style="color:#dc2626;">Chegirilgan avans: -${formatMoney(adv)}</span>
+            ${(r.advance_remaining || 0) > 0 ? `<span style="color:#b45309;">Qolgan avans: -${formatMoney(r.advance_remaining)}</span>` : ''}
+            <span style="color:#16a34a; font-weight:900;">Sof to'lanadigan: ${formatMoney(net)}</span>
           </div>
           <table>
             <thead>
@@ -1084,7 +1096,7 @@ export default function CeoReferrers() {
                                     icon: Icons.arrowDown,
                                     variant: "success",
                                     hidden: !(r.net_payable > 0),
-                                    onClick: () => payout(r.referrer_id),
+                                    onClick: () => payout(r.referrer_id, r.net_payable),
                                   },
                                   {
                                     label: isDeferred ? "Hozir to'lash (Tayyor)" : "Keyinroqqa surish (Kechiktirish)",
@@ -1301,6 +1313,12 @@ export default function CeoReferrers() {
                   <span>Chegirilgan Avans:</span>
                   <span>-{formatMoney(printModal.referrer.advance_deducted)}</span>
                 </div>
+                {printModal.referrer.advance_remaining > 0 && (
+                  <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '12px', marginBottom: '4px', color: '#b45309' }}>
+                    <span>Qolgan Avans (keyingi davrga o'tadi):</span>
+                    <span>-{formatMoney(printModal.referrer.advance_remaining)}</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '15px', fontWeight: '900', borderTop: '2px solid #000', paddingTop: '6px', marginTop: '6px' }}>
                   <span>SOF TO'LANADIGAN SUMMA:</span>
                   <span>{formatMoney(printModal.referrer.net_payable)}</span>

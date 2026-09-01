@@ -386,6 +386,7 @@ export default function Payroll() {
                       <th className="p-2.5">Tushum</th>
                       <th className="p-2.5">Hisoblangan Foiz</th>
                       <th className="p-2.5">Avans Qoplovi (-)</th>
+                      <th className="p-2.5">Qolgan Avans</th>
                       <th className="p-2.5 text-right">To'lanadigan (=)</th>
                     </tr>
                   </thead>
@@ -398,6 +399,9 @@ export default function Payroll() {
                         <td className="p-2.5 font-mono font-bold text-body">{formatMoney(p.earned_share)}</td>
                         <td className="p-2.5 font-mono text-rose-400 font-bold">
                           {p.advance_deducted > 0 ? `-${formatMoney(p.advance_deducted)}` : '0'}
+                        </td>
+                        <td className="p-2.5 font-mono text-amber-400 font-bold">
+                          {p.advance_remaining > 0 ? `-${formatMoney(p.advance_remaining)}` : '0'}
                         </td>
                         <td className="p-2.5 text-right font-mono font-black text-emerald-400 text-sm">
                           {formatMoney(p.net_payable)}
@@ -421,6 +425,7 @@ export default function Payroll() {
                       <th className="p-2.5">Jami Summa</th>
                       <th className="p-2.5">Hisoblangan Foiz</th>
                       <th className="p-2.5">Avans Qoplovi (-)</th>
+                      <th className="p-2.5">Qolgan Avans</th>
                       <th className="p-2.5 text-right">To'lanadigan (=)</th>
                     </tr>
                   </thead>
@@ -433,6 +438,9 @@ export default function Payroll() {
                         <td className="p-2.5 font-mono font-bold text-body">{formatMoney(r.earned_commission)}</td>
                         <td className="p-2.5 font-mono text-rose-400 font-bold">
                           {r.advance_deducted > 0 ? `-${formatMoney(r.advance_deducted)}` : '0'}
+                        </td>
+                        <td className="p-2.5 font-mono text-amber-400 font-bold">
+                          {r.advance_remaining > 0 ? `-${formatMoney(r.advance_remaining)}` : '0'}
                         </td>
                         <td className="p-2.5 text-right font-mono font-black text-emerald-400 text-sm">
                           {formatMoney(r.net_payable)}

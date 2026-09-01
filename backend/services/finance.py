@@ -538,7 +538,9 @@ def process_ten_day_payouts(db: Session, period_start: date, period_end: date) -
     return payouts
 
 
-def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int, source: str | None = None) -> Payout:
+def payout_recipient_balance(
+    db: Session, recipient_type: str, recipient_id: int, source: str | None = None, max_amount: int | None = None
+) -> Payout:
     today = date.today()
     if recipient_type == "referrer":
         obj = db.query(Referrer).filter(Referrer.id == recipient_id, Referrer.is_active == True).first()
@@ -568,6 +570,16 @@ def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int
     # buxgalteriya uchun (boshqa joylarda "avans qarzi" noto'g'ri ko'rinib
     # qolmasligi uchun), pul hisobiga ta'sir qilmaydi.
     beriladi = int(obj.balance)
+    # max_amount — 10-kunlik hisobot kabi DAVR bilan chegaralangan ko'rinishdan
+    # chiqarilganda beriladi. Umrbod balans (obj.balance) shu davrga tegishli
+    # bo'lmagan, oldingi to'lanmagan qoldiqni ham o'z ichiga olishi mumkin —
+    # shuning uchun ko'rsatilgan summadan ORTIQ chiqarib bo'lmaydi; qolgan
+    # qismi keyingi chiqarimga qoladi (pastda obj.balance to'liq nolga emas,
+    # faqat chiqarilgan summaga kamaytiriladi).
+    if max_amount is not None:
+        beriladi = max(0, min(beriladi, int(max_amount)))
+    if beriladi <= 0:
+        raise HTTPException(status_code=400, detail="Chiqariladigan balans yo'q")
     qoplanadi = _settle_open_advances(db, recipient_type, recipient_id)
 
     bal = get_or_create_balance(db)
@@ -589,7 +601,10 @@ def payout_recipient_balance(db: Session, recipient_type: str, recipient_id: int
         log_balance_change(db, -beriladi, "payout", f"Qo'lda chiqarim ({source_label}): {who}")
     if qoplanadi > 0:
         log_balance_change(db, 0, "advance_settle", f"Avans yopildi (hisobda edi): {who} — {qoplanadi:,} so'm")
-    obj.balance = 0
+    # max_amount tufayli obj.balance'dan kamroq chiqarilgan bo'lishi mumkin —
+    # bu holda qolgan qism keyingi chiqarimga saqlanadi (0 ga tenglashtirish
+    # to'g'ri bo'lmaydi, aks holda qolgan pul yo'qolib qoladi).
+    obj.balance = int(obj.balance) - beriladi
     db.add(payout)
     payout.settled_from_advance = qoplanadi  # javobda ko'rsatish uchun (bazaga yozilmaydi)
     return payout

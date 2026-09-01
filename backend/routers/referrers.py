@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 class PayoutBody(BaseModel):
     source: str | None = None
+    # 10-kunlik hisobotda ko'rsatilgan davr summasidan ORTIQ to'lanib
+    # ketmasligi uchun (umrbod balans boshqa, hisobotda ko'rsatilmagan
+    # davrlarni ham o'z ichiga olishi mumkin) — berilsa, chiqarim shu
+    # summadan oshmaydi.
+    max_amount: int | None = None
 
 
 def _sodda_ism(nom: str | None) -> str:
@@ -244,7 +249,7 @@ def payout_referrer(
     _: User = Depends(require_ceo),
 ):
     r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
-    payout = payout_recipient_balance(db, "referrer", referrer_id, source=body.source)
+    payout = payout_recipient_balance(db, "referrer", referrer_id, source=body.source, max_amount=body.max_amount)
     qoplandi = getattr(payout, "settled_from_advance", 0) or 0
     db.commit()
 

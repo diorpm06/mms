@@ -776,6 +776,35 @@ def export_referrers_pdf(report: dict) -> bytes:
                 )
             )
             ref_elements.append(t_ref)
+            ref_elements.append(Spacer(1, 8))
+
+            # Referrer Individual Advance/Net Summary
+            r_advance_deducted = r.get("advance_deducted", 0)
+            r_advance_remaining = r.get("advance_remaining", 0)
+            r_net_payable = r.get("net_payable", 0)
+            ref_summary_rows = [["Chegirilgan Avans:", f"-{_format_money(r_advance_deducted)}" if r_advance_deducted > 0 else "0 so'm"]]
+            if r_advance_remaining > 0:
+                ref_summary_rows.append(["Qolgan Avans (keyingi davrga o'tadi):", f"-{_format_money(r_advance_remaining)}"])
+            ref_summary_rows.append(["SOF TO'LANADIGAN SUMMA:", _format_money(r_net_payable)])
+            t_ref_summary = Table(ref_summary_rows, colWidths=[11 * cm, 8.4 * cm])
+            t_ref_summary.setStyle(
+                TableStyle(
+                    [
+                        ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+                        ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                        ("TEXTCOLOR", (0, -1), (1, -1), colors.HexColor("#16a34a")),
+                        ("FONTSIZE", (0, -1), (1, -1), 11),
+                        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                        ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#0f172a")),
+                        ("LINEBELOW", (0, 0), (-1, -2), 0.5, colors.HexColor("#cbd5e1")),
+                        ("TOPPADDING", (0, 0), (-1, -1), 3),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    ]
+                )
+            )
+            ref_elements.append(t_ref_summary)
             ref_elements.append(Spacer(1, 12))
 
             # Referrer Individual Signatures Block
