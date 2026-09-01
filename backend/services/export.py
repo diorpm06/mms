@@ -881,3 +881,234 @@ def export_referrers_pdf(report: dict) -> bytes:
     return buf.getvalue()
 
 
+def export_all_staff_pdf(report: dict) -> bytes:
+    """Barcha xodimlar (KPI shifokorlar + yo'naltiruvchilar + ikki rolda
+    ishlaydiganlar) uchun yagona master PDF — `all_staff_payout`dan.
+    Ekrandagi "Chop Etish" (brauzer) bilan bir xil ma'lumotni PDF fayl
+    sifatida yuklab olish uchun."""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        rightMargin=0.8 * cm,
+        leftMargin=0.8 * cm,
+        topMargin=0.8 * cm,
+        bottomMargin=0.8 * cm,
+    )
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "MasterDocTitle", parent=styles["Heading1"], fontSize=18, leading=22, spaceAfter=3,
+        alignment=1, fontName="Helvetica-Bold", textColor=colors.HexColor("#0f172a"),
+    )
+    subtitle_style = ParagraphStyle(
+        "MasterSubTitle", parent=styles["Normal"], fontSize=12, leading=15,
+        textColor=colors.HexColor("#334155"), alignment=1, spaceAfter=12, fontName="Helvetica-Bold",
+    )
+    section_head_style = ParagraphStyle(
+        "MasterSecHead", parent=styles["Heading2"], fontSize=12, leading=15, spaceBefore=14,
+        spaceAfter=6, textColor=colors.HexColor("#0f172a"), fontName="Helvetica-Bold",
+    )
+    th_style = ParagraphStyle(
+        "MasterTableHeader", parent=styles["Normal"], fontSize=7.3, leading=8.6, alignment=1,
+        textColor=colors.white, fontName="Helvetica-Bold",
+    )
+
+    def _th(text: str):
+        return Paragraph(text, th_style)
+
+    td_name_style = ParagraphStyle(
+        "MasterTableName", parent=styles["Normal"], fontSize=9, leading=11,
+        fontName="Helvetica-Bold", textColor=colors.HexColor("#0f172a"),
+    )
+
+    def _td_name(text: str):
+        return Paragraph(text, td_name_style)
+
+    p_start = report.get("period_start", "")
+    p_end = report.get("period_end", "")
+    date_label = f"{p_start}" if p_start == p_end else f"{p_start} — {p_end}"
+
+    staff_list = report.get("all_staff_payout") or []
+    tot_earned = sum(r.get("total_earned", 0) for r in staff_list)
+    tot_advance = sum(r.get("advance_deducted", 0) for r in staff_list)
+    tot_net = sum(r.get("net_payable", 0) for r in staff_list)
+
+    elements = [
+        Paragraph("MARJONA MED SERVICE", title_style),
+        Paragraph("BARCHA SHIFOKOR VA YO'NALTIRUVCHILARNING YAGONA HISOBOTI", subtitle_style),
+        Paragraph(f"Davr: {date_label}", subtitle_style),
+        Spacer(1, 6),
+    ]
+
+    summary_box_data = [
+        ["Umumiy Xodimlar Soni:", f"{len(staff_list)} nafar"],
+        ["Barcha Xodimlarga Hisoblangan Jami Ulush:", _format_money(tot_earned)],
+        ["Ushlangan Avanslar Summasi:", f"-{_format_money(tot_advance)}" if tot_advance > 0 else "0 so'm"],
+        ["BERILADIGAN UMUMIY SUMMA:", _format_money(tot_net)],
+    ]
+    t_summary = Table(summary_box_data, colWidths=[11 * cm, 8.4 * cm])
+    t_summary.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("TEXTCOLOR", (0, 3), (1, 3), colors.HexColor("#16a34a")),
+                ("FONTSIZE", (0, 3), (1, 3), 11.5),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                ("BOX", (0, 0), (-1, -1), 1.5, colors.HexColor("#0f172a")),
+                ("LINEBELOW", (0, 0), (-1, -2), 0.5, colors.HexColor("#cbd5e1")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    elements.append(t_summary)
+    elements.append(Spacer(1, 10))
+
+    elements.append(Paragraph("1-QISM: BARCHA XODIMLAR BO'YICHA UMUMIY QISQACHA JADVAL", section_head_style))
+    summary_table_data = [[
+        _th("#"), _th("F.I.Sh & Roli"), _th("Shifokor (KPI)"), _th("Yo'naltiruvchi Ulush"),
+        _th("Jami Ishlangan"), _th("Avans (-)"), _th("Beriladigan"),
+    ]]
+    for i, r in enumerate(staff_list, 1):
+        summary_table_data.append([
+            str(i),
+            _td_name(f"{r.get('name', '')} ({r.get('role', '')})"),
+            _format_money(r.get("provider_earned", 0)) if r.get("provider_earned", 0) > 0 else "—",
+            _format_money(r.get("referrer_earned", 0)) if r.get("referrer_earned", 0) > 0 else "—",
+            _format_money(r.get("total_earned", 0)),
+            f"-{_format_money(r.get('advance_deducted', 0))}" if r.get("advance_deducted", 0) > 0 else "0",
+            _format_money(r.get("net_payable", 0)),
+        ])
+    summary_table_data.append([
+        "", "JAMI UMUMIY SUMMA:", "", "",
+        _format_money(tot_earned),
+        f"-{_format_money(tot_advance)}" if tot_advance > 0 else "0",
+        _format_money(tot_net),
+    ])
+    t_sec1 = Table(summary_table_data, colWidths=[0.8 * cm, 5.5 * cm, 2.6 * cm, 2.8 * cm, 2.8 * cm, 2.5 * cm, 2.6 * cm])
+    t_sec1.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+                ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#e2e8f0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    elements.append(t_sec1)
+    elements.append(Spacer(1, 18))
+
+    # ---------------- SECTION 2: HAR BIR XODIM UCHUN BATAFSIL SAHIFA ----------------
+    if not staff_list:
+        elements.append(Paragraph("2-QISM: HAR BIR XODIM BO'YICHA BATAFSIL VAZIYAT", section_head_style))
+        elements.append(Paragraph("Xodimlar bo'yicha ko'rsatkichlar mavjud emas", section_head_style))
+    else:
+        for r in staff_list:
+            person_elements = []
+            r_name = r.get("name", "Noma'lum")
+            r_role = r.get("role", "")
+
+            person_elements.append(Paragraph(f"Davr: {date_label}", subtitle_style))
+            person_elements.append(Paragraph(f"{r_name} ({r_role})", section_head_style))
+
+            table_data = [[
+                _th("№"), _th("Sana"), _th("Bo'lim nomi"), _th("Manba"),
+                _th("Bemorlar"), _th("Ulush"), _th("Hisoblangan (so'm)"),
+            ]]
+            b_earned = 0
+            for idx, d in enumerate(r.get("breakdown") or [], 1):
+                b_earned += d.get("earned_fee", 0)
+                table_data.append([
+                    str(idx),
+                    d.get("date", ""),
+                    d.get("department_name", "Bo'lim"),
+                    d.get("source", ""),
+                    f"{d.get('patient_count', 1)} nafar",
+                    d.get("rate_label", "—"),
+                    _format_money(d.get("earned_fee", 0)),
+                ])
+            table_data.append(["", "JAMI:", "", "", "", "", _format_money(b_earned)])
+
+            t_person = Table(table_data, colWidths=[0.8 * cm, 2.3 * cm, 4.8 * cm, 2.8 * cm, 2.2 * cm, 2.3 * cm, 3.4 * cm])
+            t_person.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                        ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                        ("ALIGN", (3, 0), (5, -1), "CENTER"),
+                        ("ALIGN", (6, 0), (6, -1), "RIGHT"),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f8fafc")]),
+                        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#e2e8f0")),
+                        ("TOPPADDING", (0, 0), (-1, -1), 3),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    ]
+                )
+            )
+            person_elements.append(t_person)
+            person_elements.append(Spacer(1, 8))
+
+            summary_rows = [["Ishlagan puli:", _format_money(r.get("total_earned", 0))]]
+            summary_rows.append([
+                "Olgan avansi:",
+                f"-{_format_money((r.get('advance_deducted', 0) or 0) + (r.get('advance_remaining', 0) or 0))}",
+            ])
+            summary_rows.append(["BERILADIGAN SUMMA:", _format_money(r.get("net_payable", 0))])
+            t_person_summary = Table(summary_rows, colWidths=[11 * cm, 8.4 * cm])
+            t_person_summary.setStyle(
+                TableStyle(
+                    [
+                        ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+                        ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                        ("TEXTCOLOR", (0, 1), (1, 1), colors.HexColor("#dc2626")),
+                        ("TEXTCOLOR", (0, -1), (1, -1), colors.HexColor("#16a34a")),
+                        ("FONTSIZE", (0, -1), (1, -1), 11),
+                        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                        ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#0f172a")),
+                        ("LINEBELOW", (0, 0), (-1, -2), 0.5, colors.HexColor("#cbd5e1")),
+                        ("TOPPADDING", (0, 0), (-1, -1), 3),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    ]
+                )
+            )
+            person_elements.append(t_person_summary)
+            person_elements.append(Spacer(1, 12))
+
+            sig_data = [["Bosh Shifokor / Direktor Imzosi: ___________________", "Bosh Hisobchi Imzosi: ___________________"]]
+            t_sig = Table(sig_data, colWidths=[9.7 * cm, 9.7 * cm])
+            t_sig.setStyle(
+                TableStyle(
+                    [
+                        ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 10),
+                        ("ALIGN", (0, 0), (0, 0), "LEFT"),
+                        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                    ]
+                )
+            )
+            person_elements.append(t_sig)
+
+            elements.append(KeepTogether(person_elements))
+            elements.append(Spacer(1, 1.8 * cm))
+
+    doc.build(elements)
+    return buf.getvalue()
+
+

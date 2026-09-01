@@ -1409,6 +1409,16 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     )
   }
 
+  const handleDownloadMasterAllStaffPdf = async () => {
+    try {
+      const blob = await api(`/reports/export/all-staff-pdf?from=${dateFrom}&to=${dateTo}`)
+      downloadBlob(blob, `Yagona_Master_Hisobot_${dateFrom}_${dateTo}.pdf`)
+      toast("✓ Yagona master PDF hisoboti yuklab olindi!")
+    } catch (e) {
+      toast(e.message || "PDF yuklashda xatolik", 'error')
+    }
+  }
+
   const handlePrintMasterAllStaff = () => {
     const rows = referrersReport?.all_staff_payout || []
     if (rows.length === 0) {
@@ -1581,13 +1591,22 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
             </h3>
           </button>
 
-          <button
-            type="button"
-            onClick={handlePrintMasterAllStaff}
-            className="btn-outline py-1 px-3 text-xs font-bold text-amber-400 hover:text-body"
-          >
-            🖨️ Chop Etish
-          </button>
+          <div className="flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              onClick={handlePrintMasterAllStaff}
+              className="btn-outline py-1 px-3 text-xs font-bold text-amber-400 hover:text-body"
+            >
+              🖨️ Chop Etish
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadMasterAllStaffPdf}
+              className="btn-outline py-1 px-3 text-xs font-bold text-amber-400 hover:text-body"
+            >
+              📄 Yuklab Olish (PDF)
+            </button>
+          </div>
         </div>
 
         {!isCollapsed && (
