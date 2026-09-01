@@ -1483,7 +1483,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
             <p style="font-size: 14px; font-weight: bold; margin: 0; color: #334155;">Davr: ${dateFrom} — ${dateTo}</p>
           </div>
           <div style="font-size: 13px; font-weight: 900; background: #f1f5f9; padding: 6px 10px; border-left: 4px solid #0f172a; margin-bottom: 6px; display: flex; justify-content: space-between;">
-            <span>👤 ${r.name} <span style="font-size:11px; color:#64748b;">(${r.role})</span></span>
+            <span>👤 ${r.name}${r.role !== "Yo'naltiruvchi" ? ` <span style="font-size:11px; color:#64748b;">(${r.role})</span>` : ''}</span>
             <span>Ishlagan puli: ${formatMoney(r.total_earned)}</span>
           </div>
           <table>
