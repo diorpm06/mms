@@ -1996,6 +1996,12 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             item["referrer_earned"] = 196700
             item["total_earned"] = 1191700
             item["net_payable"] = 1191700
+            # Fix 26.08 Nevrologiya breakdown fee to 45 000 so'm (was 145 000 so'm)
+            bd = item.get("breakdown") or []
+            for d in bd:
+                if "nevrologiya" in d.get("department_name", "").lower() and "26.08" in d.get("date", ""):
+                    if d.get("source") == "Shifokor (KPI)":
+                        d["earned_fee"] = 45000
 
         elif "ortiqboy" in p_name:
             item["advance_deducted"] = 400000
