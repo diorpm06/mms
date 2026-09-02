@@ -1548,27 +1548,6 @@ export default function NewPatient({ homePath = '/admin' }) {
                 </button>
               ))}
 
-              <button
-                type="button"
-                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all border ${
-                  form.discount_type === 'percent' && String(form.discount_value) === '50'
-                    ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/30'
-                    : 'bg-amber-500/10 border-amber-500/40 text-amber-400 hover:bg-amber-500/20'
-                }`}
-                onClick={() => {
-                  setForm({
-                    ...form,
-                    discount_type: 'percent',
-                    discount_value: '50',
-                    discount_reason: form.discount_reason || '50% Chegirma',
-                  })
-                  const tanlangan = selectedServices.filter((s) => s.service_id)
-                  setDiscountTargetIds(tanlangan.map((s) => String(s.service_id)))
-                }}
-                title="Barcha tanlangan xizmatlarga 50% chegirma berish (yo'naltiruvchi va shifokor ulushi ham chegirmalangan summadan hisoblanadi)"
-              >
-                🏷️ 50% Chegirma
-              </button>
 
               <button
                 type="button"
