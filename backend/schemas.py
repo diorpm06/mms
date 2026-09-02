@@ -47,7 +47,7 @@ class ServiceCreate(BaseModel):
     queue_prefix: Optional[str] = "A"
     referrer_commission_percent: Optional[int] = Field(default=0, ge=0, le=100)
     referrer_commission_sum: Optional[int] = Field(default=0, ge=0)
-    referrer_doctor_split_percent: Optional[int] = Field(default=50, ge=0, le=100)
+    referrer_doctor_split_percent: Optional[int] = Field(default=0, ge=0, le=100)
     referrer_clinic_split_percent: Optional[int] = Field(default=50, ge=0, le=100)
     referrer_doctor_split_sum: Optional[int] = Field(default=0, ge=0)
     referrer_clinic_split_sum: Optional[int] = Field(default=0, ge=0)
@@ -83,7 +83,7 @@ class ServiceOut(BaseModel):
     queue_prefix: Optional[str] = "A"
     referrer_commission_percent: Optional[int] = 0
     referrer_commission_sum: Optional[int] = 0
-    referrer_doctor_split_percent: Optional[int] = 50
+    referrer_doctor_split_percent: Optional[int] = 0
     referrer_clinic_split_percent: Optional[int] = 50
     referrer_doctor_split_sum: Optional[int] = 0
     referrer_clinic_split_sum: Optional[int] = 0

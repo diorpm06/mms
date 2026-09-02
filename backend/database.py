@@ -191,7 +191,7 @@ def run_migrations():
                     if "referrer_commission_sum" not in existing_cols:
                         conn.execute(text("ALTER TABLE services ADD COLUMN referrer_commission_sum INTEGER DEFAULT 0"))
                     if "referrer_doctor_split_percent" not in existing_cols:
-                        conn.execute(text("ALTER TABLE services ADD COLUMN referrer_doctor_split_percent INTEGER DEFAULT 50"))
+                        conn.execute(text("ALTER TABLE services ADD COLUMN referrer_doctor_split_percent INTEGER DEFAULT 0"))
                     if "referrer_clinic_split_percent" not in existing_cols:
                         conn.execute(text("ALTER TABLE services ADD COLUMN referrer_clinic_split_percent INTEGER DEFAULT 50"))
                     if "referrer_doctor_split_sum" not in existing_cols:

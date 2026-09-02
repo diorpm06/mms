@@ -1326,9 +1326,9 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         if doc_ref_sum and doc_ref_sum > 0:
             doc_ref_deduction = doc_ref_sum
         else:
-            doc_split_pct = getattr(svc, "referrer_doctor_split_percent", 50) if svc else 50
+            doc_split_pct = getattr(svc, "referrer_doctor_split_percent", 0) if svc else 0
             if doc_split_pct is None:
-                doc_split_pct = 50
+                doc_split_pct = 0
             doc_ref_deduction = int((ref_comm * doc_split_pct) / 100)
 
         prov_pct = p.provider.percentage if p.provider else 50

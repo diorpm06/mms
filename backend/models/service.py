@@ -18,7 +18,13 @@ class Service(Base):
     queue_prefix: Mapped[str | None] = mapped_column(String(5), default="A", nullable=True)
     referrer_commission_percent: Mapped[int] = mapped_column(Integer, default=0)  # % of actual paid amount
     referrer_commission_sum: Mapped[int] = mapped_column(Integer, default=0)  # Fixed sum in so'm
-    referrer_doctor_split_percent: Mapped[int] = mapped_column(Integer, default=50)  # % deducted from Doctor
+    # DIQQAT: standart 0 — shifokor yo'naltiruvchi haqini "ko'tarmaydi",
+    # yo'naltiruvchi ulushi klinika hissasidan to'lanadi (UZI'dagi kabi).
+    # Ilgari bu yerda standart 50 turgan edi — bu HECH KIM tomonidan
+    # ataylab tanlanmagan, tizim darajasidagi xato edi: 162 ta xizmatning
+    # barchasida (UZI'dan tashqari, u alohida yo'l bilan hisoblanadi)
+    # yo'naltiruvchi ishtirok etganda shifokor ulushi yarimlashib qolardi.
+    referrer_doctor_split_percent: Mapped[int] = mapped_column(Integer, default=0)  # % deducted from Doctor
     referrer_clinic_split_percent: Mapped[int] = mapped_column(Integer, default=50)  # % deducted from Clinic
     referrer_doctor_split_sum: Mapped[int] = mapped_column(Integer, default=0)  # Fixed sum in so'm deducted from Doctor
     referrer_clinic_split_sum: Mapped[int] = mapped_column(Integer, default=0)  # Fixed sum in so'm deducted from Clinic
