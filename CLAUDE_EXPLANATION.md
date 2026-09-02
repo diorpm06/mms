@@ -39,7 +39,16 @@ The clinic owner reviewed the generated reports and PDF exports against physical
 - **Line Item Scaling:** Massaj breakdown items scaled to sum to exactly 235 000 so'm so line items match the summary total 100%.
 - **💵 Net Payable:** **`330 000 so'm`** *(235 000 + 95 000)*
 
-### 1.5 Razzaqberganova Gulnora (Yo'naltiruvchi)
+### 1.5 Dr. Ramazon (UZI Shifokori)
+- **User Directive:**
+  - Aligned Dr. Ramazon's daily UZI earnings with the doctor profile view.
+  - **24.08.2026:** Adjusted to **690 000 so'm** (including unlinked Ultrazvuk transaction).
+  - **29.08.2026:** Adjusted to **425 000 so'm** (including unlinked Ultrazvuk transactions).
+  - **21.08.2026:** Confirmed **290 000 so'm** (8 patients).
+- **Total Earned:** **`4 127 100 so'm`** (4 115 000 UZI KPI + 12 100 referral fee).
+- **💵 Net Payable:** **`4 127 100 so'm`**
+
+### 1.6 Razzaqberganova Gulnora (Yo'naltiruvchi)
 - **User Directive:** Updated Laboratory referral commission rate from standard rate to **30%**.
 - **💵 Net Payable:** **`39 000 so'm`**
 
