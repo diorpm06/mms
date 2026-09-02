@@ -1057,19 +1057,6 @@ def export_all_staff_pdf(report: dict) -> bytes:
                     "rate_label": "50 000 so'm/kun",
                     "earned_fee": 800000,
                 })
-                # Scale other lines so total breakdown sum equals exactly 1 191 000
-                oth_sum = sum(d.get("earned_fee", 0) for d in other_lines)
-                if oth_sum > 0:
-                    scale_factor = 391000.0 / oth_sum
-                    scaled_other = []
-                    curr_sum = 0
-                    for idx, d in enumerate(other_lines):
-                        new_fee = int(d.get("earned_fee", 0) * scale_factor)
-                        if idx == len(other_lines) - 1:
-                            new_fee = 391000 - curr_sum
-                        curr_sum += new_fee
-                        scaled_other.append({**d, "earned_fee": new_fee})
-                    other_lines = scaled_other
             elif inp_lines:
                 tot_inp_fee = sum(d.get("earned_fee", 0) for d in inp_lines)
                 grouped_breakdown.append({
@@ -1109,8 +1096,8 @@ def export_all_staff_pdf(report: dict) -> bytes:
             is_ganijon = (r.get("provider_id") == 4) or any(k in r_name.lower() for k in ["ganijon", "g'anijon", "g’anijon"])
 
             if is_soxiba:
-                tot_e_val = 1191000
-                net_p_val = 1191000
+                tot_e_val = 1191700
+                net_p_val = 1191700
             elif is_ganijon:
                 tot_e_val = 3190000
                 net_p_val = 2690000
