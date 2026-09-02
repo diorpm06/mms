@@ -29,10 +29,10 @@ The clinic owner reviewed the generated reports and PDF exports against physical
 
 ### 1.3 Dr. A. Ortiqboy (Laborant / Shifokor KPI)
 - **User Directive:** 
-  - Cancelled an erroneous 200 000 so'm advance entry logged on September 1.
+  - Total laboratory earned share set to **1 646 275 so'm**.
   - Total advance deducted set to **400 000 so'm** (200 000 + 200 000 so'm).
-- **Total Earned:** `990 138 so'm`.
-- **💵 Net Payable:** **`590 138 so'm`** *(990 138 - 400 000)*
+- **Total Earned:** `1 646 275 so'm`.
+- **💵 Net Payable:** **`1 246 275 so'm`** *(1 646 275 - 400 000)*
 
 ### 1.4 Dr. Ozoda (Shifokor + Yo'naltiruvchi)
 - **User Directive:** Massaj KPI earnings set to **235 000 so'm**; Referral earnings set to **95 000 so'm**.

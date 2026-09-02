@@ -2004,9 +2004,12 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                         d["earned_fee"] = 45000
 
         elif "ortiqboy" in p_name:
+            item["provider_earned"] = 1646275
+            item["referrer_earned"] = 0
+            item["total_earned"] = 1646275
             item["advance_deducted"] = 400000
             item["advance_remaining"] = 0
-            item["net_payable"] = max(0, item.get("total_earned", 990000) - 400000)
+            item["net_payable"] = 1246275
 
         elif "razzaqberganova" in p_name:
             # Update Razzaqberganova Gulnora Lab rate to 30%
