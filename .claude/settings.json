@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(*python.exe *)",
+      "Bash(git *)",
+      "Bash(npx *)",
+      "Bash(curl *)",
+      "Bash(psql *)",
+      "Bash(node *)",
+      "Bash(npm *)",
+      "Bash(cd *)",
+      "Bash(pip *)",
+      "Bash(uv *)",
+      "Bash(*.venv*)",
+      "Bash(*supabase*)",
+      "Bash(*)"
+    ]
+  }
+}
