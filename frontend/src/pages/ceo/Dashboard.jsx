@@ -26,6 +26,12 @@ const EMPTY = {
 const CARD_ICONS = [TrendingUp, Wallet, Users, Receipt]
 const CARD_COLORS = ['var(--success)', 'var(--gold)', 'var(--info)', 'var(--danger)']
 
+const MONTH_NAMES_UZ = [
+  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+  'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr',
+]
+const CURRENT_MONTH_NAME = MONTH_NAMES_UZ[new Date().getMonth()]
+
 export default function CeoDashboard() {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
@@ -343,9 +349,9 @@ export default function CeoDashboard() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-body font-bold text-base">
             {(chartPeriod === '10days' || chartPeriod === '7days') && `So'nggi ${chartData.length > 0 ? chartData.length : 10} kunlik daromad charti`}
-            {chartPeriod === '1-10'  && "1–10 Avgust Daromad Hisoboti (1-Dekada)"}
-            {chartPeriod === '11-20' && "11–20 Avgust Daromad Hisoboti (2-Dekada)"}
-            {chartPeriod === '21-30' && "21–30 Avgust Daromad Hisoboti (3-Dekada)"}
+            {chartPeriod === '1-10'  && `1–10 ${CURRENT_MONTH_NAME} Daromad Hisoboti (1-Dekada)`}
+            {chartPeriod === '11-20' && `11–20 ${CURRENT_MONTH_NAME} Daromad Hisoboti (2-Dekada)`}
+            {chartPeriod === '21-30' && `21–30 ${CURRENT_MONTH_NAME} Daromad Hisoboti (3-Dekada)`}
           </h2>
 
           <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border">

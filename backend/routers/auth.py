@@ -33,17 +33,57 @@ limiter = Limiter(key_func=get_remote_address)
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
 
+MAX_IP_FAILED_ATTEMPTS = 15
+IP_LOCKOUT_MINUTES = 15
+
+# IP bo'yicha muvaffaqiyatsiz urinishlar — jarayon xotirasida (VPS doim
+# ishlayotgan bitta jarayon bo'lgani uchun bu yetarli; oldin Vercel'da
+# serverless "cold start"lar orasida saqlanmasdi, shu sababli faqat
+# akkaunt darajasidagi qulflash ishlatilardi). Bu login/parolni "spray"
+# qilib (turli login, bittadan-ikkitadan urinib) akkaunt-darajasidagi
+# qulfdan chetlab o'tishning oldini oladi.
+_ip_failed_attempts: dict[str, tuple[int, datetime]] = {}
+
+
+def _check_ip_lockout(ip: str):
+    entry = _ip_failed_attempts.get(ip)
+    if not entry:
+        return
+    count, locked_until = entry
+    if locked_until and locked_until > datetime.now():
+        remaining_min = max(1, int((locked_until - datetime.now()).total_seconds() // 60) + 1)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Bu manzildan juda ko'p noto'g'ri urinish bo'ldi. {remaining_min} daqiqadan keyin qayta urinib ko'ring.",
+        )
+
+
+def _register_ip_failure(ip: str):
+    count, locked_until = _ip_failed_attempts.get(ip, (0, None))
+    count += 1
+    if count >= MAX_IP_FAILED_ATTEMPTS:
+        locked_until = datetime.now() + timedelta(minutes=IP_LOCKOUT_MINUTES)
+        count = 0
+    _ip_failed_attempts[ip] = (count, locked_until)
+
+
+def _clear_ip_failures(ip: str):
+    _ip_failed_attempts.pop(ip, None)
+
 
 @router.post("/login", response_model=TokenResponse)
-@limiter.limit("10/minute")
+@limiter.limit("5/minute")
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    ip, _device_unused = get_client_info(request)
+    _check_ip_lockout(ip)
+
     clean_username = data.username.strip() if data.username else ""
     clean_password = data.password.strip() if data.password else ""
     user = db.query(User).filter(func.lower(User.username) == func.lower(clean_username), User.is_active == True).first()
 
-    # DB-backed lockout — IP-based rate limiting above doesn't reliably survive
-    # serverless cold starts across instances, so the real guard lives here,
-    # keyed to the account itself via the shared database.
+    # DB-backed lockout — akkaunt darajasida, IP-lockout esa yuqorida —
+    # ikkalasi birga: bitta akkauntni nishonga olishga ham, ko'p akkauntni
+    # bitta manbadan "spray" qilishga ham qarshi.
     if user and user.locked_until and user.locked_until > datetime.now():
         remaining_min = max(1, int((user.locked_until - datetime.now()).total_seconds() // 60) + 1)
         raise HTTPException(
@@ -52,6 +92,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
         )
 
     if not user or not (verify_password(data.password, user.hashed_password) or verify_password(clean_password, user.hashed_password)):
+        _register_ip_failure(ip)
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
@@ -59,6 +100,8 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
                 user.failed_login_attempts = 0
             db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login yoki parol noto'g'ri")
+
+    _clear_ip_failures(ip)
 
     # Yo'naltiruvchi "nofaol" qilib belgilansa, uning portal akkaunti
     # alohida o'chirilmagan bo'lsa ham kira olmasligi kerak — aks holda
@@ -69,7 +112,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
     user.failed_login_attempts = 0
     user.locked_until = None
-    ip, device = get_client_info(request)
+    _, device = get_client_info(request)
     session = SessionLog(user_id=user.id, ip_address=ip, device_info=device)
     db.add(session)
     log_audit(

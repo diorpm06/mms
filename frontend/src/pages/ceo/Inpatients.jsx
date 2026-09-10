@@ -16,6 +16,8 @@ export default function CeoInpatients() {
   const [providers, setProviders] = useState([])
   // Statsionarda faqat "statsionar xizmat ko'rsatuvchi" belgisi qo'yilganlar tanlanadi
   const [inpatientProviders, setInpatientProviders] = useState([])
+  // Massajga faqat "massaj xizmat ko'rsatuvchi" belgisi qo'yilganlar tanlanadi
+  const [massageProviders, setMassageProviders] = useState([])
   const [referrers, setReferrers] = useState([])
   const [patients, setPatients] = useState([])
   const [tariffs, setTariffs] = useState([])
@@ -50,7 +52,7 @@ export default function CeoInpatients() {
   const [editInpatientModal, setEditInpatientModal] = useState(null)
   const [editInpatientForm, setEditInpatientForm] = useState({
     first_name: '', last_name: '', phone: '', birth_date: '', address: '',
-    room_number: '', bed_number: '', tariff_id: '', doctor_id: '', referrer_id: '',
+    room_number: '', bed_number: '', tariff_id: '', doctor_id: '', massage_provider_id: '', referrer_id: '',
     daily_rate: '', diagnosis: '', planned_days: '',
   })
   const [savingInpatientEdit, setSavingInpatientEdit] = useState(false)
@@ -62,6 +64,7 @@ export default function CeoInpatients() {
     bed_number: '',
     tariff_id: '',
     doctor_id: '',
+    massage_provider_id: '',
     referrer_id: '',
     diagnosis: '',
     daily_rate: '',
@@ -130,6 +133,7 @@ export default function CeoInpatients() {
     loadData()
     api('/providers').then(setProviders).catch(() => {})
     api('/inpatients/service-providers').then((r) => setInpatientProviders(r || [])).catch(() => setInpatientProviders([]))
+    api('/inpatients/massage-providers').then((r) => setMassageProviders(r || [])).catch(() => setMassageProviders([]))
     api('/referrers').then(setReferrers).catch(() => {})
     api('/patients?include_cancelled=false').then(setPatients).catch(() => {})
   }, [])
@@ -152,6 +156,7 @@ export default function CeoInpatients() {
       bed_number: bed ? String(bed) : '',
       tariff_id: '',
       doctor_id: '',
+      massage_provider_id: '',
       referrer_id: '',
       diagnosis: '',
       daily_rate: '',
@@ -272,6 +277,7 @@ export default function CeoInpatients() {
       bed_number: admitForm.bed_number,
       tariff_id: admitForm.tariff_id ? +admitForm.tariff_id : null,
       doctor_id: admitForm.doctor_id ? +admitForm.doctor_id : null,
+      massage_provider_id: admitForm.massage_provider_id ? +admitForm.massage_provider_id : null,
       referrer_id: admitForm.referrer_id ? +admitForm.referrer_id : null,
       daily_rate: +admitForm.daily_rate,
       diagnosis: admitForm.diagnosis || null,
@@ -314,7 +320,7 @@ export default function CeoInpatients() {
       toast('Bemor yotqizildi va qabul qilindi')
       setAdmitModal(false)
       setAdmitForm({
-        patient_id: '', room_number: '', bed_number: '', tariff_id: '', doctor_id: '',
+        patient_id: '', room_number: '', bed_number: '', tariff_id: '', doctor_id: '', massage_provider_id: '',
         referrer_id: '', diagnosis: '', daily_rate: '', planned_days: '', initial_payment_amount: '', initial_payment_type: 'cash',
         cash_amount: '', card_amount: '', click_amount: '', qr_amount: ''
       })
@@ -566,6 +572,7 @@ export default function CeoInpatients() {
       bed_number: inp.bed_number || '',
       tariff_id: inp.tariff_id ? String(inp.tariff_id) : '',
       doctor_id: inp.doctor_id ? String(inp.doctor_id) : '',
+      massage_provider_id: inp.massage_provider_id ? String(inp.massage_provider_id) : '',
       referrer_id: inp.referrer_id ? String(inp.referrer_id) : '',
       daily_rate: inp.daily_rate ? String(inp.daily_rate) : '',
       diagnosis: inp.diagnosis || '',
@@ -603,6 +610,7 @@ export default function CeoInpatients() {
           bed_number: editInpatientForm.bed_number.trim(),
           tariff_id: editInpatientForm.tariff_id ? +editInpatientForm.tariff_id : 0,
           doctor_id: editInpatientForm.doctor_id ? +editInpatientForm.doctor_id : 0,
+          massage_provider_id: editInpatientForm.massage_provider_id ? +editInpatientForm.massage_provider_id : 0,
           referrer_id: editInpatientForm.referrer_id ? +editInpatientForm.referrer_id : 0,
           daily_rate: editInpatientForm.daily_rate ? +editInpatientForm.daily_rate : undefined,
           diagnosis: editInpatientForm.diagnosis.trim() || null,
@@ -1075,6 +1083,31 @@ export default function CeoInpatients() {
                 Bemor yotgan har bir kun uchun shifokorga{' '}
                 <span className="text-gold font-bold">
                   {formatMoney(inpatientProviders.find((p) => String(p.id) === String(admitForm.doctor_id))?.daily_rate || 0)}
+                </span>{' '}
+                yoziladi.
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <select className="input-field" value={admitForm.massage_provider_id} onChange={(e) => setAdmitForm({ ...admitForm, massage_provider_id: e.target.value })}>
+              <option value="">— Massaj uchun biriktirilmagan (Yo'q) —</option>
+              {massageProviders.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name} — {formatMoney(p.daily_rate)}/kun
+                </option>
+              ))}
+            </select>
+            {massageProviders.length === 0 ? (
+              <p className="text-[11px] text-amber-400 font-semibold mt-1">
+                Massaj xizmat ko'rsatuvchi belgilanmagan. Shifokorlar bo'limidagi
+                "Massaj" qismidan qo'shing.
+              </p>
+            ) : admitForm.massage_provider_id ? (
+              <p className="text-[11px] text-muted font-semibold mt-1">
+                Yakshanbadan tashqari, yotgan har bir kun uchun{' '}
+                <span className="text-gold font-bold">
+                  {formatMoney(massageProviders.find((p) => String(p.id) === String(admitForm.massage_provider_id))?.daily_rate || 0)}
                 </span>{' '}
                 yoziladi.
               </p>
@@ -2224,6 +2257,22 @@ export default function CeoInpatients() {
                   {inpatientProviders.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.full_name} ({p.specialization || 'Shifokor'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="input-label">Massaj uchun biriktirilgan</label>
+                <select
+                  className="input-field"
+                  value={editInpatientForm.massage_provider_id}
+                  onChange={(e) => setEditInpatientForm({ ...editInpatientForm, massage_provider_id: e.target.value })}
+                >
+                  <option value="">-- Biriktirilmagan --</option>
+                  {massageProviders.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.full_name}
                     </option>
                   ))}
                 </select>

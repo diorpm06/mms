@@ -18,6 +18,7 @@ const emptyForm = {
   full_name: '', specialization: '', phone: '+998', percentage: '', fixed_salary: '',
   username: '', password: '', service_ids: [],
   is_inpatient_provider: false, inpatient_daily_rate: String(STATSIONAR_STANDART),
+  is_massage_provider: false,
   // Shu shifokorning yo'naltiruvchi sifatidagi yozuvi (bir odam ikki rolda)
   referrer_id: '',
 }
@@ -195,6 +196,14 @@ export default function CeoProviders() {
   const [edit, setEdit] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [payoutSource, setPayoutSource] = useState('Naqt kassa')
+  // Davr tanlab to'lash — "10 kunlik" hisobotdan ORTIQ (umrbod balans)
+  // to'lanib ketmasligi uchun, qaysi davr uchun to'lanayotgani ko'rinsin
+  // va o'zgartirilsin deb qo'shildi.
+  const [payoutModal, setPayoutModal] = useState(null) // {id, full_name, balance}
+  const [payoutFrom, setPayoutFrom] = useState('')
+  const [payoutTo, setPayoutTo] = useState('')
+  const [payoutPreview, setPayoutPreview] = useState(null)
+  const [payoutPreviewLoading, setPayoutPreviewLoading] = useState(false)
   const [advances, setAdvances] = useState({})
   // "Jami ishlagan" bosilganda ochiladigan kunma-kun oynasi
   const [kunlik, setKunlik] = useState(null)   // {kind, id, name}
@@ -297,6 +306,7 @@ export default function CeoProviders() {
       service_ids: p.service_ids || [],
       is_inpatient_provider: !!p.is_inpatient_provider,
       inpatient_daily_rate: String(p.inpatient_daily_rate ?? STATSIONAR_STANDART),
+      is_massage_provider: !!p.is_massage_provider,
       referrer_id: p.referrer_id ? String(p.referrer_id) : '',
     })
     setModal(true)
@@ -314,6 +324,7 @@ export default function CeoProviders() {
         is_inpatient_provider: !!form.is_inpatient_provider,
         inpatient_daily_rate: form.inpatient_daily_rate !== '' && form.inpatient_daily_rate !== null
           ? parseInt(form.inpatient_daily_rate, 10) : STATSIONAR_STANDART,
+        is_massage_provider: !!form.is_massage_provider,
         // Bo'sh bo'lsa null yuboriladi — bog'lanish uziladi
         referrer_id: form.referrer_id ? parseInt(form.referrer_id, 10) : null,
       }
@@ -335,6 +346,56 @@ export default function CeoProviders() {
     try {
       const res = await api(`/providers/${id}/payout`, { method: 'POST', body: JSON.stringify({ source: payoutSource }) })
       toast(`Balans chiqarildi: ${formatMoney(res.amount)}`)
+      load()
+    } catch (e) { toast(e.message, 'error') }
+  }
+
+  // Davr tanlab to'lash oynasi — standart 10 kunlik (bugundan 9 kun orqaga)
+  const openPayoutModal = (p) => {
+    const today = new Date()
+    const tenDaysAgo = new Date(today)
+    tenDaysAgo.setDate(today.getDate() - 9)
+    setPayoutFrom(tenDaysAgo.toISOString().slice(0, 10))
+    setPayoutTo(today.toISOString().slice(0, 10))
+    setPayoutPreview(null)
+    setPayoutModal(p)
+  }
+
+  const fetchPayoutPreview = async (id, from, to) => {
+    if (!id || !from || !to) return
+    setPayoutPreviewLoading(true)
+    try {
+      const res = await api(`/providers/${id}/period-payout-preview?from_date=${from}&to_date=${to}`)
+      setPayoutPreview(res)
+    } catch (e) {
+      toast(e.message, 'error')
+      setPayoutPreview(null)
+    } finally {
+      setPayoutPreviewLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (payoutModal && payoutFrom && payoutTo) {
+      fetchPayoutPreview(payoutModal.id, payoutFrom, payoutTo)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payoutModal, payoutFrom, payoutTo])
+
+  const confirmPeriodPayout = async () => {
+    if (!payoutModal || !payoutPreview || payoutPreview.net_payable <= 0) return
+    try {
+      const res = await api(`/providers/${payoutModal.id}/payout`, {
+        method: 'POST',
+        body: JSON.stringify({
+          source: payoutSource,
+          max_amount: payoutPreview.net_payable,
+          period_start: payoutFrom,
+          period_end: payoutTo,
+        }),
+      })
+      toast(`To'landi: ${formatMoney(res.amount)} (${payoutFrom} — ${payoutTo})`)
+      setPayoutModal(null)
       load()
     } catch (e) { toast(e.message, 'error') }
   }
@@ -573,7 +634,7 @@ export default function CeoProviders() {
                   {p.balance > 0 && isAct && (
                     <button
                       type="button"
-                      onClick={() => payout(p.id)}
+                      onClick={() => openPayoutModal(p)}
                       className="btn-emerald py-1.5 px-3 text-xs font-bold shadow-md"
                     >
                       💵 Chiqarish
@@ -753,7 +814,7 @@ export default function CeoProviders() {
                             icon: Icons.arrowDown,
                             variant: 'success',
                             hidden: !(p.balance > 0 && isAct),
-                            onClick: () => payout(p.id),
+                            onClick: () => openPayoutModal(p),
                           },
                           {
                             label: 'Avans berish',
@@ -902,6 +963,29 @@ export default function CeoProviders() {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Massaj xizmat ko'rsatuvchi */}
+          <div className={`p-3 rounded-xl border space-y-1 transition-colors ${
+            form.is_massage_provider ? 'bg-pink-500/10 border-pink-500/40' : 'bg-surface-2 border-border'
+          }`}>
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                className="rounded accent-pink-500 mt-0.5 shrink-0"
+                checked={!!form.is_massage_provider}
+                onChange={(e) => setForm({ ...form, is_massage_provider: e.target.checked })}
+              />
+              <span>
+                <span className="font-bold text-pink-300 text-xs uppercase tracking-wider block">
+                  💆 Massaj xizmat ko'rsatuvchi
+                </span>
+                <span className="text-[11px] text-muted font-semibold">
+                  Belgilansa, statsionarga bemor yotqizishda "Massaj uchun biriktirilgan"
+                  ro'yxatida chiqadi. Yakshanbadan tashqari, yotgan har bir kun uchun 25 000 so'm yoziladi.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div className="p-3 bg-surface-2 rounded-xl border border-border space-y-3">
@@ -1071,6 +1155,61 @@ export default function CeoProviders() {
           <div className="flex gap-2 pt-2">
             <Btn variant="ghost" full icon={Icons.x} onClick={() => setAdvanceModal(false)}>Bekor</Btn>
             <Btn variant="gold" full icon={Icons.save} loading={savingAdvance} onClick={handleGiveAdvance}>✓ Avans Berish</Btn>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Davr tanlab to'lash — 10-kunlik hisobotdan ORTIQ (umrbod balans)
+          to'lanib ketmasligi uchun; davr ko'rinadi va o'zgartirsa bo'ladi. */}
+      <Modal open={!!payoutModal} onClose={() => setPayoutModal(null)} title={`Chiqarish — [ ${payoutModal?.full_name || ''} ]`} size="sm">
+        <div className="space-y-4 text-xs">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="form-label font-bold">Sanadan</label>
+              <input type="date" className="input-field text-sm" value={payoutFrom} onChange={(e) => setPayoutFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="form-label font-bold">Sanagacha</label>
+              <input type="date" className="input-field text-sm" value={payoutTo} onChange={(e) => setPayoutTo(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border p-3 bg-surface-2 space-y-1.5">
+            {payoutPreviewLoading ? (
+              <p className="text-muted text-center py-2">Hisoblanmoqda…</p>
+            ) : payoutPreview ? (
+              <>
+                <div className="flex justify-between"><span className="text-muted">Bemorlar soni</span><span className="font-bold">{payoutPreview.patient_count}</span></div>
+                <div className="flex justify-between"><span className="text-muted">Shu davrda ishlagan</span><span className="font-mono font-bold">{formatMoney(payoutPreview.earned_share)}</span></div>
+                {payoutPreview.advance_deducted > 0 && (
+                  <div className="flex justify-between"><span className="text-muted">Avansdan ayirilgan</span><span className="font-mono font-bold text-amber-400">−{formatMoney(payoutPreview.advance_deducted)}</span></div>
+                )}
+                <div className="flex justify-between border-t border-border pt-1.5 mt-1.5">
+                  <span className="font-extrabold">Beriladigan summa</span>
+                  <span className="font-mono font-black text-emerald text-sm">{formatMoney(payoutPreview.net_payable)}</span>
+                </div>
+              </>
+            ) : (
+              <p className="text-muted text-center py-2">—</p>
+            )}
+          </div>
+
+          <div>
+            <label className="form-label font-bold">Manba</label>
+            <select className="input-field text-sm" value={payoutSource} onChange={(e) => setPayoutSource(e.target.value)}>
+              {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Btn variant="ghost" full icon={Icons.x} onClick={() => setPayoutModal(null)}>Bekor</Btn>
+            <Btn
+              variant="success" full icon={Icons.save}
+              disabled={!payoutPreview || payoutPreview.net_payable <= 0}
+              onClick={confirmPeriodPayout}
+            >
+              ✓ {payoutPreview ? formatMoney(payoutPreview.net_payable) : ''} Chiqarish
+            </Btn>
           </div>
         </div>
       </Modal>

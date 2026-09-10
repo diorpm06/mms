@@ -60,6 +60,7 @@ const TvManagerDashboard = safeLazy(() => import('./pages/TvManagerDashboard'))
 const UnifiedReportsHub = safeLazy(() => import('./pages/ceo/UnifiedReportsHub'))
 const ReferrerPortal = safeLazy(() => import('./pages/referrer/ReferrerPortal'))
 const WarehousePanel = safeLazy(() => import('./pages/warehouse/WarehousePanel'))
+const LandingPage = safeLazy(() => import('./pages/LandingPage'))
 
 function PageLoader() {
   return (
@@ -170,6 +171,7 @@ function AppRoutes() {
       <Toast />
       <Suspense fallback={<PageLoader />}>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/tv" element={<TvQueueDisplay />} />
         <Route path="/queue" element={<TvQueueDisplay />} />

@@ -171,6 +171,8 @@ class ProviderCreate(BaseModel):
     # Statsionar: kunlik qat'iy haq oladigan xizmat ko'rsatuvchi
     is_inpatient_provider: Optional[bool] = False
     inpatient_daily_rate: Optional[int] = Field(default=50000, ge=0, le=100_000_000)
+    # Statsionarda massajga biriktirilishi mumkinmi
+    is_massage_provider: Optional[bool] = False
     username: Optional[str] = None
     password: Optional[str] = None
     service_ids: Optional[list[int]] = None
@@ -191,6 +193,7 @@ class ProviderUpdate(BaseModel):
     fixed_salary: Optional[int] = Field(default=None, ge=0)
     is_inpatient_provider: Optional[bool] = None
     inpatient_daily_rate: Optional[int] = Field(default=None, ge=0, le=100_000_000)
+    is_massage_provider: Optional[bool] = None
     is_active: Optional[bool] = None
     username: Optional[str] = None
     password: Optional[str] = None
@@ -210,6 +213,7 @@ class ProviderOut(BaseModel):
     balance: int
     is_inpatient_provider: Optional[bool] = False
     inpatient_daily_rate: Optional[int] = 50000
+    is_massage_provider: Optional[bool] = False
     is_active: bool
     username: Optional[str] = None
     service_ids: Optional[list[int]] = None

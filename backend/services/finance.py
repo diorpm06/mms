@@ -539,7 +539,8 @@ def process_ten_day_payouts(db: Session, period_start: date, period_end: date) -
 
 
 def payout_recipient_balance(
-    db: Session, recipient_type: str, recipient_id: int, source: str | None = None, max_amount: int | None = None
+    db: Session, recipient_type: str, recipient_id: int, source: str | None = None, max_amount: int | None = None,
+    period_start: date | None = None, period_end: date | None = None,
 ) -> Payout:
     today = date.today()
     if recipient_type == "referrer":
@@ -590,8 +591,8 @@ def payout_recipient_balance(
         recipient_type=recipient_type,
         recipient_id=recipient_id,
         amount=beriladi,
-        period_start=today,
-        period_end=today,
+        period_start=period_start or today,
+        period_end=period_end or today,
     )
     source_label = source or "Manba ko'rsatilmagan"
     who = f"yo'naltiruvchi #{recipient_id}" if recipient_type == "referrer" else f"provider #{recipient_id}"

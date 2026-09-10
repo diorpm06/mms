@@ -683,7 +683,7 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
               </div>
 
               <div className="card-2 p-4">
-                <h4 className="text-xs font-bold text-gold uppercase mb-2">7 Kunlik Daromad Dinamikasi</h4>
+                <h4 className="text-xs font-bold text-gold uppercase mb-2">10 Kunlik Daromad Dinamikasi</h4>
                 {hasPositiveValues(dashboardData?.income_chart || [], 'income') ? (
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">

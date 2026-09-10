@@ -20,6 +20,11 @@ class Inpatient(CancelMixin, Base):
     bed_number: Mapped[str] = mapped_column(String(20))
     tariff_id: Mapped[int | None] = mapped_column(ForeignKey("inpatient_tariffs.id"), nullable=True)
     doctor_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id"), nullable=True)
+    # Massaj uchun biriktirilgan xodim (masalan Dr.G'anijon yoki Dr.Ozoda) —
+    # asosiy shifokordan (doctor_id) mustaqil, chunki bittasi davolaydi,
+    # ikkinchisi massaj qiladi. Yotgan har bir kun (yakshanbadan tashqari)
+    # uchun shu odamga qat'iy haq yoziladi (services/inpatient_accrual.py).
+    massage_provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id"), nullable=True)
     referrer_id: Mapped[int | None] = mapped_column(ForeignKey("referrers.id"), nullable=True)
     diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
     admitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -31,6 +36,7 @@ class Inpatient(CancelMixin, Base):
 
     tariff = relationship("InpatientTariff")
     doctor = relationship("Provider", foreign_keys=[doctor_id])
+    massage_provider = relationship("Provider", foreign_keys=[massage_provider_id])
     referrer = relationship("Referrer")
     payments = relationship("InpatientPayment", back_populates="inpatient")
     items = relationship("InpatientItem", back_populates="inpatient", cascade="all, delete-orphan")

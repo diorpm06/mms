@@ -488,6 +488,13 @@ def run_migrations():
         # ustun bazada bo'lmasligi mumkin (model avval buni e'lon
         # qilmagani uchun create_all uni yaratmagan bo'lishi mumkin).
         "ALTER TABLE appointments ADD COLUMN created_at TIMESTAMP",
+        # Statsionarda massajga alohida xodim biriktirish (asosiy
+        # shifokordan mustaqil) — har biriga kunlik qat'iy haq.
+        "ALTER TABLE providers ADD COLUMN is_massage_provider BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE inpatients ADD COLUMN massage_provider_id INTEGER",
+        "ALTER TABLE inpatient_provider_accruals ADD COLUMN accrual_type VARCHAR(20) DEFAULT 'attendance'",
+        "ALTER TABLE inpatient_provider_accruals DROP CONSTRAINT uq_inp_accrual_day",
+        "ALTER TABLE inpatient_provider_accruals ADD CONSTRAINT uq_inp_accrual_day UNIQUE (inpatient_id, accrual_date, accrual_type)",
     ):
         try:
             with engine.connect() as conn:
@@ -503,6 +510,8 @@ def run_migrations():
     for stmt in (
         "UPDATE providers SET is_inpatient_provider = FALSE WHERE is_inpatient_provider IS NULL",
         "UPDATE providers SET inpatient_daily_rate = 50000 WHERE inpatient_daily_rate IS NULL",
+        "UPDATE providers SET is_massage_provider = FALSE WHERE is_massage_provider IS NULL",
+        "UPDATE inpatient_provider_accruals SET accrual_type = 'attendance' WHERE accrual_type IS NULL",
         # Hali bir marta ham "Keldi" bosilmagan bo'lsa — 0
         "UPDATE patient_services SET used_count = 0 WHERE used_count IS NULL",
     ):

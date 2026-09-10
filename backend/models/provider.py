@@ -27,6 +27,11 @@ class Provider(Base):
     # oladi (foiz emas). Faqat shu belgi qo'yilganlar statsionarda tanlanadi.
     is_inpatient_provider: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     inpatient_daily_rate: Mapped[int] = mapped_column(Integer, default=50000, nullable=True)
+    # Statsionarda yotgan bemorga massaj uchun biriktirilishi mumkin bo'lganlar
+    # ro'yxatida ko'rinadi (masalan Dr.Ozoda — "Medsestra", lekin massaj ham
+    # qiladi, shuning uchun bu alohida belgi — specialization'ga qarab
+    # aniqlab bo'lmaydi).
+    is_massage_provider: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Ayni shifokorning YO'NALTIRUVCHI sifatidagi yozuvi.
     #

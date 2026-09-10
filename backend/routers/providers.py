@@ -27,6 +27,10 @@ class PayoutBody(BaseModel):
     # davrlarni ham o'z ichiga olishi mumkin) — berilsa, chiqarim shu
     # summadan oshmaydi.
     max_amount: int | None = None
+    # Qaysi davr uchun to'lanayotgani — chek/hisobotda shu ko'rsatiladi.
+    # Berilmasa bugungi kun sifatida saqlanadi (eski xatti-harakat).
+    period_start: date | None = None
+    period_end: date | None = None
 
 
 def _yonaltirish_xulosasi(db: Session, referrer_ids: list[int]) -> dict:
@@ -417,6 +421,35 @@ def resync_provider_balance(
     return {"message": "Balans qayta hisoblandi", "balance": new_balance}
 
 
+@router.get("/{provider_id}/period-payout-preview")
+def provider_period_payout_preview(
+    provider_id: int,
+    from_date: date = None,
+    to_date: date = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Tanlangan sana oralig'i uchun shu shifokorga qancha to'lanishi
+    kerakligini ko'rsatadi — "To'lash" bosishdan OLDIN ko'rish uchun.
+    Umrbod balansdan farqli — faqat shu davrda ishlagan puli hisobga olinadi.
+    """
+    from services.reports_data import ten_day_report as _ten_day_report
+
+    if not from_date or not to_date:
+        raise HTTPException(status_code=400, detail="from_date va to_date kiritilishi shart")
+    report = _ten_day_report(db, from_date, to_date)
+    row = next((r for r in report.get("providers_payout", []) if r["provider_id"] == provider_id), None)
+    if not row:
+        return {"provider_id": provider_id, "patient_count": 0, "earned_share": 0, "advance_deducted": 0, "net_payable": 0}
+    return {
+        "provider_id": provider_id,
+        "patient_count": row["patient_count"],
+        "earned_share": row["earned_share"],
+        "advance_deducted": row["advance_deducted"],
+        "net_payable": row["net_payable"],
+    }
+
+
 @router.post("/{provider_id}/payout")
 def payout_provider(
     provider_id: int,
@@ -425,7 +458,10 @@ def payout_provider(
     user: User = Depends(require_admin_or_ceo),
 ):
     p = db.query(Provider).filter(Provider.id == provider_id).first()
-    payout = payout_recipient_balance(db, "provider", provider_id, source=body.source, max_amount=body.max_amount)
+    payout = payout_recipient_balance(
+        db, "provider", provider_id, source=body.source, max_amount=body.max_amount,
+        period_start=body.period_start, period_end=body.period_end,
+    )
     if payout and payout.amount > 0:
         doc_name = p.full_name if p else f"#{provider_id}"
         src = body.source or "Naqt kassa"

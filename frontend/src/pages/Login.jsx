@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useToastStore } from '../store/toastStore'
 import { useTheme } from '../hooks/useTheme'
 import { api } from '../utils/api'
-import { Moon, Sun, Eye, EyeOff } from 'lucide-react'
+import { Moon, Sun, Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import logo from '@assets/logo.png'
 import { BRAND } from '../config/brand'
 
@@ -56,17 +56,26 @@ export default function Login() {
       className="flex min-h-screen items-center justify-center p-4"
       style={{ background: 'var(--bg)' }}
     >
+      {/* Saytga qaytish */}
+      <Link
+        to="/"
+        className="btn-outline absolute left-3 top-3 flex items-center gap-1.5 p-2 text-xs font-bold sm:left-5 sm:top-5 sm:px-3"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        <span className="hidden sm:inline">Saytga qaytish</span>
+      </Link>
+
       {/* Theme toggle */}
       <button
         type="button"
         onClick={toggleTheme}
-        className="btn-outline absolute right-5 top-5 p-2"
+        className="btn-outline absolute right-3 top-3 p-2 sm:right-5 sm:top-5"
         title={isLight ? 'Qora mavzu' : 'Oq mavzu'}
       >
         {isLight ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
       </button>
 
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm pt-10 sm:pt-0">
         {/* Logo */}
         <div className="mb-8 text-center">
           <div

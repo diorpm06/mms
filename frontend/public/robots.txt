@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /ceo
+Disallow: /admin
+Disallow: /doctor
+Disallow: /warehouse
+Disallow: /referrer-portal
+Disallow: /tv
+Disallow: /queue
+Disallow: /api
+
+Sitemap: https://marjonamedservis.uz/sitemap.xml

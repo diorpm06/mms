@@ -16,6 +16,9 @@ from models.inpatient_accrual import InpatientProviderAccrual
 from models.provider import Provider
 
 STANDART_KUNLIK = 50_000
+MASSAJ_KUNLIK = 25_000
+# Python'da Monday=0 ... Sunday=6
+YAKSHANBA = 6
 
 
 def _kunlik_stavka(provider: Provider) -> int:
@@ -59,18 +62,18 @@ def sync_inpatient_accruals(db: Session, inpatient_id: int | None = None) -> int
     else:
         q = q.filter(Inpatient.status == "yotmoqda")
 
+    # DIQQAT: bu yerda ilgari `bemorlar`/`shifokorlar` bo'sh bo'lsa funksiya
+    # butunlay `return 0` bilan chiqib ketardi — asosiy shifokor
+    # tayinlanmagan (doctor_id=None), lekin FAQAT massajga biriktirilgan
+    # bemor uchun bu quyidagi massaj blokini umuman ishga tushirmasdi.
+    # Endi ikkala blok mustaqil — biri bo'sh bo'lsa ham ikkinchisi ishlaydi.
     bemorlar = q.all()
-    if not bemorlar:
-        return 0
-
     doctor_ids = {b.doctor_id for b in bemorlar}
     shifokorlar = {
         p.id: p
         for p in db.query(Provider).filter(Provider.id.in_(doctor_ids)).all()
         if getattr(p, "is_inpatient_provider", False)
-    }
-    if not shifokorlar:
-        return 0
+    } if doctor_ids else {}
 
     yozildi = 0
     for inp in bemorlar:
@@ -98,10 +101,63 @@ def sync_inpatient_accruals(db: Session, inpatient_id: int | None = None) -> int
                     provider_id=provider.id,
                     accrual_date=kun,
                     amount=stavka,
+                    accrual_type="attendance",
                 ))
                 provider.balance = int(provider.balance or 0) + stavka
                 yozildi += 1
             kun = date.fromordinal(kun.toordinal() + 1)
+
+    # Massaj uchun biriktirilgan xodim — asosiy shifokordan mustaqil,
+    # yakshanba kunlari hisoblanmaydi (dam olish kuni).
+    massaj_q = db.query(Inpatient).filter(
+        Inpatient.is_cancelled == False,  # noqa: E712
+        Inpatient.massage_provider_id.isnot(None),
+    )
+    if inpatient_id is not None:
+        massaj_q = massaj_q.filter(Inpatient.id == inpatient_id)
+    else:
+        massaj_q = massaj_q.filter(Inpatient.status == "yotmoqda")
+
+    massaj_bemorlar = massaj_q.all()
+    if massaj_bemorlar:
+        massajchi_ids = {b.massage_provider_id for b in massaj_bemorlar}
+        massajchilar = {
+            p.id: p
+            for p in db.query(Provider).filter(Provider.id.in_(massajchi_ids)).all()
+            if getattr(p, "is_massage_provider", False)
+        }
+        for inp in massaj_bemorlar:
+            provider = massajchilar.get(inp.massage_provider_id)
+            if not provider:
+                continue
+            oralig = _hisob_oralig(inp, bugun)
+            if not oralig:
+                continue
+            boshi, oxiri = oralig
+
+            bor = {
+                r[0]
+                for r in db.query(InpatientProviderAccrual.accrual_date)
+                .filter(
+                    InpatientProviderAccrual.inpatient_id == inp.id,
+                    InpatientProviderAccrual.accrual_type == "massage",
+                )
+                .all()
+            }
+
+            kun = boshi
+            while kun <= oxiri:
+                if kun not in bor and kun.weekday() != YAKSHANBA:
+                    db.add(InpatientProviderAccrual(
+                        inpatient_id=inp.id,
+                        provider_id=provider.id,
+                        accrual_date=kun,
+                        amount=MASSAJ_KUNLIK,
+                        accrual_type="massage",
+                    ))
+                    provider.balance = int(provider.balance or 0) + MASSAJ_KUNLIK
+                    yozildi += 1
+                kun = date.fromordinal(kun.toordinal() + 1)
 
     if yozildi:
         try:
@@ -149,7 +205,10 @@ def provider_inpatient_summary(db: Session) -> list[dict]:
 
     shifokorlar = (
         db.query(Provider)
-        .filter(Provider.is_inpatient_provider == True)  # noqa: E712
+        .filter(
+            (Provider.is_inpatient_provider == True)  # noqa: E712
+            | (Provider.is_massage_provider == True)  # noqa: E712
+        )
         .order_by(Provider.full_name)
         .all()
     )
@@ -186,13 +245,16 @@ def provider_inpatient_summary(db: Session) -> list[dict]:
         .filter(
             Inpatient.is_cancelled == False,  # noqa: E712
             Inpatient.status == "yotmoqda",
-            Inpatient.doctor_id.in_(ids),
         )
+        .filter(Inpatient.doctor_id.in_(ids) | Inpatient.massage_provider_id.in_(ids))
         .all()
     )
     hozirgi: dict[int, int] = {}
     for inp in yotganlar:
-        hozirgi[inp.doctor_id] = hozirgi.get(inp.doctor_id, 0) + 1
+        if inp.doctor_id in ids:
+            hozirgi[inp.doctor_id] = hozirgi.get(inp.doctor_id, 0) + 1
+        if inp.massage_provider_id in ids and inp.massage_provider_id != inp.doctor_id:
+            hozirgi[inp.massage_provider_id] = hozirgi.get(inp.massage_provider_id, 0) + 1
 
     natija = []
     for p in shifokorlar:

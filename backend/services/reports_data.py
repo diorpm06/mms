@@ -1950,96 +1950,25 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "breakdown": [{**d, "source": "Yo'naltiruvchi"} for d in ref.get("daily_departments", [])],
             }
 
+    # DIQQAT: bu yerda ILGARI ayrim xodimlar (Ramazon, G'anijon, Ozoda,
+    # Soxiba, Ortiqboy, Razzaqberganova Gulnora) uchun ISM bo'yicha
+    # qidirib, ularning summalarini QATTIQ YOZILGAN (hardcoded) raqamlarga
+    # majburan almashtiradigan kod bor edi — bu hisobotni haqiqiy
+    # tranzaksiyalardan hisoblashdan to'xtatib, doim bir xil, oldindan
+    # belgilangan sonni ko'rsatishga majburlagan (hisobotni "qalbakilash-
+    # tirish"). Bu real bug ham keltirib chiqargan edi: Ramazon uchun
+    # "sana 24.08 bo'lgan BARCHA qatorlarni 690000ga o'rnat" degan qoida
+    # uning UZI (shifokor) qatorini TO'G'RI o'rnatgan bo'lsa-da, xuddi
+    # shu kunga to'g'ri kelgan, lekin BUTUNLAY BOSHQA (Laboratoriya,
+    # yo'naltiruvchi roli) qatorini ham 690000ga almashtirib, haqiqiy
+    # 12,100 so'mlik summani yashirib qo'ygan edi. Umida degan xodimni
+    # ismi bo'yicha butunlay yashirish ham xuddi shu tarzda qo'shilgan
+    # edi. Bularning barchasi olib tashlandi — hisobot endi FAQAT
+    # haqiqiy tranzaksiya/avans ma'lumotlaridan hisoblanadi.
     all_staff_payout = [
         x for x in all_staff_map.values()
-        if not (
-            (x["total_earned"] == 0 and any(ex in x["name"].lower() for ex in ["ineksiya", "ozona", "ozon"]))
-            or "umida" in x["name"].lower()
-        )
+        if not (x["total_earned"] == 0 and any(ex in x["name"].lower() for ex in ["ineksiya", "ozona", "ozon"]))
     ]
-
-    for item in all_staff_payout:
-        p_id = item.get("provider_id")
-        p_name = item.get("name", "").lower()
-        if p_id == 4 or any(k in p_name for k in ["ganijon", "g'anijon", "g’anijon"]):
-            item["provider_earned"] = 3170000
-            item["referrer_earned"] = 20000
-            item["total_earned"] = 3190000
-            item["advance_deducted"] = 500000
-            item["advance_remaining"] = 0
-            item["provider_net_payable"] = 2670000
-            item["referrer_net_payable"] = 20000
-            item["net_payable"] = 2690000
-
-            bd = item.get("breakdown") or []
-            m_items = [d for d in bd if d.get("source") == "Shifokor (KPI)"]
-            if m_items:
-                m_sum = sum(d.get("earned_fee", 0) for d in m_items)
-                diff = 3170000 - m_sum
-                m_items[0]["earned_fee"] = m_items[0].get("earned_fee", 0) + diff
-
-        elif "ozoda" in p_name:
-            item["provider_earned"] = 235000
-            item["referrer_earned"] = 95000
-            item["total_earned"] = 330000
-            item["net_payable"] = 330000
-            # Scale Dr Ozoda Massaj breakdown lines so they sum to exactly 235 000
-            bd = item.get("breakdown") or []
-            m_items = [d for d in bd if d.get("source") == "Shifokor (KPI)"]
-            if m_items:
-                m_sum = sum(d.get("earned_fee", 0) for d in m_items)
-                diff = 235000 - m_sum
-                m_items[0]["earned_fee"] = m_items[0].get("earned_fee", 0) + diff
-
-        elif "soxiba" in p_name:
-            item["provider_earned"] = 995000
-            item["referrer_earned"] = 196700
-            item["total_earned"] = 1191700
-            item["net_payable"] = 1191700
-            # Fix 26.08 Nevrologiya breakdown fee to 45 000 so'm (was 145 000 so'm)
-            bd = item.get("breakdown") or []
-            for d in bd:
-                if "nevrologiya" in d.get("department_name", "").lower() and "26.08" in d.get("date", ""):
-                    if d.get("source") == "Shifokor (KPI)":
-                        d["earned_fee"] = 45000
-
-        elif "ramazon" in p_name:
-            item["provider_earned"] = 4115000
-            item["total_earned"] = 4127100
-            item["net_payable"] = 4127100
-            bd = item.get("breakdown") or []
-            for d in bd:
-                dt = d.get("date", "")
-                if "24.08" in dt:
-                    d["earned_fee"] = 690000
-                elif "29.08" in dt:
-                    d["earned_fee"] = 425000
-
-        elif "ortiqboy" in p_name:
-            item["provider_earned"] = 1646275
-            item["referrer_earned"] = 0
-            item["total_earned"] = 1646275
-            item["advance_deducted"] = 400000
-            item["advance_remaining"] = 0
-            item["net_payable"] = 1246275
-
-        elif "razzaqberganova" in p_name:
-            # Update Razzaqberganova Gulnora Lab rate to 30%
-            bd = item.get("breakdown") or []
-            new_r_earned = 0
-            for d in bd:
-                if "lab" in d.get("department_name", "").lower():
-                    gross = d.get("gross_total", 0)
-                    new_fee = int(gross * 0.30)
-                    d["earned_fee"] = new_fee
-                    d["rate_label"] = "30%"
-                    new_r_earned += new_fee
-                else:
-                    new_r_earned += d.get("earned_fee", 0)
-            item["referrer_earned"] = new_r_earned
-            item["total_earned"] = new_r_earned
-            item["net_payable"] = new_r_earned
-
     all_staff_payout.sort(key=lambda x: x["total_earned"], reverse=True)
 
     base_report["services_detail"] = services_detail

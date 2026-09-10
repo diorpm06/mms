@@ -25,6 +25,8 @@ class PayoutBody(BaseModel):
     # davrlarni ham o'z ichiga olishi mumkin) — berilsa, chiqarim shu
     # summadan oshmaydi.
     max_amount: int | None = None
+    period_start: date | None = None
+    period_end: date | None = None
 
 
 def _sodda_ism(nom: str | None) -> str:
@@ -239,6 +241,33 @@ def resync_referrer_balance(
     return {"message": "Balans qayta hisoblandi", "balance": new_balance}
 
 
+@router.get("/{referrer_id}/period-payout-preview")
+def referrer_period_payout_preview(
+    referrer_id: int,
+    from_date: date = None,
+    to_date: date = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Tanlangan sana oralig'i uchun shu yo'naltiruvchiga qancha to'lanishi
+    kerakligini ko'rsatadi — "To'lash" bosishdan OLDIN ko'rish uchun."""
+    from services.reports_data import ten_day_report as _ten_day_report
+
+    if not from_date or not to_date:
+        raise HTTPException(status_code=400, detail="from_date va to_date kiritilishi shart")
+    report = _ten_day_report(db, from_date, to_date)
+    row = next((r for r in report.get("referrers_payout", []) if r["referrer_id"] == referrer_id), None)
+    if not row:
+        return {"referrer_id": referrer_id, "patient_count": 0, "earned_commission": 0, "advance_deducted": 0, "net_payable": 0}
+    return {
+        "referrer_id": referrer_id,
+        "patient_count": row.get("patient_count", 0),
+        "earned_commission": row["earned_commission"],
+        "advance_deducted": row["advance_deducted"],
+        "net_payable": row["net_payable"],
+    }
+
+
 @router.post("/{referrer_id}/payout")
 def payout_referrer(
     referrer_id: int,
@@ -249,7 +278,10 @@ def payout_referrer(
     _: User = Depends(require_ceo),
 ):
     r = db.query(Referrer).filter(Referrer.id == referrer_id).first()
-    payout = payout_recipient_balance(db, "referrer", referrer_id, source=body.source, max_amount=body.max_amount)
+    payout = payout_recipient_balance(
+        db, "referrer", referrer_id, source=body.source, max_amount=body.max_amount,
+        period_start=body.period_start, period_end=body.period_end,
+    )
     qoplandi = getattr(payout, "settled_from_advance", 0) or 0
     db.commit()
 

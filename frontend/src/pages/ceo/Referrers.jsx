@@ -32,7 +32,15 @@ export default function CeoReferrers() {
     other_sum: 10000,
   })
   const [payoutSource, setPayoutSource] = useState('Naqt kassa')
-  
+  // Davr tanlab to'lash — "10 kunlik" hisobotdan ORTIQ (umrbod balans)
+  // to'lanib ketmasligi uchun, qaysi davr uchun to'lanayotgani ko'rinsin
+  // va o'zgartirilsin deb qo'shildi.
+  const [payoutModal, setPayoutModal] = useState(null) // {id, full_name}
+  const [payoutFrom, setPayoutFrom] = useState('')
+  const [payoutTo, setPayoutTo] = useState('')
+  const [payoutPreview, setPayoutPreview] = useState(null)
+  const [payoutPreviewLoading, setPayoutPreviewLoading] = useState(false)
+
   // Advance Modal
   const [advanceModal, setAdvanceModal] = useState(false)
   const [selectedRefForAdvance, setSelectedRefForAdvance] = useState(null)
@@ -212,6 +220,57 @@ export default function CeoReferrers() {
     } catch (e) {
       toast(e.message, 'error')
     }
+  }
+
+  // Davr tanlab to'lash oynasi — standart 10 kunlik (bugundan 9 kun orqaga)
+  const openPayoutModal = (r) => {
+    const today = new Date()
+    const tenDaysAgo = new Date(today)
+    tenDaysAgo.setDate(today.getDate() - 9)
+    setPayoutFrom(tenDaysAgo.toISOString().slice(0, 10))
+    setPayoutTo(today.toISOString().slice(0, 10))
+    setPayoutPreview(null)
+    setPayoutModal(r)
+  }
+
+  const fetchPayoutPreview = async (id, from, to) => {
+    if (!id || !from || !to) return
+    setPayoutPreviewLoading(true)
+    try {
+      const res = await api(`/referrers/${id}/period-payout-preview?from_date=${from}&to_date=${to}`)
+      setPayoutPreview(res)
+    } catch (e) {
+      toast(e.message, 'error')
+      setPayoutPreview(null)
+    } finally {
+      setPayoutPreviewLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (payoutModal && payoutFrom && payoutTo) {
+      fetchPayoutPreview(payoutModal.id, payoutFrom, payoutTo)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payoutModal, payoutFrom, payoutTo])
+
+  const confirmPeriodPayout = async () => {
+    if (!payoutModal || !payoutPreview || payoutPreview.net_payable <= 0) return
+    try {
+      const res = await api(`/referrers/${payoutModal.id}/payout`, {
+        method: 'POST',
+        body: JSON.stringify({
+          source: payoutSource,
+          max_amount: payoutPreview.net_payable,
+          period_start: payoutFrom,
+          period_end: payoutTo,
+        }),
+      })
+      toast(`To'landi: ${formatMoney(res.amount)} (${payoutFrom} — ${payoutTo})`)
+      setPayoutModal(null)
+      load()
+      if (activeTab === '10day') loadTenDayReport()
+    } catch (e) { toast(e.message, 'error') }
   }
 
   // Bazada qo'lda tuzatilgan yozuvlardan keyin balans eskirib qolgan
@@ -855,7 +914,7 @@ export default function CeoReferrers() {
                               icon: Icons.arrowDown,
                               variant: 'success',
                               hidden: !(r.balance > 0),
-                              onClick: () => payout(r.id),
+                              onClick: () => openPayoutModal(r),
                             },
                             {
                               label: 'Avans berish',
@@ -1418,6 +1477,61 @@ export default function CeoReferrers() {
           onClose={() => setSelectedRefModalId(null)}
         />
       )}
+
+      {/* Davr tanlab to'lash — 10-kunlik hisobotdan ORTIQ (umrbod balans)
+          to'lanib ketmasligi uchun; davr ko'rinadi va o'zgartirsa bo'ladi. */}
+      <Modal open={!!payoutModal} onClose={() => setPayoutModal(null)} title={`Chiqarish — [ ${payoutModal?.full_name || ''} ]`} size="sm">
+        <div className="space-y-4 text-xs">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="form-label font-bold">Sanadan</label>
+              <input type="date" className="input-field text-sm" value={payoutFrom} onChange={(e) => setPayoutFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="form-label font-bold">Sanagacha</label>
+              <input type="date" className="input-field text-sm" value={payoutTo} onChange={(e) => setPayoutTo(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border p-3 bg-surface-2 space-y-1.5">
+            {payoutPreviewLoading ? (
+              <p className="text-muted text-center py-2">Hisoblanmoqda…</p>
+            ) : payoutPreview ? (
+              <>
+                <div className="flex justify-between"><span className="text-muted">Bemorlar soni</span><span className="font-bold">{payoutPreview.patient_count}</span></div>
+                <div className="flex justify-between"><span className="text-muted">Shu davrda ishlagan</span><span className="font-mono font-bold">{formatMoney(payoutPreview.earned_commission)}</span></div>
+                {payoutPreview.advance_deducted > 0 && (
+                  <div className="flex justify-between"><span className="text-muted">Avansdan ayirilgan</span><span className="font-mono font-bold text-amber-400">−{formatMoney(payoutPreview.advance_deducted)}</span></div>
+                )}
+                <div className="flex justify-between border-t border-border pt-1.5 mt-1.5">
+                  <span className="font-extrabold">Beriladigan summa</span>
+                  <span className="font-mono font-black text-emerald text-sm">{formatMoney(payoutPreview.net_payable)}</span>
+                </div>
+              </>
+            ) : (
+              <p className="text-muted text-center py-2">—</p>
+            )}
+          </div>
+
+          <div>
+            <label className="form-label font-bold">Manba</label>
+            <select className="input-field text-sm" value={payoutSource} onChange={(e) => setPayoutSource(e.target.value)}>
+              {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Btn variant="ghost" full icon={Icons.x} onClick={() => setPayoutModal(null)}>Bekor</Btn>
+            <Btn
+              variant="success" full icon={Icons.save}
+              disabled={!payoutPreview || payoutPreview.net_payable <= 0}
+              onClick={confirmPeriodPayout}
+            >
+              ✓ {payoutPreview ? formatMoney(payoutPreview.net_payable) : ''} Chiqarish
+            </Btn>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

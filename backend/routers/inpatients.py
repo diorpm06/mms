@@ -71,6 +71,7 @@ class InpatientCreate(BaseModel):
     bed_number: str = Field(min_length=1, max_length=50)
     tariff_id: int | None = None
     doctor_id: int | None = None
+    massage_provider_id: int | None = None
     referrer_id: int | None = None
     diagnosis: str | None = Field(default=None, max_length=2000)
     daily_rate: int = Field(gt=0, le=50_000_000)
@@ -82,7 +83,7 @@ class InpatientCreate(BaseModel):
     click_amount: int | None = Field(default=None, ge=0)
     qr_amount: int | None = Field(default=None, ge=0)
 
-    @field_validator("patient_id", "tariff_id", "doctor_id", "referrer_id", mode="before")
+    @field_validator("patient_id", "tariff_id", "doctor_id", "massage_provider_id", "referrer_id", mode="before")
     @classmethod
     def sanitize_id_zero(cls, v):
         if v == 0 or v == "0" or v == "" or v is None:
@@ -181,6 +182,7 @@ class InpatientUpdate(BaseModel):
     bed_number: str | None = None
     tariff_id: int | None = None
     doctor_id: int | None = None
+    massage_provider_id: int | None = None
     referrer_id: int | None = None
     diagnosis: str | None = None
     daily_rate: int | None = None
@@ -293,6 +295,8 @@ def _serialize_inp(i: Inpatient, days: int | None = None) -> dict:
         "doctor_name": i.doctor.full_name if getattr(i, "doctor", None) else None,
         "doctor_daily_rate": int(getattr(i.doctor, "inpatient_daily_rate", 0) or 0) if getattr(i, "doctor", None) else 0,
         "doctor_accrued_total": elapsed_days * int(getattr(i.doctor, "inpatient_daily_rate", 0) or 0) if getattr(i, "doctor", None) else 0,
+        "massage_provider_id": i.massage_provider_id,
+        "massage_provider_name": i.massage_provider.full_name if getattr(i, "massage_provider", None) else None,
         "referrer_id": i.referrer_id,
         "diagnosis": diagnosis,
         "planned_days": planned_days,
@@ -661,6 +665,34 @@ def list_inpatient_providers(
     ]
 
 
+@router.get("/massage-providers")
+def list_massage_providers(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    """Statsionarda massajga biriktirilishi mumkin bo'lgan xodimlar."""
+    from services.inpatient_accrual import MASSAJ_KUNLIK
+
+    rows = (
+        db.query(Provider)
+        .filter(
+            Provider.is_active == True,  # noqa: E712
+            Provider.is_massage_provider == True,  # noqa: E712
+        )
+        .order_by(Provider.full_name)
+        .all()
+    )
+    return [
+        {
+            "id": p.id,
+            "full_name": p.full_name,
+            "specialization": p.specialization,
+            "daily_rate": MASSAJ_KUNLIK,
+        }
+        for p in rows
+    ]
+
+
 @router.get("/provider-earnings")
 def inpatient_provider_earnings(
     db: Session = Depends(get_db),
@@ -775,6 +807,20 @@ def admit(
                        "Shifokorlar bo'limidan uni statsionar uchun belgilang.",
             )
 
+    if data.massage_provider_id:
+        masajchi = db.query(Provider).filter(
+            Provider.id == data.massage_provider_id,
+            Provider.is_active == True,  # noqa: E712
+        ).first()
+        if not masajchi:
+            raise HTTPException(status_code=404, detail="Massaj xodimi topilmadi")
+        if not getattr(masajchi, "is_massage_provider", False):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{masajchi.full_name} massaj xizmat ko'rsatuvchi emas. "
+                       "Shifokorlar bo'limidan uni massaj uchun belgilang.",
+            )
+
     # p — bazadagi mavjud bemor yozuvi. Yangi ism qo'lda kiritilsa, ambulator
     # "patients" jadvaliga yozuv OCHILMAYDI: u yerda xizmat, to'lov summasi va
     # to'lov turi majburiy, statsionarda esa bularning ma'nosi yo'q. Ilgari shu
@@ -830,6 +876,7 @@ def admit(
         # Ambulator shifokorga qaytmaydi: statsionar haqi faqat shu yerda
         # ataylab tanlangan xizmat ko'rsatuvchiga yoziladi.
         doctor_id=data.doctor_id,
+        massage_provider_id=data.massage_provider_id,
         referrer_id=data.referrer_id if data.referrer_id is not None else (p.referrer_id if p else None),
         diagnosis=diagnosis or None,
         daily_rate=data.daily_rate,
@@ -1339,6 +1386,17 @@ def update_inpatient(
         inp.tariff_id = data.tariff_id if data.tariff_id > 0 else None
     if data.doctor_id is not None:
         inp.doctor_id = data.doctor_id if data.doctor_id > 0 else None
+    if data.massage_provider_id is not None:
+        if data.massage_provider_id > 0:
+            masajchi = db.query(Provider).filter(
+                Provider.id == data.massage_provider_id,
+                Provider.is_active == True,  # noqa: E712
+            ).first()
+            if not masajchi or not getattr(masajchi, "is_massage_provider", False):
+                raise HTTPException(status_code=400, detail="Bu xodim massaj xizmat ko'rsatuvchi emas")
+            inp.massage_provider_id = data.massage_provider_id
+        else:
+            inp.massage_provider_id = None
     if data.referrer_id is not None:
         inp.referrer_id = data.referrer_id if data.referrer_id > 0 else None
     if data.daily_rate is not None and data.daily_rate > 0:

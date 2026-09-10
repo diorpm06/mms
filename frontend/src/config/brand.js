@@ -27,6 +27,8 @@ export const BRAND = {
   logo: '/assets/logo.png',
 
   workHours: '08:00 — 18:00',
+
+  address: 'Hazorasp, Sentr',
 }
 
 export default BRAND
