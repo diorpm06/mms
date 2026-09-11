@@ -846,13 +846,11 @@ def export_referrers_pdf(report: dict) -> bytes:
                 ref_summary_rows.append(["= Ishlagan puli (ikkala rol):", _format_money(r.get("earned_commission", 0))])
             else:
                 ref_summary_rows.append(["Ishlagan puli:", _format_money(r.get("earned_commission", r_fees))])
-            # Avvalgi "Chegirilgan avans" + shartli "Qolgan avans" ikki qatori
-            # tushunarsiz edi (nechta qatorda nima ko'rsatilayotgani aniq
-            # emas). Endi bitta qator — OLINGAN AVANSNING TO'LIQ summasi
-            # (bu davrda ushlanganu, keyingi davrga o'tadigan qismi ham) —
-            # aniq ko'rsatiladi.
+            r_advance_total = r_advance_deducted + r_advance_remaining
+            if r_advance_total > 0:
+                ref_summary_rows.append(["Jami avans qarzi:", _format_money(r_advance_total)])
             if r_advance_deducted > 0:
-                ref_summary_rows.append(["Olgan avansi:", f"-{_format_money(r_advance_deducted)}"])
+                ref_summary_rows.append(["Bu safar ushlangan:", f"-{_format_money(r_advance_deducted)}"])
             if r_advance_remaining > 0:
                 ref_summary_rows.append(["Qolgan avans qarzi:", f"-{_format_money(r_advance_remaining)}"])
             ref_summary_rows.append(["BERILADIGAN SUMMA:", _format_money(r_net_payable)])
@@ -1116,9 +1114,12 @@ def export_all_staff_pdf(report: dict) -> bytes:
             adv_ded = r.get("advance_deducted", 0) or 0
             adv_rem = r.get("advance_remaining", 0) or 0
 
+            adv_total = adv_ded + adv_rem
             summary_rows = [["Ishlagan puli:", _format_money(tot_e_val)]]
+            if adv_total > 0:
+                summary_rows.append(["Jami avans qarzi:", _format_money(adv_total)])
             if adv_ded > 0:
-                summary_rows.append(["Olgan avansi:", f"-{_format_money(adv_ded)}"])
+                summary_rows.append(["Bu safar ushlangan:", f"-{_format_money(adv_ded)}"])
             if adv_rem > 0:
                 summary_rows.append(["Qolgan avans qarzi:", f"-{_format_money(adv_rem)}"])
             summary_rows.append(["BERILADIGAN SUMMA:", _format_money(net_p_val)])

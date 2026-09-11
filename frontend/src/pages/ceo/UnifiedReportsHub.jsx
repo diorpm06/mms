@@ -941,6 +941,8 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
         const gross = r.gross_total || 0
         const earned = r.earned_commission || 0
         const adv = r.advance_deducted || 0
+        const advRem = r.advance_remaining || 0
+        const advTotal = adv + advRem
         const net = r.net_payable || 0
 
         grandPatientsCount += pCnt
@@ -1051,7 +1053,9 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
             </div>
             <div style="font-size: 11.5px; font-weight: 700; background: #fffbeb; padding: 5px 10px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 12px; border: 1px solid #fde68a; border-radius: 4px;">
               <span>Ishlagan puli: ${formatMoney(earned)}</span>
-              <span style="color:#dc2626;">Olgan avansi: -${formatMoney(adv)}</span>
+              ${advTotal > 0 ? `<span style="color:#b45309;">Jami avans qarzi: ${formatMoney(advTotal)}</span>` : ''}
+              ${adv > 0 ? `<span style="color:#dc2626;">Bu safar ushlangan: -${formatMoney(adv)}</span>` : ''}
+              ${advRem > 0 ? `<span style="color:#dc2626;">Qolgan avans qarzi: -${formatMoney(advRem)}</span>` : ''}
               <span style="color:#16a34a; font-weight:900;">Beriladigan summa: ${formatMoney(net)}</span>
             </div>
             <table>
@@ -1509,7 +1513,9 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
           </table>
           <div style="font-size: 11.5px; font-weight: 700; background: #fffbeb; padding: 5px 10px; margin-top: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 12px; border: 1px solid #fde68a; border-radius: 4px;">
             <span>Ishlagan puli: ${formatMoney(r.total_earned)}</span>
-            <span style="color:#dc2626;">Olgan avansi: -${formatMoney(r.advance_deducted || 0)}</span>
+            ${((r.advance_deducted || 0) + (r.advance_remaining || 0)) > 0 ? `<span style="color:#b45309;">Jami avans qarzi: ${formatMoney((r.advance_deducted || 0) + (r.advance_remaining || 0))}</span>` : ''}
+            ${(r.advance_deducted || 0) > 0 ? `<span style="color:#dc2626;">Bu safar ushlangan: -${formatMoney(r.advance_deducted || 0)}</span>` : ''}
+            ${(r.advance_remaining || 0) > 0 ? `<span style="color:#dc2626;">Qolgan avans qarzi: -${formatMoney(r.advance_remaining || 0)}</span>` : ''}
             <span style="color:#16a34a; font-weight:900;">Beriladigan summa: ${formatMoney(r.net_payable)}</span>
           </div>
           <div class="signatures" style="margin-top: 35px;">
