@@ -102,40 +102,6 @@ def job_daily_report():
     _with_db(_job)
 
 
-def resend_daily_report_if_sent() -> None:
-    """Bugungi kunlik hisobot Telegram'ga avvalroq (soat 17:00'dagi
-    birinchi yuborishda) yuborilgan bo'lsa, keyin yangi bemor/to'lov/
-    xarajat kiritilganda hisobotni avtomatik yangilaydi. Hali birinchi
-    marta yuborilmagan bo'lsa — hech narsa qilmaydi (muddatidan oldin
-    yubormaydi, buni faqat soat 17:00'dagi jadval qiladi)."""
-    from models.saved_report import SavedReport
-
-    def _job(db: Session):
-        d = date.today()
-        d_str = d.isoformat()
-        saved = db.query(SavedReport).filter(
-            SavedReport.report_type == "daily",
-            SavedReport.period_start == d_str,
-        ).first()
-        if not saved or not saved.telegram_messages:
-            return
-        _yubor_kunlik_hisobot(db, d)
-
-    _with_db(_job)
-
-
-def resend_daily_report_background() -> None:
-    """`resend_daily_report_if_sent`ni alohida oqimda ishga tushiradi —
-    bemor/to'lov so'rovi Telegram javobini kutib turmasin."""
-    import threading
-
-    def _worker():
-        try:
-            resend_daily_report_if_sent()
-        except Exception as e:
-            logger.warning("Kunlik hisobotni yangilash xatosi: %s", e)
-
-    threading.Thread(target=_worker, daemon=True).start()
 
 
 def job_weekly_report():
