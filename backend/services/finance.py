@@ -189,13 +189,21 @@ def get_referrer_rates_for_service(referrer, service, db: Session | None = None)
     svc_name = (getattr(service, "name", None) or "").lower()
     c_name = f"{cat_name} {svc_name}"
 
+    aniq_sozlangan = (referrer.id, cat_name) in istisnolar or cat_name in bolimlar
     rejim, qiymat = istisnolar.get((referrer.id, cat_name)) or bolimlar.get(cat_name) or ("none", 0)
 
     if rejim == "percent":
         return int(qiymat), 0
     if rejim == "sum":
         return 0, int(qiymat)
-    
+    if aniq_sozlangan:
+        # Bo'lim (yoki shu yo'naltiruvchi uchun istisno) rahbar panelida
+        # ANIQ "yo'q" (none) qilib qo'yilgan — pastdagi eski kalit-so'zga
+        # asoslangan zaxira bunga bo'ysunmasligi kerak (ilgari "none" ham
+        # shu zaxiraga tushib ketib, masalan Fizioterapiya "yo'q" qilib
+        # qo'yilsa ham 20% chiqaverar edi).
+        return 0, 0
+
     # 1. Laboratoriya
     if any(k in c_name for k in [
         "labora", "tahlil", "gormon", "infeksiya", "biokimyo", "klinik",
