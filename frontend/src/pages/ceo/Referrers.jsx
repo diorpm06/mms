@@ -1521,8 +1521,11 @@ export default function CeoReferrers() {
                 {payoutPreview.advance_deducted > 0 && (
                   <div className="flex justify-between"><span className="text-muted">Avansdan ayirilgan</span><span className="font-mono font-bold text-amber-400">−{formatMoney(payoutPreview.advance_deducted)}</span></div>
                 )}
+                {payoutPreview.already_paid > 0 && (
+                  <div className="flex justify-between"><span className="text-muted">Shu davr uchun avval to'langan</span><span className="font-mono font-bold text-cyan">−{formatMoney(payoutPreview.already_paid)}</span></div>
+                )}
                 <div className="flex justify-between border-t border-border pt-1.5 mt-1.5">
-                  <span className="font-extrabold">Beriladigan summa</span>
+                  <span className="font-extrabold">{payoutPreview.already_paid > 0 ? 'Hozir beriladigan (qolgan)' : 'Beriladigan summa'}</span>
                   <span className="font-mono font-black text-emerald text-sm">{formatMoney(payoutPreview.net_payable)}</span>
                 </div>
               </>

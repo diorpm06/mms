@@ -258,13 +258,19 @@ def referrer_period_payout_preview(
     report = _ten_day_report(db, from_date, to_date)
     row = next((r for r in report.get("referrers_payout", []) if r["referrer_id"] == referrer_id), None)
     if not row:
-        return {"referrer_id": referrer_id, "patient_count": 0, "earned_commission": 0, "advance_deducted": 0, "net_payable": 0}
+        return {"referrer_id": referrer_id, "patient_count": 0, "earned_commission": 0, "advance_deducted": 0, "net_payable": 0, "already_paid": 0}
     return {
         "referrer_id": referrer_id,
         "patient_count": row.get("patient_count", 0),
         "earned_commission": row["earned_commission"],
         "advance_deducted": row["advance_deducted"],
-        "net_payable": row["net_payable"],
+        # net_payable — shu davr uchun UMUMIY hisoblangan summa (hali
+        # hech narsa to'lanmagan bo'lsa). Agar shu davrga tegishli qism
+        # avval (qisman yoki to'liq) to'langan bo'lsa, haqiqiy balans
+        # buni allaqachon hisobga olgan — shuning uchun "hozir haqiqatan
+        # chiqariladigan summa" alohida ko'rsatiladi.
+        "net_payable": row["remaining_payable"],
+        "already_paid": row["already_paid"],
     }
 
 

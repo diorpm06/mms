@@ -1653,6 +1653,21 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     referrers_payout = list(ref_map.values())
     referrers_payout.sort(key=lambda x: x["earned_commission"], reverse=True)
 
+    # Bu davr uchun hisoblangan net_payable — davrga XOS raqam, u ushbu
+    # kishiga umuman qancha to'lov qilinganidan bexabar. Agar shu davr
+    # ichida (yoki undan keyin, "Chiqarish" kech bosilsa) qisman/to'liq
+    # to'lov allaqachon qilingan bo'lsa, buni ko'rsatmasak, "To'lash"
+    # tugmasi yana to'liq summani chiqarib yuboraman deb ko'rinaveradi —
+    # aslida haqiqiy balans (avvalgi to'lovlarni allaqachon hisobga olgan
+    # holda) buncha chiqarmaydi. Shuning uchun har bir qatorga real
+    # balansdan kelib chiqqan "hali beriladigan" va "avval to'langan"
+    # maydonlarini qo'shamiz.
+    from services.finance import sync_referrer_balance as _sync_ref_bal
+    for row in referrers_payout:
+        live_bal = _sync_ref_bal(db, row["referrer_id"])
+        row["remaining_payable"] = min(row["net_payable"], live_bal)
+        row["already_paid"] = max(0, row["net_payable"] - row["remaining_payable"])
+
     # 3. Providers (Doctors) 10-day Payout calculation
     prov_map = {}
     providers = db.query(Provider).filter(Provider.is_active == True).all()
@@ -1867,6 +1882,12 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     providers_payout = list(prov_map.values())
     providers_payout.sort(key=lambda x: x["earned_share"], reverse=True)
 
+    from services.finance import sync_provider_balance as _sync_prov_bal
+    for row in providers_payout:
+        live_bal = _sync_prov_bal(db, row["provider_id"])
+        row["remaining_payable"] = min(row["net_payable"], live_bal)
+        row["already_paid"] = max(0, row["net_payable"] - row["remaining_payable"])
+
     # Konsolidatsiya: bir kishi ham shifokor (Provider), ham yo'naltiruvchi
     # (Referrer) bo'lgan holatlar uchun (Provider.referrer_id orqali
     # bog'langan) — mavjud referrers_payout/providers_payout jadvallariga
@@ -1894,6 +1915,10 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             "provider_net_payable": prov["net_payable"],
             "referrer_net_payable": ref_row["net_payable"],
             "net_payable": prov["net_payable"] + ref_row["net_payable"],
+            "provider_remaining_payable": prov["remaining_payable"],
+            "referrer_remaining_payable": ref_row["remaining_payable"],
+            "remaining_payable": prov["remaining_payable"] + ref_row["remaining_payable"],
+            "already_paid": prov["already_paid"] + ref_row["already_paid"],
         })
     consolidated_payout.sort(key=lambda x: x["total_earned"], reverse=True)
 
@@ -1915,6 +1940,8 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             "provider_net_payable": prov["net_payable"],
             "referrer_net_payable": 0,
             "net_payable": prov["net_payable"],
+            "remaining_payable": prov["remaining_payable"],
+            "already_paid": prov["already_paid"],
             "breakdown": [{**d, "source": "Shifokor (KPI)"} for d in prov.get("daily_departments", [])],
         }
 
@@ -1931,6 +1958,8 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             row["advance_remaining"] += ref["advance_remaining"]
             row["referrer_net_payable"] = ref["net_payable"]
             row["net_payable"] = row["provider_net_payable"] + ref["net_payable"]
+            row["remaining_payable"] = row.get("remaining_payable", 0) + ref["remaining_payable"]
+            row["already_paid"] = row.get("already_paid", 0) + ref["already_paid"]
             row["breakdown"] += [{**d, "source": "Yo'naltiruvchi"} for d in ref.get("daily_departments", [])]
         else:
             key = f"ref_{r_id}"
@@ -1947,6 +1976,8 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "provider_net_payable": 0,
                 "referrer_net_payable": ref["net_payable"],
                 "net_payable": ref["net_payable"],
+                "remaining_payable": ref["remaining_payable"],
+                "already_paid": ref["already_paid"],
                 "breakdown": [{**d, "source": "Yo'naltiruvchi"} for d in ref.get("daily_departments", [])],
             }
 

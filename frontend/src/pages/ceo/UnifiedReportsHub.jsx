@@ -1331,18 +1331,29 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
   // logikasi YOZILMAYDI, faqat ikkita mavjud, sinovdan o'tgan endpoint
   // (/providers/{id}/payout va /referrers/{id}/payout) ketma-ket chaqiriladi.
   const handleConsolidatedPayout = async (row) => {
-    if (!window.confirm(`${row.name} uchun jami ${formatMoney(row.net_payable)} (shifokor + yo'naltiruvchi) to'lansinmi?`)) return
+    // row.remaining_payable — avval shu davr uchun qisman/to'liq
+    // to'langan bo'lsa, buni allaqachon hisobga olgan holda HOZIR
+    // haqiqatan chiqariladigan summa (row.net_payable — bu davr uchun
+    // umumiy hisoblangan summa, avvalgi to'lovlardan bexabar).
+    const toPay = row.remaining_payable ?? row.net_payable
+    if (toPay <= 0) {
+      toast("Bu davr uchun allaqachon to'liq to'langan", 'error')
+      return
+    }
+    if (!window.confirm(`${row.name} uchun ${formatMoney(toPay)} (shifokor + yo'naltiruvchi) to'lansinmi?`)) return
     try {
       // Faqat musbat ulushi bor tomon chaqiriladi — aks holda 0 summali
       // tomon backendda "chiqariladigan balans yo'q" deb xato qaytarib,
       // Promise.all ikkalasini ham bekor qilib qo'yardi.
       let total = 0
-      if (row.provider_net_payable > 0) {
-        const res = await api(`/providers/${row.provider_id}/payout`, { method: 'POST', body: JSON.stringify({ source: 'Naqt kassa', max_amount: row.provider_net_payable }) })
+      const provAmt = row.provider_remaining_payable ?? row.provider_net_payable
+      const refAmt = row.referrer_remaining_payable ?? row.referrer_net_payable
+      if (provAmt > 0) {
+        const res = await api(`/providers/${row.provider_id}/payout`, { method: 'POST', body: JSON.stringify({ source: 'Naqt kassa', max_amount: provAmt, period_start: dateFrom, period_end: dateTo }) })
         total += res?.amount || 0
       }
-      if (row.referrer_net_payable > 0) {
-        const res = await api(`/referrers/${row.referrer_id}/payout`, { method: 'POST', body: JSON.stringify({ source: 'Naqt kassa', max_amount: row.referrer_net_payable }) })
+      if (refAmt > 0) {
+        const res = await api(`/referrers/${row.referrer_id}/payout`, { method: 'POST', body: JSON.stringify({ source: 'Naqt kassa', max_amount: refAmt, period_start: dateFrom, period_end: dateTo }) })
         total += res?.amount || 0
       }
       toast(`To'landi: ${formatMoney(total)}`)
@@ -1389,15 +1400,20 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                     <td className="p-2.5 text-right font-mono" style={{ color: r.advance_remaining > 0 ? '#f87171' : undefined }}>
                       {r.advance_remaining > 0 ? formatMoney(r.advance_remaining) : '—'}
                     </td>
-                    <td className="p-2.5 text-right font-mono text-emerald font-black">{formatMoney(r.net_payable)}</td>
+                    <td className="p-2.5 text-right font-mono text-emerald font-black">
+                      {formatMoney(r.remaining_payable ?? r.net_payable)}
+                      {r.already_paid > 0 && (
+                        <div className="text-[10px] font-bold text-cyan normal-case">to'landi: {formatMoney(r.already_paid)}</div>
+                      )}
+                    </td>
                     <td className="p-2.5 text-center">
                       <button
                         type="button"
                         onClick={() => handleConsolidatedPayout(r)}
                         className="btn-outline py-0.5 px-2 text-[11px] font-bold text-emerald disabled:opacity-40 disabled:cursor-not-allowed"
-                        disabled={r.net_payable <= 0}
+                        disabled={(r.remaining_payable ?? r.net_payable) <= 0}
                       >
-                        To'lash
+                        {(r.remaining_payable ?? r.net_payable) <= 0 ? "To'landi" : "To'lash"}
                       </button>
                     </td>
                   </tr>
@@ -1650,15 +1666,20 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
                     <td className="p-2.5 text-right font-mono" style={{ color: r.advance_remaining > 0 ? '#f87171' : undefined }}>
                       {r.advance_remaining > 0 ? formatMoney(r.advance_remaining) : '—'}
                     </td>
-                    <td className="p-2.5 text-right font-mono text-emerald font-black">{formatMoney(r.net_payable)}</td>
+                    <td className="p-2.5 text-right font-mono text-emerald font-black">
+                      {formatMoney(r.remaining_payable ?? r.net_payable)}
+                      {r.already_paid > 0 && (
+                        <div className="text-[10px] font-bold text-cyan normal-case">to'landi: {formatMoney(r.already_paid)}</div>
+                      )}
+                    </td>
                     <td className="p-2.5 text-center">
                       <button
                         type="button"
                         onClick={() => handleConsolidatedPayout(r)}
                         className="btn-outline py-0.5 px-2 text-[11px] font-bold text-emerald disabled:opacity-40 disabled:cursor-not-allowed"
-                        disabled={r.net_payable <= 0}
+                        disabled={(r.remaining_payable ?? r.net_payable) <= 0}
                       >
-                        To'lash
+                        {(r.remaining_payable ?? r.net_payable) <= 0 ? "To'landi" : "To'lash"}
                       </button>
                     </td>
                   </tr>

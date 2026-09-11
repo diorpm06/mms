@@ -440,13 +440,14 @@ def provider_period_payout_preview(
     report = _ten_day_report(db, from_date, to_date)
     row = next((r for r in report.get("providers_payout", []) if r["provider_id"] == provider_id), None)
     if not row:
-        return {"provider_id": provider_id, "patient_count": 0, "earned_share": 0, "advance_deducted": 0, "net_payable": 0}
+        return {"provider_id": provider_id, "patient_count": 0, "earned_share": 0, "advance_deducted": 0, "net_payable": 0, "already_paid": 0}
     return {
         "provider_id": provider_id,
         "patient_count": row["patient_count"],
         "earned_share": row["earned_share"],
         "advance_deducted": row["advance_deducted"],
-        "net_payable": row["net_payable"],
+        "net_payable": row["remaining_payable"],
+        "already_paid": row["already_paid"],
     }
 
 
