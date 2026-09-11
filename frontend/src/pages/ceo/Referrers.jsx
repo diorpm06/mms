@@ -531,7 +531,7 @@ export default function CeoReferrers() {
           </div>
           <div style="font-size: 11.5px; font-weight: 700; background: #fffbeb; padding: 5px 10px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 12px; border: 1px solid #fde68a; border-radius: 4px;">
             <span>Ishlagan puli: ${formatMoney(earned)}</span>
-            <span style="color:#dc2626;">Olgan avansi: -${formatMoney(adv + (r.advance_remaining || 0))}</span>
+            <span style="color:#dc2626;">Olgan avansi: -${formatMoney(adv)}</span>
             <span style="color:#16a34a; font-weight:900;">Beriladigan summa: ${formatMoney(net)}</span>
           </div>
           <table>
@@ -1372,7 +1372,7 @@ export default function CeoReferrers() {
                 </div>
                 <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '12px', marginBottom: '4px', color: '#dc2626' }}>
                   <span>Olgan Avansi:</span>
-                  <span>-{formatMoney((printModal.referrer.advance_deducted || 0) + (printModal.referrer.advance_remaining || 0))}</span>
+                  <span>-{formatMoney(printModal.referrer.advance_deducted || 0)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '15px', fontWeight: '900', borderTop: '2px solid #000', paddingTop: '6px', marginTop: '6px' }}>
                   <span>SOF TO'LANADIGAN SUMMA:</span>

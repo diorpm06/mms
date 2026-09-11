@@ -851,7 +851,10 @@ def export_referrers_pdf(report: dict) -> bytes:
             # emas). Endi bitta qator — OLINGAN AVANSNING TO'LIQ summasi
             # (bu davrda ushlanganu, keyingi davrga o'tadigan qismi ham) —
             # aniq ko'rsatiladi.
-            ref_summary_rows.append(["Olgan avansi:", f"-{_format_money(r_advance_deducted + r_advance_remaining)}"])
+            if r_advance_deducted > 0:
+                ref_summary_rows.append(["Olgan avansi:", f"-{_format_money(r_advance_deducted)}"])
+            if r_advance_remaining > 0:
+                ref_summary_rows.append(["Qolgan avans qarzi:", f"-{_format_money(r_advance_remaining)}"])
             ref_summary_rows.append(["BERILADIGAN SUMMA:", _format_money(r_net_payable)])
             t_ref_summary = Table(ref_summary_rows, colWidths=[11 * cm, 8.4 * cm])
             t_ref_summary.setStyle(
@@ -1048,16 +1051,7 @@ def export_all_staff_pdf(report: dict) -> bytes:
             inp_lines = [d for d in raw_breakdown if "statsionar" in str(d.get("department_name", "")).lower()]
             other_lines = [d for d in raw_breakdown if "statsionar" not in str(d.get("department_name", "")).lower()]
 
-            if "soxiba" in r_name.lower():
-                grouped_breakdown.append({
-                    "date": "21.08–31.08",
-                    "department_name": "Statsionar xizmatlari",
-                    "source": "Shifokor (KPI)",
-                    "patient_count": "16 kun",
-                    "rate_label": "50 000 so'm/kun",
-                    "earned_fee": 800000,
-                })
-            elif inp_lines:
+            if inp_lines:
                 tot_inp_fee = sum(d.get("earned_fee", 0) for d in inp_lines)
                 grouped_breakdown.append({
                     "date": "21.08–31.08",
@@ -1092,18 +1086,8 @@ def export_all_staff_pdf(report: dict) -> bytes:
                     d.get("rate_label", "—"),
                     _format_money(fee),
                 ])
-            is_soxiba = "soxiba" in r_name.lower()
-            is_ganijon = (r.get("provider_id") == 4) or any(k in r_name.lower() for k in ["ganijon", "g'anijon", "g’anijon"])
-
-            if is_soxiba:
-                tot_e_val = 1191700
-                net_p_val = 1191700
-            elif is_ganijon:
-                tot_e_val = 3190000
-                net_p_val = 2690000
-            else:
-                tot_e_val = r.get("total_earned", b_earned)
-                net_p_val = r.get("net_payable", 0)
+            tot_e_val = r.get("total_earned", b_earned)
+            net_p_val = r.get("net_payable", 0)
 
             table_data.append(["", "JAMI:", "", "", "", "", _format_money(tot_e_val)])
 
@@ -1131,12 +1115,11 @@ def export_all_staff_pdf(report: dict) -> bytes:
 
             adv_ded = r.get("advance_deducted", 0) or 0
             adv_rem = r.get("advance_remaining", 0) or 0
-            adv_tot = 500000 if is_ganijon else (adv_ded + adv_rem)
 
             summary_rows = [["Ishlagan puli:", _format_money(tot_e_val)]]
-            if adv_tot > 0:
-                summary_rows.append(["Olgan avansi:", f"-{_format_money(adv_tot)}"])
-            if adv_rem > 0 and not is_ganijon:
+            if adv_ded > 0:
+                summary_rows.append(["Olgan avansi:", f"-{_format_money(adv_ded)}"])
+            if adv_rem > 0:
                 summary_rows.append(["Qolgan avans qarzi:", f"-{_format_money(adv_rem)}"])
             summary_rows.append(["BERILADIGAN SUMMA:", _format_money(net_p_val)])
 
