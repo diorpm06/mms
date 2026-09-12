@@ -277,7 +277,12 @@ def _split_amounts(total: int, referrer_id: int | None, provider_id: int | None,
     # (klinika, shifokor, yo'naltiruvchi) proportsional ta'sir qiladi.
     provider_basis = None
     if service and discount_amount and discount_amount > 0:
-        is_massage = main_category(service.category).strip().lower() == "massaj"
+        # "Massaj G'anijon", "Massaj (Ozoda)" kabi shifokor nomi bilan
+        # ajratilgan bo'limlar ham massaj hisoblanadi — faqat aniq
+        # "massaj" so'ziga teng bo'lganda emas, "massaj" bilan
+        # boshlangan har qanday bo'lim uchun ham shu qoida ishlashi kerak
+        # edi (aks holda bu himoya hech qachon ishlamas edi).
+        is_massage = main_category(service.category).strip().lower().startswith("massaj")
         if is_massage:
             provider_basis = total + discount_amount
 

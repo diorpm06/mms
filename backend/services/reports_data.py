@@ -25,12 +25,28 @@ def _extract_department_name(s_name: str, s_cat: str, s_cab: str) -> str:
         return "UZI"
     if any(k in combined for k in ["laborat", "labar", "tahlil", "gormon", "ifa", "ekspress", "biokimy", "revmat", "parazit", "elektrolit", "siydik", "torch", "gepatit", "qon"]):
         return "Laboratoriya"
+    if "ekg" in combined or "экг" in combined:
+        return "EKG"
+    # Bochka va Xijoma ilgari "Fizioterapiya" ichida ko'rinmas edi — endi
+    # alohida bo'lim sifatida ajratilgan (2026-09-12).
+    if "bochka" in combined:
+        return "Bochka"
+    if "xijom" in combined or "hijom" in combined:
+        return "Xijoma"
+    if "igloterap" in combined:
+        return "Igloterapiya"
     if "fizioter" in combined:
         return "Fizioterapiya"
     if "ineks" in combined or "ukol" in combined or "sistem" in combined:
         return "Ineksiya"
     if "fototer" in combined:
         return "Fototerapiya"
+    # Massaj ikkita shifokorga tegishli — hisobotda ular alohida
+    # ko'rinishi kerak, umumiy "Massaj" qatoriga qo'shilib ketmasin.
+    if "anijon" in combined:
+        return "Massaj G'anijon"
+    if "ozoda" in combined:
+        return "Massaj (Ozoda)"
     if "massaj" in combined:
         return "Massaj"
     if "ozon" in combined:
@@ -45,6 +61,24 @@ def _extract_department_name(s_name: str, s_cat: str, s_cab: str) -> str:
         dept = raw
 
     return dept or "Boshqa xizmatlar"
+
+
+# Kunlik hisobotda bo'limlar shu tartibda ko'rsatiladi (CEO qo'lda
+# belgilagan, 2026-09-12) — summasi qancha bo'lishidan qat'i nazar.
+# Ro'yxatda yo'q bo'lim (masalan hali katalogga qo'shilmagan yangi
+# xizmat) oxiriga, o'z ichida summasi bo'yicha qo'shiladi.
+KUNLIK_HISOBOT_BOLIM_TARTIBI = [
+    "UZI", "Massaj (Ozoda)", "Laboratoriya", "Ineksiya", "Fototerapiya",
+    "Nevrologiya", "Ozonoterapiya", "Massaj G'anijon", "Fizioterapiya",
+    "EKG", "Statsionar", "Igloterapiya", "Bochka", "Xijoma",
+]
+
+
+def _kunlik_hisobot_tartib_kaliti(dept_name: str, total: int):
+    try:
+        return (0, KUNLIK_HISOBOT_BOLIM_TARTIBI.index(dept_name), 0)
+    except ValueError:
+        return (1, 0, -total)
 
 
 def _infer_service_category(name: str, category: str, cabinet: str) -> str:
@@ -461,7 +495,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
             "total": d_val["total"],
             "services": svc_list,
         })
-    formatted_services.sort(key=lambda x: x["total"], reverse=True)
+    formatted_services.sort(key=lambda x: _kunlik_hisobot_tartib_kaliti(x["department"], x["total"]))
 
     if start == end:
         paper_shift_s = s - QOGOZ_SMENA_OYNASI
@@ -1679,7 +1713,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         gross_total = sum(p.payment_amount for p in pr_patients)
         total_prov_share = 0
         daily_dept_map_pr = {}
-        from services.finance import calculate_financial_split
+        from services.finance import calculate_financial_split, main_category
         for p in pr_patients:
             svc = p.service
             paid = p.payment_amount or 0
@@ -1692,6 +1726,19 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             is_uzi = any(k in c_name for k in ["uzi", "ultratovush", "mashonka"]) if svc else False
             original_price = svc.price if svc else paid
 
+            # `_split_amounts` dagi kabi — massaj xizmatida chegirma
+            # bo'lsa, shifokor ulushi CHEGIRMASIZ asl narxdan hisoblanadi.
+            # Bu yerda alohida, real to'lovdan mustaqil qayta hisoblanadi,
+            # shuning uchun xuddi shu himoya shu yerda ham takrorlanishi
+            # kerak — aks holda hisobot chegirmali bemorlarda kam
+            # ko'rsatib qo'yadi.
+            discount_amount = getattr(p, "discount_amount", 0) or 0
+            provider_basis = None
+            if svc and discount_amount > 0:
+                is_massage = main_category(svc.category).strip().lower().startswith("massaj")
+                if is_massage:
+                    provider_basis = paid + discount_amount
+
             _, prov_amt, _ = calculate_financial_split(
                 total=paid,
                 provider_percentage=pr.percentage or 0,
@@ -1701,6 +1748,7 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 ref_doc_split_sum=ref_doc_split_sum if p.referrer_id else 0,
                 is_uzi=is_uzi,
                 original_price=original_price,
+                provider_basis=provider_basis,
             )
             total_prov_share += prov_amt
 
