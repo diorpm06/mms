@@ -30,6 +30,7 @@ export default function CeoPatients() {
   const [newTicketPatient, setNewTicketPatient] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [referrers, setReferrers] = useState([])
+  const [providers, setProviders] = useState([])
   const [allServices, setAllServices] = useState([])
   const [addServiceId, setAddServiceId] = useState('')
   const [editServiceSearch, setEditServiceSearch] = useState('')
@@ -93,6 +94,10 @@ export default function CeoPatients() {
       const payload = {
         ...edit,
         referrer_id: (edit.referrer_id && Number(edit.referrer_id) > 0) ? Number(edit.referrer_id) : null,
+        provider_id: (edit.provider_id && Number(edit.provider_id) > 0) ? Number(edit.provider_id) : null,
+        birth_date: edit.birth_date || null,
+        discount_amount: Number(edit.discount_amount) || 0,
+        discount_reason: edit.discount_reason || null,
         reason: editReason,
         services: edit.servicesList ? edit.servicesList.map(s => ({
           service_id: s.service_id,
@@ -134,6 +139,11 @@ export default function CeoPatients() {
     setEdit({
       ...p,
       referrer_id: p.referrer_id || '',
+      provider_id: p.provider_id || '',
+      birth_date: p.birth_date || '',
+      payment_type: p.payment_type || 'cash',
+      discount_amount: p.discount_amount || 0,
+      discount_reason: p.discount_reason || '',
       servicesList: (p.services && p.services.length)
         ? p.services.map((s) => ({
             service_id: s.service_id,
@@ -146,11 +156,13 @@ export default function CeoPatients() {
     setEditReason('')
     setAddServiceId('')
     setEditServiceSearch('')
-    // active_only=false: bemorga avval biriktirilgan yo'naltiruvchi keyinchalik
-    // faolsizlantirilgan (o'chirilgan) bo'lsa ham, dropdown'da ko'rinishi
-    // kerak — aks holda tanlov ro'yxatida yo'q bo'lib, forma "Yo'naltiruvchi
-    // yo'q" deb bo'sh ko'rsatib qolardi, garchi haqiqatda biriktirilgan bo'lsa ham.
+    // active_only=false: bemorga avval biriktirilgan yo'naltiruvchi/shifokor
+    // keyinchalik faolsizlantirilgan (o'chirilgan) bo'lsa ham, dropdown'da
+    // ko'rinishi kerak — aks holda tanlov ro'yxatida yo'q bo'lib, forma
+    // "yo'q" deb bo'sh ko'rsatib qolardi, garchi haqiqatda biriktirilgan
+    // bo'lsa ham.
     if (!referrers.length) api('/referrers?active_only=false').then(setReferrers).catch(() => {})
+    if (!providers.length) api('/providers?active_only=false').then(setProviders).catch(() => {})
     if (!allServices.length) api('/services').then(setAllServices).catch(() => {})
   }
 
@@ -806,10 +818,71 @@ export default function CeoPatients() {
               <input className="input-field text-xs font-bold font-mono" value={edit.phone}
                 onChange={(e) => setEdit({ ...edit, phone: e.target.value })} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-muted block mb-1">Manzil</label>
+                <input className="input-field text-xs font-bold" value={edit.address}
+                  onChange={(e) => setEdit({ ...edit, address: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-muted block mb-1">Tug'ilgan sana</label>
+                <input type="date" className="input-field text-xs font-bold" value={edit.birth_date || ''}
+                  onChange={(e) => setEdit({ ...edit, birth_date: e.target.value })} />
+              </div>
+            </div>
+
             <div>
-              <label className="text-xs font-bold text-muted block mb-1">Manzil</label>
-              <input className="input-field text-xs font-bold" value={edit.address}
-                onChange={(e) => setEdit({ ...edit, address: e.target.value })} />
+              <label className="text-xs font-bold text-muted block mb-1">Shifokor</label>
+              <select
+                className="input-field text-xs font-bold"
+                value={edit.provider_id || ''}
+                onChange={(e) => setEdit({ ...edit, provider_id: e.target.value })}
+              >
+                <option value="">— Shifokor yo'q</option>
+                {providers.map((pr) => (
+                  <option key={pr.id} value={pr.id}>{pr.full_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-muted block mb-1">To'lov turi</label>
+              <div className="grid grid-cols-5 gap-1.5">
+                {[
+                  { id: 'cash', label: '💵 Naqd' },
+                  { id: 'card', label: '💳 Karta' },
+                  { id: 'click', label: '📱 Click' },
+                  { id: 'qr', label: '🔳 QR' },
+                  { id: 'later', label: '⏳ Nasiya' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setEdit({ ...edit, payment_type: opt.id })}
+                    className={`px-1.5 py-1.5 rounded-xl text-[10px] font-bold border transition-all ${
+                      edit.payment_type === opt.id
+                        ? 'bg-gold/20 border-gold/60 text-gold'
+                        : 'bg-surface-2 border-border text-muted hover:text-body'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-muted block mb-1">Chegirma (so'm)</label>
+                <input type="number" min={0} className="input-field text-xs font-bold font-mono"
+                  value={edit.discount_amount || 0}
+                  onChange={(e) => setEdit({ ...edit, discount_amount: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-muted block mb-1">Chegirma sababi</label>
+                <input className="input-field text-xs font-bold" value={edit.discount_reason || ''}
+                  onChange={(e) => setEdit({ ...edit, discount_reason: e.target.value })} />
+              </div>
             </div>
 
             {/* XIZMATLARNI TAHRIRLASH BO'LIMI */}

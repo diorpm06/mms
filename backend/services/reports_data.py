@@ -1380,9 +1380,23 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     # to'langani asl avans summasidan ayirilib, "shu davr boshida qolgan
     # qarz" hisoblanadi — xuddi umrbod balans formulasi kabi, faqat davr
     # chegarasida.
-    original_advance_map = defaultdict(int)
+    # Avanslar DAVR BOSHLANISHIDAN OLDIN mavjud bo'lganlar va DAVR ICHIDA
+    # (yoki undan keyin, hisobot kech ochilsa) yangi berilganlar ALOHIDA
+    # hisoblanadi. Sabab: pastdagi `earned_before_map` shu davr boshlanishiga
+    # QADAR ishlagan pulni ko'rsatadi — bu faqat O'SHA PAYTDA ALLAQACHON
+    # MAVJUD bo'lgan qarzni "yopishi" mumkin edi. Agar buni farqlamasak,
+    # masalan davr O'RTASIDA (masalan 14-sanada) yangi berilgan avans ham
+    # xuddi u doim bor edi-yu, davr boshlanishidan oldingi ishlagan pul bilan
+    # allaqachon "to'lab qo'yilgandek" hisoblanib qolardi — garchi u paytda
+    # bu avans hali berilmagan bo'lsa ham.
+    original_advance_before_map = defaultdict(int)
+    original_advance_during_map = defaultdict(int)
     for a in db.query(ProviderAdvance).filter(ProviderAdvance.is_cancelled == False).all():
-        original_advance_map[(a.recipient_type, a.recipient_id)] += int(a.amount or 0)
+        key = (a.recipient_type, a.recipient_id)
+        if a.created_at and a.created_at >= s and a.created_at <= e:
+            original_advance_during_map[key] += int(a.amount or 0)
+        else:
+            original_advance_before_map[key] += int(a.amount or 0)
 
     earned_before_map = defaultdict(int)
     for rid, amt in (
@@ -1410,9 +1424,12 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
         paid_before_map[(rtype, rid)] += int(amt or 0)
 
     advance_remaining_map = defaultdict(int)
-    for key, original in original_advance_map.items():
-        debt_at_start = original + paid_before_map.get(key, 0) - earned_before_map.get(key, 0)
-        advance_remaining_map[key] = max(0, debt_at_start)
+    all_advance_keys = set(original_advance_before_map) | set(original_advance_during_map)
+    for key in all_advance_keys:
+        before = original_advance_before_map.get(key, 0)
+        during = original_advance_during_map.get(key, 0)
+        debt_at_start = max(0, before + paid_before_map.get(key, 0) - earned_before_map.get(key, 0))
+        advance_remaining_map[key] = debt_at_start + during
 
     # 1. Detailed Service Breakdown with Commissions
     from sqlalchemy.orm import joinedload
