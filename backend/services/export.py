@@ -1,5 +1,5 @@
 import io
-from datetime import date
+from datetime import date, datetime
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -1023,15 +1023,65 @@ def export_all_staff_pdf(report: dict) -> bytes:
             other_lines = [d for d in raw_breakdown if "statsionar" not in str(d.get("department_name", "")).lower()]
 
             if inp_lines:
-                tot_inp_fee = sum(d.get("earned_fee", 0) for d in inp_lines)
-                grouped_breakdown.append({
-                    "date": "21.08–31.08",
-                    "department_name": "Statsionar xizmatlari",
-                    "source": "Shifokor (KPI)",
-                    "patient_count": f"{len(inp_lines)} kun",
-                    "rate_label": "50 000 so'm/kun",
-                    "earned_fee": tot_inp_fee,
-                })
+                # DIQQAT: bu yerda ilgari sana ("21.08-31.08") va stavka
+                # ("50 000 so'm/kun") QATTIQ YOZILGAN edi — haqiqiy davr yoki
+                # kunlik haq qanday bo'lishidan qat'i nazar doim aynan shu
+                # matn chiqardi.
+                #
+                # Bundan tashqari, statsionar bemorga ko'rsatilgan QO'SHIMCHA
+                # xizmatlar (masalan alohida protsedura) ham xuddi shu
+                # "Statsionar xizmatlari" nomi bilan qo'shilib kelishi mumkin
+                # — bular kunlik qatnashish haqidan (odatda barqaror, bir xil
+                # summali) FARQ QILADI. Ikkalasini bitta "X kun / Y so'm/kun"
+                # qatoriga qo'shib yuborsak, o'rtacha noto'g'ri (haqiqiy
+                # kunlik stavkaga mos kelmaydigan) chiqib qolardi. Shuning
+                # uchun eng ko'p uchraydigan summa (kunlik stavka) alohida
+                # guruhlanadi, undan farq qiladigan qo'shimcha xizmatlar esa
+                # o'z sanasi va haqiqiy summasi bilan alohida qator bo'lib
+                # ko'rsatiladi.
+                from collections import Counter
+                amounts = [d.get("earned_fee", 0) for d in inp_lines]
+                amount_counts = Counter(amounts)
+                # Eng ko'p takrorlangan summa — bu kunlik qatnashish stavkasi
+                # deb qaraladi (ikkitadan kam bo'lsa, guruhlashning ma'nosi
+                # yo'q — hammasi alohida ko'rsatiladi).
+                stavka, stavka_soni = amount_counts.most_common(1)[0]
+                if stavka_soni >= 2:
+                    kunlik_lines = [d for d in inp_lines if d.get("earned_fee", 0) == stavka]
+                    qoshimcha_lines = [d for d in inp_lines if d.get("earned_fee", 0) != stavka]
+                else:
+                    kunlik_lines = []
+                    qoshimcha_lines = inp_lines
+
+                if kunlik_lines:
+                    inp_dates = []
+                    for d in kunlik_lines:
+                        try:
+                            inp_dates.append(datetime.strptime(d.get("date", ""), "%d.%m.%Y"))
+                        except (ValueError, TypeError):
+                            pass
+                    date_range = (
+                        f"{min(inp_dates).strftime('%d.%m')}–{max(inp_dates).strftime('%d.%m')}"
+                        if inp_dates else "—"
+                    )
+                    kun_soni = len(kunlik_lines)
+                    grouped_breakdown.append({
+                        "date": date_range,
+                        "department_name": "Statsionar xizmatlari",
+                        "source": "Shifokor (KPI)",
+                        "patient_count": f"{kun_soni} kun",
+                        "rate_label": f"{stavka:,} so'm/kun".replace(",", " "),
+                        "earned_fee": stavka * kun_soni,
+                    })
+                for d in qoshimcha_lines:
+                    grouped_breakdown.append({
+                        "date": d.get("date", "—"),
+                        "department_name": "Statsionar xizmatlari (qo'shimcha)",
+                        "source": "Shifokor (KPI)",
+                        "patient_count": "1 nafar",
+                        "rate_label": "—",
+                        "earned_fee": d.get("earned_fee", 0),
+                    })
             grouped_breakdown.extend(other_lines)
 
             table_data = [[
