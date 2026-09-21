@@ -395,6 +395,7 @@ class ProviderAdvanceCreate(BaseModel):
     recipient_id: int
     amount: int = Field(gt=0)
     note: Optional[str] = None
+    source: Optional[str] = None  # Naqt kassa | Karta kassa | Bank hisob | Boshqa
 
 
 class ProviderAdvanceOut(BaseModel):

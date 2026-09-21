@@ -63,10 +63,33 @@ def list_advances(
 def create_advance(
     data: ProviderAdvanceCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_admin_or_ceo),
+    # Faqat rahbar: shifokor/yo'naltiruvchiga avans berish klinikadan pul
+    # chiqishi. Admin panelida bu tugma endi yo'q, lekin API ochiq
+    # turmasligi uchun bu yerda ham qat'iy cheklandi (xuddi payout
+    # endpointidagi kabi).
+    user: User = Depends(require_ceo),
 ):
     if data.recipient_type not in ("provider", "referrer"):
         raise HTTPException(status_code=400, detail="Recipient type 'provider' yoki 'referrer' bo'lishi kerak")
+
+    source_label = data.source or "Umumiy balans"
+    if source_label not in ("Bugungi kassa", "Umumiy balans"):
+        raise HTTPException(status_code=400, detail="Manba 'Bugungi kassa' yoki 'Umumiy balans' bo'lishi kerak")
+
+    # "Bugungi kassa" tanlansa — bugungi kassada haqiqatan shuncha naqd pul
+    # bor-yo'qligi tekshiriladi (kunlik hisobotdagi "Kassada qolgan naqd"
+    # bilan bir xil hisob-kitob). "Umumiy balans" tanlansa, umumiy
+    # (umrbod) balansdan olinadi — buni pastdagi process_advance allaqachon
+    # tekshiradi.
+    if source_label == "Bugungi kassa":
+        from services.reports_data import get_report
+        bugun = datetime.now().date()
+        bugungi_hisobot = get_report(db, bugun, bugun)
+        if bugungi_hisobot.get("net_cash", 0) < data.amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Bugungi kassada yetarli naqd pul yo'q (bor: {bugungi_hisobot.get('net_cash', 0):,} so'm)".replace(",", " "),
+            )
 
     name = "Noma'lum"
     if data.recipient_type == "provider":
@@ -104,7 +127,7 @@ def create_advance(
     # expense_id orqali avansga bog'lanadi — bekor qilinganda ikkalasi
     # birga (lekin kassaga faqat BIR marta tegib) bekor qilinadi.
     exp = Expense(
-        description=f"[MANBA: Naqt kassa] {desc}",
+        description=f"[MANBA: {source_label}] {desc}",
         amount=data.amount,
         created_by=user.id,
         category="Avans",

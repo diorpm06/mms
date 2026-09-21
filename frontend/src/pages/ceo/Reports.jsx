@@ -351,45 +351,11 @@ export default function CeoReports() {
               </div>
             </div>
 
-            {/* Shifokorlar KPI Ulushlari (10 kunlik / Davriy) */}
-            <div className="card">
-              <h3 className="accent-value mb-1 font-bold text-sm uppercase tracking-wide">
-                👨‍⚕️ Shifokorlar KPI Ulushlari (10 kunlik / Davriy)
-              </h3>
-              <p className="text-muted text-[11px] mb-3">Har 10 kunda shifokorlarga to'lanadigan KPI va ko'rsatilgan xizmatlar ulushi</p>
-              {(report.providers_breakdown || []).length === 0 ? (
-                <p className="text-muted text-sm italic py-2">KPI ma'lumoti yo'q</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-border text-gold font-bold text-left bg-surface-2">
-                        <th className="p-2">#</th>
-                        <th className="p-2">Shifokor</th>
-                        <th className="p-2">Mutaxassisligi</th>
-                        <th className="p-2 text-center">Bemorlar</th>
-                        <th className="p-2 text-right">KPI Ulush</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border font-semibold">
-                      {report.providers_breakdown.map((p, i) => (
-                        <tr key={i} className="hover:bg-surface-hover">
-                          <td className="p-2 text-muted font-mono">#{i + 1}</td>
-                          <td className="p-2 text-body font-bold">{p.name}</td>
-                          <td className="p-2 text-muted">{p.specialization}</td>
-                          <td className="p-2 text-center">
-                            <span className="badge badge-info">{p.count} ta</span>
-                          </td>
-                          <td className="p-2 text-right font-mono font-bold text-emerald">
-                            {formatMoney(p.total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            {/* "Shifokorlar KPI Ulushlari" bo'limi bu yerdan olib tashlandi —
+                u statsionar daromadini hisobga olmagani uchun 10-kunlik
+                asosiy hisobotdagi (tekshirilgan, to'g'irlangan) raqamlar
+                bilan mos kelmasdi. To'g'ri ma'lumot endi faqat 10-kunlik
+                hisobot sahifasida (UnifiedReportsHub) ko'rsatiladi. */}
 
             {/* Yotganlar */}
             <div className="card">

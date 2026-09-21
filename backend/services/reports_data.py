@@ -321,7 +321,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
     # karta/karta-emas kassaga tushadi.
     for x in expenses:
         desc = x.description or ""
-        if "[MANBA: Naqt kassa]" in desc or "[MANBA:" not in desc:
+        if "[MANBA: Naqt kassa]" in desc or "[MANBA: Bugungi kassa]" in desc or "[MANBA:" not in desc:
             cash_expenses += x.amount
         else:
             card_expenses += x.amount
@@ -373,13 +373,26 @@ def get_report(db: Session, start: date, end: date) -> dict:
     from models.inpatient_tariff import InpatientItem
 
     # 1. Ambulator xizmatlar
-    amb_svcs = (
+    #
+    # DIQQAT: ilgari PatientService.total_price to'g'ridan-to'g'ri
+    # SQL'da yig'ilardi — bu chegirmasiz (asl) narx, chegirma esa faqat
+    # Patient.discount_amount'da, bemor darajasida saqlanadi. Natijada
+    # har bir xizmat qatori chegirmasiz (kattaroq) summa ko'rsatardi,
+    # "Jami daromad" esa (Patient.payment_amount yig'indisidan) chegirma
+    # bilan (kichikroq) chiqardi — qatorlarni qo'shsa umumiydan ko'proq
+    # chiqib, mos kelmasdi. Endi har bir bemorning chegirmasi o'sha
+    # bemorning xizmat qatorlari orasida narx ulushiga qarab bo'linib,
+    # har bir xizmat NET (chegirmadan keyingi) summa bilan hisoblanadi —
+    # xuddi bemor ro'yxatga olinganda ishlatiladigan qoida kabi.
+    amb_rows = (
         db.query(
             Service.name,
             Service.category,
             Service.cabinet,
-            func.sum(PatientService.quantity).label("cnt"),
-            func.sum(PatientService.total_price).label("total"),
+            PatientService.patient_id,
+            PatientService.quantity,
+            PatientService.total_price,
+            Patient.discount_amount,
         )
         .join(PatientService, PatientService.service_id == Service.id)
         .join(Patient, Patient.id == PatientService.patient_id)
@@ -389,9 +402,43 @@ def get_report(db: Session, start: date, end: date) -> dict:
             or_(Patient.is_paper_entry == False, Patient.is_paper_entry.is_(None)),
             Patient.is_cancelled == False,
         )
-        .group_by(Service.id, Service.name, Service.category, Service.cabinet)
         .all()
     )
+
+    # Bemorlarni guruhlab, har birining chegirmasini xizmat qatorlari
+    # o'rtasida narx ulushiga qarab bo'lib chiqamiz (qoldiq — yaxlitlash
+    # farqi — shu bemorning OXIRGI qatoriga qo'shiladi, shunda yig'indi
+    # aynan Patient.discount_amount bilan teng chiqadi).
+    _by_patient: dict[int, list] = {}
+    for _r in amb_rows:
+        _by_patient.setdefault(_r.patient_id, []).append(_r)
+
+    _amb_agg: dict[tuple, dict] = {}
+    for _pid, _lines in _by_patient.items():
+        raw_total = sum(int(x.total_price or 0) for x in _lines)
+        discount = int(_lines[0].discount_amount or 0)
+        allocated_so_far = 0
+        for i, _r in enumerate(_lines):
+            raw_line = int(_r.total_price or 0)
+            if discount > 0 and raw_total > 0:
+                if i == len(_lines) - 1:
+                    line_discount = discount - allocated_so_far
+                else:
+                    line_discount = raw_line * discount // raw_total
+                    allocated_so_far += line_discount
+                net_line = max(0, raw_line - line_discount)
+            else:
+                net_line = raw_line
+            key = (_r.name, _r.category, _r.cabinet)
+            if key not in _amb_agg:
+                _amb_agg[key] = {"cnt": 0, "total": 0}
+            _amb_agg[key]["cnt"] += int(_r.quantity or 0)
+            _amb_agg[key]["total"] += net_line
+
+    amb_svcs = [
+        (name, category, cabinet, agg["cnt"], agg["total"])
+        for (name, category, cabinet), agg in _amb_agg.items()
+    ]
 
     # 2. Statsionar qo'shimcha xizmatlar va materiallar
     inp_svcs = (
@@ -546,14 +593,21 @@ def get_report(db: Session, start: date, end: date) -> dict:
     from models.provider import Provider
 
     # Providers breakdown: All active transactions in the date range
+    #
+    # DIQQAT: ilgari shifokorning ulushi 0 (yoki NULL) bo'lsa, o'sha 0
+    # o'rniga bemor to'lagan TO'LIQ summa (Transaction.total_amount)
+    # ko'rsatilar edi — go'yo shifokor haqiqatda 0% ulushga ega bo'lsa ham
+    # (masalan oylik maoshli Dr.Yulduz) yoki bu "Ineksiya"/"Ozonaterapiya"
+    # kabi haqiqiy shifokor bo'lmagan kabinet-yozuvi bo'lsa ham, ularning
+    # "KPI ulushi" sifatida kunlik JAMI TUSHUM chiqib qolardi — bu haqiqiy
+    # to'lanadigan summa bilan hech qanday aloqasi yo'q, chalkashtiruvchi
+    # raqam edi. Endi haqiqiy provider_amount ko'rsatiladi (0 bo'lsa — 0).
     providers_query = (
         db.query(
             Provider.full_name,
             Provider.specialization,
             func.count(Transaction.id).label("cnt"),
-            func.sum(
-                case((Transaction.provider_amount > 0, Transaction.provider_amount), else_=Transaction.total_amount)
-            ).label("total"),
+            func.sum(Transaction.provider_amount).label("total"),
         )
         .join(Transaction, Transaction.provider_id == Provider.id)
         .filter(
@@ -562,11 +616,7 @@ def get_report(db: Session, start: date, end: date) -> dict:
             Transaction.is_cancelled == False,
         )
         .group_by(Provider.id, Provider.full_name, Provider.specialization)
-        .order_by(
-            func.sum(
-                case((Transaction.provider_amount > 0, Transaction.provider_amount), else_=Transaction.total_amount)
-            ).desc()
-        )
+        .order_by(func.sum(Transaction.provider_amount).desc())
         .all()
     )
     providers_breakdown = providers_query
@@ -1059,6 +1109,7 @@ def admin_dashboard_summary(db: Session, d: date, shift_only: bool = False) -> d
     # yozilmagan eski yozuvlar) naqd hisoblanadi (reports_data.py
     # yuqorisidagi bir xil izoh).
     naqddan = (Expense.description.contains("[MANBA: Naqt kassa]")
+               | Expense.description.contains("[MANBA: Bugungi kassa]")
                | ~Expense.description.contains("[MANBA:"))
     xar = (
         db.query(
@@ -1317,14 +1368,51 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     s, e = _period_range(start, end)
     base_report = get_report(db, start, end)
 
-    # Har bir referrer/provider uchun alohida so'rov o'rniga — bitta so'rovda
-    # barcha yopilmagan avanslarni olib, xotirada guruhlaymiz
+    # DIQQAT: avvalgi versiya `ProviderAdvance.remaining`ni to'g'ridan-to'g'ri
+    # ishlatardi — lekin bu maydon FAQAT qo'lda "to'liq yopish" amalida
+    # nolga tushadi, davr o'tishi bilan o'zi kamaymaydi (sync_referrer_balance
+    # dagi izohga qarang). Natijada har bir 10-kunlik hisobot avansni doim
+    # ASL summasidan hisoblab qolardi — masalan odam 1-10 kunlikda avansining
+    # bir qismini "ishlab yopgan" bo'lsa ham, 11-20 kunlikda xuddi hech narsa
+    # to'lanmagandek yana to'liq summadan boshlanardi, garchi haqiqiy umrbod
+    # balansi (sync_referrer_balance/sync_provider_balance) buni to'g'ri
+    # hisoblasa ham. Endi shu davr BOSHLANISHIGA qadar qancha ishlab, qancha
+    # to'langani asl avans summasidan ayirilib, "shu davr boshida qolgan
+    # qarz" hisoblanadi — xuddi umrbod balans formulasi kabi, faqat davr
+    # chegarasida.
+    original_advance_map = defaultdict(int)
+    for a in db.query(ProviderAdvance).filter(ProviderAdvance.is_cancelled == False).all():
+        original_advance_map[(a.recipient_type, a.recipient_id)] += int(a.amount or 0)
+
+    earned_before_map = defaultdict(int)
+    for rid, amt in (
+        db.query(Transaction.referrer_id, func.coalesce(func.sum(Transaction.referrer_amount), 0))
+        .filter(Transaction.referrer_id.isnot(None), Transaction.created_at < s, Transaction.is_cancelled == False)
+        .group_by(Transaction.referrer_id)
+        .all()
+    ):
+        earned_before_map[("referrer", rid)] += int(amt or 0)
+    for pid, amt in (
+        db.query(Transaction.provider_id, func.coalesce(func.sum(Transaction.provider_amount), 0))
+        .filter(Transaction.provider_id.isnot(None), Transaction.created_at < s, Transaction.is_cancelled == False)
+        .group_by(Transaction.provider_id)
+        .all()
+    ):
+        earned_before_map[("provider", pid)] += int(amt or 0)
+
+    paid_before_map = defaultdict(int)
+    for rtype, rid, amt in (
+        db.query(Payout.recipient_type, Payout.recipient_id, func.coalesce(func.sum(Payout.amount), 0))
+        .filter(Payout.created_at < s)
+        .group_by(Payout.recipient_type, Payout.recipient_id)
+        .all()
+    ):
+        paid_before_map[(rtype, rid)] += int(amt or 0)
+
     advance_remaining_map = defaultdict(int)
-    for a in db.query(ProviderAdvance).filter(
-        ProviderAdvance.is_settled == False,
-        ProviderAdvance.is_cancelled == False,
-    ).all():
-        advance_remaining_map[(a.recipient_type, a.recipient_id)] += a.remaining
+    for key, original in original_advance_map.items():
+        debt_at_start = original + paid_before_map.get(key, 0) - earned_before_map.get(key, 0)
+        advance_remaining_map[key] = max(0, debt_at_start)
 
     # 1. Detailed Service Breakdown with Commissions
     from sqlalchemy.orm import joinedload

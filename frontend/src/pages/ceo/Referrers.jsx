@@ -12,6 +12,10 @@ import EarningsDailyModal from '../../components/EarningsDailyModal'
 import ReferrerProfileModal from '../../components/ReferrerProfileModal'
 
 const SOURCES = ['Naqt kassa', 'Karta kassa', 'Bank hisob', 'Boshqa']
+// Avans berishda faqat shu ikkisidan biri tanlanadi: "Bugungi kassa"
+// bo'lsa bugungi naqd yetarli-yo'qligi tekshiriladi, "Umumiy balans"
+// bo'lsa umumiy (umrbod) balansdan olinadi.
+const ADVANCE_SOURCES = ['Bugungi kassa', 'Umumiy balans']
 
 export default function CeoReferrers() {
   const [activeTab, setActiveTab] = useState('catalog') // 'catalog' | '10day' | 'commission'
@@ -43,6 +47,7 @@ export default function CeoReferrers() {
 
   // Advance Modal
   const [advanceModal, setAdvanceModal] = useState(false)
+  const [advanceSource, setAdvanceSource] = useState('Umumiy balans')
   const [selectedRefForAdvance, setSelectedRefForAdvance] = useState(null)
   const [advanceAmount, setAdvanceAmount] = useState('1000000')
   const [savingAdvance, setSavingAdvance] = useState(false)
@@ -312,6 +317,7 @@ export default function CeoReferrers() {
           recipient_id: selectedRefForAdvance.id,
           amount: Number(advanceAmount),
           note: "Oldindan avans berildi",
+          source: advanceSource,
         }),
       })
       toast(`${selectedRefForAdvance.full_name} ga ${formatMoney(Number(advanceAmount))} avans berildi ✓`)
@@ -1283,6 +1289,12 @@ export default function CeoReferrers() {
             <p className="text-[11px] text-muted mt-1">
               💡 Ushbu summa 10-kunlik foiz to'lovida avtomatik chegirib qolinadi.
             </p>
+          </div>
+          <div>
+            <label className="form-label">Manba</label>
+            <select className="input-field text-sm" value={advanceSource} onChange={(e) => setAdvanceSource(e.target.value)}>
+              {ADVANCE_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
           <div className="flex gap-2 pt-2">
             <Btn variant="ghost" full icon={Icons.x} onClick={() => setAdvanceModal(false)}>

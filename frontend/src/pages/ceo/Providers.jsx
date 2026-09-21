@@ -13,6 +13,10 @@ import ActionMenu from '../../components/ActionMenu'
 import EarningsDailyModal from '../../components/EarningsDailyModal'
 
 const SOURCES = ['Naqt kassa', 'Karta kassa', 'Bank hisob', 'Boshqa']
+// Avans berishda faqat shu ikkisidan biri tanlanadi: "Bugungi kassa"
+// bo'lsa bugungi naqd yetarli-yo'qligi tekshiriladi, "Umumiy balans"
+// bo'lsa umumiy (umrbod) balansdan olinadi.
+const ADVANCE_SOURCES = ['Bugungi kassa', 'Umumiy balans']
 const STATSIONAR_STANDART = 50000
 const emptyForm = {
   full_name: '', specialization: '', phone: '+998', percentage: '', fixed_salary: '',
@@ -210,6 +214,7 @@ export default function CeoProviders() {
   const [advanceModal, setAdvanceModal] = useState(false)
   const [selectedProviderForAdvance, setSelectedProviderForAdvance] = useState(null)
   const [advanceAmount, setAdvanceAmount] = useState('1000000')
+  const [advanceSource, setAdvanceSource] = useState('Umumiy balans')
   const [savingAdvance, setSavingAdvance] = useState(false)
   const toast = useToastStore((s) => s.add)
 
@@ -224,6 +229,7 @@ export default function CeoProviders() {
           recipient_id: selectedProviderForAdvance.id,
           amount: Number(advanceAmount),
           note: "Oldindan avans berildi",
+          source: advanceSource,
         }),
       })
       toast(`${selectedProviderForAdvance.full_name} ga ${formatMoney(Number(advanceAmount))} avans berildi ✓`)
@@ -1151,6 +1157,12 @@ export default function CeoProviders() {
               value={advanceAmount}
               onChange={(e) => setAdvanceAmount(e.target.value)}
             />
+          </div>
+          <div>
+            <label className="form-label font-bold">Manba</label>
+            <select className="input-field text-sm" value={advanceSource} onChange={(e) => setAdvanceSource(e.target.value)}>
+              {ADVANCE_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
           <div className="flex gap-2 pt-2">
             <Btn variant="ghost" full icon={Icons.x} onClick={() => setAdvanceModal(false)}>Bekor</Btn>

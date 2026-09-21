@@ -210,9 +210,14 @@ export default function AdminExpenses() {
 
             <select className="input-field font-semibold" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
               <option value="">— Xodim yoki shifokorni tanlang —</option>
-              {employees.map((e) => (
-                <option key={e.value} value={e.value}>{e.label}</option>
-              ))}
+              {/* Shifokor/yo'naltiruvchiga AVANS berish faqat CEO panelida
+                  (u yerda "Manba" ham so'raladi) — bu yerda faqat oddiy
+                  xodimlarga avans berilsin. */}
+              {employees
+                .filter((e) => category !== 'Avans' || e.type !== 'provider')
+                .map((e) => (
+                  <option key={e.value} value={e.value}>{e.label}</option>
+                ))}
             </select>
           </div>
         )}
