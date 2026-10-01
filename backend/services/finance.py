@@ -889,16 +889,24 @@ def process_inpatient_payment(
             if it_amt <= 0:
                 continue
 
-            # Statsionar bemorga biriktirilgan shifokor (inpatient.doctor_id)
-            # bo'lsa — qo'shimcha xizmat ulushi ENG AVVALO shu shifokorga
-            # tegishli bo'lishi kerak. Ilgari bu yerda har doim `None`
-            # uzatilardi, ya'ni biriktirilgan shifokor umuman hisobga
-            # olinmasdi — pastdagi "mutaxassislik bo'yicha BIRINCHI faol
-            # shifokor" gipotetik qidiruvi bir nechta bir xil mutaxassislik
-            # egalari orasida tasodifiy notog'ri kishiga pul yozib qo'yishi
-            # mumkin edi (masalan ikkita UZI shifokoridan doim faqat biriga).
+            # DIQQAT (2026-10-01, egasi bilan tasdiqlangan): statsionarga
+            # biriktirilgan shifokor (inpatient.doctor_id) FAQAT kunlik
+            # qatnashish haqini (InpatientProviderAccrual) oladi — u
+            # yotgan bemoriga qo'shilgan har qanday qo'shimcha xizmat/
+            # dori-darmon (tahlil, igna, ozon va h.k.) uchun HECH QANDAY
+            # ulush olmasligi kerak, garchi shu shifokorning shaxsiy
+            # ambulator ulush foizi (masalan 100%) baland bo'lsa ham.
+            # Ilgari bu yerda `inpatient.doctor_id` uzatilib, biriktirilgan
+            # shifokorning shaxsiy foizi (Dr.Soxiba uchun 100%) har qanday
+            # lab tahlil/dori narxiga bexato qo'llanib, uning haqiqiy
+            # ishi bilan bog'liq bo'lmagan pulni ham unga yozib qo'yardi.
+            # Endi `None` uzatiladi — pastdagi mutaxassislik bo'yicha
+            # qidiruv orqali, agar HAQIQATDA shu sohaning o'z shifokori
+            # bo'lsa, faqat o'shangagina (masalan UZI/Ozon/Laboratoriya
+            # mutaxassisiga) tegishli bo'ladi, aks holda to'liq markazga
+            # ketadi.
             prov, ref, r_amt, p_amt, c_amt_calc = _split_amounts(
-                it_amt, inpatient.referrer_id, inpatient.doctor_id, db, service_id=it.service_id
+                it_amt, inpatient.referrer_id, None, db, service_id=it.service_id
             )
 
             # Faqat biriktirilgan shifokor bo'lmagan holatlar uchun zaxira:
