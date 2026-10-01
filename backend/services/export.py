@@ -1259,11 +1259,21 @@ def _group_staff_inpatient_breakdown(raw_breakdown: list) -> list[dict]:
                 if inp_dates else "—"
             )
             kun_soni = len(kunlik_lines)
+            # Bir kunda bir nechta bemor yotgan bo'lishi mumkin (masalan
+            # 3 ta bemor x 50 000 = 150 000/kun) — shuning uchun "X kun"
+            # emas, "bemor-kun" (har bir bemorning har bir kuni) summasi
+            # stavkaga ko'paytirilganda jamiga mos kelishi kerak. Faqat
+            # "X kun" deb yozib qo'ysak, bitta bemorga qarab hisoblangandek
+            # ko'rinib, summa bilan mos kelmay qoladi (masalan "12 kun x
+            # 50 000" = 600 000 deb o'ylanadi, aslida bir nechta bemor
+            # ustma-ust yotgani uchun 1 000 000 chiqadi).
+            bemor_kun = sum((d.get("patient_count") or 1) for d in kunlik_lines)
+            patient_label = f"{kun_soni} kun" if bemor_kun == kun_soni else f"{bemor_kun} bemor-kun ({kun_soni} kun)"
             grouped.append({
                 "date": date_range,
                 "department_name": "Statsionar xizmatlari",
                 "source": "Shifokor (KPI)",
-                "patient_count": f"{kun_soni} kun",
+                "patient_count": patient_label,
                 "rate_label": f"{stavka:,} so'm/kun".replace(",", " "),
                 "earned_fee": sum(d.get("earned_fee", 0) for d in kunlik_lines),
             })
