@@ -923,6 +923,7 @@ export default function CeoInpatients() {
                 <th className="p-3">Ism-Sharifi</th>
                 <th className="p-3">Palata</th>
                 <th className="p-3">Tarif</th>
+                <th className="p-3">Shifokor</th>
                 <th className="p-3">Chiqqan sana</th>
                 <th className="p-3">Jami Hisob</th>
                 <th className="p-3 text-right">Amallar</th>
@@ -934,6 +935,12 @@ export default function CeoInpatients() {
                   <td className="p-3 font-medium">{i.first_name} {i.last_name}</td>
                   <td className="p-3 font-mono text-muted">{i.room_number}/{i.bed_number}</td>
                   <td className="p-3 text-xs text-muted">{i.tariff_name || 'Standart'}</td>
+                  <td className="p-3 text-xs">
+                    <div className="text-foreground font-semibold">{i.doctor_name || '—'}</div>
+                    {i.massage_provider_name && (
+                      <div className="text-muted">💆 {i.massage_provider_name}</div>
+                    )}
+                  </td>
                   <td className="p-3 font-mono text-xs text-muted">
                     {i.discharged_at ? new Date(i.discharged_at).toLocaleDateString('uz-UZ') : '—'}
                   </td>
@@ -951,6 +958,11 @@ export default function CeoInpatients() {
                           label: '📅 Chiqish sanasini tahrirlash',
                           variant: 'default',
                           onClick: () => openEditDischargeDate(i),
+                        },
+                        {
+                          label: "✏️ Ma'lumotlarni tahrirlash (shifokor, massajchi va h.k.)",
+                          variant: 'default',
+                          onClick: () => openEditInpatient(i),
                         },
                         {
                           label: '❌ Bekor qilish (xato yozuv)',

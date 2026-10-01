@@ -1452,6 +1452,10 @@ def update_inpatient(
 
     if data.tariff_id is not None:
         inp.tariff_id = data.tariff_id if data.tariff_id > 0 else None
+
+    old_doctor_id = inp.doctor_id
+    old_massage_provider_id = inp.massage_provider_id
+
     if data.doctor_id is not None:
         inp.doctor_id = data.doctor_id if data.doctor_id > 0 else None
     if data.massage_provider_id is not None:
@@ -1477,6 +1481,18 @@ def update_inpatient(
             inp.diagnosis = _update_planned_days(diag, p_days)
         else:
             inp.diagnosis = _clean_diagnosis(diag)
+
+    # Bemor ALLAQACHON CHIQARILGAN bo'lsa, shifokor/massajchi biriktiruvi
+    # o'zgarsa, chiqishda bir yo'la yozilgan kunlik haq (InpatientProviderAccrual)
+    # eski shifokorga tegishli bo'lib qolaveradi — yangisiga hech narsa
+    # yozilmaydi. Shuning uchun o'zgargan bo'lsa, eski haqlar butunlay
+    # qaytarilib, yangi biriktiruv bo'yicha qaytadan hisoblanadi.
+    doctor_changed = data.doctor_id is not None and inp.doctor_id != old_doctor_id
+    massage_changed = data.massage_provider_id is not None and inp.massage_provider_id != old_massage_provider_id
+    if inp.status == "chiqdi" and (doctor_changed or massage_changed):
+        reverse_inpatient_accruals(db, inp.id)
+        db.flush()
+        sync_inpatient_accruals(db, inp.id)
 
     db.commit()
     db.refresh(inp)
