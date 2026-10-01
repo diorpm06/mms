@@ -1200,20 +1200,148 @@ def _xlsx_header_row(ws, row: int, headers: list[str]) -> None:
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
 
+def _xlsx_section_title(ws, row: int, text: str, ncols: int) -> None:
+    ws.cell(row=row, column=1, value=text).font = Font(bold=True, size=11, color="0F172A")
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+    ws.cell(row=row, column=1).fill = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+
+
+def _referrer_detail_rows(r: dict, date_label: str) -> tuple[list[dict], int, int, int]:
+    """Bitta yo'naltiruvchi uchun batafsil qator ro'yxatini qaytaradi
+    (Excel uchun) — `export_referrers_pdf`dagi 3 pog'onali zaxira
+    mantiqning (daily_departments -> departments -> patients) aynan o'zi,
+    faqat PDF'ga emas, xlsx qator lug'atlariga yoziladi."""
+    r_daily_depts = r.get("daily_departments") or []
+    r_depts = r.get("departments") or []
+    r_patients = r.get("patients") or []
+    r_pat_cnt = r.get("patient_count") or len(r_patients)
+
+    rows: list[dict] = []
+    r_fees = 0
+    r_svc_cnt = 0
+
+    if r_daily_depts:
+        for d in r_daily_depts:
+            cnt = d.get("service_count", 0)
+            fee = d.get("earned_fee", 0)
+            r_svc_cnt += cnt
+            r_fees += fee
+            if fee <= 0:
+                continue
+            rows.append({
+                "date": d.get("date", ""),
+                "department_name": d.get("department_name", "Bo'lim"),
+                "patient_count_label": f"{d.get('patient_count', 1)} nafar",
+                "service_count_label": f"{cnt} ta",
+                "rate_label": d.get("rate_label", "10%"),
+                "fee": fee,
+            })
+    elif r_depts:
+        for d in r_depts:
+            cnt = d.get("service_count", 0)
+            fee = d.get("earned_fee", 0)
+            r_svc_cnt += cnt
+            r_fees += fee
+            if fee <= 0:
+                continue
+            rows.append({
+                "date": date_label,
+                "department_name": d.get("department_name", "Bo'lim"),
+                "patient_count_label": f"{d.get('patient_count', 1)} nafar",
+                "service_count_label": f"{cnt} ta",
+                "rate_label": d.get("rate_label", "10%"),
+                "fee": fee,
+            })
+    else:
+        for p in r_patients:
+            fee = p.get("referrer_fee", 0)
+            r_svc_cnt += 1
+            r_fees += fee
+            if fee <= 0:
+                continue
+            rows.append({
+                "date": p.get("date", "").split(" ")[0] if p.get("date") else "",
+                "department_name": p.get("department_name", "Bo'lim"),
+                "patient_count_label": "1 nafar",
+                "service_count_label": "1 ta",
+                "rate_label": p.get("rate_label", "10%"),
+                "fee": fee,
+            })
+
+    return rows, r_pat_cnt, r_svc_cnt, r_fees
+
+
+def _group_staff_inpatient_breakdown(raw_breakdown: list) -> list[dict]:
+    """Bitta xodimning `breakdown` ro'yxatidagi statsionar qatorlarini
+    kunlik stavka va undan farq qiladigan qo'shimcha xizmatlarga ajratib
+    guruhlaydi (Excel uchun) — `export_all_staff_pdf`dagi xuddi shu
+    mantiqning aynan o'zi."""
+    from collections import Counter
+
+    grouped: list[dict] = []
+    inp_lines = [d for d in raw_breakdown if "statsionar" in str(d.get("department_name", "")).lower()]
+    other_lines = [d for d in raw_breakdown if "statsionar" not in str(d.get("department_name", "")).lower()]
+
+    if inp_lines:
+        amounts = [d.get("earned_fee", 0) for d in inp_lines]
+        stavka, stavka_soni = Counter(amounts).most_common(1)[0]
+        if stavka_soni >= 2:
+            kunlik_lines = [d for d in inp_lines if d.get("earned_fee", 0) == stavka]
+            qoshimcha_lines = [d for d in inp_lines if d.get("earned_fee", 0) != stavka]
+        else:
+            kunlik_lines = []
+            qoshimcha_lines = inp_lines
+
+        if kunlik_lines:
+            inp_dates = []
+            for d in kunlik_lines:
+                try:
+                    inp_dates.append(datetime.strptime(d.get("date", ""), "%d.%m.%Y"))
+                except (ValueError, TypeError):
+                    pass
+            date_range = (
+                f"{min(inp_dates).strftime('%d.%m')}–{max(inp_dates).strftime('%d.%m')}"
+                if inp_dates else "—"
+            )
+            kun_soni = len(kunlik_lines)
+            grouped.append({
+                "date": date_range,
+                "department_name": "Statsionar xizmatlari",
+                "source": "Shifokor (KPI)",
+                "patient_count": f"{kun_soni} kun",
+                "rate_label": f"{stavka:,} so'm/kun".replace(",", " "),
+                "earned_fee": stavka * kun_soni,
+            })
+        for d in qoshimcha_lines:
+            grouped.append({
+                "date": d.get("date", "—"),
+                "department_name": "Statsionar xizmatlari (qo'shimcha)",
+                "source": "Shifokor (KPI)",
+                "patient_count": "1 nafar",
+                "rate_label": "—",
+                "earned_fee": d.get("earned_fee", 0),
+            })
+    grouped.extend(other_lines)
+    return grouped
+
+
 def export_referrers_excel(report: dict) -> bytes:
     """Yo'naltiruvchilar 10 kunlik hisoboti — Excel (.xlsx) ko'rinishida.
 
-    Ekrandagi/PDF dagi "Yo'naltiruvchilar Mukammal Hisobot" jadvali bilan
-    bir xil ustunlar — bir xodim, bir qator."""
+    1-qism: PDF dagi kabi umumiy jamlovchi jadval (bir xodim — bir qator).
+    2-qism: har bir yo'naltiruvchi uchun PDF dagi kabi to'liq batafsil
+    jadval — har bir xizmat/bo'lim bo'yicha sana, bemorlar/xizmatlar soni,
+    ulush va hisoblangan summa."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Yo'naltiruvchilar"
+    NCOLS = 8
 
-    period = f"{report.get('period_start', '')} — {report.get('period_end', '')}"
+    date_label = f"{report.get('period_start', '')} — {report.get('period_end', '')}"
     ws["A1"] = "MARJONA MED SERVIS — YO'NALTIRUVCHILAR HISOBOTI"
     ws["A1"].font = Font(bold=True, size=14)
     ws.merge_cells("A1:H1")
-    ws["A2"] = f"Davr: {period}"
+    ws["A2"] = f"Davr: {date_label}"
     ws["A2"].font = Font(italic=True, size=10)
     ws.merge_cells("A2:H2")
 
@@ -1222,10 +1350,10 @@ def export_referrers_excel(report: dict) -> bytes:
     header_row = 4
     _xlsx_header_row(ws, header_row, headers)
 
-    rows = report.get("referrers_payout", [])
+    ref_list = report.get("referrers_payout", [])
     r = header_row + 1
     totals = [0, 0, 0, 0, 0]
-    for ref in rows:
+    for ref in ref_list:
         values = [
             ref.get("name") or "",
             ref.get("phone") or "",
@@ -1251,8 +1379,57 @@ def export_referrers_excel(report: dict) -> bytes:
     ws.cell(row=r, column=5, value=totals[2]).font = Font(bold=True)
     ws.cell(row=r, column=7, value=totals[3]).font = Font(bold=True)
     ws.cell(row=r, column=8, value=totals[4]).font = Font(bold=True)
+    r += 3
 
-    widths = [26, 16, 12, 18, 14, 14, 18, 14]
+    # ---------------- 2-QISM: HAR BIR YO'NALTIRUVCHI BO'YICHA BATAFSIL ----------------
+    _xlsx_section_title(ws, r, "2-QISM: HAR BIR YO'NALTIRUVCHI BO'YICHA BATAFSIL XIZMATLAR VAZIYATI", NCOLS)
+    r += 2
+
+    detail_headers = ["№", "Sana", "Bo'lim nomi", "Bemorlar soni", "Xizmatlar soni",
+                       "Belgilangan Ulush", "Hisoblangan Ulush (so'm)"]
+    for ref in ref_list:
+        header_text = ref.get("name", "Noma'lum") + (f" ({ref.get('phone')})" if ref.get("phone") else "")
+        ws.cell(row=r, column=1, value=header_text).font = Font(bold=True, size=11, color="0F172A")
+        r += 1
+
+        _xlsx_header_row(ws, r, detail_headers)
+        r += 1
+
+        rows, r_pat_cnt, r_svc_cnt, r_fees = _referrer_detail_rows(ref, date_label)
+        for idx, d in enumerate(rows, 1):
+            ws.cell(row=r, column=1, value=idx)
+            ws.cell(row=r, column=2, value=d["date"])
+            ws.cell(row=r, column=3, value=d["department_name"])
+            ws.cell(row=r, column=4, value=d["patient_count_label"])
+            ws.cell(row=r, column=5, value=d["service_count_label"])
+            ws.cell(row=r, column=6, value=d["rate_label"])
+            ws.cell(row=r, column=7, value=d["fee"])
+            r += 1
+
+        ws.cell(row=r, column=2, value="JAMI:").font = Font(bold=True)
+        ws.cell(row=r, column=4, value=f"{r_pat_cnt} nafar bemor").font = Font(bold=True)
+        ws.cell(row=r, column=5, value=f"{r_svc_cnt} ta xizmat").font = Font(bold=True)
+        ws.cell(row=r, column=7, value=r_fees).font = Font(bold=True)
+        r += 2
+
+        adv_ded = ref.get("advance_deducted", 0) or 0
+        adv_rem = ref.get("advance_remaining", 0) or 0
+        summary = [("Ishlagan puli:", ref.get("earned_commission", r_fees))]
+        if adv_ded + adv_rem > 0:
+            summary.append(("Jami avans qarzi:", adv_ded + adv_rem))
+        if adv_ded > 0:
+            summary.append(("Bu safar ushlangan:", -adv_ded))
+        if adv_rem > 0:
+            summary.append(("Qolgan avans qarzi:", -adv_rem))
+        summary.append(("BERILADIGAN SUMMA:", ref.get("net_payable", 0)))
+        for label, val in summary:
+            ws.cell(row=r, column=1, value=label).font = Font(bold=True)
+            cell = ws.cell(row=r, column=2, value=val)
+            cell.font = Font(bold=True, color="16A34A") if label == "BERILADIGAN SUMMA:" else Font(bold=True)
+            r += 1
+        r += 2
+
+    widths = [26, 16, 22, 14, 14, 16, 18, 14]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[chr(64 + i)].width = w
 
@@ -1263,11 +1440,17 @@ def export_referrers_excel(report: dict) -> bytes:
 
 def export_all_staff_excel(report: dict) -> bytes:
     """Barcha xodimlar (shifokor + yo'naltiruvchi) 10 kunlik yagona
-    hisoboti — Excel (.xlsx) ko'rinishida, ekrandagi/PDF dagi "Yagona
-    Master Hisobot" jadvali bilan bir xil ustunlar."""
+    hisoboti — Excel (.xlsx) ko'rinishida.
+
+    1-qism: PDF dagi kabi umumiy jamlovchi jadval (bir xodim — bir qator).
+    2-qism: har bir xodim uchun PDF dagi kabi to'liq batafsil jadval —
+    har bir xizmat/bo'lim bo'yicha sana, bemorlar soni, ulush va
+    hisoblangan summa (statsionar kunlik stavka va qo'shimcha xizmatlar
+    ham PDF dagi kabi alohida ajratilgan)."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Barcha xodimlar"
+    NCOLS = 8
 
     period = f"{report.get('period_start', '')} — {report.get('period_end', '')}"
     ws["A1"] = "MARJONA MED SERVIS — BARCHA XODIMLAR YAGONA HISOBOTI"
@@ -1282,10 +1465,10 @@ def export_all_staff_excel(report: dict) -> bytes:
     header_row = 4
     _xlsx_header_row(ws, header_row, headers)
 
-    rows = report.get("all_staff_payout", [])
+    staff_rows = report.get("all_staff_payout", [])
     r = header_row + 1
     totals = [0, 0, 0, 0, 0, 0]
-    for x in rows:
+    for x in staff_rows:
         remaining = x.get("remaining_payable", x.get("net_payable", 0))
         values = [
             x.get("name") or "",
@@ -1310,8 +1493,64 @@ def export_all_staff_excel(report: dict) -> bytes:
     ws.cell(row=r, column=1, value="JAMI:").font = Font(bold=True)
     for col, t in enumerate(totals, start=3):
         ws.cell(row=r, column=col, value=t).font = Font(bold=True)
+    r += 3
 
-    widths = [26, 24, 16, 18, 16, 14, 14, 18]
+    # ---------------- 2-QISM: HAR BIR XODIM BO'YICHA BATAFSIL ----------------
+    _xlsx_section_title(ws, r, "2-QISM: HAR BIR XODIM BO'YICHA BATAFSIL XIZMATLAR VAZIYATI", NCOLS)
+    r += 2
+
+    detail_headers = ["№", "Sana", "Bo'lim nomi", "Manba", "Bemorlar", "Ulush", "Hisoblangan (so'm)"]
+    for x in staff_rows:
+        role = x.get("role") or ""
+        header_text = x.get("name", "Noma'lum") if role == "Yo'naltiruvchi" else f"{x.get('name', 'Noma`lum')} ({role})"
+        ws.cell(row=r, column=1, value=header_text).font = Font(bold=True, size=11, color="0F172A")
+        r += 1
+
+        _xlsx_header_row(ws, r, detail_headers)
+        r += 1
+
+        grouped = _group_staff_inpatient_breakdown(x.get("breakdown") or [])
+        idx = 0
+        b_earned = 0
+        for d in grouped:
+            fee = d.get("earned_fee", 0)
+            b_earned += fee
+            if fee <= 0:
+                continue
+            idx += 1
+            p_cnt = d.get("patient_count", 1)
+            ws.cell(row=r, column=1, value=idx)
+            ws.cell(row=r, column=2, value=d.get("date", ""))
+            ws.cell(row=r, column=3, value=d.get("department_name", "Bo'lim"))
+            ws.cell(row=r, column=4, value=d.get("source", ""))
+            ws.cell(row=r, column=5, value=f"{p_cnt} nafar" if isinstance(p_cnt, int) else str(p_cnt))
+            ws.cell(row=r, column=6, value=d.get("rate_label", "—"))
+            ws.cell(row=r, column=7, value=fee)
+            r += 1
+
+        tot_e_val = x.get("total_earned", b_earned)
+        ws.cell(row=r, column=2, value="JAMI:").font = Font(bold=True)
+        ws.cell(row=r, column=7, value=tot_e_val).font = Font(bold=True)
+        r += 2
+
+        adv_ded = x.get("advance_deducted", 0) or 0
+        adv_rem = x.get("advance_remaining", 0) or 0
+        summary = [("Ishlagan puli:", tot_e_val)]
+        if adv_ded + adv_rem > 0:
+            summary.append(("Jami avans qarzi:", adv_ded + adv_rem))
+        if adv_ded > 0:
+            summary.append(("Bu safar ushlangan:", -adv_ded))
+        if adv_rem > 0:
+            summary.append(("Qolgan avans qarzi:", -adv_rem))
+        summary.append(("SOF TO'LANADIGAN:", x.get("net_payable", 0)))
+        for label, val in summary:
+            ws.cell(row=r, column=1, value=label).font = Font(bold=True)
+            cell = ws.cell(row=r, column=2, value=val)
+            cell.font = Font(bold=True, color="16A34A") if label == "SOF TO'LANADIGAN:" else Font(bold=True)
+            r += 1
+        r += 2
+
+    widths = [26, 24, 18, 14, 14, 16, 18, 14]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[chr(64 + i)].width = w
 
