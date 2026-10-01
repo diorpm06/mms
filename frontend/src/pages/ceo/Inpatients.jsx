@@ -56,6 +56,9 @@ export default function CeoInpatients() {
     daily_rate: '', diagnosis: '', planned_days: '',
   })
   const [savingInpatientEdit, setSavingInpatientEdit] = useState(false)
+  const [editDischargeModal, setEditDischargeModal] = useState(null)
+  const [editDischargeDate, setEditDischargeDate] = useState('')
+  const [savingDischargeDate, setSavingDischargeDate] = useState(false)
 
   // Forms
   const [admitForm, setAdmitForm] = useState({
@@ -627,6 +630,50 @@ export default function CeoInpatients() {
     }
   }
 
+  // Open Edit Discharge Date Modal (for already-discharged patients)
+  const openEditDischargeDate = (inp) => {
+    setEditDischargeDate((inp.discharged_at || '').slice(0, 10))
+    setEditDischargeModal(inp)
+  }
+
+  // Save Edit Discharge Date — chiqish sanasini tuzatish (oldinga/orqaga)
+  const handleSaveDischargeDate = async () => {
+    if (!editDischargeModal || !editDischargeDate) return
+    setSavingDischargeDate(true)
+    try {
+      await api(`/inpatients/${editDischargeModal.id}/discharge-date`, {
+        method: 'PATCH',
+        body: JSON.stringify({ discharged_at: editDischargeDate }),
+      })
+      toast("Chiqish sanasi tuzatildi ✓ Hisobotlar yangilandi")
+      setEditDischargeModal(null)
+      loadData()
+    } catch (e) {
+      toast(e.message || 'Saqlashda xatolik', 'error')
+    } finally {
+      setSavingDischargeDate(false)
+    }
+  }
+
+  // Cancel (bekor qilish) an inpatient admission — reverses payments/balances
+  const handleCancelInpatient = async (inpatientId) => {
+    const reason = window.prompt("Bekor qilish sababini yozing (kamida 3 harf):")
+    if (reason === null) return
+    if (!reason.trim() || reason.trim().length < 3) {
+      toast('Sabab kamida 3 harf bo\'lishi kerak', 'error')
+      return
+    }
+    try {
+      await api(`/inpatients/${inpatientId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason.trim() }),
+      })
+      toast("Statsionar yozuvi bekor qilindi, pul/balanslar qaytarildi")
+      loadData()
+    } catch (e) {
+      toast(e.message || 'Bekor qilishda xatolik', 'error')
+    }
+  }
 
   // Live patient search from API when receptionist types in search box
   useEffect(() => {
@@ -876,8 +923,9 @@ export default function CeoInpatients() {
                 <th className="p-3">Ism-Sharifi</th>
                 <th className="p-3">Palata</th>
                 <th className="p-3">Tarif</th>
+                <th className="p-3">Chiqqan sana</th>
                 <th className="p-3">Jami Hisob</th>
-                <th className="p-3 text-right">Chek</th>
+                <th className="p-3 text-right">Amallar</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -886,15 +934,31 @@ export default function CeoInpatients() {
                   <td className="p-3 font-medium">{i.first_name} {i.last_name}</td>
                   <td className="p-3 font-mono text-muted">{i.room_number}/{i.bed_number}</td>
                   <td className="p-3 text-xs text-muted">{i.tariff_name || 'Standart'}</td>
+                  <td className="p-3 font-mono text-xs text-muted">
+                    {i.discharged_at ? new Date(i.discharged_at).toLocaleDateString('uz-UZ') : '—'}
+                  </td>
                   <td className="p-3 font-mono font-bold text-gold">{formatMoney(i.total_amount)}</td>
                   <td className="p-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedReceipt({ ...i, status: 'chiqdi' })}
-                      className="btn-outline text-xs py-1 px-2.5"
-                    >
-                      🧾 Chek
-                    </button>
+                    <ActionMenu
+                      title="Amallar"
+                      items={[
+                        {
+                          label: '🧾 Chek',
+                          variant: 'gold',
+                          onClick: () => setSelectedReceipt({ ...i, status: 'chiqdi' }),
+                        },
+                        {
+                          label: '📅 Chiqish sanasini tahrirlash',
+                          variant: 'default',
+                          onClick: () => openEditDischargeDate(i),
+                        },
+                        {
+                          label: '❌ Bekor qilish (xato yozuv)',
+                          variant: 'danger',
+                          onClick: () => handleCancelInpatient(i.id),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
@@ -2109,6 +2173,67 @@ export default function CeoInpatients() {
                 onClick={handleExtendStay}
               >
                 ✓ Muddatni Uzaytirish (+{extendDaysCount} kun)
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* MODAL: EDIT DISCHARGE DATE (CHIQISH SANASINI TAHRIRLASH) */}
+      <Modal open={!!editDischargeModal} onClose={() => setEditDischargeModal(null)} title="📅 Chiqish Sanasini Tahrirlash">
+        {editDischargeModal && (
+          <div className="space-y-4 pt-2 text-xs">
+            <div className="p-3.5 bg-amber-950/30 border border-amber-500/40 rounded-2xl space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-extrabold text-gold text-sm">{editDischargeModal.first_name} {editDischargeModal.last_name}</span>
+                <span className="badge badge-gold font-mono">{editDischargeModal.room_number}/{editDischargeModal.bed_number}</span>
+              </div>
+              <p className="text-muted text-xs">
+                Yotgan sana: <strong className="text-foreground">{new Date(editDischargeModal.admitted_at).toLocaleDateString('uz-UZ')}</strong>
+              </p>
+              <p className="text-muted text-xs">
+                Hozirgi chiqish sanasi: <strong className="text-foreground">
+                  {editDischargeModal.discharged_at ? new Date(editDischargeModal.discharged_at).toLocaleDateString('uz-UZ') : '—'}
+                </strong>
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="form-label font-bold text-foreground">
+                Yangi chiqish sanasi (oldinga yoki orqaga o'zgartirish mumkin) *
+              </label>
+              <input
+                type="date"
+                className="input-field text-sm font-mono"
+                value={editDischargeDate}
+                min={(editDischargeModal.admitted_at || '').slice(0, 10)}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setEditDischargeDate(e.target.value)}
+                autoFocus
+              />
+              <p className="text-[11px] text-muted">
+                ⚠️ Sana o'zgartirilsa, kunlar soni va shifokor/massajchi kunlik haqi
+                yangi sanaga moslab qayta hisoblanadi. To'langan pul miqdori o'zgarmaydi.
+                10 kunlik va umumiy hisobotlar yangi sanaga qarab avtomatik yangilanadi.
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                className="btn-outline flex-1 py-2.5"
+                onClick={() => setEditDischargeModal(null)}
+                disabled={savingDischargeDate}
+              >
+                Bekor qilish
+              </button>
+              <button
+                type="button"
+                className="btn-gold flex-1 py-2.5 font-black text-xs uppercase"
+                onClick={handleSaveDischargeDate}
+                disabled={savingDischargeDate || !editDischargeDate}
+              >
+                {savingDischargeDate ? 'Saqlanmoqda...' : '✓ Saqlash'}
               </button>
             </div>
           </div>

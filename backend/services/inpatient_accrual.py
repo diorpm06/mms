@@ -195,6 +195,37 @@ def reverse_inpatient_accruals(db: Session, inpatient_id: int) -> int:
     return sum(jami.values())
 
 
+def trim_inpatient_accruals(db: Session, inpatient_id: int, new_discharge_date: date) -> int:
+    """Chiqish sanasi orqaga qaytarilganda (muddat qisqarganda) yangi sanadan
+    keyingi kunlar uchun yozilgan shifokor/massajchi haqini bekor qiladi va
+    provider balansidan ayiradi. O'chirilgan qatorlar sonini qaytaradi.
+    """
+    qatorlar = (
+        db.query(InpatientProviderAccrual)
+        .filter(
+            InpatientProviderAccrual.inpatient_id == inpatient_id,
+            InpatientProviderAccrual.accrual_date > new_discharge_date,
+        )
+        .all()
+    )
+    if not qatorlar:
+        return 0
+
+    jami: dict[int, int] = {}
+    for r in qatorlar:
+        jami[r.provider_id] = jami.get(r.provider_id, 0) + int(r.amount or 0)
+
+    for pid, summa in jami.items():
+        p = db.query(Provider).filter(Provider.id == pid).first()
+        if p:
+            p.balance = max(0, int(p.balance or 0) - summa)
+
+    for r in qatorlar:
+        db.delete(r)
+
+    return len(qatorlar)
+
+
 def provider_inpatient_summary(db: Session) -> list[dict]:
     """Har bir statsionar xizmat ko'rsatuvchi bo'yicha yig'ma hisobot.
 

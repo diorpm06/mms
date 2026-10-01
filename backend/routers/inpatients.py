@@ -26,6 +26,7 @@ from services.inpatient_accrual import (
     provider_inpatient_summary,
     reverse_inpatient_accruals,
     sync_inpatient_accruals,
+    trim_inpatient_accruals,
 )
 from services.telegram_notify import send_telegram_background, send_telegram_message
 
@@ -170,6 +171,10 @@ class CancelBody(BaseModel):
 class InpatientExtendBody(BaseModel):
     additional_days: int | None = Field(default=None, ge=1, le=180)
     new_planned_days: int | None = Field(default=None, ge=1, le=180)
+
+
+class DischargeDateEditBody(BaseModel):
+    discharged_at: date
 
 
 class InpatientUpdate(BaseModel):
@@ -1268,6 +1273,69 @@ def extend_stay(
         f"💰 Kunlik narxi: {inp.daily_rate:,} so'm"
     ).replace(",", " ")
     _telegram_yubor(msg)
+
+    return _serialize_inp(inp)
+
+
+@router.patch("/{inpatient_id}/discharge-date")
+def edit_discharge_date(
+    inpatient_id: int,
+    body: DischargeDateEditBody,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_or_ceo),
+):
+    """Allaqachon chiqarilgan (Выписка qilingan) bemorning chiqish sanasini
+    tuzatish — masalan, xodim sanani adashib kiritgan bo'lsa.
+
+    To'lov yozuvlari (InpatientPayment) — haqiqiy to'langan pul — tegilmay
+    qoladi. Faqat chiqish sanasi va shunga bog'liq shifokor/massajchi kunlik
+    haqi (InpatientProviderAccrual) yangi sanaga moslab qayta hisoblanadi,
+    shu orqali 10 kunlik va umumiy hisobotlar to'g'ri davrga tushadi.
+    """
+    inp = _qulflab_ol(db, inpatient_id)
+    if not inp or inp.status != "chiqdi" or inp.is_cancelled:
+        raise HTTPException(status_code=400, detail="Faqat allaqachon chiqarilgan bemorning sanasini tahrirlash mumkin")
+
+    yotgan_kun = inp.admitted_at.date()
+    if body.discharged_at < yotgan_kun:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Chiqish sanasi yotgan sanadan ({yotgan_kun.strftime('%d.%m.%Y')}) "
+                   "oldin bo'lishi mumkin emas.",
+        )
+    if body.discharged_at > date.today():
+        raise HTTPException(status_code=400, detail="Chiqish sanasi kelajakda bo'lishi mumkin emas.")
+
+    old_discharged_at = inp.discharged_at
+    inp.discharged_at = datetime.combine(body.discharged_at, datetime.min.time())
+
+    removed = trim_inpatient_accruals(db, inp.id, body.discharged_at)
+    db.flush()
+    added = sync_inpatient_accruals(db, inp.id)
+
+    ip, device = get_client_info(request)
+    log_audit(
+        db, user_id=user.id, user_role=user.role, action_type="EDIT_DISCHARGE_DATE",
+        table_name="inpatients", record_id=inp.id,
+        new_data={
+            "old_discharged_at": old_discharged_at.isoformat() if old_discharged_at else None,
+            "new_discharged_at": inp.discharged_at.isoformat(),
+            "accrual_days_removed": removed,
+            "accrual_days_added": added,
+        },
+        ip_address=ip, device_info=device,
+    )
+    db.commit()
+    db.refresh(inp)
+
+    eski = old_discharged_at.strftime("%d.%m.%Y") if old_discharged_at else "-"
+    yangi = inp.discharged_at.strftime("%d.%m.%Y")
+    _telegram_yubor(
+        f"🛏 Statsionar chiqish sanasi tuzatildi\n"
+        f"👤 {inp.first_name} {inp.last_name}\n"
+        f"📅 {eski} → {yangi}"
+    )
 
     return _serialize_inp(inp)
 
