@@ -1695,6 +1695,15 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     # chalkash ko'rinar edi), endi ODDIY qatorlar kabi SANA bo'yicha
     # guruhlanadi — bitta kunda nechta statsionar bemordan pul kelgani
     # bitta qatorda ko'rsatiladi (xuddi Fizioterapiya/Laboratoriya kabi).
+    # DIQQAT (2026-10-01, egasi bilan tasdiqlangan): statsionar bemorning
+    # puli endi tranzaksiya qachon YOZILGANIGA emas, bemor QACHON CHIQQANIGA
+    # (Inpatient.discharged_at) qarab davrga biriktiriladi. Ilgari bemor
+    # ko'p kunlik 10-kunlik chegarasidan o'tib yotsa (masalan 12-23 sentabr),
+    # uning puli ikkita hisobotga "yarmi-yarmidan" bo'linib ketardi — bemor
+    # hali yotganida ham, chiqqanida ham tushunarsiz ko'rinardi. Endi bemor
+    # necha davrga cho'zilib yotmasin, puli FAQAT u chiqqan davrning
+    # hisobotida to'liq ko'rinadi (hali chiqmagan bo'lsa — hech qaysi
+    # davrda ko'rinmaydi, chunki haqiqiy yakuniy hisob chiqishda aniqlanadi).
     inp_ref_raw = (
         db.query(
             Transaction.referrer_id,
@@ -1703,12 +1712,15 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             Transaction.total_amount,
             Transaction.created_at,
         )
+        .join(Inpatient, Inpatient.id == Transaction.inpatient_id)
         .filter(
             Transaction.inpatient_id.isnot(None),
             Transaction.referrer_id.isnot(None),
             Transaction.referrer_amount > 0,
-            Transaction.created_at >= s,
-            Transaction.created_at <= e,
+            Transaction.is_cancelled == False,
+            Inpatient.discharged_at.isnot(None),
+            Inpatient.discharged_at >= s,
+            Inpatient.discharged_at <= e,
         )
         .all()
     )
@@ -1918,6 +1930,9 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
     # `Patient` (ambulator) jadvalidan tuzilgani uchun statsionardan kelgan
     # KPI ulushi bu yerda umuman ko'rinmasdi — xuddi yo'naltiruvchi tomonida
     # yuqorida tuzatilgan xato bilan bir xil, faqat shifokor tomonida.
+    # DIQQAT (2026-10-01): yuqoridagi yo'naltiruvchi tomonidagi izohga
+    # qarang — bu yerda ham bemor puli endi QACHON CHIQQANIGA qarab davrga
+    # biriktiriladi, tranzaksiya yozilgan sanaga emas.
     inp_prov_raw = (
         db.query(
             Transaction.provider_id,
@@ -1926,12 +1941,15 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             Transaction.total_amount,
             Transaction.created_at,
         )
+        .join(Inpatient, Inpatient.id == Transaction.inpatient_id)
         .filter(
             Transaction.inpatient_id.isnot(None),
             Transaction.provider_id.isnot(None),
             Transaction.provider_amount > 0,
-            Transaction.created_at >= s,
-            Transaction.created_at <= e,
+            Transaction.is_cancelled == False,
+            Inpatient.discharged_at.isnot(None),
+            Inpatient.discharged_at >= s,
+            Inpatient.discharged_at <= e,
         )
         .all()
     )
@@ -1982,7 +2000,10 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
                 "daily_departments": _merge_inpatient_into_daily([], date_groups),
             }
 
-    # Statsionar shifokorning kunlik qatnashish haqi (InpatientProviderAccrual)
+    # Statsionar shifokorning kunlik qatnashish haqi (InpatientProviderAccrual).
+    # DIQQAT (2026-10-01): bu yerda ham endi har bir kun alohida emas, bemor
+    # QACHON CHIQQANIGA qarab (Inpatient.discharged_at) butun kunlik haq
+    # bitta davrga yig'iladi — yuqoridagi izohlarga qarang.
     from models.inpatient_accrual import InpatientProviderAccrual
     inp_accruals = (
         db.query(
@@ -1990,10 +2011,12 @@ def ten_day_report(db: Session, start: date, end: date) -> dict:
             InpatientProviderAccrual.accrual_date,
             InpatientProviderAccrual.amount,
         )
+        .join(Inpatient, Inpatient.id == InpatientProviderAccrual.inpatient_id)
         .filter(
-            InpatientProviderAccrual.accrual_date >= s.date(),
-            InpatientProviderAccrual.accrual_date <= e.date(),
             InpatientProviderAccrual.amount > 0,
+            Inpatient.discharged_at.isnot(None),
+            Inpatient.discharged_at >= s,
+            Inpatient.discharged_at <= e,
         )
         .all()
     )
