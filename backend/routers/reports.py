@@ -388,6 +388,40 @@ def export_all_staff_pdf_route(
     )
 
 
+@router.get("/export/referrers-xlsx")
+def export_referrers_excel_route(
+    from_date: date = Query(..., alias="from"),
+    to_date: date = Query(..., alias="to"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    from services.export import export_referrers_excel
+    report = ten_day_report(db, from_date, to_date)
+    content = export_referrers_excel(report)
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=Yonaltiruvchilar_Hisobot_{from_date}_{to_date}.xlsx"},
+    )
+
+
+@router.get("/export/all-staff-xlsx")
+def export_all_staff_excel_route(
+    from_date: date = Query(..., alias="from"),
+    to_date: date = Query(..., alias="to"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_or_ceo),
+):
+    from services.export import export_all_staff_excel
+    report = ten_day_report(db, from_date, to_date)
+    content = export_all_staff_excel(report)
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=Yagona_Master_Hisobot_{from_date}_{to_date}.xlsx"},
+    )
+
+
 def _pdf_uchun_tozala(report: dict, rol: str, tur: str) -> dict:
     """PDF ga chiqmasligi kerak bo'lgan ichki ma'lumotni olib tashlaydi.
 

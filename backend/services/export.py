@@ -1190,3 +1190,133 @@ def export_all_staff_pdf(report: dict) -> bytes:
     return buf.getvalue()
 
 
+def _xlsx_header_row(ws, row: int, headers: list[str]) -> None:
+    fill = PatternFill(start_color=GOLD, end_color=GOLD, fill_type="solid")
+    bold_white = Font(bold=True, color="FFFFFF")
+    for col, text in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col, value=text)
+        cell.font = bold_white
+        cell.fill = fill
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+
+def export_referrers_excel(report: dict) -> bytes:
+    """Yo'naltiruvchilar 10 kunlik hisoboti — Excel (.xlsx) ko'rinishida.
+
+    Ekrandagi/PDF dagi "Yo'naltiruvchilar Mukammal Hisobot" jadvali bilan
+    bir xil ustunlar — bir xodim, bir qator."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Yo'naltiruvchilar"
+
+    period = f"{report.get('period_start', '')} — {report.get('period_end', '')}"
+    ws["A1"] = "MARJONA MED SERVIS — YO'NALTIRUVCHILAR HISOBOTI"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.merge_cells("A1:H1")
+    ws["A2"] = f"Davr: {period}"
+    ws["A2"].font = Font(italic=True, size=10)
+    ws.merge_cells("A2:H2")
+
+    headers = ["F.I.Sh", "Telefon", "Bemorlar soni", "Ishlangan komissiya",
+               "Avans (-)", "Qolgan qarz", "Sof to'lanadigan", "To'landi"]
+    header_row = 4
+    _xlsx_header_row(ws, header_row, headers)
+
+    rows = report.get("referrers_payout", [])
+    r = header_row + 1
+    totals = [0, 0, 0, 0, 0]
+    for ref in rows:
+        values = [
+            ref.get("name") or "",
+            ref.get("phone") or "",
+            ref.get("patient_count", 0),
+            ref.get("earned_commission", 0),
+            ref.get("advance_deducted", 0),
+            ref.get("advance_remaining", 0),
+            ref.get("remaining_payable", ref.get("net_payable", 0)),
+            ref.get("already_paid", 0),
+        ]
+        for col, v in enumerate(values, start=1):
+            ws.cell(row=r, column=col, value=v)
+        totals[0] += ref.get("patient_count", 0)
+        totals[1] += ref.get("earned_commission", 0)
+        totals[2] += ref.get("advance_deducted", 0)
+        totals[3] += ref.get("remaining_payable", ref.get("net_payable", 0))
+        totals[4] += ref.get("already_paid", 0)
+        r += 1
+
+    ws.cell(row=r, column=1, value="JAMI:").font = Font(bold=True)
+    ws.cell(row=r, column=3, value=totals[0]).font = Font(bold=True)
+    ws.cell(row=r, column=4, value=totals[1]).font = Font(bold=True)
+    ws.cell(row=r, column=5, value=totals[2]).font = Font(bold=True)
+    ws.cell(row=r, column=7, value=totals[3]).font = Font(bold=True)
+    ws.cell(row=r, column=8, value=totals[4]).font = Font(bold=True)
+
+    widths = [26, 16, 12, 18, 14, 14, 18, 14]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def export_all_staff_excel(report: dict) -> bytes:
+    """Barcha xodimlar (shifokor + yo'naltiruvchi) 10 kunlik yagona
+    hisoboti — Excel (.xlsx) ko'rinishida, ekrandagi/PDF dagi "Yagona
+    Master Hisobot" jadvali bilan bir xil ustunlar."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Barcha xodimlar"
+
+    period = f"{report.get('period_start', '')} — {report.get('period_end', '')}"
+    ws["A1"] = "MARJONA MED SERVIS — BARCHA XODIMLAR YAGONA HISOBOTI"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.merge_cells("A1:H1")
+    ws["A2"] = f"Davr: {period}"
+    ws["A2"].font = Font(italic=True, size=10)
+    ws.merge_cells("A2:H2")
+
+    headers = ["F.I.Sh", "Roli", "Shifokor ulushi", "Yo'naltiruvchi ulushi",
+               "Jami ishlangan", "Avans (-)", "Qolgan qarz", "Sof to'lanadigan"]
+    header_row = 4
+    _xlsx_header_row(ws, header_row, headers)
+
+    rows = report.get("all_staff_payout", [])
+    r = header_row + 1
+    totals = [0, 0, 0, 0, 0, 0]
+    for x in rows:
+        remaining = x.get("remaining_payable", x.get("net_payable", 0))
+        values = [
+            x.get("name") or "",
+            x.get("role") or "",
+            x.get("provider_earned", 0),
+            x.get("referrer_earned", 0),
+            x.get("total_earned", 0),
+            x.get("advance_deducted", 0),
+            x.get("advance_remaining", 0),
+            remaining,
+        ]
+        for col, v in enumerate(values, start=1):
+            ws.cell(row=r, column=col, value=v)
+        totals[0] += x.get("provider_earned", 0)
+        totals[1] += x.get("referrer_earned", 0)
+        totals[2] += x.get("total_earned", 0)
+        totals[3] += x.get("advance_deducted", 0)
+        totals[4] += x.get("advance_remaining", 0)
+        totals[5] += remaining
+        r += 1
+
+    ws.cell(row=r, column=1, value="JAMI:").font = Font(bold=True)
+    for col, t in enumerate(totals, start=3):
+        ws.cell(row=r, column=col, value=t).font = Font(bold=True)
+
+    widths = [26, 24, 16, 18, 16, 14, 14, 18]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+

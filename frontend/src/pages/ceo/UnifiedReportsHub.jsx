@@ -918,6 +918,16 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     }
   }
 
+  const handleDownloadReferrersExcel = async () => {
+    try {
+      const blob = await api(`/reports/export/referrers-xlsx?from=${dateFrom}&to=${dateTo}`)
+      downloadBlob(blob, `Yonaltiruvchilar_Mukammal_Hisobot_${dateFrom}_${dateTo}.xlsx`)
+      toast("✓ Yo'naltiruvchilar Excel hisoboti yuklab olindi!")
+    } catch (e) {
+      toast(e.message || "Excel yuklashda xatolik", 'error')
+    }
+  }
+
   const handlePrintReferrersDetailed = () => {
     const printWindow = window.open('', '_blank', 'width=1050,height=900')
     const refPayouts = referrersReport?.referrers_payout || []
@@ -1200,8 +1210,8 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
             <button type="button" onClick={handleDownloadReferrersPdf} className="btn-outline py-1 px-3 text-xs font-bold text-cyan hover:text-body">
               📄 PDF Mukammal Hisobot
             </button>
-            <button type="button" onClick={() => handleExportExcel('referrers')} className="btn-outline py-1 px-3 text-xs font-bold">
-              Excel
+            <button type="button" onClick={handleDownloadReferrersExcel} className="btn-outline py-1 px-3 text-xs font-bold text-emerald hover:text-body">
+              📊 Excel
             </button>
             <button
               type="button"
@@ -1445,6 +1455,16 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
     }
   }
 
+  const handleDownloadMasterAllStaffExcel = async () => {
+    try {
+      const blob = await api(`/reports/export/all-staff-xlsx?from=${dateFrom}&to=${dateTo}`)
+      downloadBlob(blob, `Yagona_Master_Hisobot_${dateFrom}_${dateTo}.xlsx`)
+      toast("✓ Yagona master Excel hisoboti yuklab olindi!")
+    } catch (e) {
+      toast(e.message || "Excel yuklashda xatolik", 'error')
+    }
+  }
+
   const handlePrintMasterAllStaff = () => {
     const rows = referrersReport?.all_staff_payout || []
     if (rows.length === 0) {
@@ -1636,6 +1656,13 @@ export default function UnifiedReportsHub({ homePath = '/ceo' }) {
               className="btn-outline py-1 px-3 text-xs font-bold text-amber-400 hover:text-body"
             >
               📄 Yuklab Olish (PDF)
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadMasterAllStaffExcel}
+              className="btn-outline py-1 px-3 text-xs font-bold text-emerald hover:text-body"
+            >
+              📊 Yuklab Olish (Excel)
             </button>
           </div>
         </div>
