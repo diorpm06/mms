@@ -1016,73 +1016,15 @@ def export_all_staff_pdf(report: dict) -> bytes:
             header_text = r_name if r_role == "Yo'naltiruvchi" else f"{r_name} ({r_role})"
             person_elements.append(Paragraph(header_text, section_head_style))
 
-            # Group Statsionar lines for individual breakdown table
-            raw_breakdown = r.get("breakdown") or []
-            grouped_breakdown = []
-            inp_lines = [d for d in raw_breakdown if "statsionar" in str(d.get("department_name", "")).lower()]
-            other_lines = [d for d in raw_breakdown if "statsionar" not in str(d.get("department_name", "")).lower()]
-
-            if inp_lines:
-                # DIQQAT: bu yerda ilgari sana ("21.08-31.08") va stavka
-                # ("50 000 so'm/kun") QATTIQ YOZILGAN edi — haqiqiy davr yoki
-                # kunlik haq qanday bo'lishidan qat'i nazar doim aynan shu
-                # matn chiqardi.
-                #
-                # Bundan tashqari, statsionar bemorga ko'rsatilgan QO'SHIMCHA
-                # xizmatlar (masalan alohida protsedura) ham xuddi shu
-                # "Statsionar xizmatlari" nomi bilan qo'shilib kelishi mumkin
-                # — bular kunlik qatnashish haqidan (odatda barqaror, bir xil
-                # summali) FARQ QILADI. Ikkalasini bitta "X kun / Y so'm/kun"
-                # qatoriga qo'shib yuborsak, o'rtacha noto'g'ri (haqiqiy
-                # kunlik stavkaga mos kelmaydigan) chiqib qolardi. Shuning
-                # uchun eng ko'p uchraydigan summa (kunlik stavka) alohida
-                # guruhlanadi, undan farq qiladigan qo'shimcha xizmatlar esa
-                # o'z sanasi va haqiqiy summasi bilan alohida qator bo'lib
-                # ko'rsatiladi.
-                from collections import Counter
-                amounts = [d.get("earned_fee", 0) for d in inp_lines]
-                amount_counts = Counter(amounts)
-                # Eng ko'p takrorlangan summa — bu kunlik qatnashish stavkasi
-                # deb qaraladi (ikkitadan kam bo'lsa, guruhlashning ma'nosi
-                # yo'q — hammasi alohida ko'rsatiladi).
-                stavka, stavka_soni = amount_counts.most_common(1)[0]
-                if stavka_soni >= 2:
-                    kunlik_lines = [d for d in inp_lines if d.get("earned_fee", 0) == stavka]
-                    qoshimcha_lines = [d for d in inp_lines if d.get("earned_fee", 0) != stavka]
-                else:
-                    kunlik_lines = []
-                    qoshimcha_lines = inp_lines
-
-                if kunlik_lines:
-                    inp_dates = []
-                    for d in kunlik_lines:
-                        try:
-                            inp_dates.append(datetime.strptime(d.get("date", ""), "%d.%m.%Y"))
-                        except (ValueError, TypeError):
-                            pass
-                    date_range = (
-                        f"{min(inp_dates).strftime('%d.%m')}–{max(inp_dates).strftime('%d.%m')}"
-                        if inp_dates else "—"
-                    )
-                    kun_soni = len(kunlik_lines)
-                    grouped_breakdown.append({
-                        "date": date_range,
-                        "department_name": "Statsionar xizmatlari",
-                        "source": "Shifokor (KPI)",
-                        "patient_count": f"{kun_soni} kun",
-                        "rate_label": f"{stavka:,} so'm/kun".replace(",", " "),
-                        "earned_fee": stavka * kun_soni,
-                    })
-                for d in qoshimcha_lines:
-                    grouped_breakdown.append({
-                        "date": d.get("date", "—"),
-                        "department_name": "Statsionar xizmatlari (qo'shimcha)",
-                        "source": "Shifokor (KPI)",
-                        "patient_count": "1 nafar",
-                        "rate_label": "—",
-                        "earned_fee": d.get("earned_fee", 0),
-                    })
-            grouped_breakdown.extend(other_lines)
+            # Group Statsionar lines for individual breakdown table.
+            # DIQQAT: bu yerda ilgari sana ("21.08-31.08") va stavka
+            # ("50 000 so'm/kun") QATTIQ YOZILGAN edi — haqiqiy davr yoki
+            # kunlik haq qanday bo'lishidan qat'i nazar doim aynan shu
+            # matn chiqardi. Keyinchalik buni haqiqiy sana/stavkadan
+            # hisoblaydigan qilib tuzatilgan, logika pastdagi umumiy
+            # `_group_staff_inpatient_breakdown()` yordamchisiga ko'chirildi
+            # (Excel eksporti ham xuddi shu funksiyadan foydalanadi).
+            grouped_breakdown = _group_staff_inpatient_breakdown(r.get("breakdown") or [])
 
             table_data = [[
                 _th("№"), _th("Sana"), _th("Bo'lim nomi"), _th("Manba"),
@@ -1274,8 +1216,7 @@ def _referrer_detail_rows(r: dict, date_label: str) -> tuple[list[dict], int, in
 def _group_staff_inpatient_breakdown(raw_breakdown: list) -> list[dict]:
     """Bitta xodimning `breakdown` ro'yxatidagi statsionar qatorlarini
     kunlik stavka va undan farq qiladigan qo'shimcha xizmatlarga ajratib
-    guruhlaydi (Excel uchun) — `export_all_staff_pdf`dagi xuddi shu
-    mantiqning aynan o'zi."""
+    guruhlaydi (PDF va Excel uchun umumiy)."""
     from collections import Counter
 
     grouped: list[dict] = []
@@ -1283,11 +1224,25 @@ def _group_staff_inpatient_breakdown(raw_breakdown: list) -> list[dict]:
     other_lines = [d for d in raw_breakdown if "statsionar" not in str(d.get("department_name", "")).lower()]
 
     if inp_lines:
-        amounts = [d.get("earned_fee", 0) for d in inp_lines]
-        stavka, stavka_soni = Counter(amounts).most_common(1)[0]
+        # Har bir qator aslida BITTA KUNDAGI bir nechta bemorning yig'indisi
+        # bo'lishi mumkin (masalan 3 bemor x 50 000 = 150 000) — shu sababli
+        # "stavka"ni qatorning yig'indisidan emas, BITTA BEMOR-KUNGA to'g'ri
+        # keladigan ulushdan (earned_fee / patient_count) topish kerak.
+        # Aks holda kunlar davomida bemorlar soni o'zgarsa (masalan bir kuni
+        # 3 ta, boshqasida 2 ta bemor yotgan bo'lsa), ikkinchi kun "boshqacha
+        # summa" deb chiqib, xato ravishda alohida "qo'shimcha xizmat"
+        # sifatida ko'rsatilardi — aslida ikkalasi ham bir xil kunlik
+        # stavka, faqat o'sha kuni yotgan bemorlar soni farq qilgan.
+        def _per_patient(d: dict) -> int:
+            cnt = d.get("patient_count") or 1
+            fee = d.get("earned_fee", 0)
+            return round(fee / cnt) if cnt else fee
+
+        per_patient_amounts = [_per_patient(d) for d in inp_lines]
+        stavka, stavka_soni = Counter(per_patient_amounts).most_common(1)[0]
         if stavka_soni >= 2:
-            kunlik_lines = [d for d in inp_lines if d.get("earned_fee", 0) == stavka]
-            qoshimcha_lines = [d for d in inp_lines if d.get("earned_fee", 0) != stavka]
+            kunlik_lines = [d for d, pp in zip(inp_lines, per_patient_amounts) if pp == stavka]
+            qoshimcha_lines = [d for d, pp in zip(inp_lines, per_patient_amounts) if pp != stavka]
         else:
             kunlik_lines = []
             qoshimcha_lines = inp_lines
@@ -1310,7 +1265,7 @@ def _group_staff_inpatient_breakdown(raw_breakdown: list) -> list[dict]:
                 "source": "Shifokor (KPI)",
                 "patient_count": f"{kun_soni} kun",
                 "rate_label": f"{stavka:,} so'm/kun".replace(",", " "),
-                "earned_fee": stavka * kun_soni,
+                "earned_fee": sum(d.get("earned_fee", 0) for d in kunlik_lines),
             })
         for d in qoshimcha_lines:
             grouped.append({
